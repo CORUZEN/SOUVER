@@ -19,6 +19,9 @@ const ROUTE_LABELS: Record<string, string> = {
   '2fa': 'Autenticação de Dois Fatores',
   auditoria: 'Trilha de Auditoria',
   'acesso-negado': 'Acesso Negado',
+  departamentos: 'Departamentos',
+  perfil: 'Meu Perfil',
+  perfis: 'Perfis de Acesso',
   novo: 'Novo',
   editar: 'Editar',
 }

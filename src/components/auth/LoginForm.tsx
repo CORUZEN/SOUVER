@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { Eye, EyeOff, LogIn, Mail } from 'lucide-react'
@@ -123,6 +124,12 @@ export default function LoginForm() {
         <LogIn className="w-4 h-4" />
         {loading ? 'Autenticando...' : 'Entrar'}
       </Button>
+
+      <div className="text-center pt-1">
+        <Link href="/esqueci-senha" className="text-xs text-brand-600 hover:underline">
+          Esqueci minha senha
+        </Link>
+      </div>
     </form>
   )
 }

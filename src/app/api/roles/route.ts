@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
 
   const roles = await prisma.role.findMany({
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, code: true, description: true },
+    select: {
+      id: true, name: true, code: true, description: true,
+      _count: { select: { users: true, rolePermissions: true } },
+    },
   })
 
   return NextResponse.json({ roles })

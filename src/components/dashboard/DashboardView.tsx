@@ -114,7 +114,7 @@ export default function DashboardView() {
             <RefreshCw size={15} className={loadingKpis ? 'animate-spin' : ''} />
           </button>
           <TrendingUp className="w-4 h-4 text-primary-600" />
-          <span className="text-sm text-surface-600 font-medium">Sistema Ouro Verde — Fase 3</span>
+          <span className="text-sm text-surface-600 font-medium">Sistema Ouro Verde — Fase 5</span>
           <Badge variant="success">Online</Badge>
         </div>
       </div>
@@ -139,17 +139,18 @@ export default function DashboardView() {
         ))}
       </div>
 
-      {/* Banner Fase 3 */}
+      {/* Banner Fase 5 */}
       <Card className="border-primary-200 bg-primary-50">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-5 h-5 text-primary-700" />
           </div>
           <div>
-            <h3 className="font-semibold text-primary-900 text-sm">Fase 3 em andamento — Qualidade, RH e Relatórios</h3>
+            <h3 className="font-semibold text-primary-900 text-sm">Fase 5 concluída — Sistema Ouro Verde completo</h3>
             <p className="text-sm text-primary-700 mt-1 leading-relaxed">
-              Módulos de Produção, Logística, Qualidade (NCs e Inspeções), RH e Relatórios ativos.
-              KPIs acima são dados reais do banco de dados.
+              Todos os módulos estão ativos: Produção, Logística, Qualidade, RH, Relatórios,
+              Comunicação Interna, Notificações, Departamentos, Perfis de Acesso e Recuperação de Senha.
+              KPIs refletem dados reais do banco de dados.
             </p>
           </div>
         </div>
@@ -182,11 +183,16 @@ export default function DashboardView() {
                 { label: 'Autenticação + 2FA',               done: true },
                 { label: 'Gestão de Usuários e Perfis',      done: true },
                 { label: 'Trilha de Auditoria',              done: true },
-                { label: 'Produção — Lotes e Apontamentos',  done: true },
+                { label: 'Produção — Lotes e Apontamentos',   done: true },
                 { label: 'Logística — Estoque e Movimentações', done: true },
                 { label: 'Qualidade — NCs e Inspeções',      done: true },
                 { label: 'Recursos Humanos',                 done: true },
-                { label: 'Relatórios e Indicadores',         done: true },
+                { label: 'Relatórios e Indicadores + CSV',   done: true },
+                { label: 'Comunicação Interna (Chat)',        done: true },
+                { label: 'Notificações em tempo real',        done: true },
+                { label: 'Departamentos + CRUD',             done: true },
+                { label: 'Perfis de Acesso (visão)',         done: true },
+                { label: 'Recuperação de Senha',             done: true },
               ].map(({ label, done }, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-sm text-surface-600">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${done ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-400'}`}>

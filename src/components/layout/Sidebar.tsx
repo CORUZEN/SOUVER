@@ -15,6 +15,7 @@ import {
   ClipboardList,
   UserCog,
   ChevronRight,
+  Building2,
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -33,9 +34,10 @@ const NAV_SECTIONS = [
   {
     label: 'Sistema',
     items: [
-      { label: 'Usuários', href: '/usuarios', icon: UserCog },
-      { label: 'Auditoria', href: '/auditoria', icon: ClipboardList },
-      { label: 'Configurações', href: '/configuracoes', icon: Settings },
+      { label: 'Usuários',        href: '/usuarios',       icon: UserCog     },
+      { label: 'Departamentos',   href: '/departamentos',  icon: Building2   },
+      { label: 'Auditoria',       href: '/auditoria',      icon: ClipboardList },
+      { label: 'Configurações',   href: '/configuracoes',  icon: Settings    },
     ],
   },
 ]

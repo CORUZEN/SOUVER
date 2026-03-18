@@ -79,10 +79,28 @@ function SectionHeader({ section }: { section: ReportSection }) {
 }
 
 export default function RelatoriosPage() {
-  const [data, setData]       = useState<KpiData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [active, setActive]   = useState<string>('production')
-  const [period, setPeriod]   = useState('today')
+  const [data, setData]           = useState<KpiData | null>(null)
+  const [loading, setLoading]     = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [active, setActive]       = useState<string>('production')
+  const [period, setPeriod]       = useState('today')
+
+  async function downloadCsv() {
+    setExporting(true)
+    try {
+      const res = await fetch(`/api/reports/export?module=${active}`)
+      if (!res.ok) return
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const cd   = res.headers.get('content-disposition') ?? ''
+      const name = cd.match(/filename="([^"]+)"/)?.[1] ?? `${active}_export.csv`
+      a.href = url
+      a.download = name
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally { setExporting(false) }
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -130,6 +148,14 @@ export default function RelatoriosPage() {
               </select>
               <ChevronDown className="w-3 h-3" />
             </div>
+            <button
+              onClick={downloadCsv}
+              disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 rounded-lg transition-colors"
+            >
+              <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-bounce' : ''}`} />
+              {exporting ? 'Exportando…' : 'CSV'}
+            </button>
             <button
               onClick={fetchData}
               className="p-2 text-surface-400 hover:text-surface-700 border border-surface-200 rounded-lg"
@@ -368,7 +394,7 @@ export default function RelatoriosPage() {
             Dados consolidados em tempo real · Última atualização: {new Date().toLocaleTimeString('pt-BR')}
           </p>
           <p className="text-xs text-surface-300 mt-0.5">
-            Exportação em CSV/XLSX/PDF disponível em breve
+            Clique em <strong>CSV</strong> para exportar os dados da aba selecionada
           </p>
         </div>
       </div>
