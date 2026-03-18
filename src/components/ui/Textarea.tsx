@@ -29,7 +29,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={rows}
           className={cn(
             'w-full rounded-lg border text-sm text-surface-900 placeholder:text-surface-400 bg-white',
-            'px-3 py-2.5 resize-y min-h-[80px]',
+            'px-3 py-2.5 resize-y min-h-20',
             'transition-all duration-150',
             'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
             'disabled:bg-surface-50 disabled:text-surface-400 disabled:cursor-not-allowed',

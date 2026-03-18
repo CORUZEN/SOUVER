@@ -26,6 +26,7 @@ model Department {
 
   users          User[]
   manager        User?    @relation("DepartmentManager", fields: [managerUserId], references: [id])
+  batches        ProductionBatch[]
 
   @@map("departments")
 }
@@ -106,6 +107,10 @@ model User {
   twoFactorCodes       TwoFactorRecoveryCode[]
   auditLogs            AuditLog[]
   notifications        Notification[]
+  createdBatches       ProductionBatch[]         @relation("BatchCreator")
+  createdEvents        ProductionEvent[]         @relation("EventCreator")
+  createdItems         InventoryItem[]           @relation("InventoryCreator")
+  createdMovements     InventoryMovement[]       @relation("MovementCreator")
 
   @@map("users")
 }
@@ -176,6 +181,142 @@ model AuditLog {
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 2 — OPERAÇÃO ESSENCIAL
+// ═══════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// PRODUÇÃO — LOTES
+// ──────────────────────────────────────────────
+model ProductionBatch {
+  id              String              @id @default(cuid())
+  batchCode       String              @unique @map("batch_code")
+  productName     String              @map("product_name")
+  productType     String?             @map("product_type")    // ex: "Café Torrado", "Café Moído"
+  productionLine  String?             @map("production_line") // ex: "Linha A", "Linha B"
+  shift           ProductionShift     @default(MORNING)
+  plannedQty      Decimal?            @map("planned_qty") @db.Decimal(12, 3)
+  producedQty     Decimal?            @default(0) @map("produced_qty") @db.Decimal(12, 3)
+  unit            String              @default("kg")
+  status          ProductionStatus    @default(OPEN)
+  startedAt       DateTime?           @map("started_at")
+  finishedAt      DateTime?           @map("finished_at")
+  notes           String?
+  departmentId    String?             @map("department_id")
+  createdByUserId String              @map("created_by_user_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  department      Department?         @relation(fields: [departmentId], references: [id])
+  createdBy       User                @relation("BatchCreator", fields: [createdByUserId], references: [id])
+  events          ProductionEvent[]
+
+  @@map("production_batches")
+}
+
+enum ProductionStatus {
+  OPEN
+  IN_PROGRESS
+  PAUSED
+  FINISHED
+  CANCELLED
+}
+
+enum ProductionShift {
+  MORNING   // Manhã
+  AFTERNOON // Tarde
+  NIGHT     // Noite
+}
+
+// ──────────────────────────────────────────────
+// PRODUÇÃO — EVENTOS/APONTAMENTOS
+// ──────────────────────────────────────────────
+model ProductionEvent {
+  id          String            @id @default(cuid())
+  batchId     String            @map("batch_id")
+  type        ProductionEventType
+  description String
+  quantity    Decimal?          @db.Decimal(12, 3)
+  unit        String?
+  occurredAt  DateTime          @default(now()) @map("occurred_at")
+  createdById String            @map("created_by_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  batch       ProductionBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdBy   User              @relation("EventCreator", fields: [createdById], references: [id])
+
+  @@map("production_events")
+}
+
+enum ProductionEventType {
+  START      // Início do lote
+  PROGRESS   // Atualização de quantidade produzida
+  PAUSE      // Interrupção/pausa
+  RESUME     // Retomada
+  WASTE      // Descarte/perda
+  FINISH     // Encerramento
+  NOTE       // Observação geral
+}
+
+// ──────────────────────────────────────────────
+// LOGÍSTICA — ITENS DE ESTOQUE
+// ──────────────────────────────────────────────
+model InventoryItem {
+  id              String              @id @default(cuid())
+  sku             String              @unique
+  name            String
+  description     String?
+  category        String?
+  unit            String              @default("kg")
+  currentQty      Decimal             @default(0) @map("current_qty") @db.Decimal(12, 3)
+  minQty          Decimal?            @map("min_qty") @db.Decimal(12, 3)  // alerta de estoque mínimo
+  maxQty          Decimal?            @map("max_qty") @db.Decimal(12, 3)
+  location        String?             // posição no depósito
+  isActive        Boolean             @default(true) @map("is_active")
+  createdByUserId String              @map("created_by_user_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  createdBy       User                @relation("InventoryCreator", fields: [createdByUserId], references: [id])
+  movements       InventoryMovement[]
+
+  @@map("inventory_items")
+}
+
+// ──────────────────────────────────────────────
+// LOGÍSTICA — MOVIMENTAÇÕES
+// ──────────────────────────────────────────────
+model InventoryMovement {
+  id              String              @id @default(cuid())
+  itemId          String              @map("item_id")
+  type            MovementType
+  quantity        Decimal             @db.Decimal(12, 3)
+  unit            String
+  qtyBefore       Decimal             @map("qty_before") @db.Decimal(12, 3)
+  qtyAfter        Decimal             @map("qty_after") @db.Decimal(12, 3)
+  reason          String?
+  batchRef        String?             @map("batch_ref")  // referência ao lote de produção, se aplicável
+  supplier        String?
+  documentRef     String?             @map("document_ref")  // NF, ordem de compra, etc.
+  movedAt         DateTime            @default(now()) @map("moved_at")
+  createdByUserId String              @map("created_by_user_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  item            InventoryItem       @relation(fields: [itemId], references: [id])
+  createdBy       User                @relation("MovementCreator", fields: [createdByUserId], references: [id])
+
+  @@map("inventory_movements")
+}
+
+enum MovementType {
+  ENTRY       // Entrada
+  EXIT        // Saída
+  TRANSFER    // Transferência interna
+  ADJUSTMENT  // Ajuste de inventário
+  RETURN      // Devolução
+  WASTE       // Descarte/perda
 }
 
 // ──────────────────────────────────────────────

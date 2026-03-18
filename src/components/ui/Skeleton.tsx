@@ -48,7 +48,7 @@ export function Spinner({
 // ─── Loading Page ────────────────────────────────────────────
 export function LoadingPage({ label = 'Carregando...' }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[240px] gap-3 text-surface-500">
+    <div className="flex flex-col items-center justify-center min-h-60 gap-3 text-surface-500">
       <Spinner size="lg" />
       <p className="text-sm">{label}</p>
     </div>

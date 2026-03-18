@@ -4,7 +4,7 @@ export default function AuthLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-900 via-surface-800 to-primary-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-surface-900 via-surface-800 to-primary-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logotipo e identidade */}
         <div className="text-center mb-8">
