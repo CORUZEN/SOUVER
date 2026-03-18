@@ -4,7 +4,7 @@
  * - Departamentos
  * - Perfis (Roles)
  * - Permissões
- * - Usuário administrador master padrão
+ * - Usuário Desenvolvedor (administrador geral do sistema)
  *
  * Execute com: npm run db:seed
  */
@@ -44,7 +44,7 @@ async function main() {
   // ── Perfis (Roles) ─────────────────────────────────────────
   console.log('👥 Criando perfis de acesso...')
   const roles = [
-    { name: 'Administrador Master', code: 'ADMIN_MASTER', description: 'Acesso total ao sistema' },
+    { name: 'Desenvolvedor', code: 'DEVELOPER', description: 'Administrador geral do sistema com acesso completo' },
     { name: 'Gestão / Diretoria', code: 'MANAGEMENT', description: 'Acesso gerencial completo' },
     { name: 'Gerente', code: 'MANAGER', description: 'Acesso de gerência por setor' },
     { name: 'Supervisor', code: 'SUPERVISOR', description: 'Supervisão operacional' },
@@ -101,8 +101,8 @@ async function main() {
   console.log(`  ✔ ${permissions.length} permissões criadas\n`)
 
   // ── Associar todas as permissões ao Admin Master ───────────
-  console.log('🔗 Associando permissões ao Administrador Master...')
-  const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN_MASTER' } })
+  console.log('🔗 Associando permissões ao Desenvolvedor...')
+  const adminRole = await prisma.role.findUnique({ where: { code: 'DEVELOPER' } })
   const allPermissions = await prisma.permission.findMany()
 
   if (adminRole) {
@@ -121,7 +121,7 @@ async function main() {
         },
       })
     }
-    console.log(`  ✔ ${allPermissions.length} permissões associadas ao Admin Master\n`)
+    console.log(`  ✔ ${allPermissions.length} permissões associadas ao Desenvolvedor\n`)
   }
 
   // ── Usuário Administrador Padrão ───────────────────────────
@@ -133,7 +133,7 @@ async function main() {
     const passwordHash = await bcrypt.hash('Admin@2026', 12)
     await prisma.user.create({
       data: {
-        fullName: 'Administrador Master',
+        fullName: 'Desenvolvedor',
         email: 'admin@ouroverde.com.br',
         login: 'admin',
         passwordHash,
