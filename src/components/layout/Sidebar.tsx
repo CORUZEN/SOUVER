@@ -12,18 +12,32 @@ import {
   FileBarChart2,
   MessageSquare,
   Settings,
+  ClipboardList,
+  UserCog,
   ChevronRight,
 } from 'lucide-react'
 
-const NAV_ITEMS = [
-  { label: 'Painel Executivo', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Produção', href: '/producao', icon: Factory },
-  { label: 'Logística', href: '/logistica', icon: Truck },
-  { label: 'Qualidade', href: '/qualidade', icon: ShieldCheck },
-  { label: 'Recursos Humanos', href: '/rh', icon: Users },
-  { label: 'Relatórios', href: '/relatorios', icon: FileBarChart2 },
-  { label: 'Comunicação', href: '/comunicacao', icon: MessageSquare },
-  { label: 'Configurações', href: '/configuracoes', icon: Settings },
+const NAV_SECTIONS = [
+  {
+    label: 'Módulos',
+    items: [
+      { label: 'Painel Executivo', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Produção', href: '/producao', icon: Factory },
+      { label: 'Logística', href: '/logistica', icon: Truck },
+      { label: 'Qualidade', href: '/qualidade', icon: ShieldCheck },
+      { label: 'Recursos Humanos', href: '/rh', icon: Users },
+      { label: 'Relatórios', href: '/relatorios', icon: FileBarChart2 },
+      { label: 'Comunicação', href: '/comunicacao', icon: MessageSquare },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { label: 'Usuários', href: '/usuarios', icon: UserCog },
+      { label: 'Auditoria', href: '/auditoria', icon: ClipboardList },
+      { label: 'Configurações', href: '/configuracoes', icon: Settings },
+    ],
+  },
 ]
 
 export default function Sidebar() {
@@ -57,29 +71,37 @@ export default function Sidebar() {
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                'group relative',
-                active
-                  ? 'bg-primary-600 text-white'
-                  : 'text-surface-400 hover:bg-surface-800 hover:text-white'
-              )}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="flex-1 truncate">{label}</span>
-              {active && (
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              )}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        {NAV_SECTIONS.map(({ label, items }) => (
+          <div key={label}>
+            <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">
+              {label}
+            </p>
+            <div className="space-y-0.5">
+              {items.map(({ label: itemLabel, href, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(href + '/')
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                      active
+                        ? 'bg-primary-600 text-white'
+                        : 'text-surface-400 hover:bg-surface-800 hover:text-white'
+                    )}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="flex-1 truncate">{itemLabel}</span>
+                    {active && (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Rodapé */}

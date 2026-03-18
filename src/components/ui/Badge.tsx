@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import { HTMLAttributes } from 'react'
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'gold'
+  variant?: 'default' | 'secondary' | 'success' | 'warning' | 'error' | 'info' | 'gold'
   size?: 'sm' | 'md'
 }
 
@@ -15,6 +15,7 @@ export default function Badge({
 }: BadgeProps) {
   const variants = {
     default: 'bg-surface-100 text-surface-700',
+    secondary: 'bg-surface-100 text-surface-600 border border-surface-200',
     success: 'bg-green-100 text-green-800',
     warning: 'bg-yellow-100 text-yellow-800',
     error: 'bg-red-100 text-red-800',

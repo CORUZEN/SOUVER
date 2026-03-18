@@ -43,6 +43,42 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // ── Bloqueio progressivo ──────────────────────────────────
+    const MAX_ATTEMPTS = 5
+    const LOCK_DURATION_MS = 30 * 60 * 1000 // 30 min
+
+    const recentFailures = await prisma.auditLog.findMany({
+      where: {
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        createdAt: { gte: new Date(Date.now() - LOCK_DURATION_MS) },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_ATTEMPTS + 1,
+    })
+
+    if (recentFailures.length >= MAX_ATTEMPTS) {
+      const lastFail = recentFailures[0]
+      const unlockAt = new Date(lastFail.createdAt.getTime() + LOCK_DURATION_MS)
+      if (unlockAt > new Date()) {
+        await auditLog({
+          userId: user.id,
+          module: 'auth',
+          action: 'LOGIN_BLOCKED',
+          description: `Login bloqueado por excesso de tentativas. Desbloqueio às ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+          ipAddress: ip,
+          userAgent,
+        })
+        return NextResponse.json(
+          {
+            message: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente às ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+          },
+          { status: 429 }
+        )
+      }
+    }
+    // ─────────────────────────────────────────────────────────
+
     const passwordValid = await verifyPassword(password, user.passwordHash)
     if (!passwordValid) {
       await auditLog({

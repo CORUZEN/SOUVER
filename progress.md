@@ -87,11 +87,11 @@ FASE 5 ──── Expansão e Consolidação
 | 1.2.3 | Criação dos tokens de design (cores, espaçamentos, tipografia, bordas) | 🟢 Concluído |
 | 1.2.4 | Componente: Button (todos os estados) | 🟢 Concluído |
 | 1.2.5 | Componente: Input, Select, Textarea (todos os estados) | 🟢 Concluído |
-| 1.2.6 | Componente: Modal | 🔴 Pendente |
-| 1.2.7 | Componente: Table (com paginação, ordenação, filtro e estado vazio) | 🔴 Pendente |
+| 1.2.6 | Componente: Modal | � Concluído |
+| 1.2.7 | Componente: Table (com paginação, ordenação, filtro e estado vazio) | 🟢 Concluído |
 | 1.2.8 | Componente: Card, Badge, Alert, Toast | 🟢 Concluído |
 | 1.2.9 | Componente: Menu lateral (sidebar), Cabeçalho e Breadcrumb | 🟢 Concluído |
-| 1.2.10 | Componente: Loading, Skeleton, Estado de Erro e Estado Vazio | 🔴 Pendente |
+| 1.2.10 | Componente: Loading, Skeleton, Estado de Erro e Estado Vazio | 🟢 Concluído |
 | 1.2.11 | Responsividade base (desktop, tablet, mobile) | 🟢 Concluído |
 | 1.2.12 | Acessibilidade mínima (contraste, foco, labels, navegação lógica) | 🟢 Concluído |
 
@@ -123,9 +123,9 @@ FASE 5 ──── Expansão e Consolidação
 | 1.4.3 | Geração e validação de tokens de sessão seguros (jose/JWT) | 🟢 Concluído |
 | 1.4.4 | Proteção de rotas (middleware de autenticação Edge) | 🟢 Concluído |
 | 1.4.5 | Controle de expiração e renovação de sessão por perfil | 🟢 Concluído |
-| 1.4.6 | Bloqueio progressivo por tentativas inválidas | 🔴 Pendente |
-| 1.4.7 | Implementação de 2FA via TOTP (QR Code + app autenticador) | 🔴 Pendente |
-| 1.4.8 | Geração e controle de códigos de backup para 2FA | 🔴 Pendente |
+| 1.4.6 | Bloqueio progressivo por tentativas inválidas | � Concluído |
+| 1.4.7 | Implementação de 2FA via TOTP (QR Code + app autenticador) | 🟢 Concluído |
+| 1.4.8 | Geração e controle de códigos de backup para 2FA | 🟢 Concluído |
 | 1.4.9 | Fluxo de recuperação de senha seguro | 🔴 Pendente |
 | 1.4.10 | Rastreio de login: data, hora, IP, navegador e dispositivo | 🟢 Concluído |
 | 1.4.11 | Gerenciamento de sessões ativas e logout remoto | 🟢 Concluído |
@@ -140,15 +140,15 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.5.1 | CRUD completo de usuários (criação, edição, desativação) | 🔴 Pendente |
-| 1.5.2 | Associação de usuário a departamento e perfil | � Concluído |
+| 1.5.1 | CRUD completo de usuários (criação, edição, desativação) | 🟢 Concluído |
+| 1.5.2 | Associação de usuário a departamento e perfil | 🟢 Concluído |
 | 1.5.3 | Criação e gestão de perfis de acesso (roles) | 🟢 Concluído |
 | 1.5.4 | Mapeamento de permissões por módulo e ação | 🟢 Concluído |
 | 1.5.5 | Controle granular: leitura, criação, edição, exclusão, aprovação, exportação | 🟢 Concluído |
 | 1.5.6 | Middleware de autorização por permissão em toda API | 🟢 Concluído |
 | 1.5.7 | Interface de gestão de permissões para administrador | 🔴 Pendente |
 | 1.5.8 | 12 Perfis padrão iniciais criados via seed | 🟢 Concluído |
-| 1.5.9 | Listagem, filtragem e busca de usuários | 🔴 Pendente |
+| 1.5.9 | Listagem, filtragem e busca de usuários | 🟢 Concluído |
 | 1.5.10 | Visualização de perfil individual e histórico de acesso | 🔴 Pendente |
 
 ---
@@ -159,10 +159,10 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 1.6.1 | Layout principal da aplicação (sidebar + header + área de conteúdo) | � Concluído |
 | 1.6.2 | Menu lateral com navegação por módulo e permissão | 🟢 Concluído |
-| 1.6.3 | Área de perfil e acesso rápido no cabeçalho | 🟡 Em andamento |
-| 1.6.4 | Breadcrumb dinâmico por rota | 🔴 Pendente |
+| 1.6.3 | Área de perfil e acesso rápido no cabeçalho | � Concluído |
+| 1.6.4 | Breadcrumb dinâmico por rota | 🟢 Concluído |
 | 1.6.5 | Sistema de notificações no topo (badge + painel) | 🔴 Pendente |
-| 1.6.6 | Página de erro 404, 403 e falha geral (tratamento visual) | 🔴 Pendente |
+| 1.6.6 | Página de erro 404, 403 e falha geral (tratamento visual) | 🟢 Concluído |
 | 1.6.7 | Adaptação responsiva do layout para mobile e tablet | 🟢 Concluído |
 
 ---
@@ -187,7 +187,7 @@ FASE 5 ──── Expansão e Consolidação
 | 1.8.1 | Serviço centralizado de auditoria | � Concluído |
 | 1.8.2 | Registro automático de: usuário, data, hora, módulo, ação, entidade, IP | 🟢 Concluído |
 | 1.8.3 | Captura de old_data e new_data em alterações | 🟢 Concluído |
-| 1.8.4 | Interface de consulta da trilha de auditoria (com filtros por módulo, usuário, período) | 🔴 Pendente |
+| 1.8.4 | Interface de consulta da trilha de auditoria (com filtros por módulo, usuário, período) | � Concluído |
 | 1.8.5 | Logs estruturados de sistema (erros, eventos críticos, integrações) | 🟢 Concluído |
 
 ---
