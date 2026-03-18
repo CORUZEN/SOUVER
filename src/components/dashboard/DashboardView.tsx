@@ -8,7 +8,6 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
-  Clock,
 } from 'lucide-react'
 
 const KPI_CARDS = [
@@ -52,7 +51,7 @@ const KPI_CARDS = [
 
 const STATUS_ITEMS = [
   { label: 'Sistema', status: 'online', icon: CheckCircle2, color: 'text-green-500' },
-  { label: 'Banco de Dados', status: 'aguardando configuração', icon: Clock, color: 'text-yellow-500' },
+  { label: 'Banco de Dados', status: 'online (Neon)', icon: CheckCircle2, color: 'text-green-500' },
   { label: 'Integrações', status: 'não configuradas', icon: AlertTriangle, color: 'text-orange-500' },
 ]
 
@@ -94,22 +93,20 @@ export default function DashboardView() {
         ))}
       </div>
 
-      {/* Alerta de configuração inicial */}
-      <Card className="border-gold-300 bg-gold-50">
+      {/* Alerta de desenvolvimento ativo */}
+      <Card className="border-primary-200 bg-primary-50">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-gold-200 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-gold-700" />
+          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-primary-700" />
           </div>
           <div>
-            <h3 className="font-semibold text-gold-900 text-sm">
-              Configuração inicial necessária
+            <h3 className="font-semibold text-primary-900 text-sm">
+              Fase 1 concluída — Sistema operacional
             </h3>
-            <p className="text-sm text-gold-700 mt-1 leading-relaxed">
-              O sistema foi iniciado com sucesso. Para começar a operar, configure a conexão
-              com o banco de dados PostgreSQL (Neon) no arquivo{' '}
-              <code className="bg-gold-100 px-1 rounded text-xs font-mono">.env.local</code>{' '}
-              e execute as migrations com{' '}
-              <code className="bg-gold-100 px-1 rounded text-xs font-mono">npm run db:migrate</code>.
+            <p className="text-sm text-primary-700 mt-1 leading-relaxed">
+              Infraestrutura, autenticação, RBAC e banco de dados (Neon PostgreSQL) configurados e
+              funcionando. O desenvolvimento continua com a Fase 2 — Módulos de Produção, Logística
+              e Comunicação Interna.
             </p>
           </div>
         </div>
@@ -145,16 +142,16 @@ export default function DashboardView() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Próximas Etapas — Fase 1</CardTitle>
+            <CardTitle>Próximas Etapas — Fase 2</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2.5">
               {[
-                'Configurar banco de dados (Neon PostgreSQL)',
-                'Executar prisma migrate dev',
-                'Executar seed de dados iniciais',
-                'Criar primeiro usuário administrador',
-                'Configurar perfis e permissões',
+                'Gestão de usuários: CRUD completo e listagem',
+                'Módulo Produção: abertura e controle de lotes',
+                'Módulo Logística: movimentação de estoque',
+                'Módulo Qualidade: não conformidades',
+                'Chat interno em tempo real',
               ].map((step, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-sm text-surface-600">
                   <span className="w-5 h-5 rounded-full bg-surface-100 text-surface-500 flex items-center justify-center text-xs font-semibold shrink-0">

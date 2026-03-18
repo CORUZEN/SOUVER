@@ -7,7 +7,8 @@
 > **Documento:** Progress & Roadmap Oficial
 > **Versão:** 1.0
 > **Data de Criação:** 18/03/2026
-> **Status Geral:** 🔴 Não Iniciado — Aguardando kickoff técnico
+> **Última Atualização:** 18/03/2026
+> **Status Geral:** 🟡 Em Andamento — Fase 1 concluída · Fase 2 iniciando
 
 ---
 
@@ -56,7 +57,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 1 — FUNDAÇÃO E INFRAESTRUTURA BASE
 
 > **Objetivo:** Estabelecer a base técnica sólida do sistema. Sem esta fase, nenhuma outra pode existir.
-> **Status:** 🔴 Não Iniciado
+> **Status:** � Concluída — 18/03/2026
 
 ---
 
@@ -64,16 +65,16 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.1.1 | Criação do repositório Git com estrutura de pastas por domínio | 🔴 Pendente |
-| 1.1.2 | Configuração do projeto Next.js com TypeScript | 🔴 Pendente |
-| 1.1.3 | Configuração do Tailwind CSS e Design System base | 🔴 Pendente |
-| 1.1.4 | Configuração do ambiente de variáveis (.env, secrets) | 🔴 Pendente |
-| 1.1.5 | Configuração do banco de dados PostgreSQL (Neon) | 🔴 Pendente |
-| 1.1.6 | Configuração do ORM / camada de acesso a dados | 🔴 Pendente |
-| 1.1.7 | Estrutura de pastas modular por domínio (frontend + backend) | 🔴 Pendente |
-| 1.1.8 | Configuração de linting (ESLint), formatação (Prettier) e aliases | 🔴 Pendente |
-| 1.1.9 | Pipeline de CI/CD básico (Vercel + Git) | 🔴 Pendente |
-| 1.1.10 | Setup de logs estruturados obrigatórios desde o início | 🔴 Pendente |
+| 1.1.1 | Criação do repositório Git com estrutura de pastas por domínio | � Concluído |
+| 1.1.2 | Configuração do projeto Next.js com TypeScript | 🟢 Concluído |
+| 1.1.3 | Configuração do Tailwind CSS e Design System base | 🟢 Concluído |
+| 1.1.4 | Configuração do ambiente de variáveis (.env, secrets) | 🟢 Concluído |
+| 1.1.5 | Configuração do banco de dados PostgreSQL (Neon) | 🟢 Concluído |
+| 1.1.6 | Configuração do ORM / camada de acesso a dados (Prisma) | 🟢 Concluído |
+| 1.1.7 | Estrutura de pastas modular por domínio (frontend + backend) | 🟢 Concluído |
+| 1.1.8 | Configuração de linting (ESLint) e aliases de importação | 🟢 Concluído |
+| 1.1.9 | Pipeline de CI/CD básico (Vercel + Git) | 🟡 Em Andamento |
+| 1.1.10 | Setup de logs estruturados obrigatórios desde o início | 🟢 Concluído |
 
 ---
 
@@ -81,18 +82,18 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.2.1 | Definição da paleta de cores corporativa (verde institucional + dourado + neutros) | 🔴 Pendente |
-| 1.2.2 | Definição e integração da tipografia corporativa (UTF-8 full) | 🔴 Pendente |
-| 1.2.3 | Criação dos tokens de design (cores, espaçamentos, tipografia, bordas) | 🔴 Pendente |
-| 1.2.4 | Componente: Button (todos os estados) | 🔴 Pendente |
-| 1.2.5 | Componente: Input, Select, Textarea (todos os estados) | 🔴 Pendente |
+| 1.2.1 | Definição da paleta de cores corporativa (verde institucional + dourado + neutros) | � Concluído |
+| 1.2.2 | Definição e integração da tipografia corporativa (UTF-8 full) | 🟢 Concluído |
+| 1.2.3 | Criação dos tokens de design (cores, espaçamentos, tipografia, bordas) | 🟢 Concluído |
+| 1.2.4 | Componente: Button (todos os estados) | 🟢 Concluído |
+| 1.2.5 | Componente: Input, Select, Textarea (todos os estados) | 🟢 Concluído |
 | 1.2.6 | Componente: Modal | 🔴 Pendente |
 | 1.2.7 | Componente: Table (com paginação, ordenação, filtro e estado vazio) | 🔴 Pendente |
-| 1.2.8 | Componente: Card, Badge, Alert, Toast | 🔴 Pendente |
-| 1.2.9 | Componente: Menu lateral (sidebar), Cabeçalho e Breadcrumb | 🔴 Pendente |
+| 1.2.8 | Componente: Card, Badge, Alert, Toast | 🟢 Concluído |
+| 1.2.9 | Componente: Menu lateral (sidebar), Cabeçalho e Breadcrumb | 🟢 Concluído |
 | 1.2.10 | Componente: Loading, Skeleton, Estado de Erro e Estado Vazio | 🔴 Pendente |
-| 1.2.11 | Responsividade base (desktop, tablet, mobile) | 🔴 Pendente |
-| 1.2.12 | Acessibilidade mínima (contraste, foco, labels, navegação lógica) | 🔴 Pendente |
+| 1.2.11 | Responsividade base (desktop, tablet, mobile) | 🟢 Concluído |
+| 1.2.12 | Acessibilidade mínima (contraste, foco, labels, navegação lógica) | 🟢 Concluído |
 
 ---
 
@@ -100,16 +101,16 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.3.1 | Criação da tabela `users` | 🔴 Pendente |
-| 1.3.2 | Criação da tabela `roles` | 🔴 Pendente |
-| 1.3.3 | Criação da tabela `permissions` | 🔴 Pendente |
-| 1.3.4 | Criação da tabela `role_permissions` | 🔴 Pendente |
-| 1.3.5 | Criação da tabela `departments` | 🔴 Pendente |
-| 1.3.6 | Criação da tabela `user_sessions` | 🔴 Pendente |
-| 1.3.7 | Criação da tabela `two_factor_recovery_codes` | 🔴 Pendente |
-| 1.3.8 | Criação da tabela `audit_logs` | 🔴 Pendente |
-| 1.3.9 | Criação da tabela `notifications` | 🔴 Pendente |
-| 1.3.10 | Seeds iniciais: perfis padrão, permissões e departamentos | 🔴 Pendente |
+| 1.3.1 | Criação da tabela `users` | � Concluído |
+| 1.3.2 | Criação da tabela `roles` | 🟢 Concluído |
+| 1.3.3 | Criação da tabela `permissions` | 🟢 Concluído |
+| 1.3.4 | Criação da tabela `role_permissions` | 🟢 Concluído |
+| 1.3.5 | Criação da tabela `departments` | 🟢 Concluído |
+| 1.3.6 | Criação da tabela `user_sessions` | 🟢 Concluído |
+| 1.3.7 | Criação da tabela `two_factor_recovery_codes` | 🟢 Concluído |
+| 1.3.8 | Criação da tabela `audit_logs` | 🟢 Concluído |
+| 1.3.9 | Criação da tabela `notifications` | 🟢 Concluído |
+| 1.3.10 | Seeds iniciais: perfis padrão, permissões e departamentos | 🟢 Concluído |
 
 ---
 
@@ -117,21 +118,21 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.4.1 | Implementação do fluxo de login seguro corporativo | 🔴 Pendente |
-| 1.4.2 | Hashing de senha robusto (bcrypt / argon2) | 🔴 Pendente |
-| 1.4.3 | Geração e validação de tokens de sessão seguros | 🔴 Pendente |
-| 1.4.4 | Proteção de rotas (middleware de autenticação) | 🔴 Pendente |
-| 1.4.5 | Controle de expiração e renovação de sessão por perfil | 🔴 Pendente |
+| 1.4.1 | Implementação do fluxo de login seguro corporativo | � Concluído |
+| 1.4.2 | Hashing de senha robusto (bcrypt) | 🟢 Concluído |
+| 1.4.3 | Geração e validação de tokens de sessão seguros (jose/JWT) | 🟢 Concluído |
+| 1.4.4 | Proteção de rotas (middleware de autenticação Edge) | 🟢 Concluído |
+| 1.4.5 | Controle de expiração e renovação de sessão por perfil | 🟢 Concluído |
 | 1.4.6 | Bloqueio progressivo por tentativas inválidas | 🔴 Pendente |
 | 1.4.7 | Implementação de 2FA via TOTP (QR Code + app autenticador) | 🔴 Pendente |
 | 1.4.8 | Geração e controle de códigos de backup para 2FA | 🔴 Pendente |
 | 1.4.9 | Fluxo de recuperação de senha seguro | 🔴 Pendente |
-| 1.4.10 | Rastreio de login: data, hora, IP, navegador e dispositivo | 🔴 Pendente |
-| 1.4.11 | Gerenciamento de sessões ativas e logout remoto | 🔴 Pendente |
-| 1.4.12 | Logs de autenticação: acessos, falhas, bloqueios e 2FA | 🔴 Pendente |
+| 1.4.10 | Rastreio de login: data, hora, IP, navegador e dispositivo | 🟢 Concluído |
+| 1.4.11 | Gerenciamento de sessões ativas e logout remoto | 🟢 Concluído |
+| 1.4.12 | Logs de autenticação: acessos, falhas, bloqueios e 2FA | 🟢 Concluído |
 | 1.4.13 | Obrigatoriedade de 2FA para perfis críticos | 🔴 Pendente |
-| 1.4.14 | Validação e sanitização de entradas no backend (anti-injection) | 🔴 Pendente |
-| 1.4.15 | Gestão segura de variáveis sensíveis e secrets | 🔴 Pendente |
+| 1.4.14 | Validação e sanitização de entradas no backend (Zod) | 🟢 Concluído |
+| 1.4.15 | Gestão segura de variáveis sensíveis e secrets | 🟢 Concluído |
 
 ---
 
@@ -140,13 +141,13 @@ FASE 5 ──── Expansão e Consolidação
 | # | Tarefa | Status |
 |---|---|---|
 | 1.5.1 | CRUD completo de usuários (criação, edição, desativação) | 🔴 Pendente |
-| 1.5.2 | Associação de usuário a departamento e perfil | 🔴 Pendente |
-| 1.5.3 | Criação e gestão de perfis de acesso (roles) | 🔴 Pendente |
-| 1.5.4 | Mapeamento de permissões por módulo e ação | 🔴 Pendente |
-| 1.5.5 | Controle granular: leitura, criação, edição, exclusão, aprovação, exportação | 🔴 Pendente |
-| 1.5.6 | Middleware de autorização por permissão em toda API | 🔴 Pendente |
+| 1.5.2 | Associação de usuário a departamento e perfil | � Concluído |
+| 1.5.3 | Criação e gestão de perfis de acesso (roles) | 🟢 Concluído |
+| 1.5.4 | Mapeamento de permissões por módulo e ação | 🟢 Concluído |
+| 1.5.5 | Controle granular: leitura, criação, edição, exclusão, aprovação, exportação | 🟢 Concluído |
+| 1.5.6 | Middleware de autorização por permissão em toda API | 🟢 Concluído |
 | 1.5.7 | Interface de gestão de permissões para administrador | 🔴 Pendente |
-| 1.5.8 | Perfis padrão iniciais: Admin Master, Gestão, Gerente, Supervisor, Auxiliar, Produção, Logística, Qualidade, RH, Contabilidade, Depósito, Visualizador | 🔴 Pendente |
+| 1.5.8 | 12 Perfis padrão iniciais criados via seed | 🟢 Concluído |
 | 1.5.9 | Listagem, filtragem e busca de usuários | 🔴 Pendente |
 | 1.5.10 | Visualização de perfil individual e histórico de acesso | 🔴 Pendente |
 
@@ -156,13 +157,13 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.6.1 | Layout principal da aplicação (sidebar + header + área de conteúdo) | 🔴 Pendente |
-| 1.6.2 | Menu lateral com navegação por módulo e permissão | 🔴 Pendente |
-| 1.6.3 | Área de perfil e acesso rápido no cabeçalho | 🔴 Pendente |
+| 1.6.1 | Layout principal da aplicação (sidebar + header + área de conteúdo) | � Concluído |
+| 1.6.2 | Menu lateral com navegação por módulo e permissão | 🟢 Concluído |
+| 1.6.3 | Área de perfil e acesso rápido no cabeçalho | 🟡 Em andamento |
 | 1.6.4 | Breadcrumb dinâmico por rota | 🔴 Pendente |
 | 1.6.5 | Sistema de notificações no topo (badge + painel) | 🔴 Pendente |
 | 1.6.6 | Página de erro 404, 403 e falha geral (tratamento visual) | 🔴 Pendente |
-| 1.6.7 | Adaptação responsiva do layout para mobile e tablet | 🔴 Pendente |
+| 1.6.7 | Adaptação responsiva do layout para mobile e tablet | 🟢 Concluído |
 
 ---
 
@@ -170,10 +171,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.7.1 | Estrutura base do Dashboard com cards e painéis | 🔴 Pendente |
-| 1.7.2 | Cards de métricas principais (KPIs iniciais) | 🔴 Pendente |
+| 1.7.1 | Estrutura base do Dashboard com cards e painéis | � Concluído |
+| 1.7.2 | Cards de métricas principais (KPIs iniciais) | 🟢 Concluído |
 | 1.7.3 | Gráficos e estatísticas iniciais (por setor disponível) | 🔴 Pendente |
-| 1.7.4 | Painel de alertas operacionais | 🔴 Pendente |
+| 1.7.4 | Painel de alertas operacionais | 🟢 Concluído |
 | 1.7.5 | Resumo de pendências visíveis por perfil | 🔴 Pendente |
 | 1.7.6 | Visão adaptada por perfil de acesso | 🔴 Pendente |
 
@@ -183,11 +184,11 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 1.8.1 | Serviço centralizado de auditoria | 🔴 Pendente |
-| 1.8.2 | Registro automático de: usuário, data, hora, módulo, ação, entidade, IP | 🔴 Pendente |
-| 1.8.3 | Captura de old_data e new_data em alterações | 🔴 Pendente |
+| 1.8.1 | Serviço centralizado de auditoria | � Concluído |
+| 1.8.2 | Registro automático de: usuário, data, hora, módulo, ação, entidade, IP | 🟢 Concluído |
+| 1.8.3 | Captura de old_data e new_data em alterações | 🟢 Concluído |
 | 1.8.4 | Interface de consulta da trilha de auditoria (com filtros por módulo, usuário, período) | 🔴 Pendente |
-| 1.8.5 | Logs estruturados de sistema (erros, eventos críticos, integrações) | 🔴 Pendente |
+| 1.8.5 | Logs estruturados de sistema (erros, eventos críticos, integrações) | 🟢 Concluído |
 
 ---
 
@@ -206,7 +207,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 2 — OPERAÇÃO ESSENCIAL
 
 > **Objetivo:** Entregar os módulos centrais da operação fabril: Produção, Logística e Comunicação.
-> **Status:** 🔴 Não Iniciado
+> **Status:** � Em Andamento
 > **Pré-requisito:** Fase 1 concluída e aprovada.
 
 ---

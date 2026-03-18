@@ -17,10 +17,11 @@ export async function GET(req: NextRequest) {
       authenticated: true,
       user: {
         id: user.id,
-        fullName: user.fullName,
+        name: user.fullName,
         email: user.email,
         login: user.login,
-        role: user.role?.code,
+        role: user.role?.name ?? user.role?.code ?? 'Usuário',
+        roleCode: user.role?.code,
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
       },
