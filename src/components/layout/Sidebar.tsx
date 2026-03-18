@@ -16,6 +16,7 @@ import {
   UserCog,
   ChevronRight,
   Building2,
+  Plug,
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -29,6 +30,7 @@ const NAV_SECTIONS = [
       { label: 'Recursos Humanos', href: '/rh', icon: Users },
       { label: 'Relatórios', href: '/relatorios', icon: FileBarChart2 },
       { label: 'Comunicação', href: '/comunicacao', icon: MessageSquare },
+      { label: 'Integrações', href: '/integracoes', icon: Plug },
     ],
   },
   {

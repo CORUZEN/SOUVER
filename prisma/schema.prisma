@@ -510,3 +510,55 @@ enum MessageType {
   TEXT
   SYSTEM  // mensagem de sistema (ex: "usuário entrou")
 }
+
+// ═══════════════════════════════════════════════════════════
+// FASE 6 — INTEGRAÇÕES EXTERNAS
+// ═══════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// INTEGRAÇÕES
+// ──────────────────────────────────────────────
+model Integration {
+  id               String            @id @default(cuid())
+  name             String
+  provider         String            // sankhya, erp, api_custom, etc.
+  description      String?
+  status           IntegrationStatus @default(INACTIVE)
+  baseUrl          String?           @map("base_url")
+  configEncrypted  String?           @map("config_encrypted")
+  lastSyncAt       DateTime?         @map("last_sync_at")
+  lastSyncStatus   String?           @map("last_sync_status")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  logs             IntegrationLog[]
+
+  @@map("integrations")
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  PENDING
+}
+
+// ──────────────────────────────────────────────
+// LOGS DE INTEGRAÇÃO
+// ──────────────────────────────────────────────
+model IntegrationLog {
+  id              String      @id @default(cuid())
+  integrationId   String      @map("integration_id")
+  eventType       String      @map("event_type")   // SYNC, TEST, ERROR, IMPORT, EXPORT
+  status          String                            // success, error, partial
+  message         String?
+  requestPayload  Json?       @map("request_payload")
+  responsePayload Json?       @map("response_payload")
+  durationMs      Int?        @map("duration_ms")
+  recordsAffected Int?        @map("records_affected")
+  executedAt      DateTime    @default(now()) @map("executed_at")
+
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("integration_logs")
+}

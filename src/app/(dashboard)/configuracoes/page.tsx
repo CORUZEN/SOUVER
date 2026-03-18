@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Settings, ShieldCheck, Users, KeyRound, User } from 'lucide-react'
+import { Settings, ShieldCheck, Users, KeyRound, User, Monitor, Plug } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 const SETTINGS_CARDS = [
@@ -30,7 +30,16 @@ const SETTINGS_CARDS = [
     href: '/configuracoes/perfis',
     color: 'text-purple-600',
     bg: 'bg-purple-50',
-    available: false,
+    available: true,
+  },
+  {
+    icon: Monitor,
+    title: 'Sessões Ativas',
+    description: 'Visualize e encerre sessões ativas em outros dispositivos.',
+    href: '/configuracoes/sessoes',
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+    available: true,
   },
   {
     icon: ShieldCheck,
@@ -39,6 +48,15 @@ const SETTINGS_CARDS = [
     href: '/auditoria',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
+    available: true,
+  },
+  {
+    icon: Plug,
+    title: 'Integrações',
+    description: 'Gerencie integrações com Sankhya e outros sistemas externos.',
+    href: '/integracoes',
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
     available: true,
   },
 ]
