@@ -12,7 +12,7 @@ const SETTINGS_CARDS = [
     href: '/configuracoes/perfil',
     color: 'text-primary-600',
     bg: 'bg-primary-50',
-    available: false,
+    available: true,
   },
   {
     icon: KeyRound,

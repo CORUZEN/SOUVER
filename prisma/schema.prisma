@@ -28,6 +28,7 @@ model Department {
   manager        User?    @relation("DepartmentManager", fields: [managerUserId], references: [id])
   batches        ProductionBatch[]
   nonConformances NonConformance[]
+  conversations  Conversation[]
 
   @@map("departments")
 }
@@ -115,6 +116,9 @@ model User {
   qualityInspections   QualityRecord[]           @relation("QualityInspector")
   openedNCs            NonConformance[]          @relation("NCOpener")
   assignedNCs          NonConformance[]          @relation("NCAssignee")
+  createdConversations Conversation[]            @relation("ConversationCreator")
+  conversationParticipations ConversationParticipant[]
+  sentMessages         Message[]                 @relation("MessageSender")
 
   @@map("users")
 }
@@ -417,4 +421,75 @@ enum NCStatus {
   IN_TREATMENT
   RESOLVED
   CLOSED
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 4 — COMUNICAÇÃO INTERNA
+// ═══════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// CONVERSAS
+// ──────────────────────────────────────────────
+model Conversation {
+  id            String           @id @default(cuid())
+  type          ConversationType @default(DIRECT)
+  name          String?          // usado em grupos/setores
+  departmentId  String?          @map("department_id")
+  createdById   String           @map("created_by_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  department    Department?      @relation(fields: [departmentId], references: [id])
+  createdBy     User             @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@map("conversations")
+}
+
+enum ConversationType {
+  DIRECT  // entre dois usuários
+  GROUP   // grupo manual
+  DEPARTMENT // canal de setor
+}
+
+// ──────────────────────────────────────────────
+// PARTICIPANTES DAS CONVERSAS
+// ──────────────────────────────────────────────
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  userId         String       @map("user_id")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  lastReadAt     DateTime?    @map("last_read_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// ──────────────────────────────────────────────
+// MENSAGENS
+// ──────────────────────────────────────────────
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
+  content        String
+  messageType    MessageType  @default(TEXT)
+  editedAt       DateTime?    @map("edited_at")
+  deletedAt      DateTime?    @map("deleted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM  // mensagem de sistema (ex: "usuário entrou")
 }
