@@ -27,6 +27,7 @@ model Department {
   users          User[]
   manager        User?    @relation("DepartmentManager", fields: [managerUserId], references: [id])
   batches        ProductionBatch[]
+  nonConformances NonConformance[]
 
   @@map("departments")
 }
@@ -111,6 +112,9 @@ model User {
   createdEvents        ProductionEvent[]         @relation("EventCreator")
   createdItems         InventoryItem[]           @relation("InventoryCreator")
   createdMovements     InventoryMovement[]       @relation("MovementCreator")
+  qualityInspections   QualityRecord[]           @relation("QualityInspector")
+  openedNCs            NonConformance[]          @relation("NCOpener")
+  assignedNCs          NonConformance[]          @relation("NCAssignee")
 
   @@map("users")
 }
@@ -212,6 +216,8 @@ model ProductionBatch {
   department      Department?         @relation(fields: [departmentId], references: [id])
   createdBy       User                @relation("BatchCreator", fields: [createdByUserId], references: [id])
   events          ProductionEvent[]
+  qualityRecords  QualityRecord[]
+  nonConformances NonConformance[]
 
   @@map("production_batches")
 }
@@ -335,4 +341,80 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 3 — QUALIDADE
+// ═══════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// QUALIDADE — REGISTROS DE INSPEÇÃO
+// ──────────────────────────────────────────────
+model QualityRecord {
+  id              String            @id @default(cuid())
+  batchId         String?           @map("batch_id")
+  inspectionType  String            @map("inspection_type") // ex: "Físico-Química", "Sensorial", "Visual"
+  result          InspectionResult  @default(PENDING)
+  notes           String?
+  inspectedById   String            @map("inspected_by_id")
+  inspectedAt     DateTime          @default(now()) @map("inspected_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  batch           ProductionBatch?  @relation(fields: [batchId], references: [id])
+  inspectedBy     User              @relation("QualityInspector", fields: [inspectedById], references: [id])
+  nonConformances NonConformance[]
+
+  @@map("quality_records")
+}
+
+enum InspectionResult {
+  PENDING
+  APPROVED
+  CONDITIONAL
+  REJECTED
+}
+
+// ──────────────────────────────────────────────
+// QUALIDADE — NÃO CONFORMIDADES
+// ──────────────────────────────────────────────
+model NonConformance {
+  id              String      @id @default(cuid())
+  title           String
+  description     String
+  severity        NCSeverity  @default(MEDIUM)
+  status          NCStatus    @default(OPEN)
+  batchId         String?     @map("batch_id")
+  departmentId    String?     @map("department_id")
+  qualityRecordId String?     @map("quality_record_id")
+  openedById      String      @map("opened_by_id")
+  assignedToId    String?     @map("assigned_to_id")
+  openedAt        DateTime    @default(now()) @map("opened_at")
+  resolvedAt      DateTime?   @map("resolved_at")
+  closedAt        DateTime?   @map("closed_at")
+  resolution      String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  batch           ProductionBatch?  @relation(fields: [batchId], references: [id])
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  qualityRecord   QualityRecord?    @relation(fields: [qualityRecordId], references: [id])
+  openedBy        User              @relation("NCOpener", fields: [openedById], references: [id])
+  assignedTo      User?             @relation("NCAssignee", fields: [assignedToId], references: [id])
+
+  @@map("non_conformances")
+}
+
+enum NCSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NCStatus {
+  OPEN
+  IN_ANALYSIS
+  IN_TREATMENT
+  RESOLVED
+  CLOSED
 }
