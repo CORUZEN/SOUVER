@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { signToken, verifyToken } from './jwt'
+import { signTokenEdge, verifyTokenEdge } from './jwt-edge'
 import { addSeconds } from 'date-fns'
 
 const SESSION_SECONDS = parseInt(
@@ -25,13 +25,13 @@ export async function createSession(
     },
   })
 
-  const token = signToken(userId, session.id)
+  const token = await signTokenEdge(userId, session.id)
   return { token, expiresAt }
 }
 
 /** Retorna usuário autenticado pelo token, ou null se inválido/expirado */
 export async function getCurrentUser(token: string) {
-  const payload = verifyToken(token)
+  const payload = await verifyTokenEdge(token)
   if (!payload) return null
 
   const session = await prisma.userSession.findFirst({
@@ -54,7 +54,7 @@ export async function getCurrentUser(token: string) {
 
 /** Revoga uma sessão pelo token JWT */
 export async function revokeSession(token: string): Promise<void> {
-  const payload = verifyToken(token)
+  const payload = await verifyTokenEdge(token)
   if (!payload) return
 
   await prisma.userSession.updateMany({

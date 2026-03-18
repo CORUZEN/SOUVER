@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { Eye, EyeOff, LogIn, Mail } from 'lucide-react'
 
 export default function LoginForm() {
-  const router = useRouter()
   const [form, setForm] = useState({ login: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
@@ -45,12 +43,11 @@ export default function LoginForm() {
       }
 
       if (data.requiresTwoFactor) {
-        router.push(`/login/2fa?userId=${data.userId}`)
+        window.location.href = `/login/2fa?userId=${data.userId}`
         return
       }
 
-      router.push('/dashboard')
-      router.refresh()
+      window.location.href = '/dashboard'
     } catch {
       setApiError('Falha de conexão. Tente novamente.')
     } finally {

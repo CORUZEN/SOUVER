@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth/jwt'
+import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
 
 // Rotas públicas que não exigem autenticação
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/health']
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Permite rotas públicas e assets
@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  const payload = verifyToken(token)
+  const payload = await verifyTokenEdge(token)
 
   if (!payload) {
     const response = NextResponse.redirect(new URL('/login', req.url))
