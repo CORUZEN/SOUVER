@@ -3,6 +3,11 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listMovements, registerMovement, MovementTypeValue } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { prisma } from '@/lib/prisma'
+import {
+  createNotificationsForRole,
+  NOTIFICATION_TYPES,
+} from '@/domains/notifications/notifications.service'
 
 const createSchema = z.object({
   itemId: z.string().min(1, 'Item é obrigatório'),
@@ -61,6 +66,24 @@ export async function POST(req: NextRequest) {
     description: `Movimentação ${parsed.data.type}: ${movement.item.name} (${parsed.data.quantity} ${movement.item.unit})`,
     ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
   })
+
+  // ── Automação: alerta de estoque mínimo ───────────────────────
+  if (['EXIT', 'WASTE', 'TRANSFER'].includes(parsed.data.type)) {
+    const item = await prisma.inventoryItem.findUnique({
+      where:  { id: parsed.data.itemId },
+      select: { name: true, sku: true, currentQty: true, minQty: true, unit: true },
+    })
+    if (item?.minQty && item.currentQty.lte(item.minQty)) {
+      createNotificationsForRole('LOGISTICS', {
+        type:    NOTIFICATION_TYPES.LOW_STOCK,
+        title:   `Estoque mínimo atingido: ${item.name}`,
+        message: `O item ${item.sku} — ${item.name} está com ${item.currentQty} ${item.unit} (mínimo: ${item.minQty} ${item.unit}). Reposição necessária.`,
+        module:  'inventory',
+        link:    '/logistica',
+      }).catch(() => null)
+    }
+  }
+  // ─────────────────────────────────────────────────────────────
 
   return NextResponse.json(movement, { status: 201 })
 }

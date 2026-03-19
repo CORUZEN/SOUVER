@@ -23,6 +23,7 @@ import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
 import { Spinner, EmptyState, ErrorState } from '@/components/ui/Skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import ModuleKpiBar from '@/components/dashboard/ModuleKpiBar'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -301,6 +302,9 @@ export default function LogisticaPage() {
           <Plus size={16} /> Novo Item
         </Button>
       </div>
+
+      {/* Indicadores do módulo */}
+      <ModuleKpiBar module="inventory" />
 
       {/* Filtros */}
       <Card>

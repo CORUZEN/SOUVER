@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { token, expiresAt } = await createSession(user.id, ip, userAgent)
+    const { token, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
 
     await prisma.user.update({
       where: { id: user.id },

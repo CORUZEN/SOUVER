@@ -11,9 +11,13 @@ const SESSION_SECONDS = parseInt(
 export async function createSession(
   userId: string,
   ipAddress: string,
-  userAgent: string
+  userAgent: string,
+  sessionDurationHours?: number | null
 ): Promise<{ token: string; expiresAt: Date }> {
-  const expiresAt = addSeconds(new Date(), SESSION_SECONDS)
+  const seconds = sessionDurationHours != null
+    ? sessionDurationHours * 3600
+    : SESSION_SECONDS
+  const expiresAt = addSeconds(new Date(), seconds)
 
   const session = await prisma.userSession.create({
     data: {

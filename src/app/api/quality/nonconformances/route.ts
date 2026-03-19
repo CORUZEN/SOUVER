@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listNonConformances, createNC, NCStatusValue, NCSeverityValue } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import {
+  createNotificationsForRole,
+  NOTIFICATION_TYPES,
+} from '@/domains/notifications/notifications.service'
 
 const createSchema = z.object({
   title:           z.string().min(1, 'Título obrigatório'),
@@ -59,6 +63,32 @@ export async function POST(req: NextRequest) {
     description: `NC aberta: ${nc.title}`,
     ipAddress:   req.headers.get('x-forwarded-for') ?? undefined,
   })
+
+  // ── Automação: alertas por severidade ─────────────────────────
+  if (parsed.data.severity === 'CRITICAL' || parsed.data.severity === 'HIGH') {
+    const type    = parsed.data.severity === 'CRITICAL' ? NOTIFICATION_TYPES.NC_CRITICAL : NOTIFICATION_TYPES.NC_OPENED
+    const sevLabel = parsed.data.severity === 'CRITICAL' ? '🔴 CRÍTICA' : '🟠 ALTA'
+
+    createNotificationsForRole('QUALITY', {
+      type,
+      title:   `NC ${sevLabel} aberta: ${nc.title}`,
+      message: `Uma não conformidade de severidade ${parsed.data.severity} foi registrada por ${user.name ?? user.id}. Requer atenção.`,
+      module:  'quality',
+      link:    '/qualidade',
+    }).catch(() => null)
+
+    // NCs CRÍTICAS também alertam ADMIN
+    if (parsed.data.severity === 'CRITICAL') {
+      createNotificationsForRole('ADMIN', {
+        type,
+        title:   `NC CRÍTICA aberta: ${nc.title}`,
+        message: `Uma não conformidade crítica foi registrada no módulo de Qualidade por ${user.name ?? user.id}. Verifique imediatamente.`,
+        module:  'quality',
+        link:    '/qualidade',
+      }).catch(() => null)
+    }
+  }
+  // ─────────────────────────────────────────────────────────────
 
   return NextResponse.json(nc, { status: 201 })
 }

@@ -37,14 +37,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params
   const body = await req.json()
 
-  // Apenas requireTwoFactor é editável aqui
-  if (typeof body.requireTwoFactor !== 'boolean') {
-    return NextResponse.json({ error: 'Campo inválido' }, { status: 400 })
+  // Editable fields: requireTwoFactor and sessionDurationHours
+  const updates: { requireTwoFactor?: boolean; sessionDurationHours?: number | null } = {}
+
+  if (typeof body.requireTwoFactor === 'boolean') {
+    updates.requireTwoFactor = body.requireTwoFactor
+  }
+
+  if ('sessionDurationHours' in body) {
+    if (body.sessionDurationHours === null || body.sessionDurationHours === undefined) {
+      updates.sessionDurationHours = null
+    } else if (typeof body.sessionDurationHours === 'number' && body.sessionDurationHours >= 1 && body.sessionDurationHours <= 720) {
+      updates.sessionDurationHours = Math.round(body.sessionDurationHours)
+    } else {
+      return NextResponse.json({ error: 'sessionDurationHours deve ser um número entre 1 e 720 (horas)' }, { status: 400 })
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nenhum campo válido enviado' }, { status: 400 })
   }
 
   const updated = await prisma.role.update({
     where: { id },
-    data: { requireTwoFactor: body.requireTwoFactor },
+    data: updates,
   })
 
   return NextResponse.json({ role: updated })

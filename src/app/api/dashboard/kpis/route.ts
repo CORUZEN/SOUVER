@@ -40,12 +40,34 @@ function buildDateRange(period: string): KpiDateRange | undefined {
   }
 }
 
+// ─── Helper: calcula o período anterior equivalente ──────────────
+
+function buildPreviousDateRange(period: string): KpiDateRange | undefined {
+  if (period === 'all') return undefined
+  const current = buildDateRange(period)
+  if (!current) return undefined
+
+  const durationMs = current.to.getTime() - current.from.getTime()
+  return {
+    from: new Date(current.from.getTime() - durationMs - 1),
+    to:   new Date(current.from.getTime() - 1),
+  }
+}
+
+// ─── Helper: variação percentual ─────────────────────────────────
+
+function delta(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null
+  return Math.round(((current - previous) / previous) * 100)
+}
+
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const period    = req.nextUrl.searchParams.get('period') ?? 'all'
-  const dateRange = buildDateRange(period)
+  const period        = req.nextUrl.searchParams.get('period') ?? 'all'
+  const dateRange     = buildDateRange(period)
+  const prevDateRange = buildPreviousDateRange(period)
 
   const [production, inventory, quality, hr, activeUsers] = await Promise.all([
     getProductionKPIs(dateRange),
@@ -55,5 +77,34 @@ export async function GET(req: NextRequest) {
     prisma.user.count({ where: { status: 'ACTIVE' } }),
   ])
 
-  return NextResponse.json({ production, inventory, quality, hr, activeUsers, period })
+  // Busca KPIs do período anterior para calcular variação
+  let variation: Record<string, number | null> | undefined
+  if (prevDateRange) {
+    const [prevProd, prevInv, prevQuality, prevHr] = await Promise.all([
+      getProductionKPIs(prevDateRange),
+      getInventoryKPIs(prevDateRange),
+      getQualityKPIs(prevDateRange),
+      getHRKPIs(prevDateRange),
+    ])
+
+    variation = {
+      // Produção
+      totalBatches:    delta(production.totalBatches,      prevProd.totalBatches),
+      finished:        delta(production.finished,          prevProd.finished),
+      totalProducedQty: delta(
+        production.totalProducedQty  ?? 0,
+        prevProd.totalProducedQty    ?? 0,
+      ),
+      // Logística
+      totalMovements:  delta(inventory.totalMovements,     prevInv.totalMovements),
+      lowStockCount:   delta(inventory.lowStockCount,      prevInv.lowStockCount),
+      // Qualidade
+      openNCs:         delta(quality.openNCs,              prevQuality.openNCs),
+      totalRecords:    delta(quality.totalRecords,         prevQuality.totalRecords),
+      // RH
+      loggedToday:     delta(hr.loggedToday,               prevHr.loggedToday),
+    }
+  }
+
+  return NextResponse.json({ production, inventory, quality, hr, activeUsers, period, variation })
 }

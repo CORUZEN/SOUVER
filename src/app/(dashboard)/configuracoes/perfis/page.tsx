@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronRight, Users, Lock, CheckCircle2, Search, Info, ShieldCheck } from 'lucide-react'
+import { Shield, ChevronRight, Users, Lock, CheckCircle2, Search, Info, ShieldCheck, Clock } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 
@@ -25,13 +25,14 @@ interface Permission {
 }
 
 interface RoleDetail {
-  id:               string
-  name:             string
-  code:             string
-  description:      string | null
-  requireTwoFactor: boolean
-  _count:           { users: number }
-  rolePermissions:  { permission: Permission }[]
+  id:                   string
+  name:                 string
+  code:                 string
+  description:          string | null
+  requireTwoFactor:     boolean
+  sessionDurationHours: number | null
+  _count:               { users: number }
+  rolePermissions:      { permission: Permission }[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -89,6 +90,8 @@ export default function PerfisPage() {
   const [selected,     setSelected]     = useState<RoleDetail | null>(null)
   const [search,       setSearch]       = useState('')
   const [togglingId,   setTogglingId]   = useState<string | null>(null)
+  const [savingSession, setSavingSession] = useState(false)
+  const [sessionInput,  setSessionInput]  = useState('')
 
   const loadRoles = useCallback(async () => {
     setLoading(true)
@@ -101,7 +104,11 @@ export default function PerfisPage() {
 
   async function selectRole(id: string) {
     const r = await fetch(`/api/roles/${id}`)
-    if (r.ok) { const d = await r.json(); setSelected(d.role) }
+    if (r.ok) {
+      const d = await r.json()
+      setSelected(d.role)
+      setSessionInput(d.role.sessionDurationHours != null ? String(d.role.sessionDurationHours) : '')
+    }
   }
 
   async function toggleRequire2FA(role: RoleDetail) {
@@ -118,6 +125,22 @@ export default function PerfisPage() {
         setRoles(prev => prev.map(r => r.id === role.id ? { ...r, requireTwoFactor: next } : r))
       }
     } finally { setTogglingId(null) }
+  }
+
+  async function updateSessionDuration(role: RoleDetail) {
+    setSavingSession(true)
+    try {
+      const hours = sessionInput === '' ? null : Number(sessionInput)
+      if (hours !== null && (isNaN(hours) || hours < 1 || hours > 720)) return
+      const res = await fetch(`/api/roles/${role.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionDurationHours: hours }),
+      })
+      if (res.ok) {
+        setSelected(prev => prev ? { ...prev, sessionDurationHours: hours } : prev)
+      }
+    } finally { setSavingSession(false) }
   }
 
   // Agrupa permissões por módulo
@@ -218,7 +241,7 @@ export default function PerfisPage() {
               )}
 
               {/* Toggle: Exigir 2FA */}
-              <div className="flex items-center justify-between p-4 mb-5 rounded-xl border border-surface-200 bg-surface-50">
+              <div className="flex items-center justify-between p-4 mb-4 rounded-xl border border-surface-200 bg-surface-50">
                 <div className="flex items-center gap-2.5">
                   <ShieldCheck size={16} className={selected.requireTwoFactor ? 'text-emerald-600' : 'text-surface-400'} />
                   <div>
@@ -238,6 +261,41 @@ export default function PerfisPage() {
                     selected.requireTwoFactor ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </button>
+              </div>
+
+              {/* Duração da sessão */}
+              <div className="flex items-center justify-between p-4 mb-5 rounded-xl border border-surface-200 bg-surface-50">
+                <div className="flex items-center gap-2.5">
+                  <Clock size={16} className="text-amber-500" />
+                  <div>
+                    <p className="text-sm font-medium text-surface-800">Duração da sessão</p>
+                    <p className="text-xs text-surface-500">
+                      Horas até expiração automática · padrão do sistema: 8h
+                      {selected.sessionDurationHours != null && (
+                        <span className="ml-1 font-medium text-amber-600">· atual: {selected.sessionDurationHours}h</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    min={1}
+                    max={720}
+                    value={sessionInput}
+                    onChange={e => setSessionInput(e.target.value)}
+                    placeholder="padrão"
+                    className="w-24 border border-surface-200 rounded-lg px-2.5 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <span className="text-xs text-surface-500">h</span>
+                  <button
+                    onClick={() => updateSessionDuration(selected)}
+                    disabled={savingSession}
+                    className="px-3 py-1.5 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    {savingSession ? '…' : 'Salvar'}
+                  </button>
+                </div>
               </div>
 
               {/* Permissões por módulo */}

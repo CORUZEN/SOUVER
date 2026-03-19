@@ -41,9 +41,10 @@ model Role {
   name               String    @unique
   code               String    @unique
   description        String?
-  requireTwoFactor   Boolean   @default(false) @map("require_two_factor")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  requireTwoFactor      Boolean   @default(false) @map("require_two_factor")
+  sessionDurationHours  Int?      @map("session_duration_hours")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   users           User[]
   rolePermissions RolePermission[]

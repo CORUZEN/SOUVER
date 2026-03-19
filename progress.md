@@ -336,10 +336,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 3.4.1 | Indicadores comparativos por período (semana, mês, trimestre) | 🔴 Pendente |
-| 3.4.2 | Visões executivas e operacionais por módulo | 🔴 Pendente |
+| 3.4.1 | Indicadores comparativos por período (semana, mês, trimestre) | ✅ Concluído — variação % vs período anterior; DeltaBadge; seletor de período no Dashboard |
+| 3.4.2 | Visões executivas e operacionais por módulo | ✅ Concluído — ModuleKpiBar component; adicionado em Produção e Logística; Qualidade e RH já possuem KPIs próprios |
 | 3.4.3 | Gráficos avançados e painéis interativos | � Parcial — BarChart + PieChart no Dashboard |
-| 3.4.4 | Dashboard personalizado por perfil de acesso | 🔴 Pendente |
+| 3.4.4 | Dashboard personalizado por perfil de acesso | ✅ Concluído — ROLE_VISIBILITY config; visível por cargo (PRODUCTION/LOGISTICS/QUALITY/HR/OPERATOR/VIEWER); badge de visão personalizada |
 
 ---
 
@@ -347,7 +347,7 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 3.5.1 | Políticas específicas de expiração de sessão por perfil | 🔴 Pendente |
+| 3.5.1 | Políticas específicas de expiração de sessão por perfil | ✅ Concluído — campo sessionDurationHours em Role; migration aplicada; createSession usa duração do perfil; UI de edição na página de Perfis |
 | 3.5.2 | 2FA obrigatório para perfis críticos (Admin, Gestão, Gerente) | ✅ Concluído — campo requireTwoFactor em Role + migration + login enforcement + toggle UI |
 | 3.5.3 | Alertas de acesso suspeito (IP diferente, horário incomum) | ✅ Concluído — detecção de IP diferente no login + notificação para usuário e admins |
 | 3.5.4 | Painel de gerenciamento de sessões ativas por usuário | � Concluído |
@@ -426,7 +426,7 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 4.4.1 | Automações configuráveis por evento (ex: alerta automático por NC grave) | 🔴 Pendente |
+| 4.4.1 | Automações configuráveis por evento (ex: alerta automático por NC grave) | ✅ Concluído — NC CRITICAL/HIGH alerta QUALITY+ADMIN; EXIT/WASTE/TRANSFER verifica low-stock e alerta LOGISTICS |
 | 4.4.2 | Agendamento de relatórios automáticos | 🔴 Pendente |
 | 4.4.3 | Rotinas de limpeza e manutenção automatizadas | 🔴 Pendente |
 
