@@ -149,7 +149,7 @@ FASE 5 ──── Expansão e Consolidação
 | 1.5.7 | Interface de gestão de permissões para administrador | � Concluído |
 | 1.5.8 | 12 Perfis padrão iniciais criados via seed | 🟢 Concluído |
 | 1.5.9 | Listagem, filtragem e busca de usuários | 🟢 Concluído |
-| 1.5.10 | Visualização de perfil individual e histórico de acesso | 🟡 Parcial |
+| 1.5.10 | Visualização de perfil individual e histórico de acesso | ✅ Concluído |
 
 ---
 
@@ -237,7 +237,7 @@ FASE 5 ──── Expansão e Consolidação
 | 2.2.3 | Movimentações internas e transferências | 🟢 Concluído |
 | 2.2.4 | Controle de posições de armazenamento | 🟡 Parcial |
 | 2.2.5 | Situação de lotes, itens e posições | 🟢 Concluído |
-| 2.2.6 | Fluxos de separação, conferência e expedição | 🔴 Pendente |
+| 2.2.6 | Fluxos de separação, conferência e expedição | ✅ Concluído |
 | 2.2.7 | Alertas de estoque mínimo | 🟢 Concluído |
 | 2.2.8 | Histórico de movimentações com rastreabilidade completa | 🟢 Concluído |
 | 2.2.9 | Indicadores logísticos e operacionais | 🟢 Concluído |
@@ -415,10 +415,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 4.3.1 | Relatórios estratégicos com dados consolidados de múltiplos módulos | 🔴 Pendente |
-| 4.3.2 | Visões executivas para Diretoria e Gestão | 🔴 Pendente |
-| 4.3.3 | Integração com ferramentas de BI (base preparada) | 🔴 Pendente |
-| 4.3.4 | Análises comparativas avançadas | 🔴 Pendente |
+| 4.3.1 | Relatórios estratégicos com dados consolidados de múltiplos módulos | ✅ Concluído |
+| 4.3.2 | Visões executivas para Diretoria e Gestão | ✅ Concluído |
+| 4.3.3 | Integração com ferramentas de BI (base preparada) | ✅ Concluído |
+| 4.3.4 | Análises comparativas avançadas | ✅ Concluído |
 
 ---
 
@@ -428,7 +428,7 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 4.4.1 | Automações configuráveis por evento (ex: alerta automático por NC grave) | ✅ Concluído — NC CRITICAL/HIGH alerta QUALITY+ADMIN; EXIT/WASTE/TRANSFER verifica low-stock e alerta LOGISTICS |
 | 4.4.2 | Agendamento de relatórios automáticos | 🔴 Pendente |
-| 4.4.3 | Rotinas de limpeza e manutenção automatizadas | 🔴 Pendente |
+| 4.4.3 | Rotinas de limpeza e manutenção automatizadas | ✅ Concluído |
 
 ---
 
@@ -456,7 +456,7 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 5.1.1 | Revisão geral de queries críticas e índices no banco | 🔴 Pendente |
+| 5.1.1 | Revisão geral de queries críticas e índices no banco | ✅ Concluído |
 | 5.1.2 | Implementação de cache estratégico | 🔴 Pendente |
 | 5.1.3 | Otimização de paginação e consultas pesadas | 🔴 Pendente |
 | 5.1.4 | Monitoramento e observabilidade em produção | 🔴 Pendente |
