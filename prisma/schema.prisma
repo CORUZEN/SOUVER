@@ -148,6 +148,8 @@ model UserSession {
 
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, status])
+  @@index([status, expiresAt])
   @@map("user_sessions")
 }
 
@@ -185,6 +187,7 @@ model PasswordResetToken {
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, expiresAt])
   @@map("password_reset_tokens")
 }
 
@@ -207,6 +210,9 @@ model AuditLog {
 
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([userId, createdAt])
+  @@index([module, action, createdAt])
+  @@index([entityType, entityId])
   @@map("audit_logs")
 }
 
@@ -242,6 +248,9 @@ model ProductionBatch {
   qualityRecords  QualityRecord[]
   nonConformances NonConformance[]
 
+  @@index([status, createdAt])
+  @@index([departmentId, status])
+  @@index([shift, status])
   @@map("production_batches")
 }
 
@@ -336,6 +345,9 @@ model InventoryMovement {
   item            InventoryItem       @relation(fields: [itemId], references: [id])
   createdBy       User                @relation("MovementCreator", fields: [createdByUserId], references: [id])
 
+  @@index([itemId, movedAt])
+  @@index([type, movedAt])
+  @@index([createdByUserId, createdAt])
   @@map("inventory_movements")
 }
 
@@ -391,6 +403,8 @@ model QualityRecord {
   inspectedBy     User              @relation("QualityInspector", fields: [inspectedById], references: [id])
   nonConformances NonConformance[]
 
+  @@index([result, inspectedAt])
+  @@index([batchId, result])
   @@map("quality_records")
 }
 
@@ -428,6 +442,9 @@ model NonConformance {
   openedBy        User              @relation("NCOpener", fields: [openedById], references: [id])
   assignedTo      User?             @relation("NCAssignee", fields: [assignedToId], references: [id])
 
+  @@index([status, severity, openedAt])
+  @@index([departmentId, status])
+  @@index([assignedToId, status])
   @@map("non_conformances")
 }
 

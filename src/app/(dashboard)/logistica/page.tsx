@@ -14,6 +14,10 @@ import {
   RotateCcw,
   Sliders,
   ChevronRight,
+  Truck,
+  CheckCircle2,
+  ClipboardList,
+  X,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -140,6 +144,79 @@ export default function LogisticaPage() {
     type: 'ENTRY', quantity: '', reason: '',
     supplier: '', documentRef: '', batchRef: '',
   })
+
+  // Expedição
+  type ExpStep = 'separacao' | 'conferencia' | 'expedicao'
+  interface ExpItem { itemId: string; name: string; sku: string; unit: string; qty: string; currentQty: number }
+  const [showExpModal, setShowExpModal] = useState(false)
+  const [expStep, setExpStep] = useState<ExpStep>('separacao')
+  const [expItems, setExpItems] = useState<ExpItem[]>([{ itemId: '', name: '', sku: '', unit: '', qty: '', currentQty: 0 }])
+  const [expDocRef, setExpDocRef] = useState('')
+  const [expDest, setExpDest] = useState('')
+  const [expError, setExpError] = useState<string | null>(null)
+  const [savingExp, setSavingExp] = useState(false)
+
+  function openExpModal() {
+    setExpStep('separacao')
+    setExpItems([{ itemId: '', name: '', sku: '', unit: '', qty: '', currentQty: 0 }])
+    setExpDocRef('')
+    setExpDest('')
+    setExpError(null)
+    setShowExpModal(true)
+  }
+
+  function addExpLine() {
+    setExpItems(prev => [...prev, { itemId: '', name: '', sku: '', unit: '', qty: '', currentQty: 0 }])
+  }
+
+  function removeExpLine(i: number) {
+    setExpItems(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  function setExpItemField(i: number, field: keyof ExpItem, value: string | number) {
+    setExpItems(prev => prev.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
+  }
+
+  function onSelectExpItem(i: number, itemId: string) {
+    const found = items.find(it => it.id === itemId)
+    if (found) {
+      setExpItems(prev => prev.map((row, idx) => idx === i
+        ? { ...row, itemId: found.id, name: found.name, sku: found.sku, unit: found.unit, currentQty: found.currentQty }
+        : row
+      ))
+    }
+  }
+
+  async function confirmExpedicao() {
+    setExpError(null)
+    const validLines = expItems.filter(l => l.itemId && Number(l.qty) > 0)
+    if (validLines.length === 0) return setExpError('Adicione pelo menos um item com quantidade.')
+    const overstock = validLines.find(l => Number(l.qty) > l.currentQty)
+    if (overstock) return setExpError(`Quantidade informada para "${overstock.name}" excede o saldo atual (${overstock.currentQty} ${overstock.unit}).`)
+    setSavingExp(true)
+    try {
+      for (const line of validLines) {
+        await fetch('/api/inventory/movements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            itemId: line.itemId,
+            type: 'EXIT',
+            quantity: Number(line.qty),
+            reason: `Expedição${expDest ? ` para ${expDest}` : ''}${expDocRef ? ` — Doc: ${expDocRef}` : ''}`,
+            documentRef: expDocRef || undefined,
+          }),
+        })
+      }
+      setShowExpModal(false)
+      fetchItems()
+      if (selectedItem) openDetail(selectedItem)
+    } catch {
+      setExpError('Erro ao registrar expedição. Tente novamente.')
+    } finally {
+      setSavingExp(false)
+    }
+  }
 
   // ─── Busca ─────────────────────────────────────────────────────────────────
 
@@ -300,6 +377,9 @@ export default function LogisticaPage() {
         </div>
         <Button onClick={openCreateItem} className="flex items-center gap-2">
           <Plus size={16} /> Novo Item
+        </Button>
+        <Button variant="outline" onClick={openExpModal} className="flex items-center gap-2">
+          <Truck size={16} /> Expedir
         </Button>
       </div>
 
@@ -686,6 +766,188 @@ export default function LogisticaPage() {
             />
           )}
         </div>
+      </Modal>
+
+      {/* ─── Modal Fluxo de Expedição ──────────────────────── */}
+      <Modal
+        open={showExpModal}
+        onClose={() => !savingExp && setShowExpModal(false)}
+        title="Fluxo de Expedição"
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="flex gap-2">
+              {expStep !== 'separacao' && (
+                <Button variant="outline" onClick={() => setExpStep(s => s === 'expedicao' ? 'conferencia' : 'separacao')} disabled={savingExp}>
+                  Voltar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowExpModal(false)} disabled={savingExp}>
+                Cancelar
+              </Button>
+              {expStep === 'separacao' && (
+                <Button onClick={() => {
+                  setExpError(null)
+                  const valid = expItems.filter(l => l.itemId && Number(l.qty) > 0)
+                  if (valid.length === 0) return setExpError('Selecione ao menos um item com quantidade.')
+                  setExpStep('conferencia')
+                }}>
+                  Conferir →
+                </Button>
+              )}
+              {expStep === 'conferencia' && (
+                <Button onClick={() => setExpStep('expedicao')}>
+                  Confirmar Conferência →
+                </Button>
+              )}
+              {expStep === 'expedicao' && (
+                <Button onClick={confirmExpedicao} loading={savingExp}>
+                  Registrar Expedição
+                </Button>
+              )}
+            </div>
+          </div>
+        }
+      >
+        {/* Stepper */}
+        <div className="flex items-center gap-2 mb-6">
+          {(['separacao', 'conferencia', 'expedicao'] as ExpStep[]).map((s, i) => {
+            const labels = ['1. Separação', '2. Conferência', '3. Expedição']
+            const icons = [ClipboardList, CheckCircle2, Truck]
+            const Icon = icons[i]
+            const active = expStep === s
+            const done = (['separacao', 'conferencia', 'expedicao'] as ExpStep[]).indexOf(expStep) > i
+            return (
+              <div key={s} className="flex items-center gap-2 flex-1">
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  active ? 'bg-indigo-600 text-white' : done ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-400'
+                }`}>
+                  <Icon className="w-3.5 h-3.5" />
+                  {labels[i]}
+                </div>
+                {i < 2 && <div className={`flex-1 h-0.5 ${done ? 'bg-green-400' : 'bg-surface-200'}`} />}
+              </div>
+            )
+          })}
+        </div>
+
+        {expError && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {expError}
+          </div>
+        )}
+
+        {/* Etapa 1 — Separação */}
+        {expStep === 'separacao' && (
+          <div className="space-y-4">
+            <p className="text-sm text-surface-600">Selecione os itens a separar para a expedição.</p>
+            <div className="space-y-3">
+              {expItems.map((line, i) => (
+                <div key={i} className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-surface-600 mb-1 block">Item</label>
+                    <select
+                      value={line.itemId}
+                      onChange={e => onSelectExpItem(i, e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                    >
+                      <option value="">Selecione...</option>
+                      {items.filter(it => it.isActive).map(it => (
+                        <option key={it.id} value={it.id}>{it.sku} — {it.name} (saldo: {it.currentQty} {it.unit})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-28">
+                    <label className="text-xs font-medium text-surface-600 mb-1 block">Qtd. {line.unit && `(${line.unit})`}</label>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={line.qty}
+                      onChange={e => setExpItemField(i, 'qty', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      placeholder="0"
+                    />
+                  </div>
+                  <button
+                    onClick={() => removeExpLine(i)}
+                    disabled={expItems.length === 1}
+                    className="p-2 text-surface-400 hover:text-red-500 disabled:opacity-30 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={addExpLine}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar item
+            </button>
+          </div>
+        )}
+
+        {/* Etapa 2 — Conferência */}
+        {expStep === 'conferencia' && (
+          <div className="space-y-3">
+            <p className="text-sm text-surface-600">Confira os itens e quantidades antes de registrar a saída.</p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-200 bg-surface-50 text-xs text-surface-500">
+                  <th className="text-left px-3 py-2">SKU</th>
+                  <th className="text-left px-3 py-2">Produto</th>
+                  <th className="text-right px-3 py-2">Qtd. a Expedir</th>
+                  <th className="text-right px-3 py-2">Saldo Atual</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expItems.filter(l => l.itemId && Number(l.qty) > 0).map((line, i) => (
+                  <tr key={i} className="border-b border-surface-100 last:border-0">
+                    <td className="px-3 py-2 font-mono text-xs text-indigo-700">{line.sku}</td>
+                    <td className="px-3 py-2 font-medium">{line.name}</td>
+                    <td className="px-3 py-2 text-right font-bold text-surface-800">{line.qty} {line.unit}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${Number(line.qty) > line.currentQty ? 'text-red-600' : 'text-green-700'}`}>
+                      {line.currentQty} {line.unit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Etapa 3 — Expedição */}
+        {expStep === 'expedicao' && (
+          <div className="space-y-4">
+            <p className="text-sm text-surface-600">Preencha os dados da expedição para registrar as saídas.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-surface-600 mb-1 block">Destino (opcional)</label>
+                <input
+                  value={expDest}
+                  onChange={e => setExpDest(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder="Ex.: Linha 1, Distribuidor X..."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-surface-600 mb-1 block">Nº Documento (opcional)</label>
+                <input
+                  value={expDocRef}
+                  onChange={e => setExpDocRef(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder="NF, OS, Pedido..."
+                />
+              </div>
+            </div>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800">
+              <strong>{expItems.filter(l => l.itemId && Number(l.qty) > 0).length} item(ns)</strong> serão registrados como saída (EXIT) no estoque.
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

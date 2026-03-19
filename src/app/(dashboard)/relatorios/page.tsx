@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   FileBarChart2, Factory, Truck, ShieldCheck, Users,
   RefreshCw, Download, Calendar, Filter, ChevronDown,
@@ -537,6 +538,12 @@ export default function RelatoriosPage() {
           <p className="text-xs text-surface-300 mt-0.5">
             Clique em <strong>CSV</strong> ou <strong>XLSX</strong> para exportar os dados da aba selecionada
           </p>
+          <Link
+            href="/relatorios/executivo"
+            className="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
+          >
+            Ver Visão Executiva Consolidada →
+          </Link>
         </div>
       </div>
     </div>
