@@ -200,7 +200,7 @@ export default function ProducaoPage() {
   useEffect(() => {
     fetch('/api/departments')
       .then(r => r.json())
-      .then(d => setDepartments(d.items ?? d ?? []))
+      .then(d => setDepartments(d.departments ?? d.items ?? []))
       .catch(() => {})
   }, [])
 
@@ -317,7 +317,7 @@ export default function ProducaoPage() {
       {/* Indicadores do módulo */}
       <ModuleKpiBar module="production" />
 
-      {/* Filtros */}}
+      {/* Filtros */}
       <Card>
         <CardContent className="pt-4">
           <div className="flex flex-col sm:flex-row gap-3">
