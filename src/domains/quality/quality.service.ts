@@ -234,7 +234,16 @@ export async function changeNCStatus(id: string, newStatus: NCStatusValue) {
 
 // ─── KPIs de Qualidade ───────────────────────────────────────────
 
-export async function getQualityKPIs() {
+export async function getQualityKPIs(dateRange?: { from: Date; to: Date }) {
+  const rangeFilter = dateRange
+    ? { gte: dateRange.from, lte: dateRange.to }
+    : undefined
+
+  const recordsWhere = rangeFilter ? { inspectedAt: rangeFilter } : {}
+  const resolvedWhere = rangeFilter
+    ? { resolvedAt: rangeFilter }
+    : { resolvedAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }
+
   const [
     totalRecords,
     pendingRecords,
@@ -244,16 +253,16 @@ export async function getQualityKPIs() {
     criticalNCs,
     resolvedThisMonth,
   ] = await Promise.all([
-    prisma.qualityRecord.count(),
-    prisma.qualityRecord.count({ where: { result: 'PENDING'  } }),
-    prisma.qualityRecord.count({ where: { result: 'APPROVED' } }),
-    prisma.qualityRecord.count({ where: { result: 'REJECTED' } }),
+    prisma.qualityRecord.count({ where: recordsWhere }),
+    prisma.qualityRecord.count({ where: { result: 'PENDING',  ...recordsWhere } }),
+    prisma.qualityRecord.count({ where: { result: 'APPROVED', ...recordsWhere } }),
+    prisma.qualityRecord.count({ where: { result: 'REJECTED', ...recordsWhere } }),
     prisma.nonConformance.count({ where: { status: { in: ['OPEN', 'IN_ANALYSIS', 'IN_TREATMENT'] as never[] } } }),
     prisma.nonConformance.count({ where: { severity: 'CRITICAL', status: { not: 'CLOSED' as never } } }),
     prisma.nonConformance.count({
       where: {
         status: { in: ['RESOLVED', 'CLOSED'] as never[] },
-        resolvedAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        ...resolvedWhere,
       },
     }),
   ])

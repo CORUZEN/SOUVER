@@ -4,6 +4,11 @@ import { verifyPassword } from '@/lib/auth/password'
 import { createSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/domains/audit/audit.service'
+import {
+  createNotification,
+  createNotificationsForRole,
+  NOTIFICATION_TYPES,
+} from '@/domains/notifications/notifications.service'
 
 export async function POST(req: NextRequest) {
   try {
@@ -138,6 +143,13 @@ export async function POST(req: NextRequest) {
       return setupResponse
     }
 
+    // Captura IP do último login ANTES de registrar o atual (para comparação)
+    const previousLogin = await prisma.auditLog.findFirst({
+      where:   { userId: user.id, action: 'LOGIN_SUCCESS' },
+      orderBy: { createdAt: 'desc' },
+      select:  { ipAddress: true },
+    })
+
     await auditLog({
       userId: user.id,
       module: 'auth',
@@ -146,6 +158,35 @@ export async function POST(req: NextRequest) {
       ipAddress: ip,
       userAgent,
     })
+
+    // ── Alerta de acesso suspeito (IP diferente do último login) ──
+    if (
+      previousLogin?.ipAddress &&
+      previousLogin.ipAddress !== 'unknown' &&
+      ip !== 'unknown' &&
+      previousLogin.ipAddress !== ip
+    ) {
+      const userName = user.fullName
+
+      // Notificação pessoal para o próprio usuário
+      createNotification(user.id, {
+        type:    NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
+        title:   'Acesso de novo endereço IP detectado',
+        message: `Seu acesso foi realizado de um IP diferente do usual. IP anterior: ${previousLogin.ipAddress} | IP atual: ${ip}. Se não foi você, contate o administrador.`,
+        module:  'auth',
+        link:    '/configuracoes/perfil',
+      }).catch(() => null)
+
+      // Alerta para administradores
+      createNotificationsForRole('ADMIN', {
+        type:    NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
+        title:   `Acesso suspeito — ${userName}`,
+        message: `O usuário ${userName} (${user.login}) acessou o sistema de um IP diferente. Anterior: ${previousLogin.ipAddress} | Atual: ${ip}.`,
+        module:  'auth',
+        link:    '/auditoria',
+      }).catch(() => null)
+    }
+    // ─────────────────────────────────────────────────────────────
 
     const response = NextResponse.json({
       message: 'Autenticado com sucesso.',

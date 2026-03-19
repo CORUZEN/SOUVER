@@ -243,16 +243,17 @@ export async function registerMovement(input: MovementInput) {
 // KPIs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getInventoryKPIs() {
+export async function getInventoryKPIs(dateRange?: { from: Date; to: Date }) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [totalItems, lowStockItems, movementsToday] = await Promise.all([
+  const movedDateFilter = dateRange
+    ? { gte: dateRange.from, lte: dateRange.to }
+    : { gte: today }
+
+  const [totalItems, totalMovements] = await Promise.all([
     prisma.inventoryItem.count({ where: { isActive: true } }),
-    prisma.inventoryItem.count({
-      where: { isActive: true, minQty: { not: null } },
-    }),
-    prisma.inventoryMovement.count({ where: { movedAt: { gte: today } } }),
+    prisma.inventoryMovement.count({ where: { movedAt: movedDateFilter } }),
   ])
 
   // Filtrar em memória os que estão abaixo do mínimo
@@ -264,5 +265,12 @@ export async function getInventoryKPIs() {
     (i: { currentQty: unknown; minQty: unknown }) => Number(i.currentQty) <= Number(i.minQty)
   ).length
 
-  return { totalItems, lowStockItems: lowCount, movementsToday }
+  return {
+    totalItems,
+    activeItems: totalItems,
+    lowStockItems: lowCount,
+    lowStockCount: lowCount,
+    movementsToday: totalMovements,  // compat com dashboard
+    totalMovements,
+  }
 }

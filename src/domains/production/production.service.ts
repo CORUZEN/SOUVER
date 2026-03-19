@@ -230,17 +230,49 @@ export async function createEvent(input: CreateEventInput) {
 // KPIs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getProductionKPIs() {
+export interface KpiDateRange { from: Date; to: Date }
+
+export async function getProductionKPIs(dateRange?: KpiDateRange) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [openCount, inProgressCount, finishedToday] = await Promise.all([
-    prisma.productionBatch.count({ where: { status: 'OPEN' } }),
-    prisma.productionBatch.count({ where: { status: 'IN_PROGRESS' } }),
-    prisma.productionBatch.count({
-      where: { status: 'FINISHED', finishedAt: { gte: today } },
+  // Filtros sensíveis ao período
+  const rangeFilter = dateRange
+    ? { gte: dateRange.from, lte: dateRange.to }
+    : undefined
+
+  const createdWhere = rangeFilter ? { createdAt: rangeFilter } : {}
+  const finishedWhere = rangeFilter
+    ? { finishedAt: rangeFilter }
+    : { finishedAt: { gte: today } }
+
+  const [
+    totalBatches,
+    openCount,
+    inProgressCount,
+    finished,
+    cancelled,
+    prodAgg,
+  ] = await Promise.all([
+    prisma.productionBatch.count({ where: createdWhere }),
+    prisma.productionBatch.count({ where: { status: 'OPEN', ...createdWhere } }),
+    prisma.productionBatch.count({ where: { status: 'IN_PROGRESS', ...createdWhere } }),
+    prisma.productionBatch.count({ where: { status: 'FINISHED', ...finishedWhere } }),
+    prisma.productionBatch.count({ where: { status: 'CANCELLED', ...createdWhere } }),
+    prisma.productionBatch.aggregate({
+      _sum: { producedQty: true },
+      where: finishedWhere,
     }),
   ])
 
-  return { openCount, inProgressCount, finishedToday }
+  return {
+    totalBatches,
+    openCount,
+    inProgressCount,
+    inProgress: inProgressCount,
+    finishedToday: finished,   // compat com dashboard
+    finished,
+    cancelled,
+    totalProducedQty: prodAgg._sum.producedQty ? Number(prodAgg._sum.producedQty) : null,
+  }
 }

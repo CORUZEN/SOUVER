@@ -7,8 +7,8 @@
 > **Documento:** Progress & Roadmap Oficial
 > **Versão:** 2.0
 > **Data de Criação:** 18/03/2026
-> **Última Atualização:** 18/03/2026
-> **Status Geral:** 🟡 Em Andamento — Fases 1, 2 e 3 concluídas · Fase 4 iniciada (Integrações)
+> **Última Atualização:** 19/03/2026
+> **Status Geral:** 🟡 Em Andamento — Fases 1, 2 e 3 concluídas · Fase 4 em andamento
 
 ---
 
@@ -253,7 +253,7 @@ FASE 5 ──── Expansão e Consolidação
 | 2.3.1 | Estrutura de relatórios base (componentes visuais reutilizáveis) | � Concluído |
 | 2.3.2 | Relatório de produção por período | 🟢 Concluído |
 | 2.3.3 | Relatório de movimentação de estoque | 🟢 Concluído |
-| 2.3.4 | Exportação em CSV, XLSX e PDF | 🟡 Parcial — CSV + XLSX implementados; PDF pendente |
+| 2.3.4 | Exportação em CSV, XLSX e PDF | ✅ Concluído — CSV + XLSX + PDF via jsPDF/autoTable |
 | 2.3.5 | Histórico de exportações realizadas (`report_exports`) | 🔴 Pendente |
 | 2.3.6 | Filtros avançados nos relatórios (período, setor, usuário, tipo) | 🟢 Concluído |
 
@@ -289,7 +289,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 3 — CONTROLE AVANÇADO
 
 > **Objetivo:** Expandir o sistema com módulos de Qualidade, RH, gestão avançada de segurança e controle de não conformidades.
-> **Status:** ✅ Concluída — Qualidade, RH, Contabilidade e Gráficos entregues; Políticas de Segurança (2FA por perfil) implementadas
+> **Status:** ✅ Concluída — Qualidade, RH, Contabilidade, Gráficos, Segurança (2FA por perfil), Notificações avançadas, Export PDF e Alertas de acesso suspeito entregues
 > **Pré-requisito:** Fase 2 concluída e aprovada.
 
 ---
@@ -349,7 +349,7 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 3.5.1 | Políticas específicas de expiração de sessão por perfil | 🔴 Pendente |
 | 3.5.2 | 2FA obrigatório para perfis críticos (Admin, Gestão, Gerente) | ✅ Concluído — campo requireTwoFactor em Role + migration + login enforcement + toggle UI |
-| 3.5.3 | Alertas de acesso suspeito (IP diferente, horário incomum) | 🔴 Pendente |
+| 3.5.3 | Alertas de acesso suspeito (IP diferente, horário incomum) | ✅ Concluído — detecção de IP diferente no login + notificação para usuário e admins |
 | 3.5.4 | Painel de gerenciamento de sessões ativas por usuário | � Concluído |
 | 3.5.5 | Revisão e hardening geral de segurança | 🔴 Pendente |
 
@@ -359,10 +359,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 3.6.1 | Tipos configuráveis de notificação por evento | 🔴 Pendente |
-| 3.6.2 | Notificações por perfil e setor | 🔴 Pendente |
-| 3.6.3 | Marcação em lote e gestão do painel de notificações | 🔴 Pendente |
-| 3.6.4 | Histórico de notificações lidas e não lidas | 🔴 Pendente |
+| 3.6.1 | Tipos configuráveis de notificação por evento | ✅ Concluído — NOTIFICATION_TYPES enum + campo module/link na tabela |
+| 3.6.2 | Notificações por perfil e setor | ✅ Concluído — createNotificationsForRole / createNotificationsForAll / createNotificationsForUsers |
+| 3.6.3 | Marcação em lote e gestão do painel de notificações | ✅ Concluído — /api/notifications/batch-read (PATCH) + página /notificacoes com checkboxes + bulk actions |
+| 3.6.4 | Histórico de notificações lidas e não lidas | ✅ Concluído — /notificacoes com paginação, filtro por módulo/status, link "Ver todas" no Header |
 
 ---
 

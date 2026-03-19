@@ -108,7 +108,11 @@ export async function getCollaboratorById(id: string) {
 
 // ─── KPIs de RH ─────────────────────────────────────────────────
 
-export async function getHRKPIs() {
+export async function getHRKPIs(dateRange?: { from: Date; to: Date }) {
+  const loggedFilter = dateRange
+    ? { gte: dateRange.from, lte: dateRange.to }
+    : { gte: new Date(new Date().setHours(0, 0, 0, 0)) }
+
   const [
     totalActive,
     totalInactive,
@@ -123,9 +127,7 @@ export async function getHRKPIs() {
     prisma.user.count({ where: { status: 'SUSPENDED' } }),
     prisma.user.count({ where: { twoFactorEnabled: true } }),
     prisma.user.count({
-      where: {
-        lastLoginAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-      },
+      where: { lastLoginAt: loggedFilter },
     }),
     prisma.user.groupBy({
       by:    ['departmentId'],

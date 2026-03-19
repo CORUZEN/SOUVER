@@ -184,6 +184,17 @@ export default function Header() {
                   </li>
                 ))}
               </ul>
+
+              {/* Footer — ver todas */}
+              <div className="border-t border-surface-100 px-4 py-2.5">
+                <Link
+                  href="/notificacoes"
+                  onClick={() => setShowNotifs(false)}
+                  className="block w-full text-center text-xs font-medium text-brand-600 hover:text-brand-800 py-1"
+                >
+                  Ver todas as notificações
+                </Link>
+              </div>
             </div>
           )}
         </div>

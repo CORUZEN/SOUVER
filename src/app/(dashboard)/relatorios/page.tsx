@@ -83,14 +83,15 @@ export default function RelatoriosPage() {
   const [loading, setLoading]     = useState(false)
   const [exporting, setExporting]       = useState(false)
   const [exportingXlsx, setExportingXlsx] = useState(false)
+  const [exportingPdf,  setExportingPdf]  = useState(false)
   const [active, setActive]       = useState<string>('production')
   const [period, setPeriod]       = useState('today')
 
-  async function downloadFile(format: 'csv' | 'xlsx') {
-    const setter = format === 'xlsx' ? setExportingXlsx : setExporting
+  async function downloadFile(format: 'csv' | 'xlsx' | 'pdf') {
+    const setter = format === 'xlsx' ? setExportingXlsx : format === 'pdf' ? setExportingPdf : setExporting
     setter(true)
     try {
-      const res = await fetch(`/api/reports/export?module=${active}&format=${format}`)
+      const res = await fetch(`/api/reports/export?module=${active}&format=${format}&period=${period}`)
       if (!res.ok) return
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
@@ -106,14 +107,15 @@ export default function RelatoriosPage() {
 
   const downloadCsv  = () => downloadFile('csv')
   const downloadXlsx = () => downloadFile('xlsx')
+  const downloadPdf  = () => downloadFile('pdf')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/dashboard/kpis')
+      const res = await fetch(`/api/dashboard/kpis?period=${period}`)
       if (res.ok) setData(await res.json())
     } finally { setLoading(false) }
-  }, [])
+  }, [period])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -149,13 +151,14 @@ export default function RelatoriosPage() {
                 <option value="today">Hoje</option>
                 <option value="week">Esta semana</option>
                 <option value="month">Este mês</option>
+                <option value="quarter">Últimos 90 dias</option>
                 <option value="all">Todo o período</option>
               </select>
               <ChevronDown className="w-3 h-3" />
             </div>
             <button
               onClick={downloadCsv}
-              disabled={exporting || exportingXlsx}
+              disabled={exporting || exportingXlsx || exportingPdf}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 rounded-lg transition-colors"
             >
               <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-bounce' : ''}`} />
@@ -163,11 +166,19 @@ export default function RelatoriosPage() {
             </button>
             <button
               onClick={downloadXlsx}
-              disabled={exporting || exportingXlsx}
+              disabled={exporting || exportingXlsx || exportingPdf}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg transition-colors"
             >
               <Download className={`w-3.5 h-3.5 ${exportingXlsx ? 'animate-bounce' : ''}`} />
               {exportingXlsx ? 'Exportando…' : 'XLSX'}
+            </button>
+            <button
+              onClick={downloadPdf}
+              disabled={exporting || exportingXlsx || exportingPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60 rounded-lg transition-colors"
+            >
+              <Download className={`w-3.5 h-3.5 ${exportingPdf ? 'animate-bounce' : ''}`} />
+              {exportingPdf ? 'Gerando…' : 'PDF'}
             </button>
             <button
               onClick={fetchData}
@@ -404,7 +415,13 @@ export default function RelatoriosPage() {
         {/* Rodapé informativo */}
         <div className="text-center pt-2 pb-4">
           <p className="text-xs text-surface-400">
-            Dados consolidados em tempo real · Última atualização: {new Date().toLocaleTimeString('pt-BR')}
+            Dados consolidados · Período: <strong>{{
+              today: 'Hoje',
+              week: 'Últimos 7 dias',
+              month: 'Este mês',
+              quarter: 'Últimos 90 dias',
+              all: 'Todo o período',
+            }[period] ?? 'Todo o período'}</strong> · Atualizado às {new Date().toLocaleTimeString('pt-BR')}
           </p>
           <p className="text-xs text-surface-300 mt-0.5">
             Clique em <strong>CSV</strong> ou <strong>XLSX</strong> para exportar os dados da aba selecionada
