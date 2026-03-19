@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
+import { auditLog } from '@/domains/audit/audit.service'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -176,6 +177,15 @@ export async function GET(req: NextRequest) {
       CriadoEm:    new Date(b.createdAt).toLocaleDateString('pt-BR'),
     }))
 
+    await auditLog({
+      userId: auth.id,
+      module: 'reports',
+      action: 'EXPORT',
+      description: `Exportação de produção em formato ${format.toUpperCase()} (${rows.length} registros)`,
+      ipAddress: req.headers.get('x-forwarded-for') ?? 'unknown',
+      userAgent: req.headers.get('user-agent') ?? 'unknown',
+    })
+
     if (format === 'pdf') {
       return pdfResponse(
         'Relatório de Produção',
@@ -212,6 +222,15 @@ export async function GET(req: NextRequest) {
       Ativo:      i.isActive ? 'Sim' : 'Não',
       CriadoEm:  new Date(i.createdAt).toLocaleDateString('pt-BR'),
     }))
+
+    await auditLog({
+      userId: auth.id,
+      module: 'reports',
+      action: 'EXPORT',
+      description: `Exportação de logística em formato ${format.toUpperCase()} (${rows.length} registros)`,
+      ipAddress: req.headers.get('x-forwarded-for') ?? 'unknown',
+      userAgent: req.headers.get('user-agent') ?? 'unknown',
+    })
 
     if (format === 'pdf') {
       return pdfResponse(
@@ -270,6 +289,15 @@ export async function GET(req: NextRequest) {
       Resolucao:    n.resolution ?? '',
       ResolvidoEm:  n.resolvedAt ? new Date(n.resolvedAt).toLocaleDateString('pt-BR') : '',
     }))
+
+    await auditLog({
+      userId: auth.id,
+      module: 'reports',
+      action: 'EXPORT',
+      description: `Exportação de qualidade em formato ${format.toUpperCase()} (${iRows.length + ncRows.length} registros)`,
+      ipAddress: req.headers.get('x-forwarded-for') ?? 'unknown',
+      userAgent: req.headers.get('user-agent') ?? 'unknown',
+    })
 
     if (format === 'pdf') {
       return pdfResponse(
@@ -334,6 +362,15 @@ export async function GET(req: NextRequest) {
       ÚltimoLogin:  u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('pt-BR') : '',
       CriadoEm:    new Date(u.createdAt).toLocaleDateString('pt-BR'),
     }))
+
+    await auditLog({
+      userId: auth.id,
+      module: 'reports',
+      action: 'EXPORT',
+      description: `Exportação de RH em formato ${format.toUpperCase()} (${rows.length} registros)`,
+      ipAddress: req.headers.get('x-forwarded-for') ?? 'unknown',
+      userAgent: req.headers.get('user-agent') ?? 'unknown',
+    })
 
     if (format === 'pdf') {
       return pdfResponse(

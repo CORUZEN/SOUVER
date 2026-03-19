@@ -130,7 +130,7 @@ FASE 5 ──── Expansão e Consolidação
 | 1.4.10 | Rastreio de login: data, hora, IP, navegador e dispositivo | 🟢 Concluído |
 | 1.4.11 | Gerenciamento de sessões ativas e logout remoto | 🟢 Concluído |
 | 1.4.12 | Logs de autenticação: acessos, falhas, bloqueios e 2FA | 🟢 Concluído |
-| 1.4.13 | Obrigatoriedade de 2FA para perfis críticos | 🔴 Pendente |
+| 1.4.13 | Obrigatoriedade de 2FA para perfis críticos | ✅ Concluído |
 | 1.4.14 | Validação e sanitização de entradas no backend (Zod) | 🟢 Concluído |
 | 1.4.15 | Gestão segura de variáveis sensíveis e secrets | 🟢 Concluído |
 
@@ -161,7 +161,7 @@ FASE 5 ──── Expansão e Consolidação
 | 1.6.2 | Menu lateral com navegação por módulo e permissão | 🟢 Concluído |
 | 1.6.3 | Área de perfil e acesso rápido no cabeçalho | � Concluído |
 | 1.6.4 | Breadcrumb dinâmico por rota | 🟢 Concluído |
-| 1.6.5 | Sistema de notificações no topo (badge + painel) | 🔴 Pendente |
+| 1.6.5 | Sistema de notificações no topo (badge + painel) | ✅ Concluído |
 | 1.6.6 | Página de erro 404, 403 e falha geral (tratamento visual) | 🟢 Concluído |
 | 1.6.7 | Adaptação responsiva do layout para mobile e tablet | 🟢 Concluído |
 
@@ -175,8 +175,8 @@ FASE 5 ──── Expansão e Consolidação
 | 1.7.2 | Cards de métricas principais (KPIs iniciais) | 🟢 Concluído |
 | 1.7.3 | Gráficos e estatísticas iniciais (por setor disponível) | ✅ Concluído — BarChart Produção + PieChart Qualidade |
 | 1.7.4 | Painel de alertas operacionais | 🟢 Concluído |
-| 1.7.5 | Resumo de pendências visíveis por perfil | 🔴 Pendente |
-| 1.7.6 | Visão adaptada por perfil de acesso | 🔴 Pendente |
+| 1.7.5 | Resumo de pendências visíveis por perfil | ✅ Concluído |
+| 1.7.6 | Visão adaptada por perfil de acesso | ✅ Concluído |
 
 ---
 
@@ -254,7 +254,7 @@ FASE 5 ──── Expansão e Consolidação
 | 2.3.2 | Relatório de produção por período | 🟢 Concluído |
 | 2.3.3 | Relatório de movimentação de estoque | 🟢 Concluído |
 | 2.3.4 | Exportação em CSV, XLSX e PDF | ✅ Concluído — CSV + XLSX + PDF via jsPDF/autoTable |
-| 2.3.5 | Histórico de exportações realizadas (`report_exports`) | 🔴 Pendente |
+| 2.3.5 | Histórico de exportações realizadas (`report_exports`) | ✅ Concluído |
 | 2.3.6 | Filtros avançados nos relatórios (período, setor, usuário, tipo) | 🟢 Concluído |
 
 ---
@@ -351,7 +351,7 @@ FASE 5 ──── Expansão e Consolidação
 | 3.5.2 | 2FA obrigatório para perfis críticos (Admin, Gestão, Gerente) | ✅ Concluído — campo requireTwoFactor em Role + migration + login enforcement + toggle UI |
 | 3.5.3 | Alertas de acesso suspeito (IP diferente, horário incomum) | ✅ Concluído — detecção de IP diferente no login + notificação para usuário e admins |
 | 3.5.4 | Painel de gerenciamento de sessões ativas por usuário | � Concluído |
-| 3.5.5 | Revisão e hardening geral de segurança | 🔴 Pendente |
+| 3.5.5 | Revisão e hardening geral de segurança | ✅ Concluído |
 
 ---
 

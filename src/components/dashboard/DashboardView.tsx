@@ -253,6 +253,46 @@ export default function DashboardView() {
         ))}
       </div>
 
+      {/* ── Resumo de Pendências (1.7.5) ── */}
+      {!loadingKpis && kpis && (() => {
+        const items: { label: string; href: string; color: string; icon: React.ElementType }[] = []
+        if (show.production && (kpis.production.openCount > 0 || kpis.production.inProgressCount > 0)) {
+          const n = kpis.production.openCount + kpis.production.inProgressCount
+          items.push({ label: `${n} lote${n !== 1 ? 's' : ''} em aberto / andamento`, href: '/producao', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: PlayCircle })
+        }
+        if (show.quality && kpis.quality.criticalNCs > 0) {
+          items.push({ label: `${kpis.quality.criticalNCs} NC${kpis.quality.criticalNCs !== 1 ? 's' : ''} crítica${kpis.quality.criticalNCs !== 1 ? 's' : ''} em aberto`, href: '/qualidade', color: 'text-red-700 bg-red-50 border-red-200', icon: AlertTriangle })
+        }
+        if (show.inventory && kpis.inventory.lowStockCount > 0) {
+          items.push({ label: `${kpis.inventory.lowStockCount} item${kpis.inventory.lowStockCount !== 1 ? 'ns' : ''} abaixo do estoque mínimo`, href: '/logistica', color: 'text-orange-700 bg-orange-50 border-orange-200', icon: Package })
+        }
+        if (items.length === 0) return null
+        return (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-yellow-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-yellow-900 text-sm mb-2">Pendências que requerem atenção</h3>
+                <div className="flex flex-wrap gap-2">
+                  {items.map(({ label, href, color, icon: Icon }) => (
+                    <a
+                      key={href}
+                      href={href}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-opacity hover:opacity-80 ${color}`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )
+      })()}
+
       {/* Banner Fase 5 */}
       <Card className="border-primary-200 bg-primary-50">
         <div className="flex items-start gap-4">

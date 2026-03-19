@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   FileBarChart2, Factory, Truck, ShieldCheck, Users,
   RefreshCw, Download, Calendar, Filter, ChevronDown,
-  BarChart3, TrendingUp, Package, AlertTriangle, CheckCircle2
+  BarChart3, TrendingUp, Package, AlertTriangle, CheckCircle2, History, Clock
 } from 'lucide-react'
 
 // ─── Tipos ───────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ const SECTIONS: ReportSection[] = [
   { id: 'inventory',  label: 'Logística',     icon: <Truck className="w-4 h-4" />,          color: 'bg-cyan-600'    },
   { id: 'quality',    label: 'Qualidade',     icon: <ShieldCheck className="w-4 h-4" />,    color: 'bg-emerald-600' },
   { id: 'hr',         label: 'RH',            icon: <Users className="w-4 h-4" />,          color: 'bg-violet-600'  },
+  { id: 'history',    label: 'Histórico',     icon: <History className="w-4 h-4" />,         color: 'bg-slate-500'   },
 ]
 
 function StatCard({ label, value, sub, accent }: {
@@ -86,6 +87,38 @@ export default function RelatoriosPage() {
   const [exportingPdf,  setExportingPdf]  = useState(false)
   const [active, setActive]       = useState<string>('production')
   const [period, setPeriod]       = useState('today')
+
+  interface ExportLogEntry {
+    id: string
+    description: string | null
+    createdAt: string
+    user?: { fullName: string } | null
+  }
+  const [history, setHistory]             = useState<ExportLogEntry[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyError, setHistoryError]   = useState(false)
+
+  const fetchHistory = useCallback(async () => {
+    setLoadingHistory(true)
+    setHistoryError(false)
+    try {
+      const res = await fetch('/api/audit?module=reports&action=EXPORT&period=30d&limit=20')
+      if (res.ok) {
+        const json = await res.json()
+        setHistory(json.logs ?? [])
+      } else {
+        setHistoryError(true)
+      }
+    } catch {
+      setHistoryError(true)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (active === 'history') fetchHistory()
+  }, [active, fetchHistory])
 
   async function downloadFile(format: 'csv' | 'xlsx' | 'pdf') {
     const setter = format === 'xlsx' ? setExportingXlsx : format === 'pdf' ? setExportingPdf : setExporting
@@ -409,6 +442,84 @@ export default function RelatoriosPage() {
                 <p className="text-sm text-surface-400 text-center py-4">Nenhum colaborador cadastrado</p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Histórico de Exportações ── */}
+        {active === 'history' && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-slate-500 flex items-center justify-center text-white">
+                <History className="w-4 h-4" />
+              </div>
+              <h2 className="font-semibold text-surface-900">Histórico de Exportações</h2>
+              <button
+                onClick={fetchHistory}
+                className="ml-auto p-1.5 text-surface-400 hover:text-surface-700 border border-surface-200 rounded-lg"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingHistory ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-12 text-surface-400 text-sm gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Carregando histórico…
+              </div>
+            ) : historyError ? (
+              <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0" />
+                Sem permissão para visualizar a trilha de auditoria ou dados indisponíveis.
+              </div>
+            ) : history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-surface-400 text-sm gap-2">
+                <Clock className="w-8 h-8 opacity-30" />
+                <p>Nenhuma exportação registrada nos últimos 30 dias.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-surface-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-200 bg-surface-50">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Data / Hora</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Módulo</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Formato</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Registros</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Usuário</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((entry, idx) => {
+                      const desc = entry.description ?? ''
+                      const modMatch    = desc.match(/^Exportação de (.+?) em formato/)
+                      const fmtMatch    = desc.match(/em formato (\w+)/)
+                      const countMatch  = desc.match(/\((\d+) registros?\)/)
+                      const mod    = modMatch?.[1]  ?? '—'
+                      const fmt    = fmtMatch?.[1]  ?? '—'
+                      const count  = countMatch?.[1] ?? '—'
+                      const dt     = new Date(entry.createdAt)
+                      return (
+                        <tr key={entry.id} className={`border-b border-surface-100 last:border-0 ${idx % 2 === 0 ? '' : 'bg-surface-50'}`}>
+                          <td className="px-4 py-2.5 text-xs text-surface-700 whitespace-nowrap">
+                            {dt.toLocaleDateString('pt-BR')} {dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-surface-700 capitalize">{mod}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              fmt === 'PDF'  ? 'bg-rose-100 text-rose-700' :
+                              fmt === 'XLSX' ? 'bg-emerald-100 text-emerald-700' :
+                              'bg-indigo-100 text-indigo-700'
+                            }`}>{fmt}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-surface-500">{count}</td>
+                          <td className="px-4 py-2.5 text-xs text-surface-600">{entry.user?.fullName ?? '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
