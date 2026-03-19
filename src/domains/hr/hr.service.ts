@@ -160,22 +160,31 @@ export async function getHRKPIs(dateRange?: { from: Date; to: Date }) {
 // ─── Histograma de logins (últimos 7 dias) ───────────────────────
 
 export async function getLoginActivity() {
-  const days = 7
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - 6)
+  start.setHours(0, 0, 0, 0)
+
+  const rows = await prisma.$queryRaw<Array<{ day: Date; count: bigint }>>`
+    SELECT date_trunc('day', started_at) AS day, COUNT(*)::bigint AS count
+    FROM user_sessions
+    WHERE started_at >= ${start}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `
+
+  const byDay = new Map<string, number>(
+    rows.map((r) => [new Date(r.day).toDateString(), Number(r.count)])
+  )
+
   const result: { date: string; count: number }[] = []
-
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const start = new Date(d.setHours(0, 0, 0, 0))
-    const end   = new Date(d.setHours(23, 59, 59, 999))
-
-    const count = await prisma.userSession.count({
-      where: { startedAt: { gte: start, lte: end } },
-    })
-
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(now.getDate() - i)
+    d.setHours(0, 0, 0, 0)
     result.push({
-      date:  start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      count,
+      date: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      count: byDay.get(d.toDateString()) ?? 0,
     })
   }
 

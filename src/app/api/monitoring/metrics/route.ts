@@ -27,13 +27,13 @@ export async function GET(req: NextRequest) {
     integrationErrors,
   ] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
-    prisma.session.count({ where: { expiresAt: { gte: now }, revokedAt: null } }),
+    prisma.userSession.count({ where: { expiresAt: { gte: now }, revokedAt: null } }),
     prisma.auditLog.count({ where: { createdAt: { gte: last7 } } }),
     prisma.auditLog.count({ where: { createdAt: { gte: last30 } } }),
     prisma.productionBatch.count({ where: { createdAt: { gte: today } } }),
-    prisma.inventoryMovement.count({ where: { createdAt: { gte: today } } }),
+    prisma.inventoryMovement.count({ where: { movedAt: { gte: today } } }),
     prisma.nonConformance.count({ where: { status: 'OPEN' } }),
-    prisma.integrationLog.count({ where: { status: 'ERROR', createdAt: { gte: last7 } } }),
+    prisma.integrationLog.count({ where: { status: 'error', executedAt: { gte: last7 } } }),
   ])
 
   return NextResponse.json(

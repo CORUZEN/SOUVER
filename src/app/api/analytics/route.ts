@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * GET /api/analytics — Analytics avançado por módulo e usuário
@@ -62,12 +63,16 @@ export async function GET(req: NextRequest) {
   }))
 
   // ── Atividade por dia (timeline) ────────────────────────────
-  const dailyActivity = await prisma.$queryRaw<{ day: string; count: bigint }[]>`
-    SELECT DATE("createdAt") as day, COUNT(*)::bigint as count
-    FROM "AuditLog"
-    WHERE "createdAt" >= ${since}
-    ${filterUserId ? prisma.$queryRaw`AND "userId" = ${filterUserId}` : prisma.$queryRaw``}
-    GROUP BY DATE("createdAt")
+  const userClause = filterUserId
+    ? Prisma.sql`AND "user_id" = ${filterUserId}`
+    : Prisma.empty
+
+  const dailyActivity = await prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+    SELECT DATE("created_at") as day, COUNT(*)::bigint as count
+    FROM "audit_logs"
+    WHERE "created_at" >= ${since}
+    ${userClause}
+    GROUP BY DATE("created_at")
     ORDER BY day ASC
   `.catch(() => [])
 
@@ -100,7 +105,7 @@ export async function GET(req: NextRequest) {
       actions: actionsByType.map((a) => ({ action: a.action, count: a._count.id })),
       topUsers: topUsersWithNames,
       dailyActivity: dailyActivity.map((d) => ({
-        day: d.day,
+        day: d.day instanceof Date ? d.day.toISOString().slice(0, 10) : String(d.day),
         count: Number(d.count),
       })),
       production: {

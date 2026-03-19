@@ -123,6 +123,7 @@ model User {
   sentMessages         Message[]                 @relation("MessageSender")
   passwordResetTokens  PasswordResetToken[]
 
+  @@index([status, lastLoginAt])
   @@map("users")
 }
 
@@ -150,6 +151,7 @@ model UserSession {
 
   @@index([userId, status])
   @@index([status, expiresAt])
+  @@index([startedAt])
   @@map("user_sessions")
 }
 
@@ -320,6 +322,9 @@ model InventoryItem {
   createdBy       User                @relation("InventoryCreator", fields: [createdByUserId], references: [id])
   movements       InventoryMovement[]
 
+  @@index([isActive, name])
+  @@index([category])
+  @@index([location])
   @@map("inventory_items")
 }
 

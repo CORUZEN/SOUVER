@@ -130,7 +130,7 @@ export default function RelatorioExecutivoPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/dashboard/kpis?period=${period}`)
+      const res = await fetch(`/api/dashboard/kpis?period=${period}&variation=false`)
       if (res.ok) setData(await res.json())
     } finally { setLoading(false) }
   }, [period])

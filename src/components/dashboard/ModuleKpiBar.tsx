@@ -64,12 +64,12 @@ export default function ModuleKpiBar({ module }: { module: Module }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/dashboard/kpis?period=today')
+    fetch(`/api/dashboard/kpis?period=today&module=${module}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setKpis(d) })
       .catch(() => null)
       .finally(() => setLoading(false))
-  }, [])
+  }, [module])
 
   if (loading) {
     return (

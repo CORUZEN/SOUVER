@@ -12,6 +12,7 @@ export interface ItemFilter {
   isActive?: boolean
   lowStock?: boolean
   location?: string
+  compact?: boolean
   page?: number
   pageSize?: number
 }
@@ -45,8 +46,11 @@ export interface MovementInput {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function listItems(filter: ItemFilter) {
-  const { page = 1, pageSize = 20 } = filter
-  const skip = (page - 1) * pageSize
+  const safePage = Number.isFinite(filter.page) ? Math.max(1, Number(filter.page)) : 1
+  const safePageSize = Number.isFinite(filter.pageSize)
+    ? Math.min(100, Math.max(1, Number(filter.pageSize)))
+    : 20
+  const skip = (safePage - 1) * safePageSize
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = {}
@@ -63,28 +67,50 @@ export async function listItems(filter: ItemFilter) {
   if (filter.isActive !== undefined) where.isActive = filter.isActive
   if (filter.lowStock) {
     where.minQty = { not: null }
+    // Compara colunas no banco para evitar filtro em memória e manter paginação correta.
+    where.currentQty = { lte: prisma.inventoryItem.fields.minQty }
   }
 
-  let items = await prisma.inventoryItem.findMany({
-    where,
-    skip,
-    take: pageSize,
-    orderBy: { name: 'asc' },
-    include: {
-      createdBy: { select: { id: true, fullName: true } },
-      _count: { select: { movements: true } },
-    },
-  })
-
-  // Filtro de estoque baixo em memória
-  if (filter.lowStock) {
-    items = items.filter(
-      (i: typeof items[0]) => i.minQty !== null && Number(i.currentQty) <= Number(i.minQty)
-    )
-  }
+  const items = filter.compact
+    ? await prisma.inventoryItem.findMany({
+        where,
+        skip,
+        take: safePageSize,
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          description: true,
+          category: true,
+          unit: true,
+          currentQty: true,
+          minQty: true,
+          maxQty: true,
+          location: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
+    : await prisma.inventoryItem.findMany({
+        where,
+        skip,
+        take: safePageSize,
+        orderBy: { name: 'asc' },
+        include: {
+          createdBy: { select: { id: true, fullName: true } },
+          _count: { select: { movements: true } },
+        },
+      })
 
   const total = await prisma.inventoryItem.count({ where })
-  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+  return {
+    items,
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+  }
 }
 
 export async function getItemById(id: string) {
@@ -160,8 +186,11 @@ export async function listMovements(filter: {
   page?: number
   pageSize?: number
 }) {
-  const { page = 1, pageSize = 20 } = filter
-  const skip = (page - 1) * pageSize
+  const safePage = Number.isFinite(filter.page) ? Math.max(1, Number(filter.page)) : 1
+  const safePageSize = Number.isFinite(filter.pageSize)
+    ? Math.min(100, Math.max(1, Number(filter.pageSize)))
+    : 20
+  const skip = (safePage - 1) * safePageSize
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: Record<string, any> = {}
@@ -182,7 +211,7 @@ export async function listMovements(filter: {
     prisma.inventoryMovement.findMany({
       where,
       skip,
-      take: pageSize,
+      take: safePageSize,
       orderBy: { movedAt: 'desc' },
       include: {
         item: { select: { id: true, name: true, sku: true, unit: true } },
@@ -191,7 +220,13 @@ export async function listMovements(filter: {
     }),
   ])
 
-  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+  return {
+    items,
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+  }
 }
 
 /** Cria movimentação e ajusta o currentQty do item de forma transacional */
@@ -258,14 +293,13 @@ export async function getInventoryKPIs(dateRange?: { from: Date; to: Date }) {
     prisma.inventoryMovement.count({ where: { movedAt: movedDateFilter } }),
   ])
 
-  // Filtrar em memória os que estão abaixo do mínimo
-  const itemsWithMin = await prisma.inventoryItem.findMany({
-    where: { isActive: true, minQty: { not: null } },
-    select: { currentQty: true, minQty: true },
+  const lowCount = await prisma.inventoryItem.count({
+    where: {
+      isActive: true,
+      minQty: { not: null },
+      currentQty: { lte: prisma.inventoryItem.fields.minQty },
+    },
   })
-  const lowCount = itemsWithMin.filter(
-    (i: { currentQty: unknown; minQty: unknown }) => Number(i.currentQty) <= Number(i.minQty)
-  ).length
 
   return {
     totalItems,

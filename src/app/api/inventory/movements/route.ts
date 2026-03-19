@@ -35,7 +35,11 @@ export async function GET(req: NextRequest) {
     pageSize: Number(searchParams.get('pageSize') ?? 20),
   })
 
-  return NextResponse.json(result)
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'private, max-age=10, stale-while-revalidate=15',
+    },
+  })
 }
 
 export async function POST(req: NextRequest) {

@@ -120,7 +120,7 @@ export default function DashboardView() {
     const prd = p ?? period
     setLoadingKpis(true)
     try {
-      const res = await fetch(`/api/dashboard/kpis?period=${prd}`)
+      const res = await fetch(`/api/dashboard/kpis?period=${prd}&variation=true`)
       if (res.ok) setKpis(await res.json())
     } catch {
       // silent — mostra "—" nos cards

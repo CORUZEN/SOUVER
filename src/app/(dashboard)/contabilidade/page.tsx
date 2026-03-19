@@ -163,7 +163,7 @@ export default function ContabilidadePage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/dashboard/kpis')
+      const res = await fetch('/api/dashboard/kpis?variation=false')
       if (res.ok) setData(await res.json())
     } finally { setLoading(false) }
   }, [])

@@ -485,12 +485,12 @@ export default function QualidadePage() {
   }, [recPage, recResult])
 
   const fetchKPIs = useCallback(async () => {
-    const res = await fetch('/api/dashboard/kpis')
+    const res = await fetch('/api/dashboard/kpis?module=quality&variation=false')
     if (res.ok) {
       const data = await res.json()
       setKpis({
-        open:     data.quality?.openNCs     ?? 0,
-        critical: data.quality?.criticalNCs ?? 0,
+        open:     data.quality?.openNCs      ?? 0,
+        critical: data.quality?.criticalNCs  ?? 0,
         records:  data.quality?.totalRecords ?? 0,
       })
     }

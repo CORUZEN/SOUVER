@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Package,
   Plus,
@@ -123,8 +123,10 @@ export default function LogisticaPage() {
 
   // Filtros
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [filterLowStock, setFilterLowStock] = useState(false)
   const [filterActive, setFilterActive] = useState<string>('true')
+  const fetchControllerRef = useRef<AbortController | null>(null)
 
   // Mapa de posições
   const [viewMode, setViewMode] = useState<'list' | 'mapa'>('list')
@@ -203,22 +205,35 @@ export default function LogisticaPage() {
     if (overstock) return setExpError(`Quantidade informada para "${overstock.name}" excede o saldo atual (${overstock.currentQty} ${overstock.unit}).`)
     setSavingExp(true)
     try {
+      const mergedByItem = new Map<string, ExpItem & { qtyNum: number }>()
       for (const line of validLines) {
-        await fetch('/api/inventory/movements', {
+        const qtyNum = Number(line.qty)
+        const existing = mergedByItem.get(line.itemId)
+        if (existing) {
+          existing.qtyNum += qtyNum
+          continue
+        }
+        mergedByItem.set(line.itemId, { ...line, qtyNum })
+      }
+
+      const requests = Array.from(mergedByItem.values()).map(async (line) => {
+        const res = await fetch('/api/inventory/movements', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             itemId: line.itemId,
             type: 'EXIT',
-            quantity: Number(line.qty),
+            quantity: line.qtyNum,
             reason: `Expedição${expDest ? ` para ${expDest}` : ''}${expDocRef ? ` — Doc: ${expDocRef}` : ''}`,
             documentRef: expDocRef || undefined,
           }),
         })
-      }
+        if (!res.ok) throw new Error('Falha ao registrar saída')
+      })
+      await Promise.all(requests)
       setShowExpModal(false)
-      fetchItems()
-      if (selectedItem) openDetail(selectedItem)
+      await fetchItems()
+      if (selectedItem) await openDetail(selectedItem)
     } catch {
       setExpError('Erro ao registrar expedição. Tente novamente.')
     } finally {
@@ -229,6 +244,10 @@ export default function LogisticaPage() {
   // ─── Busca ─────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
+    fetchControllerRef.current?.abort()
+    const controller = new AbortController()
+    fetchControllerRef.current = controller
+
     setLoading(true)
     setError(null)
     try {
@@ -236,27 +255,35 @@ export default function LogisticaPage() {
       if (search) params.set('search', search)
       if (filterActive) params.set('isActive', filterActive)
       if (filterLowStock) params.set('lowStock', 'true')
-      const res = await fetch(`/api/inventory/items?${params}`)
+      const res = await fetch(`/api/inventory/items?${params}`, { signal: controller.signal })
       if (!res.ok) throw new Error('Falha ao carregar itens')
       const data = await res.json()
       setItems(data.items ?? [])
       setTotal(data.total ?? 0)
       setTotalPages(data.totalPages ?? 1)
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
       setError(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }, [page, search, filterActive, filterLowStock])
 
   useEffect(() => { fetchItems() }, [fetchItems])
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSearch(searchInput.trim())
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [searchInput])
 
   // ─── Mapa de Posições ─────────────────────────────────────────────────────
 
   async function loadMapItems() {
     setLoadingMap(true)
     try {
-      const params = new URLSearchParams({ page: '1', pageSize: '500', isActive: 'true' })
+      const params = new URLSearchParams({ page: '1', pageSize: '300', isActive: 'true', compact: 'true' })
       const res = await fetch(`/api/inventory/items?${params}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
@@ -270,7 +297,7 @@ export default function LogisticaPage() {
 
   function switchToMap() {
     setViewMode('mapa')
-    loadMapItems()
+    if (!loadingMap && mapItems.length === 0) loadMapItems()
   }
 
   // ─── Detalhe ───────────────────────────────────────────────────────────────
@@ -368,13 +395,15 @@ export default function LogisticaPage() {
         alert(err.error ?? 'Erro ao registrar movimentação')
         return
       }
+      const created = await res.json()
       setShowMovModal(false)
       setMovForm({ type: 'ENTRY', quantity: '', reason: '', supplier: '', documentRef: '', batchRef: '' })
-      // Recarregar dados
-      const updated = await fetch(`/api/inventory/items/${selectedItem.id}`).then(r => r.json())
-      setSelectedItem(updated)
-      openDetail(updated)
-      fetchItems()
+      const nextSelected = {
+        ...selectedItem,
+        currentQty: Number(created?.qtyAfter ?? selectedItem.currentQty),
+      }
+      setSelectedItem(nextSelected)
+      await Promise.all([openDetail(nextSelected), fetchItems()])
     } finally {
       setSavingMov(false)
     }
@@ -443,8 +472,8 @@ export default function LogisticaPage() {
             <div className="flex-1 relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
               <input
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                value={searchInput}
+                onChange={e => { setSearchInput(e.target.value); setPage(1) }}
                 placeholder="Buscar por SKU, nome ou categoria..."
                 className="w-full pl-9 pr-3 py-2 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
               />

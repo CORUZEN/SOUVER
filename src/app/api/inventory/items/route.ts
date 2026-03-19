@@ -25,13 +25,18 @@ export async function GET(req: NextRequest) {
     search: searchParams.get('search') ?? undefined,
     category: searchParams.get('category') ?? undefined,
     location: searchParams.get('location') ?? undefined,
+    compact: searchParams.get('compact') === 'true',
     isActive: searchParams.has('isActive') ? searchParams.get('isActive') === 'true' : undefined,
     lowStock: searchParams.get('lowStock') === 'true',
     page: Number(searchParams.get('page') ?? 1),
     pageSize: Number(searchParams.get('pageSize') ?? 20),
   })
 
-  return NextResponse.json(result)
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'private, max-age=10, stale-while-revalidate=15',
+    },
+  })
 }
 
 export async function POST(req: NextRequest) {

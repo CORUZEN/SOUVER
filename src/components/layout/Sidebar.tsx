@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -50,6 +51,8 @@ const NAV_SECTIONS = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   return (
     <aside className="w-64 shrink-0 bg-surface-900 flex flex-col h-full">
@@ -87,7 +90,7 @@ export default function Sidebar() {
             </p>
             <div className="space-y-0.5">
               {items.map(({ label: itemLabel, href, icon: Icon }) => {
-                const active = pathname === href || pathname.startsWith(href + '/')
+                const active = mounted && (pathname === href || pathname.startsWith(href + '/'))
                 return (
                   <Link
                     key={href}
