@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ShieldCheck, Plus, Search, AlertTriangle, CheckCircle2, Clock, XCircle,
   ChevronRight, RefreshCw, Eye, Tag, Building2, User, Calendar, FileText,
@@ -436,6 +436,7 @@ export default function QualidadePage() {
   const [ncTotal, setNcTotal] = useState(0)
   const [ncPage, setNcPage]   = useState(1)
   const [ncSearch, setNcSearch]     = useState('')
+  const [debouncedNcSearch, setDebouncedNcSearch] = useState('')
   const [ncStatus, setNcStatus]     = useState('')
   const [ncSeverity, setNcSeverity] = useState('')
   const [selectedNC, setSelectedNC] = useState<NC | null>(null)
@@ -453,52 +454,83 @@ export default function QualidadePage() {
 
   // KPI counters
   const [kpis, setKpis] = useState({ open: 0, critical: 0, records: 0 })
+  const ncAbortRef = useRef<AbortController | null>(null)
+  const recordsAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedNcSearch(ncSearch), 300)
+    return () => clearTimeout(timeout)
+  }, [ncSearch])
 
   const fetchNCs = useCallback(async () => {
+    ncAbortRef.current?.abort()
+    const controller = new AbortController()
+    ncAbortRef.current = controller
     setLoadingNCs(true)
     try {
       const params = new URLSearchParams({ page: String(ncPage), pageSize: '15' })
-      if (ncSearch)   params.set('search',   ncSearch)
+      if (debouncedNcSearch) params.set('search', debouncedNcSearch)
       if (ncStatus)   params.set('status',   ncStatus)
       if (ncSeverity) params.set('severity', ncSeverity)
-      const res = await fetch(`/api/quality/nonconformances?${params}`)
+      const res = await fetch(`/api/quality/nonconformances?${params}`, { signal: controller.signal })
       if (res.ok) {
         const data = await res.json()
         setNcs(data.items)
         setNcTotal(data.total)
       }
-    } finally { setLoadingNCs(false) }
-  }, [ncPage, ncSearch, ncStatus, ncSeverity])
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Erro ao carregar NCs', err)
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoadingNCs(false)
+    }
+  }, [ncPage, debouncedNcSearch, ncStatus, ncSeverity])
 
   const fetchRecords = useCallback(async () => {
+    recordsAbortRef.current?.abort()
+    const controller = new AbortController()
+    recordsAbortRef.current = controller
     setLoadingRec(true)
     try {
       const params = new URLSearchParams({ page: String(recPage), pageSize: '15' })
       if (recResult) params.set('result', recResult)
-      const res = await fetch(`/api/quality/records?${params}`)
+      const res = await fetch(`/api/quality/records?${params}`, { signal: controller.signal })
       if (res.ok) {
         const data = await res.json()
         setRecords(data.items)
         setRecTotal(data.total)
       }
-    } finally { setLoadingRec(false) }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Erro ao carregar inspeções', err)
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoadingRec(false)
+    }
   }, [recPage, recResult])
 
   const fetchKPIs = useCallback(async () => {
-    const res = await fetch('/api/dashboard/kpis?module=quality&variation=false')
+    const res = await fetch('/api/quality/kpis')
     if (res.ok) {
       const data = await res.json()
       setKpis({
-        open:     data.quality?.openNCs      ?? 0,
-        critical: data.quality?.criticalNCs  ?? 0,
-        records:  data.quality?.totalRecords ?? 0,
+        open:     data.openNCs      ?? 0,
+        critical: data.criticalNCs  ?? 0,
+        records:  data.totalRecords ?? 0,
       })
     }
   }, [])
 
   useEffect(() => { fetchNCs() }, [fetchNCs])
-  useEffect(() => { fetchRecords() }, [fetchRecords])
+  useEffect(() => {
+    if (tab === 'inspections') fetchRecords()
+  }, [tab, fetchRecords])
   useEffect(() => { fetchKPIs() }, [fetchKPIs])
+  useEffect(() => () => {
+    ncAbortRef.current?.abort()
+    recordsAbortRef.current?.abort()
+  }, [])
 
   function handleNCStatusChange(id: string, status: NCStatus) {
     setNcs(prev => prev.map(n => n.id === id ? { ...n, status } : n))

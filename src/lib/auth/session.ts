@@ -38,22 +38,51 @@ export async function getCurrentUser(token: string) {
   const payload = await verifyTokenEdge(token)
   if (!payload) return null
 
-  const session = await prisma.userSession.findFirst({
-    where: {
-      id: payload.sessionId,
-      userId: payload.sub,
-      status: 'ACTIVE',
-      expiresAt: { gt: new Date() },
-      revokedAt: null,
+  const session = await prisma.userSession.findUnique({
+    where: { id: payload.sessionId },
+    select: {
+      userId: true,
+      status: true,
+      expiresAt: true,
+      revokedAt: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          login: true,
+          roleId: true,
+          departmentId: true,
+          isActive: true,
+          twoFactorEnabled: true,
+          role: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              requireTwoFactor: true,
+              sessionDurationHours: true,
+            },
+          },
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
   })
 
   if (!session) return null
+  if (session.userId !== payload.sub) return null
+  if (session.status !== 'ACTIVE') return null
+  if (session.revokedAt) return null
+  if (session.expiresAt <= new Date()) return null
+  if (!session.user?.isActive) return null
 
-  return prisma.user.findFirst({
-    where: { id: payload.sub, isActive: true },
-    include: { role: true, department: true },
-  })
+  return session.user
 }
 
 /** Revoga uma sessão pelo token JWT */

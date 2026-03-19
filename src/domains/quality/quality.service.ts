@@ -277,3 +277,17 @@ export async function getQualityKPIs(dateRange?: { from: Date; to: Date }) {
     resolvedThisMonth,
   }
 }
+
+export async function getQualityKpisSummary() {
+  const [totalRecords, openNCs, criticalNCs] = await Promise.all([
+    prisma.qualityRecord.count(),
+    prisma.nonConformance.count({
+      where: { status: { in: ['OPEN', 'IN_ANALYSIS', 'IN_TREATMENT'] as never[] } },
+    }),
+    prisma.nonConformance.count({
+      where: { severity: 'CRITICAL', status: { not: 'CLOSED' as never } },
+    }),
+  ])
+
+  return { totalRecords, openNCs, criticalNCs }
+}

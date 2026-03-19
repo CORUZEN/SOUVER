@@ -410,6 +410,7 @@ model QualityRecord {
   nonConformances NonConformance[]
 
   @@index([result, inspectedAt])
+  @@index([inspectedAt])
   @@index([batchId, result])
   @@map("quality_records")
 }
@@ -449,6 +450,9 @@ model NonConformance {
   assignedTo      User?             @relation("NCAssignee", fields: [assignedToId], references: [id])
 
   @@index([status, severity, openedAt])
+  @@index([createdAt])
+  @@index([severity, status])
+  @@index([resolvedAt])
   @@index([departmentId, status])
   @@index([assignedToId, status])
   @@map("non_conformances")
