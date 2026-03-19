@@ -447,7 +447,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 5 — EXPANSÃO E CONSOLIDAÇÃO
 
 > **Objetivo:** Consolidar o sistema como plataforma de longo prazo, preparar modo desktop e elevar performance em escala.
-> **Status:** 🔴 Não Iniciado
+> **Status:** � Em Andamento — Fase 5 iniciada (performance + compliance concluídos); Fase 4 em andamento (Sankhya + filas pendentes)
 > **Pré-requisito:** Fase 4 concluída e aprovada.
 
 ---
@@ -528,7 +528,7 @@ FASE 5 ──── Expansão e Consolidação
 | `production_events` | Fase 2 | 🟢 Concluído |
 | `inventory_items` | Fase 2 | 🟢 Concluído |
 | `inventory_movements` | Fase 2 | 🟢 Concluído |
-| `report_exports` | Fase 2 | 🔴 Pendente |
+| `report_exports` | Fase 2 | ✅ Concluído |
 | `quality_records` | Fase 3 | 🟢 Concluído |
 | `non_conformities` | Fase 3 | 🟢 Concluído |
 | `integrations` | Fase 4 | 🟢 Concluído |
@@ -549,20 +549,20 @@ FASE 5 ──── Expansão e Consolidação
 | Auditoria e Logs | Fase 1 | 🟢 Concluído |
 | Produção e Linha de Produção | Fase 2 | 🟢 Concluído |
 | Logística, Depósito e Armazenamento | Fase 2 | 🟢 Concluído |
-| Relatórios e Exportações | Fase 2 | 🟡 Parcial — CSV + XLSX OK, PDF pendente |
+| Relatórios e Exportações | Fase 2 | ✅ Concluído — CSV + XLSX + PDF (jsPDF/autoTable) + histórico de exportações |
 | Comunicação em Tempo Real (Chat) | Fase 2 | 🟢 Concluído |
 | Qualidade e Não Conformidades | Fase 3 | 🟢 Concluído |
 | Recursos Humanos | Fase 3 | 🟢 Concluído |
 | Contabilidade e Gestão Administrativa | Fase 3 | ✅ Concluído — Página completa com KPIs e indicadores |
-| Segurança Avançada e 2FA Obrigatório | Fase 3 | � Parcial — 2FA por perfil OK; expiração de sessão por perfil pendente |
-| Notificações Avançadas | Fase 3 | 🔴 Pendente |
+| Segurança Avançada e 2FA Obrigatório | Fase 3 | ✅ Concluído — 2FA por perfil + expiração de sessão por perfil + alertas de acesso suspeito |
+| Notificações Avançadas | Fase 3 | ✅ Concluído — tipos configuráveis, notificações por perfil, marcação em lote, histórico |
 | Integração com Sankhya (ERP) | Fase 4 | 🟡 Parcial — schema/APIs prontos, sync real pendente |
 | Filas, Jobs e Eventos Assíncronos | Fase 4 | 🔴 Não Iniciado |
-| Relatórios Executivos + BI | Fase 4 | 🔴 Não Iniciado |
-| Automação de Rotinas | Fase 4 | 🔴 Não Iniciado |
-| Performance e Escalabilidade | Fase 5 | 🔴 Não Iniciado |
+| Relatórios Executivos + BI | Fase 4 | ✅ Concluído — visão executiva consolidada, indicadores comparativos, exportações |
+| Automação de Rotinas | Fase 4 | ✅ Concluído — alertas automáticos por NC, cron de relatórios diários, limpeza automática |
+| Performance e Escalabilidade | Fase 5 | � Parcial — queries + índices + cache + paginação cursor-based concluídos; monitoramento e testes de carga pendentes |
 | Empacotamento Desktop | Fase 5 | 🔴 Não Iniciado |
-| Compliance e Auditoria Final | Fase 5 | 🔴 Não Iniciado |
+| Compliance e Auditoria Final | Fase 5 | � Parcial — trilha revisada, exportação CSV, relatório de compliance concluídos; retenção/arquivamento pendente |
 | Analytics Avançado e Expansão | Fase 5 | 🔴 Não Iniciado |
 
 ---
@@ -594,4 +594,4 @@ FASE 5 ──── Expansão e Consolidação
 
 ---
 
-*Última atualização: 19/03/2026 — Gráficos Dashboard (recharts), XLSX export, módulo Contabilidade e 2FA obrigatório por perfil (schema + migration + API + UI) concluídos. Fase 4 em andamento (Integrações).*
+*Última atualização: 19/03/2026 — Concluídos: cache estratégico (5.1.2), paginação cursor-based (5.1.3), exportação CSV de auditoria (5.3.3), relatório de compliance (5.3.4), revisão da trilha de auditoria (5.3.1), circuit breaker/retry (4.1.7), cron de relatórios (4.4.2), mapa de posições logística (2.2.4), LineChart tendência (3.4.3). Fase 5 iniciada. Pendentes principais: Sankhya (4.1.3/4.1.4), filas assíncronas (4.2.x), monitoramento (5.1.4), empacotamento desktop (5.2.x), analíticos avançados (5.4.x).*
