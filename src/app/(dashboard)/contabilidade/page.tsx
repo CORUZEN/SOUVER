@@ -17,6 +17,9 @@ import {
   Activity,
   ArrowRight,
   Plug,
+  Globe,
+  Zap,
+  XCircle,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Skeleton'
@@ -55,6 +58,25 @@ interface KpiData {
     loggedToday: number
   }
   activeUsers?: number
+}
+
+interface IntegrationSummary {
+  id: string; name: string; provider: string; status: string
+  lastSyncAt: string | null; lastSyncStatus: string | null
+  _count: { logs: number }
+}
+interface IntegrationLog {
+  id: string; eventType: string; status: string; message: string | null
+  durationMs: number | null; recordsAffected: number | null; executedAt: string
+  integration: { name: string; provider: string }
+}
+interface IntegrationData {
+  integrations: IntegrationSummary[]
+  recentLogs:   IntegrationLog[]
+  summary: {
+    total: number; active: number; error: number; inactive: number
+    successRate: number; totalLogs30d: number; errorLogs30d: number
+  }
 }
 
 // ─── Componentes auxiliares ──────────────────────────────────────
@@ -135,6 +157,8 @@ function Row({ label, value, highlight }: { label: string; value: string | numbe
 export default function ContabilidadePage() {
   const [data, setData]       = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [intData, setIntData] = useState<IntegrationData | null>(null)
+  const [intLoading, setIntLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -144,7 +168,16 @@ export default function ContabilidadePage() {
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const fetchIntegrations = useCallback(async () => {
+    setIntLoading(true)
+    try {
+      const res = await fetch('/api/integrations/summary')
+      if (res.ok) setIntData(await res.json())
+    } catch { /* silencioso */ }
+    finally { setIntLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchData(); fetchIntegrations() }, [fetchData, fetchIntegrations])
 
   const p  = data?.production
   const inv = data?.inventory
@@ -329,6 +362,106 @@ export default function ContabilidadePage() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Integrações Externas — Visão Estratégica ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-sky-600 flex items-center justify-center shrink-0">
+              <Globe className="w-4 h-4 text-white" />
+            </div>
+            <CardTitle>Integrações Externas — Fontes de Dados</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {intLoading ? <Spinner /> : !intData ? (
+            <p className="text-sm text-surface-400">Dados indisponíveis</p>
+          ) : (
+            <div className="space-y-4">
+              {/* KPIs de integrações */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-surface-100 p-3 text-center">
+                  <p className="text-2xl font-bold text-surface-900">{intData.summary.total}</p>
+                  <p className="text-xs text-surface-500">Integrações</p>
+                </div>
+                <div className="rounded-xl border border-surface-100 p-3 text-center">
+                  <p className="text-2xl font-bold text-emerald-600">{intData.summary.active}</p>
+                  <p className="text-xs text-surface-500">Ativas</p>
+                </div>
+                <div className="rounded-xl border border-surface-100 p-3 text-center">
+                  <p className={`text-2xl font-bold ${intData.summary.error > 0 ? 'text-red-600' : 'text-surface-900'}`}>{intData.summary.error}</p>
+                  <p className="text-xs text-surface-500">Com Erro</p>
+                </div>
+                <div className="rounded-xl border border-surface-100 p-3 text-center">
+                  <p className={`text-2xl font-bold ${intData.summary.successRate >= 90 ? 'text-emerald-600' : 'text-amber-600'}`}>{intData.summary.successRate}%</p>
+                  <p className="text-xs text-surface-500">Taxa de Sucesso (30d)</p>
+                </div>
+              </div>
+
+              {/* Lista de integrações */}
+              {intData.integrations.length > 0 && (
+                <div className="space-y-2">
+                  {intData.integrations.map((ig) => (
+                    <div key={ig.id} className="flex items-center justify-between py-2 px-3 rounded-lg border border-surface-100 hover:bg-surface-50 transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        {ig.status === 'ACTIVE' ? <Zap className="w-4 h-4 text-emerald-500" /> :
+                         ig.status === 'ERROR'  ? <XCircle className="w-4 h-4 text-red-500" /> :
+                         <Plug className="w-4 h-4 text-surface-400" />}
+                        <div>
+                          <p className="text-sm font-medium text-surface-800">{ig.name}</p>
+                          <p className="text-[11px] text-surface-400 capitalize">{ig.provider.replace(/_/g, ' ')}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          ig.status === 'ACTIVE'  ? 'bg-emerald-100 text-emerald-700' :
+                          ig.status === 'ERROR'   ? 'bg-red-100 text-red-700' :
+                          ig.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                          'bg-surface-100 text-surface-600'
+                        }`}>{ig.status}</span>
+                        {ig.lastSyncAt && (
+                          <p className="text-[10px] text-surface-400 mt-0.5">
+                            Último sync: {new Date(ig.lastSyncAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Últimos logs */}
+              {intData.recentLogs.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-surface-600 mb-2">Últimas Atividades</p>
+                  <div className="space-y-1">
+                    {intData.recentLogs.slice(0, 5).map((log) => (
+                      <div key={log.id} className="flex items-center justify-between text-xs py-1.5 border-b border-surface-50 last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : log.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                          <span className="text-surface-700 font-medium">{log.integration.name}</span>
+                          <span className="text-surface-400">{log.eventType}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-surface-400">
+                          {log.recordsAffected != null && <span>{log.recordsAffected} reg.</span>}
+                          {log.durationMs != null && <span>{log.durationMs}ms</span>}
+                          <span>{new Date(log.executedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-center pt-2">
+                <Link href="/integracoes" className="text-xs text-primary-600 hover:underline font-medium">
+                  Gerenciar Integrações →
+                </Link>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

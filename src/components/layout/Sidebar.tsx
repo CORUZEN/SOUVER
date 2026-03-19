@@ -18,6 +18,7 @@ import {
   Building2,
   Plug,
   DollarSign,
+  BarChart3,
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -41,6 +42,7 @@ const NAV_SECTIONS = [
       { label: 'Usuários',        href: '/usuarios',       icon: UserCog     },
       { label: 'Departamentos',   href: '/departamentos',  icon: Building2   },
       { label: 'Auditoria',       href: '/auditoria',      icon: ClipboardList },
+      { label: 'Analytics',        href: '/analytics',      icon: BarChart3     },
       { label: 'Configurações',   href: '/configuracoes',  icon: Settings    },
     ],
   },

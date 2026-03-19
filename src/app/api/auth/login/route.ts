@@ -4,6 +4,7 @@ import { verifyPassword } from '@/lib/auth/password'
 import { createSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 import {
   createNotification,
   createNotificationsForRole,
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
         ipAddress: ip,
         userAgent,
       })
+      emitDomainEvent('auth:login.failed', { login, ip })
       return NextResponse.json(
         { message: 'Credenciais inválidas.' },
         { status: 401 }
@@ -94,6 +96,7 @@ export async function POST(req: NextRequest) {
         ipAddress: ip,
         userAgent,
       })
+      emitDomainEvent('auth:login.failed', { login: user.login, ip })
       return NextResponse.json(
         { message: 'Credenciais inválidas.' },
         { status: 401 }
@@ -158,6 +161,8 @@ export async function POST(req: NextRequest) {
       ipAddress: ip,
       userAgent,
     })
+
+    emitDomainEvent('auth:login.success', { userId: user.id, ip })
 
     // ── Alerta de acesso suspeito (IP diferente do último login) ──
     if (

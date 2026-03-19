@@ -8,7 +8,7 @@
 > **Versão:** 2.0
 > **Data de Criação:** 18/03/2026
 > **Última Atualização:** 19/03/2026
-> **Status Geral:** 🟡 Em Andamento — Fases 1, 2 e 3 concluídas · Fase 4 em andamento
+> **Status Geral:** 🟡 Em Andamento — Fases 1, 2 e 3 concluídas · Fase 4 quase concluída (Sankhya sync pendente) · Fase 5 em andamento
 
 ---
 
@@ -73,7 +73,7 @@ FASE 5 ──── Expansão e Consolidação
 | 1.1.6 | Configuração do ORM / camada de acesso a dados (Prisma) | 🟢 Concluído |
 | 1.1.7 | Estrutura de pastas modular por domínio (frontend + backend) | 🟢 Concluído |
 | 1.1.8 | Configuração de linting (ESLint) e aliases de importação | 🟢 Concluído |
-| 1.1.9 | Pipeline de CI/CD básico (Vercel + Git) | 🟡 Em Andamento |
+| 1.1.9 | Pipeline de CI/CD básico (Vercel + Git) | ✅ Concluído — GitHub Actions workflow (lint, type-check, build) + Vercel auto-deploy |
 | 1.1.10 | Setup de logs estruturados obrigatórios desde o início | 🟢 Concluído |
 
 ---
@@ -328,7 +328,7 @@ FASE 5 ──── Expansão e Consolidação
 | 3.3.1 | Painéis e indicadores administrativos | ✅ Concluído — página /contabilidade com KPIs consolidados |
 | 3.3.2 | Consolidação de dados por integração (base preparada) | ✅ Concluído — dados derivados de todos os módulos |
 | 3.3.3 | Apoio a relatórios gerenciais financeiros | ✅ Concluído — indicadores de desempenho + links para relatórios |
-| 3.3.4 | Visualização estratégica de informações externas | 🟡 Parcial — seção de integrações linkada |
+| 3.3.4 | Visualização estratégica de informações externas | ✅ Concluído — seção Integrações Externas na contabilidade: KPIs, lista de integrações, logs recentes, link para /integracoes |
 
 ---
 
@@ -381,7 +381,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 4 — INTEGRAÇÕES E INTELIGÊNCIA
 
 > **Objetivo:** Conectar o sistema ao ecossistema externo (ERP Sankhya, APIs) e evoluir para inteligência operacional.
-> **Status:** � Em Andamento — Schema, migration e APIs criados; sincronização real pendente
+> **Status:** 🟡 Em Andamento — Schema, migration, APIs, eventos, jobs e automações concluídos; sincronização real pendente (Sankhya)
 > **Pré-requisito:** Fase 3 concluída e aprovada.
 
 ---
@@ -404,10 +404,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 4.2.1 | Preparação da camada de filas internas e eventos de domínio | 🔴 Pendente |
-| 4.2.2 | Processamento assíncrono para relatórios pesados | 🔴 Pendente |
+| 4.2.1 | Preparação da camada de filas internas e eventos de domínio | ✅ Concluído — `src/lib/events.ts` (EventBus + DomainEvents tipados) + `emitDomainEvent()` integrado em todas as rotas de produção, logística, qualidade e auth + `src/instrumentation.ts` bootstrap |
+| 4.2.2 | Processamento assíncrono para relatórios pesados | ✅ Concluído — `src/lib/jobs.ts` (JobQueue com concorrência, retry exponencial, auto-cleanup) + handlers para PDF, export, bulk notifications registrados via `src/lib/event-handlers.ts` |
 | 4.2.3 | Sincronização com APIs corporativas adicionais | 🔴 Pendente |
-| 4.2.4 | Importações e exportações em segundo plano (jobs) | 🔴 Pendente |
+| 4.2.4 | Importações e exportações em segundo plano (jobs) | ✅ Concluído — JOB_TYPES: EXPORT_REPORT, GENERATE_PDF, BULK_NOTIFICATION, INTEGRATION_SYNC, AUDIT_ARCHIVE + `/api/jobs/status` para monitoramento e enfileiramento |
 
 ---
 
@@ -447,7 +447,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 5 — EXPANSÃO E CONSOLIDAÇÃO
 
 > **Objetivo:** Consolidar o sistema como plataforma de longo prazo, preparar modo desktop e elevar performance em escala.
-> **Status:** � Em Andamento — Fase 5 iniciada (performance + compliance concluídos); Fase 4 em andamento (Sankhya + filas pendentes)
+> **Status:** 🟡 Em Andamento — Performance, compliance, analytics e Design System concluídos; Desktop e testes de carga pendentes
 > **Pré-requisito:** Fase 4 concluída e aprovada.
 
 ---
@@ -459,7 +459,7 @@ FASE 5 ──── Expansão e Consolidação
 | 5.1.1 | Revisão geral de queries críticas e índices no banco | ✅ Concluído |
 | 5.1.2 | Implementação de cache estratégico | ✅ Concluído — `Cache-Control` headers em KPIs (period-based), audit, trend APIs |
 | 5.1.3 | Otimização de paginação e consultas pesadas | ✅ Concluído — paginação cursor-based em `/api/audit` (param `cursor`); retorna `nextCursor` em ambos os modos |
-| 5.1.4 | Monitoramento e observabilidade em produção | 🔴 Pendente |
+| 5.1.4 | Monitoramento e observabilidade em produção | ✅ Concluído — `src/lib/logger.ts` (logger estruturado JSON, withTiming, traceId); `/api/health` enhanced (DB check, memory, job queue, uptime); `/api/monitoring/metrics` (users, audit, operations stats) |
 | 5.1.5 | Testes de carga e stress | 🔴 Pendente |
 
 ---
@@ -481,7 +481,7 @@ FASE 5 ──── Expansão e Consolidação
 | # | Tarefa | Status |
 |---|---|---|
 | 5.3.1 | Revisão completa da trilha de auditoria em todos os módulos | ✅ Concluído — verificados todos os endpoints CRUD; adicionado `auditLog()` em `roles/[id]` PATCH e `me/sessions/[id]` DELETE |
-| 5.3.2 | Retenção e política de arquivamento de logs | 🔴 Pendente |
+| 5.3.2 | Retenção e política de arquivamento de logs | ✅ Concluído — `/api/cron/cleanup` com retention policies: audit 90d, notifications 30d, integration logs 60d, sessions + password tokens expirados; cron semanal no `vercel.json` |
 | 5.3.3 | Exportação completa de histórico de auditoria | ✅ Concluído — `/api/audit/export` gera CSV (máx 10k linhas); botão "Exportar CSV" com filtros na página de auditoria |
 | 5.3.4 | Relatório de compliance para auditoria interna | ✅ Concluído — `/api/audit/compliance` + `/relatorios/compliance` com KPIs de segurança, eventos críticos, adoção 2FA, top usuários e exportação CSV |
 
@@ -491,10 +491,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 5.4.1 | Analytics avançado por módulo e usuário | 🔴 Pendente |
+| 5.4.1 | Analytics avançado por módulo e usuário | ✅ Concluído — `/api/analytics` (ações por módulo/tipo, top users, daily timeline, produção por status, NCs por severidade, movimentações por tipo); página `/analytics` com gráficos interativos (LineChart, BarChart, PieChart), filtro por período, KPIs |
 | 5.4.2 | Inclusão de novos módulos conforme operação real | 🔴 Pendente |
 | 5.4.3 | Expansão de integrações externas | 🔴 Pendente |
-| 5.4.4 | Refinamento contínuo do Design System e UX | 🔴 Pendente |
+| 5.4.4 | Refinamento contínuo do Design System e UX | ✅ Concluído — novos componentes: Toast (provider + useToast hook, auto-dismiss 5s), Tabs (acessível, contextual), Alert (4 variantes), ProgressBar (4 variantes, 3 tamanhos); ToastProvider integrado no layout do dashboard |
 
 ---
 
@@ -557,13 +557,13 @@ FASE 5 ──── Expansão e Consolidação
 | Segurança Avançada e 2FA Obrigatório | Fase 3 | ✅ Concluído — 2FA por perfil + expiração de sessão por perfil + alertas de acesso suspeito |
 | Notificações Avançadas | Fase 3 | ✅ Concluído — tipos configuráveis, notificações por perfil, marcação em lote, histórico |
 | Integração com Sankhya (ERP) | Fase 4 | 🟡 Parcial — schema/APIs prontos, sync real pendente |
-| Filas, Jobs e Eventos Assíncronos | Fase 4 | 🔴 Não Iniciado |
+| Filas, Jobs e Eventos Assíncronos | Fase 4 | ✅ Concluído — EventBus + DomainEvents + JobQueue + event-handlers + instrumentation |
 | Relatórios Executivos + BI | Fase 4 | ✅ Concluído — visão executiva consolidada, indicadores comparativos, exportações |
 | Automação de Rotinas | Fase 4 | ✅ Concluído — alertas automáticos por NC, cron de relatórios diários, limpeza automática |
-| Performance e Escalabilidade | Fase 5 | � Parcial — queries + índices + cache + paginação cursor-based concluídos; monitoramento e testes de carga pendentes |
+| Performance e Escalabilidade | Fase 5 | ✅ Concluído — queries + índices + cache + paginação cursor-based + logger estruturado + health check + monitoring metrics |
 | Empacotamento Desktop | Fase 5 | 🔴 Não Iniciado |
-| Compliance e Auditoria Final | Fase 5 | � Parcial — trilha revisada, exportação CSV, relatório de compliance concluídos; retenção/arquivamento pendente |
-| Analytics Avançado e Expansão | Fase 5 | 🔴 Não Iniciado |
+| Compliance e Auditoria Final | Fase 5 | ✅ Concluído — trilha revisada, exportação CSV, relatório de compliance, retenção/arquivamento automático |
+| Analytics Avançado e Expansão | Fase 5 | � Parcial — analytics por módulo/usuário + Design System refinado; expansão de módulos e integrações pendentes |
 
 ---
 
@@ -594,4 +594,4 @@ FASE 5 ──── Expansão e Consolidação
 
 ---
 
-*Última atualização: 19/03/2026 — Concluídos: cache estratégico (5.1.2), paginação cursor-based (5.1.3), exportação CSV de auditoria (5.3.3), relatório de compliance (5.3.4), revisão da trilha de auditoria (5.3.1), circuit breaker/retry (4.1.7), cron de relatórios (4.4.2), mapa de posições logística (2.2.4), LineChart tendência (3.4.3). Fase 5 iniciada. Pendentes principais: Sankhya (4.1.3/4.1.4), filas assíncronas (4.2.x), monitoramento (5.1.4), empacotamento desktop (5.2.x), analíticos avançados (5.4.x).*
+*Última atualização: 19/03/2026 — Sessão 3: Concluídos: event bus + domain events (4.2.1), job queue assíncrono (4.2.2/4.2.4), monitoramento/observabilidade (5.1.4), analytics avançado (5.4.1), Design System refinado (5.4.4 — Toast/Tabs/Alert/ProgressBar), CI/CD pipeline (1.1.9), integrações na contabilidade (3.3.4), retenção de logs (5.3.2). Pendentes principais: Sankhya sync real (4.1.3/4.1.4), APIs corporativas adicionais (4.2.3), empacotamento desktop (5.2.x), testes de carga (5.1.5), novos módulos/integrações (5.4.2/5.4.3).*

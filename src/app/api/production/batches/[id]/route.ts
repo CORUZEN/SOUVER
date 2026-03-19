@@ -8,6 +8,7 @@ import {
   ProductionStatusValue,
 } from '@/domains/production/production.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 
 const updateSchema = z.object({
   productName: z.string().min(1).optional(),
@@ -88,6 +89,12 @@ export async function PATCH(
   }
 
   const batch = await changeBatchStatus(id, parsed.data.status as ProductionStatusValue)
+
+  if (parsed.data.status === 'FINISHED') {
+    emitDomainEvent('production:batch.finished', { batchId: id, userId: user.id })
+  } else if (parsed.data.status === 'CANCELLED') {
+    emitDomainEvent('production:batch.cancelled', { batchId: id, userId: user.id })
+  }
 
   await auditLog({
     userId: user.id,

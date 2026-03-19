@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listNonConformances, createNC, NCStatusValue, NCSeverityValue } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 import {
   createNotificationsForRole,
   NOTIFICATION_TYPES,
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
   }
 
   const nc = await createNC({ ...parsed.data, openedById: user.id })
+
+  emitDomainEvent('quality:nc.opened', { ncId: nc.id, severity: parsed.data.severity, userId: user.id })
 
   await auditLog({
     userId:      user.id,

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listItems, createItem } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
   sku: z.string().min(1, 'SKU é obrigatório'),
@@ -46,6 +47,8 @@ export async function POST(req: NextRequest) {
   }
 
   const item = await createItem({ ...parsed.data, createdByUserId: user.id })
+
+  emitDomainEvent('inventory:item.created', { itemId: item.id, userId: user.id })
 
   await auditLog({
     userId: user.id,

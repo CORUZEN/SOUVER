@@ -1,6 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import Breadcrumb from '@/components/ui/Breadcrumb'
+import { ToastProvider } from '@/components/ui/Toast'
 
 export default function DashboardLayout({
   children,
@@ -8,6 +9,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
+    <ToastProvider>
     <div className="flex h-screen bg-surface-50 overflow-hidden">
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -22,5 +24,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+    </ToastProvider>
   )
 }

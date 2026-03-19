@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listMovements, registerMovement, MovementTypeValue } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 import { prisma } from '@/lib/prisma'
 import {
   createNotificationsForRole,
@@ -54,6 +55,13 @@ export async function POST(req: NextRequest) {
     type: parsed.data.type as MovementTypeValue,
     movedAt: parsed.data.movedAt ? new Date(parsed.data.movedAt) : undefined,
     createdByUserId: user.id,
+  })
+
+  emitDomainEvent('inventory:movement.created', {
+    movementId: movement.id,
+    itemId: parsed.data.itemId,
+    type: parsed.data.type,
+    userId: user.id,
   })
 
   await auditLog({

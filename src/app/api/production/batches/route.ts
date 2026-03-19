@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { listBatches, createBatch, ProductionShiftValue } from '@/domains/production/production.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
   batchCode: z.string().min(1, 'Código do lote é obrigatório'),
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
   }
 
   const batch = await createBatch({ ...parsed.data, createdByUserId: user.id })
+
+  emitDomainEvent('production:batch.created', { batchId: batch.id, userId: user.id })
 
   await auditLog({
     userId: user.id,

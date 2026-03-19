@@ -7,6 +7,7 @@ import {
   InspectionResultValue,
 } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
   batchId:        z.string().optional(),
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
   }
 
   const record = await createQualityRecord({ ...parsed.data, inspectedById: user.id })
+
+  emitDomainEvent('quality:record.created', { recordId: record.id, userId: user.id, result: record.result })
 
   await auditLog({
     userId:      user.id,

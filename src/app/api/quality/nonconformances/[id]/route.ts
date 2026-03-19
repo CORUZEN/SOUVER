@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { getNCById, updateNC, changeNCStatus, NCStatusValue } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
+import { emitDomainEvent } from '@/lib/events'
 
 const updateSchema = z.object({
   title:        z.string().min(1).optional(),
@@ -77,6 +78,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updated = await changeNCStatus(id, parsed.data.status as NCStatusValue)
+
+  if (parsed.data.status === 'RESOLVED') {
+    emitDomainEvent('quality:nc.resolved', { ncId: id, userId: user.id })
+  }
 
   await auditLog({
     userId:      user.id,
