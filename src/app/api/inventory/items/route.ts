@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   const result = await listItems({
     search: searchParams.get('search') ?? undefined,
     category: searchParams.get('category') ?? undefined,
+    location: searchParams.get('location') ?? undefined,
     isActive: searchParams.has('isActive') ? searchParams.get('isActive') === 'true' : undefined,
     lowStock: searchParams.get('lowStock') === 'true',
     page: Number(searchParams.get('page') ?? 1),

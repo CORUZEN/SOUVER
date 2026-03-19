@@ -544,6 +544,13 @@ export default function RelatoriosPage() {
           >
             Ver Visão Executiva Consolidada →
           </Link>
+          <Link
+            href="/relatorios/compliance"
+            className="inline-flex items-center gap-1.5 mt-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Relatório de Compliance e Segurança →
+          </Link>
         </div>
       </div>
     </div>

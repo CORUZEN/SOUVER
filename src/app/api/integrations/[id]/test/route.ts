@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
+import { withRetry, CircuitBreaker, CircuitOpenError } from '@/lib/resilience'
+
+// Um circuito por integração (mantido em memória do processo)
+const circuits = new Map<string, CircuitBreaker>()
+function getCircuit(id: string): CircuitBreaker {
+  if (!circuits.has(id)) {
+    circuits.set(id, new CircuitBreaker(`integration:${id}`, { failureThreshold: 3, recoveryTimeMs: 30_000 }))
+  }
+  return circuits.get(id)!
+}
 
 // POST /api/integrations/[id]/test — dispara um teste de conexão simulado
 export async function POST(
@@ -27,17 +37,23 @@ export async function POST(
     testMessage = 'URL base não configurada.'
   } else {
     try {
-      const res = await fetch(integration.baseUrl, {
-        method:  'GET',
-        signal:  AbortSignal.timeout(5000),
-      })
-      if (!res.ok) {
-        testStatus  = 'error'
-        testMessage = `Servidor respondeu com status ${res.status}.`
-      }
+      await withRetry(
+        () => getCircuit(id).execute(async () => {
+          const res = await fetch(integration.baseUrl!, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000),
+          })
+          if (!res.ok) throw new Error(`Servidor respondeu com status ${res.status}.`)
+        }),
+        { maxAttempts: 2, initialDelayMs: 200 },
+      )
     } catch (err: unknown) {
-      testStatus  = 'error'
-      testMessage = err instanceof Error ? err.message : 'Falha de conexão.'
+      testStatus = 'error'
+      if (err instanceof CircuitOpenError) {
+        testMessage = `Circuito aberto após falhas repetidas. Aguarde ${Math.ceil(err.retryAfterMs / 1000)}s.`
+      } else {
+        testMessage = err instanceof Error ? err.message : 'Falha de conexão.'
+      }
     }
   }
 

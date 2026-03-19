@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
+import { auditLog } from '@/domains/audit/audit.service'
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -61,6 +62,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const updated = await prisma.role.update({
     where: { id },
     data: updates,
+  })
+
+  await auditLog({
+    userId:      user.id,
+    module:      'system',
+    action:      'PERMISSION_CHANGED',
+    entityType:  'Role',
+    entityId:    id,
+    description: `Perfil ${updated.name} atualizado: ${JSON.stringify(updates)}`,
+    ipAddress:   req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
   })
 
   return NextResponse.json({ role: updated })

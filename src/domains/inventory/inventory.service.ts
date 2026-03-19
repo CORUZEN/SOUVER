@@ -11,6 +11,7 @@ export interface ItemFilter {
   category?: string
   isActive?: boolean
   lowStock?: boolean
+  location?: string
   page?: number
   pageSize?: number
 }
@@ -58,6 +59,7 @@ export async function listItems(filter: ItemFilter) {
     ]
   }
   if (filter.category) where.category = { contains: filter.category, mode: 'insensitive' }
+  if (filter.location) where.location = { contains: filter.location, mode: 'insensitive' }
   if (filter.isActive !== undefined) where.isActive = filter.isActive
   if (filter.lowStock) {
     where.minQty = { not: null }

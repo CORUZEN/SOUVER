@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
+import { auditLog } from '@/domains/audit/audit.service'
 
 // DELETE /api/users/me/sessions/[id]  — revoga uma sessão específica do usuário atual
 export async function DELETE(
@@ -32,6 +33,16 @@ export async function DELETE(
   await prisma.userSession.update({
     where: { id: sessionId },
     data:  { status: 'REVOKED', revokedAt: new Date() },
+  })
+
+  await auditLog({
+    userId:     user.id,
+    module:     'auth',
+    action:     'SESSION_REVOKED',
+    entityType: 'UserSession',
+    entityId:   sessionId,
+    description: `Sessão ${sessionId.slice(0, 8)}… revogada pelo usuário`,
+    ipAddress:  req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
   })
 
   return NextResponse.json({ message: 'Sessão encerrada com sucesso.' })

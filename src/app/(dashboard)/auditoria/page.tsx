@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { ShieldCheck, Search, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ShieldCheck, Search, RefreshCw, Download } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import Table, { Column } from '@/components/ui/Table'
 import Badge from '@/components/ui/Badge'
@@ -59,6 +59,32 @@ export default function AuditoriaPage() {
   const [search, setSearch] = useState('')
   const [period, setPeriod] = useState('7d')
   const [module, setModule] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const anchorRef = useRef<HTMLAnchorElement>(null)
+
+  const exportCsv = useCallback(async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({
+        period,
+        ...(search && { search }),
+        ...(module && { module }),
+      })
+      const res = await fetch(`/api/audit/export?${params}`)
+      if (!res.ok) throw new Error('Erro ao exportar')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = anchorRef.current!
+      a.href = url
+      a.download = `auditoria_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // silencioso — erro exibido naturalmente pela ausência do download
+    } finally {
+      setExporting(false)
+    }
+  }, [period, search, module])
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true)
@@ -156,13 +182,26 @@ export default function AuditoriaPage() {
             {total} {total === 1 ? 'registro encontrado' : 'registros encontrados'} no período
           </p>
         </div>
-        <button
-          onClick={fetchLogs}
-          className="w-10 h-10 flex items-center justify-center rounded-lg border border-surface-300 text-surface-500 hover:bg-surface-100 transition-colors"
-          title="Atualizar"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={exporting}
+            className="flex items-center gap-1.5 h-10 px-3 rounded-lg border border-surface-300 text-surface-600 text-sm hover:bg-surface-100 transition-colors disabled:opacity-50"
+            title="Exportar CSV"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exportando…' : 'Exportar CSV'}
+          </button>
+          <button
+            onClick={fetchLogs}
+            className="w-10 h-10 flex items-center justify-center rounded-lg border border-surface-300 text-surface-500 hover:bg-surface-100 transition-colors"
+            title="Atualizar"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+        {/* âncora oculta para download */}
+        <a ref={anchorRef} className="hidden" aria-hidden />
       </div>
 
       {/* Filters */}

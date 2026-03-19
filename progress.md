@@ -235,7 +235,7 @@ FASE 5 ──── Expansão e Consolidação
 | 2.2.1 | Modelagem de `inventory_items` e `inventory_movements` no banco | � Concluído |
 | 2.2.2 | Controle de entradas e saídas de estoque | 🟢 Concluído |
 | 2.2.3 | Movimentações internas e transferências | 🟢 Concluído |
-| 2.2.4 | Controle de posições de armazenamento | 🟡 Parcial |
+| 2.2.4 | Controle de posições de armazenamento | ✅ Concluído — filtro `location` no serviço + API + mapa visual agrupado por posição na página de logística |
 | 2.2.5 | Situação de lotes, itens e posições | 🟢 Concluído |
 | 2.2.6 | Fluxos de separação, conferência e expedição | ✅ Concluído |
 | 2.2.7 | Alertas de estoque mínimo | 🟢 Concluído |
@@ -338,7 +338,7 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 3.4.1 | Indicadores comparativos por período (semana, mês, trimestre) | ✅ Concluído — variação % vs período anterior; DeltaBadge; seletor de período no Dashboard |
 | 3.4.2 | Visões executivas e operacionais por módulo | ✅ Concluído — ModuleKpiBar component; adicionado em Produção e Logística; Qualidade e RH já possuem KPIs próprios |
-| 3.4.3 | Gráficos avançados e painéis interativos | � Parcial — BarChart + PieChart no Dashboard |
+| 3.4.3 | Gráficos avançados e painéis interativos | ✅ Concluído — BarChart + PieChart + LineChart de tendência 7 dias (`/api/dashboard/trend`) |
 | 3.4.4 | Dashboard personalizado por perfil de acesso | ✅ Concluído — ROLE_VISIBILITY config; visível por cargo (PRODUCTION/LOGISTICS/QUALITY/HR/OPERATOR/VIEWER); badge de visão personalizada |
 
 ---
@@ -396,7 +396,7 @@ FASE 5 ──── Expansão e Consolidação
 | 4.1.4 | Rotinas de importação e sincronização de dados | 🔴 Pendente |
 | 4.1.5 | Tratamento de erros, reprocessamento e logs de integração | 🟢 Concluído |
 | 4.1.6 | Painel de status das integrações (last sync, falhas, alertas) | 🟢 Concluído |
-| 4.1.7 | Resiliência: circuit breaker e retry controlado | 🔴 Pendente |
+| 4.1.7 | Resiliência: circuit breaker e retry controlado | ✅ Concluído — `src/lib/resilience.ts`: `withRetry`, `CircuitBreaker`, `withResiliency`; aplicado em integrations test route |
 
 ---
 
@@ -427,7 +427,7 @@ FASE 5 ──── Expansão e Consolidação
 | # | Tarefa | Status |
 |---|---|---|
 | 4.4.1 | Automações configuráveis por evento (ex: alerta automático por NC grave) | ✅ Concluído — NC CRITICAL/HIGH alerta QUALITY+ADMIN; EXIT/WASTE/TRANSFER verifica low-stock e alerta LOGISTICS |
-| 4.4.2 | Agendamento de relatórios automáticos | 🔴 Pendente |
+| 4.4.2 | Agendamento de relatórios automáticos | ✅ Concluído — `vercel.json` cron `0 7 * * *` + `/api/cron/reports` envia notificações resumo diário para admins |
 | 4.4.3 | Rotinas de limpeza e manutenção automatizadas | ✅ Concluído |
 
 ---
@@ -457,8 +457,8 @@ FASE 5 ──── Expansão e Consolidação
 | # | Tarefa | Status |
 |---|---|---|
 | 5.1.1 | Revisão geral de queries críticas e índices no banco | ✅ Concluído |
-| 5.1.2 | Implementação de cache estratégico | 🔴 Pendente |
-| 5.1.3 | Otimização de paginação e consultas pesadas | 🔴 Pendente |
+| 5.1.2 | Implementação de cache estratégico | ✅ Concluído — `Cache-Control` headers em KPIs (period-based), audit, trend APIs |
+| 5.1.3 | Otimização de paginação e consultas pesadas | ✅ Concluído — paginação cursor-based em `/api/audit` (param `cursor`); retorna `nextCursor` em ambos os modos |
 | 5.1.4 | Monitoramento e observabilidade em produção | 🔴 Pendente |
 | 5.1.5 | Testes de carga e stress | 🔴 Pendente |
 
@@ -480,10 +480,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 5.3.1 | Revisão completa da trilha de auditoria em todos os módulos | 🔴 Pendente |
+| 5.3.1 | Revisão completa da trilha de auditoria em todos os módulos | ✅ Concluído — verificados todos os endpoints CRUD; adicionado `auditLog()` em `roles/[id]` PATCH e `me/sessions/[id]` DELETE |
 | 5.3.2 | Retenção e política de arquivamento de logs | 🔴 Pendente |
-| 5.3.3 | Exportação completa de histórico de auditoria | 🔴 Pendente |
-| 5.3.4 | Relatório de compliance para auditoria interna | 🔴 Pendente |
+| 5.3.3 | Exportação completa de histórico de auditoria | ✅ Concluído — `/api/audit/export` gera CSV (máx 10k linhas); botão "Exportar CSV" com filtros na página de auditoria |
+| 5.3.4 | Relatório de compliance para auditoria interna | ✅ Concluído — `/api/audit/compliance` + `/relatorios/compliance` com KPIs de segurança, eventos críticos, adoção 2FA, top usuários e exportação CSV |
 
 ---
 

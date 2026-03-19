@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   ClipboardList,
   X,
+  MapPin,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -122,6 +125,11 @@ export default function LogisticaPage() {
   const [search, setSearch] = useState('')
   const [filterLowStock, setFilterLowStock] = useState(false)
   const [filterActive, setFilterActive] = useState<string>('true')
+
+  // Mapa de posições
+  const [viewMode, setViewMode] = useState<'list' | 'mapa'>('list')
+  const [mapItems, setMapItems] = useState<InventoryItem[]>([])
+  const [loadingMap, setLoadingMap] = useState(false)
 
   // Detalhe / Movimentações
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
@@ -242,6 +250,28 @@ export default function LogisticaPage() {
   }, [page, search, filterActive, filterLowStock])
 
   useEffect(() => { fetchItems() }, [fetchItems])
+
+  // ─── Mapa de Posições ─────────────────────────────────────────────────────
+
+  async function loadMapItems() {
+    setLoadingMap(true)
+    try {
+      const params = new URLSearchParams({ page: '1', pageSize: '500', isActive: 'true' })
+      const res = await fetch(`/api/inventory/items?${params}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setMapItems(data.items ?? [])
+    } catch {
+      setMapItems([])
+    } finally {
+      setLoadingMap(false)
+    }
+  }
+
+  function switchToMap() {
+    setViewMode('mapa')
+    loadMapItems()
+  }
 
   // ─── Detalhe ───────────────────────────────────────────────────────────────
 
@@ -381,6 +411,26 @@ export default function LogisticaPage() {
         <Button variant="outline" onClick={openExpModal} className="flex items-center gap-2">
           <Truck size={16} /> Expedir
         </Button>
+        <div className="flex items-center border border-surface-200 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setViewMode('list')}
+            title="Lista de itens"
+            className={`px-2.5 py-2 transition-colors ${
+              viewMode === 'list' ? 'bg-primary text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
+            }`}
+          >
+            <List size={15} />
+          </button>
+          <button
+            onClick={switchToMap}
+            title="Mapa de posições"
+            className={`px-2.5 py-2 transition-colors ${
+              viewMode === 'mapa' ? 'bg-primary text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
+            }`}
+          >
+            <LayoutGrid size={15} />
+          </button>
+        </div>
       </div>
 
       {/* Indicadores do módulo */}
@@ -425,8 +475,100 @@ export default function LogisticaPage() {
         </CardContent>
       </Card>
 
-      {/* Conteúdo */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* Mapa de Posições */}
+      {viewMode === 'mapa' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin size={18} className="text-primary" />
+              <h2 className="text-base font-semibold text-surface-900">Mapa de Posições de Armazenamento</h2>
+            </div>
+            <button
+              onClick={loadMapItems}
+              className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 hover:text-surface-600"
+              title="Atualizar mapa"
+            >
+              <RefreshCw size={14} className={loadingMap ? 'animate-spin' : ''} />
+            </button>
+          </div>
+
+          {loadingMap ? (
+            <div className="flex justify-center py-12"><span className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" /></div>
+          ) : (() => {
+            const grouped: Record<string, InventoryItem[]> = {}
+            for (const item of mapItems) {
+              const loc = item.location?.trim() || '— Sem localização'
+              if (!grouped[loc]) grouped[loc] = []
+              grouped[loc].push(item)
+            }
+            const sortedKeys = Object.keys(grouped).sort((a, b) =>
+              a === '— Sem localização' ? 1 : b === '— Sem localização' ? -1 : a.localeCompare(b, 'pt-BR')
+            )
+            if (sortedKeys.length === 0) return (
+              <div className="text-center py-12 text-surface-400">
+                <Package size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum item cadastrado</p>
+              </div>
+            )
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {sortedKeys.map(loc => {
+                  const locItems = grouped[loc]
+                  const lowCount = locItems.filter(isLowStock).length
+                  const isUnassigned = loc === '— Sem localização'
+                  return (
+                    <div
+                      key={loc}
+                      className={`rounded-xl border p-4 ${
+                        isUnassigned
+                          ? 'border-surface-200 bg-surface-50'
+                          : 'border-blue-200 bg-blue-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <MapPin size={15} className={isUnassigned ? 'text-surface-400' : 'text-blue-600'} />
+                        <span className={`font-semibold text-sm ${
+                          isUnassigned ? 'text-surface-500 italic' : 'text-blue-800'
+                        }`}>{loc}</span>
+                        <span className="ml-auto text-xs text-surface-500">
+                          {locItems.length} item{locItems.length !== 1 ? 'ns' : ''}
+                        </span>
+                        {lowCount > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-yellow-700 bg-yellow-100 border border-yellow-200 rounded-full px-2 py-0.5">
+                            <AlertTriangle size={10} /> {lowCount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        {locItems.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => { setViewMode('list'); openDetail(item) }}
+                            className="w-full flex items-center justify-between text-left px-2.5 py-2 rounded-lg bg-white border border-surface-100 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-mono text-primary truncate">{item.sku}</p>
+                              <p className="text-xs text-surface-700 truncate">{item.name}</p>
+                            </div>
+                            <span className={`text-xs font-bold ml-2 shrink-0 ${
+                              isLowStock(item) ? 'text-yellow-700' : 'text-green-700'
+                            }`}>
+                              {formatQty(item.currentQty, item.unit)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* Conteúdo — visível somente na view de lista */}
+      <div className={`grid grid-cols-1 lg:grid-cols-5 gap-6 ${viewMode === 'mapa' ? 'hidden' : ''}`}>
         {/* Listagem de Itens */}
         <div className="lg:col-span-2 space-y-2">
           <p className="text-xs text-surface-500 font-medium uppercase tracking-wide pl-1">

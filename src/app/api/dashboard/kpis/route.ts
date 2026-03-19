@@ -106,5 +106,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ production, inventory, quality, hr, activeUsers, period, variation })
+  return NextResponse.json(
+    { production, inventory, quality, hr, activeUsers, period, variation },
+    {
+      headers: {
+        'Cache-Control':
+          period === 'today'
+            ? 'private, max-age=30, stale-while-revalidate=30'
+            : period === 'week'
+            ? 'private, max-age=120, stale-while-revalidate=60'
+            : 'private, max-age=300, stale-while-revalidate=120',
+      },
+    },
+  )
 }

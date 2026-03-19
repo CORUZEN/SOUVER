@@ -19,6 +19,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
+  LineChart, Line, CartesianGrid,
 } from 'recharts'
 
 interface KPIData {
@@ -112,6 +113,8 @@ export default function DashboardView() {
   const [loadingKpis, setLoadingKpis] = useState(true)
   const [period, setPeriod]         = useState('today')
   const [userRole, setUserRole]     = useState<string | null>(null)
+  const [trendData, setTrendData]   = useState<{ date: string; batches: number; movements: number; ncs: number }[]>([])
+  const [loadingTrend, setLoadingTrend] = useState(true)
 
   async function loadKpis(p?: string) {
     const prd = p ?? period
@@ -132,6 +135,12 @@ export default function DashboardView() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
       .catch(() => null)
+    // Carregar tendência dos últimos 7 dias
+    fetch('/api/dashboard/trend?days=7')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.days) setTrendData(d.days) })
+      .catch(() => null)
+      .finally(() => setLoadingTrend(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePeriodChange(p: string) {
@@ -447,6 +456,50 @@ export default function DashboardView() {
           )}
 
         </div>
+      )}
+
+      {/* ── Tendência 7 dias ── */}
+      {show.charts && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tendência dos Últimos 7 Dias</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingTrend ? (
+              <div className="flex justify-center py-8"><Spinner /></div>
+            ) : trendData.length === 0 ? (
+              <p className="text-sm text-surface-400 text-center py-10">Sem dados de tendência disponíveis</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                    formatter={(value, name) => {
+                      const labels: Record<string, string> = { batches: 'Lotes', movements: 'Movimentações', ncs: 'NCs' }
+                      return [value, labels[String(name)] ?? name]
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} formatter={name => {
+                    const labels: Record<string, string> = { batches: 'Lotes', movements: 'Movimentações', ncs: 'NCs' }
+                    return labels[name] ?? name
+                  }} />
+                  {show.production && (
+                    <Line type="monotone" dataKey="batches" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  )}
+                  {show.inventory && (
+                    <Line type="monotone" dataKey="movements" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  )}
+                  {show.quality && (
+                    <Line type="monotone" dataKey="ncs" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
