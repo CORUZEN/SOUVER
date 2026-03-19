@@ -14,6 +14,10 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts'
 
 interface KPIData {
   production: {
@@ -193,6 +197,8 @@ export default function DashboardView() {
                 { label: 'Departamentos + CRUD',             done: true },
                 { label: 'Perfis de Acesso (visão)',         done: true },
                 { label: 'Recuperação de Senha',             done: true },
+                { label: 'Integrações Externas',             done: true },
+                { label: 'Contabilidade Gerencial',          done: true },
               ].map(({ label, done }, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-sm text-surface-600">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${done ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-400'}`}>
@@ -204,6 +210,87 @@ export default function DashboardView() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* ── Gráficos ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Produção — Distribuição de Status */}
+        <Card>
+          <CardHeader><CardTitle>Produção — Status dos Lotes</CardTitle></CardHeader>
+          <CardContent>
+            {loadingKpis ? (
+              <div className="flex justify-center py-8"><Spinner /></div>
+            ) : kpis ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={[
+                    { name: 'Em Andamento', valor: kpis.production.inProgressCount, fill: '#3b82f6' },
+                    { name: 'Abertos',       valor: kpis.production.openCount,       fill: '#f59e0b' },
+                    { name: 'Finalizados',   valor: kpis.production.finishedToday,   fill: '#22c55e' },
+                  ]}
+                  margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                >
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip formatter={(v) => [v, 'Lotes']} />
+                  <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
+                    {[
+                      { fill: '#3b82f6' },
+                      { fill: '#f59e0b' },
+                      { fill: '#22c55e' },
+                    ].map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-surface-400 text-center py-10">Sem dados disponíveis</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Qualidade — NCs e Inspeções */}
+        <Card>
+          <CardHeader><CardTitle>Qualidade — Visão Geral</CardTitle></CardHeader>
+          <CardContent>
+            {loadingKpis ? (
+              <div className="flex justify-center py-8"><Spinner /></div>
+            ) : kpis ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'NCs Abertas',  value: kpis.quality.openNCs    || 0, color: '#ef4444' },
+                      { name: 'NCs Críticas', value: kpis.quality.criticalNCs || 0, color: '#f97316' },
+                      { name: 'Inspeções',    value: kpis.quality.totalRecords || 0, color: '#22c55e' },
+                    ].filter(d => d.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                  >
+                    {[
+                      { color: '#ef4444' },
+                      { color: '#f97316' },
+                      { color: '#22c55e' },
+                    ].map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-surface-400 text-center py-10">Sem dados disponíveis</p>
+            )}
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   )

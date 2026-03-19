@@ -48,6 +48,12 @@ export default function LoginForm() {
         return
       }
 
+      // Perfil obriga 2FA — sessão criada, redireciona para configuração
+      if (data.requiresTwoFactorSetup) {
+        window.location.href = '/configuracoes/2fa?setup=required'
+        return
+      }
+
       window.location.href = '/dashboard'
     } catch {
       setApiError('Falha de conexão. Tente novamente.')

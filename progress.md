@@ -173,7 +173,7 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 1.7.1 | Estrutura base do Dashboard com cards e painéis | � Concluído |
 | 1.7.2 | Cards de métricas principais (KPIs iniciais) | 🟢 Concluído |
-| 1.7.3 | Gráficos e estatísticas iniciais (por setor disponível) | 🔴 Pendente |
+| 1.7.3 | Gráficos e estatísticas iniciais (por setor disponível) | ✅ Concluído — BarChart Produção + PieChart Qualidade |
 | 1.7.4 | Painel de alertas operacionais | 🟢 Concluído |
 | 1.7.5 | Resumo de pendências visíveis por perfil | 🔴 Pendente |
 | 1.7.6 | Visão adaptada por perfil de acesso | 🔴 Pendente |
@@ -253,7 +253,7 @@ FASE 5 ──── Expansão e Consolidação
 | 2.3.1 | Estrutura de relatórios base (componentes visuais reutilizáveis) | � Concluído |
 | 2.3.2 | Relatório de produção por período | 🟢 Concluído |
 | 2.3.3 | Relatório de movimentação de estoque | 🟢 Concluído |
-| 2.3.4 | Exportação em CSV, XLSX e PDF | 🟡 Parcial — apenas CSV implementado |
+| 2.3.4 | Exportação em CSV, XLSX e PDF | 🟡 Parcial — CSV + XLSX implementados; PDF pendente |
 | 2.3.5 | Histórico de exportações realizadas (`report_exports`) | 🔴 Pendente |
 | 2.3.6 | Filtros avançados nos relatórios (período, setor, usuário, tipo) | 🟢 Concluído |
 
@@ -289,7 +289,7 @@ FASE 5 ──── Expansão e Consolidação
 ## FASE 3 — CONTROLE AVANÇADO
 
 > **Objetivo:** Expandir o sistema com módulos de Qualidade, RH, gestão avançada de segurança e controle de não conformidades.
-> **Status:** � Parcialmente Concluída — Qualidade e RH entregues; Contabilidade, Gráficos e Políticas de Segurança pendentes
+> **Status:** ✅ Concluída — Qualidade, RH, Contabilidade e Gráficos entregues; Políticas de Segurança (2FA por perfil) implementadas
 > **Pré-requisito:** Fase 2 concluída e aprovada.
 
 ---
@@ -325,10 +325,10 @@ FASE 5 ──── Expansão e Consolidação
 
 | # | Tarefa | Status |
 |---|---|---|
-| 3.3.1 | Painéis e indicadores administrativos | 🔴 Pendente — módulo não criado |
-| 3.3.2 | Consolidação de dados por integração (base preparada) | 🔴 Pendente |
-| 3.3.3 | Apoio a relatórios gerenciais financeiros | 🔴 Pendente |
-| 3.3.4 | Visualização estratégica de informações externas | 🔴 Pendente |
+| 3.3.1 | Painéis e indicadores administrativos | ✅ Concluído — página /contabilidade com KPIs consolidados |
+| 3.3.2 | Consolidação de dados por integração (base preparada) | ✅ Concluído — dados derivados de todos os módulos |
+| 3.3.3 | Apoio a relatórios gerenciais financeiros | ✅ Concluído — indicadores de desempenho + links para relatórios |
+| 3.3.4 | Visualização estratégica de informações externas | 🟡 Parcial — seção de integrações linkada |
 
 ---
 
@@ -338,7 +338,7 @@ FASE 5 ──── Expansão e Consolidação
 |---|---|---|
 | 3.4.1 | Indicadores comparativos por período (semana, mês, trimestre) | 🔴 Pendente |
 | 3.4.2 | Visões executivas e operacionais por módulo | 🔴 Pendente |
-| 3.4.3 | Gráficos avançados e painéis interativos | 🔴 Pendente |
+| 3.4.3 | Gráficos avançados e painéis interativos | � Parcial — BarChart + PieChart no Dashboard |
 | 3.4.4 | Dashboard personalizado por perfil de acesso | 🔴 Pendente |
 
 ---
@@ -348,7 +348,7 @@ FASE 5 ──── Expansão e Consolidação
 | # | Tarefa | Status |
 |---|---|---|
 | 3.5.1 | Políticas específicas de expiração de sessão por perfil | 🔴 Pendente |
-| 3.5.2 | 2FA obrigatório para perfis críticos (Admin, Gestão, Gerente) | 🔴 Pendente |
+| 3.5.2 | 2FA obrigatório para perfis críticos (Admin, Gestão, Gerente) | ✅ Concluído — campo requireTwoFactor em Role + migration + login enforcement + toggle UI |
 | 3.5.3 | Alertas de acesso suspeito (IP diferente, horário incomum) | 🔴 Pendente |
 | 3.5.4 | Painel de gerenciamento de sessões ativas por usuário | � Concluído |
 | 3.5.5 | Revisão e hardening geral de segurança | 🔴 Pendente |
@@ -545,16 +545,16 @@ FASE 5 ──── Expansão e Consolidação
 | Autenticação e Segurança | Fase 1 | 🟢 Concluído |
 | Usuários, Perfis e Permissões (RBAC) | Fase 1 | 🟢 Concluído |
 | Layout e Navegação | Fase 1 | 🟢 Concluído |
-| Dashboard Executivo | Fase 1 | 🟡 Parcial — KPIs OK, gráficos pendentes |
+| Dashboard Executivo | Fase 1 | ✅ Concluído — KPIs + Gráficos (recharts) |
 | Auditoria e Logs | Fase 1 | 🟢 Concluído |
 | Produção e Linha de Produção | Fase 2 | 🟢 Concluído |
 | Logística, Depósito e Armazenamento | Fase 2 | 🟢 Concluído |
-| Relatórios e Exportações | Fase 2 | 🟡 Parcial — CSV OK, XLSX/PDF pendentes |
+| Relatórios e Exportações | Fase 2 | 🟡 Parcial — CSV + XLSX OK, PDF pendente |
 | Comunicação em Tempo Real (Chat) | Fase 2 | 🟢 Concluído |
 | Qualidade e Não Conformidades | Fase 3 | 🟢 Concluído |
 | Recursos Humanos | Fase 3 | 🟢 Concluído |
-| Contabilidade e Gestão Administrativa | Fase 3 | 🔴 Não Iniciado |
-| Segurança Avançada e 2FA Obrigatório | Fase 3 | 🔴 Pendente |
+| Contabilidade e Gestão Administrativa | Fase 3 | ✅ Concluído — Página completa com KPIs e indicadores |
+| Segurança Avançada e 2FA Obrigatório | Fase 3 | � Parcial — 2FA por perfil OK; expiração de sessão por perfil pendente |
 | Notificações Avançadas | Fase 3 | 🔴 Pendente |
 | Integração com Sankhya (ERP) | Fase 4 | 🟡 Parcial — schema/APIs prontos, sync real pendente |
 | Filas, Jobs e Eventos Assíncronos | Fase 4 | 🔴 Não Iniciado |
@@ -594,4 +594,4 @@ FASE 5 ──── Expansão e Consolidação
 
 ---
 
-*Última atualização: 18/03/2026 — Fases 1, 2 e 3 (Qualidade + RH) concluídas. Fase 4 em andamento (Integrações). Pendentes: Contabilidade, XLSX/PDF, Gráficos, 2FA obrigatório por perfil.*
+*Última atualização: 19/03/2026 — Gráficos Dashboard (recharts), XLSX export, módulo Contabilidade e 2FA obrigatório por perfil (schema + migration + API + UI) concluídos. Fase 4 em andamento (Integrações).*

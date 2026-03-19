@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Building2,
   Plug,
+  DollarSign,
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -29,6 +30,7 @@ const NAV_SECTIONS = [
       { label: 'Qualidade', href: '/qualidade', icon: ShieldCheck },
       { label: 'Recursos Humanos', href: '/rh', icon: Users },
       { label: 'Relatórios', href: '/relatorios', icon: FileBarChart2 },
+      { label: 'Contabilidade', href: '/contabilidade', icon: DollarSign },
       { label: 'Comunicação', href: '/comunicacao', icon: MessageSquare },
       { label: 'Integrações', href: '/integracoes', icon: Plug },
     ],

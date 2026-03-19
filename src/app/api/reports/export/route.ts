@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
+import * as XLSX from 'xlsx'
 
 // ─── Helper: convert array of objects to CSV string ──────────────
 
@@ -29,15 +30,36 @@ function csvResponse(csv: string, filename: string): NextResponse {
   })
 }
 
-// ─── GET /api/reports/export?module=production|inventory|quality|hr ──
+// ─── Helper: convert array of objects to XLSX buffer ─────────────
+
+function xlsxResponse(
+  sheets: { name: string; rows: Record<string, unknown>[] }[],
+  filename: string,
+): NextResponse {
+  const wb = XLSX.utils.book_new()
+  for (const { name, rows } of sheets) {
+    const ws = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(wb, ws, name)
+  }
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+  return new NextResponse(buf, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  })
+}
+
+// ─── GET /api/reports/export?module=production|inventory|quality|hr&format=csv|xlsx ──
 
 export async function GET(req: NextRequest) {
   const auth = await getAuthUser(req)
   if (!auth) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const mod = req.nextUrl.searchParams.get('module') ?? ''
-  const now  = new Date()
-  const ts   = now.toISOString().slice(0, 10)
+  const mod    = req.nextUrl.searchParams.get('module') ?? ''
+  const format = req.nextUrl.searchParams.get('format') ?? 'csv'
+  const now    = new Date()
+  const ts     = now.toISOString().slice(0, 10)
 
   if (mod === 'production') {
     const batches = await prisma.productionBatch.findMany({
@@ -65,6 +87,7 @@ export async function GET(req: NextRequest) {
       CriadoEm:    new Date(b.createdAt).toLocaleDateString('pt-BR'),
     }))
 
+    if (format === 'xlsx') return xlsxResponse([{ name: 'Produção', rows }], `producao_${ts}.xlsx`)
     return csvResponse(toCsv(rows), `producao_${ts}.csv`)
   }
 
@@ -87,6 +110,7 @@ export async function GET(req: NextRequest) {
       CriadoEm:  new Date(i.createdAt).toLocaleDateString('pt-BR'),
     }))
 
+    if (format === 'xlsx') return xlsxResponse([{ name: 'Estoque', rows }], `estoque_${ts}.xlsx`)
     return csvResponse(toCsv(rows), `estoque_${ts}.csv`)
   }
 
@@ -129,6 +153,16 @@ export async function GET(req: NextRequest) {
       ResolvidoEm:  n.resolvedAt ? new Date(n.resolvedAt).toLocaleDateString('pt-BR') : '',
     }))
 
+    if (format === 'xlsx') {
+      return xlsxResponse(
+        [
+          { name: 'Inspeções', rows: iRows },
+          { name: 'Não Conformidades', rows: ncRows },
+        ],
+        `qualidade_${ts}.xlsx`,
+      )
+    }
+
     // Retorna dois blocos no mesmo CSV, separados por uma linha em branco
     const csv = [
       '=== INSPEÇÕES ===',
@@ -163,6 +197,7 @@ export async function GET(req: NextRequest) {
       CriadoEm:    new Date(u.createdAt).toLocaleDateString('pt-BR'),
     }))
 
+    if (format === 'xlsx') return xlsxResponse([{ name: 'Colaboradores', rows }], `colaboradores_${ts}.xlsx`)
     return csvResponse(toCsv(rows), `colaboradores_${ts}.csv`)
   }
 

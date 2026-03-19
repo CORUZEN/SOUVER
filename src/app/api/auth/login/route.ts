@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2FA obrigatório se habilitado
+    // 2FA: se o usuário já tem 2FA habilitado, redireciona para verificação
     if (user.twoFactorEnabled) {
       return NextResponse.json(
         { requiresTwoFactor: true, userId: user.id },
@@ -109,6 +109,34 @@ export async function POST(req: NextRequest) {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     })
+
+    // Perfil exige 2FA mas o usuário ainda não o configurou — cria sessão e redireciona para setup
+    if (user.role?.requireTwoFactor) {
+      await auditLog({
+        userId: user.id,
+        module: 'auth',
+        action: 'LOGIN_SUCCESS',
+        description: 'Login realizado. Redirecionado para configuração obrigatória de 2FA.',
+        ipAddress: ip,
+        userAgent,
+      })
+
+      const setupResponse = NextResponse.json(
+        {
+          message: 'Login realizado. Configure o 2FA antes de continuar.',
+          requiresTwoFactorSetup: true,
+        },
+        { status: 200 }
+      )
+      setupResponse.cookies.set('souver_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        expires: expiresAt,
+        path: '/',
+      })
+      return setupResponse
+    }
 
     await auditLog({
       userId: user.id,

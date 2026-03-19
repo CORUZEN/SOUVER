@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronRight, Users, Lock, CheckCircle2, Search, Info } from 'lucide-react'
+import { Shield, ChevronRight, Users, Lock, CheckCircle2, Search, Info, ShieldCheck } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 
 // ─── Tipos ───────────────────────────────────────────────────────
 
 interface RoleSummary {
-  id:          string
-  name:        string
-  code:        string
-  description: string | null
-  _count:      { users: number; rolePermissions: number }
+  id:               string
+  name:             string
+  code:             string
+  description:      string | null
+  requireTwoFactor: boolean
+  _count:           { users: number; rolePermissions: number }
 }
 
 interface Permission {
@@ -24,12 +25,13 @@ interface Permission {
 }
 
 interface RoleDetail {
-  id:             string
-  name:           string
-  code:           string
-  description:    string | null
-  _count:         { users: number }
-  rolePermissions: { permission: Permission }[]
+  id:               string
+  name:             string
+  code:             string
+  description:      string | null
+  requireTwoFactor: boolean
+  _count:           { users: number }
+  rolePermissions:  { permission: Permission }[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -82,10 +84,11 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
 // ─── Página ───────────────────────────────────────────────────────
 
 export default function PerfisPage() {
-  const [roles,      setRoles]      = useState<RoleSummary[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [selected,   setSelected]   = useState<RoleDetail | null>(null)
-  const [search,     setSearch]     = useState('')
+  const [roles,        setRoles]        = useState<RoleSummary[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [selected,     setSelected]     = useState<RoleDetail | null>(null)
+  const [search,       setSearch]       = useState('')
+  const [togglingId,   setTogglingId]   = useState<string | null>(null)
 
   const loadRoles = useCallback(async () => {
     setLoading(true)
@@ -99,6 +102,22 @@ export default function PerfisPage() {
   async function selectRole(id: string) {
     const r = await fetch(`/api/roles/${id}`)
     if (r.ok) { const d = await r.json(); setSelected(d.role) }
+  }
+
+  async function toggleRequire2FA(role: RoleDetail) {
+    setTogglingId(role.id)
+    try {
+      const next = !role.requireTwoFactor
+      const res  = await fetch(`/api/roles/${role.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requireTwoFactor: next }),
+      })
+      if (res.ok) {
+        setSelected(prev => prev ? { ...prev, requireTwoFactor: next } : prev)
+        setRoles(prev => prev.map(r => r.id === role.id ? { ...r, requireTwoFactor: next } : r))
+      }
+    } finally { setTogglingId(null) }
   }
 
   // Agrupa permissões por módulo
@@ -197,6 +216,29 @@ export default function PerfisPage() {
                   Perfil DEVELOPER — acesso total ao sistema sem restrições de permissão.
                 </div>
               )}
+
+              {/* Toggle: Exigir 2FA */}
+              <div className="flex items-center justify-between p-4 mb-5 rounded-xl border border-surface-200 bg-surface-50">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck size={16} className={selected.requireTwoFactor ? 'text-emerald-600' : 'text-surface-400'} />
+                  <div>
+                    <p className="text-sm font-medium text-surface-800">Exigir autenticação de dois fatores</p>
+                    <p className="text-xs text-surface-500">Usuários deste perfil precisarão configurar o 2FA antes de acessar o sistema</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleRequire2FA(selected)}
+                  disabled={togglingId === selected.id}
+                  aria-label="Alternar exigência de 2FA"
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${
+                    selected.requireTwoFactor ? 'bg-emerald-500' : 'bg-surface-300'
+                  } ${togglingId === selected.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    selected.requireTwoFactor ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
 
               {/* Permissões por módulo */}
               {Object.keys(grouped).length === 0 && !isDeveloper ? (

@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     orderBy: { name: 'asc' },
     select: {
       id: true, name: true, code: true, description: true,
+      requireTwoFactor: true,
       _count: { select: { users: true, rolePermissions: true } },
     },
   })

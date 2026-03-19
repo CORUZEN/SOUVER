@@ -24,6 +24,7 @@ const ROUTE_LABELS: Record<string, string> = {
   perfis: 'Perfis de Acesso',
   sessoes: 'Sessões Ativas',
   integracoes: 'Integrações',
+  contabilidade: 'Contabilidade',
   novo: 'Novo',
   editar: 'Editar',
 }
