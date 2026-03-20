@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import dynamic from 'next/dynamic'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Skeleton'
@@ -17,21 +16,10 @@ import {
   ShieldCheck,
   Minus,
 } from 'lucide-react'
-
-// Lazy load recharts para reduzir o bundle do dashboard
-const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false })
-const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false })
-const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false })
-const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false })
-const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false })
-const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false })
-const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false })
-const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false })
-const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false })
-const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false })
-const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false })
-const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false })
-const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false })
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
+} from 'recharts'
 
 interface KPIData {
   production: {

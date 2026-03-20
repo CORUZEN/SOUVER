@@ -5,7 +5,7 @@ import {
   Building2, Plus, Search, Edit2, Trash2, Users, X, Check,
   ChevronRight, Factory, ShieldCheck, AlertTriangle,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/Badge'
+import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 
 // ─── Tipos ───────────────────────────────────────────────────────
