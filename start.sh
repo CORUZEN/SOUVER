@@ -181,16 +181,43 @@ trap "kill ${DEV_PID} 2>/dev/null; wait ${DEV_PID} 2>/dev/null; exit 0" INT TERM
 
   log_info "Pré-compilando rotas do sistema em segundo plano..."
 
-  # Disparar requests em paralelo — webpack compilará todos os bundles ao mesmo tempo
-  WARMUP_ROUTES=(
+  # Páginas (page routes)
+  PAGE_ROUTES=(
     "/dashboard" "/producao" "/logistica" "/qualidade" "/rh"
     "/auditoria" "/usuarios" "/departamentos" "/relatorios"
     "/configuracoes" "/contabilidade" "/comunicacao" "/integracoes" "/analytics"
   )
-  for route in "${WARMUP_ROUTES[@]}"; do
+  # API routes — compiladas separadamente pelo webpack (cada arquivo route.ts é um bundle)
+  API_ROUTES=(
+    "/api/health"
+    "/api/auth/me"
+    "/api/dashboard/kpis?period=today&variation=true"
+    "/api/dashboard/trend?days=7"
+    "/api/notifications?limit=10"
+    "/api/production/batches?page=1&pageSize=20"
+    "/api/departments"
+    "/api/inventory/items?page=1&pageSize=20&isActive=true"
+    "/api/dashboard/kpis?period=today&module=inventory"
+    "/api/quality/kpis"
+    "/api/quality/nonconformances?page=1&pageSize=15"
+    "/api/hr/kpis"
+    "/api/hr/collaborators?page=1&pageSize=20"
+    "/api/audit?page=1&limit=50&period=7d"
+    "/api/analytics?period=30"
+    "/api/users?page=1&limit=20"
+    "/api/roles"
+    "/api/integrations/summary"
+    "/api/integrations"
+    "/api/chat/conversations"
+    "/api/reports"
+  )
+
+  # Disparar todas as rotas em paralelo — webpack compilará todos os bundles de uma vez
+  ALL_ROUTES=("${PAGE_ROUTES[@]}" "${API_ROUTES[@]}")
+  for route in "${ALL_ROUTES[@]}"; do
     curl -sf "http://localhost:${APP_PORT}${route}" \
       -H "Cookie: souver_token=${WARMUP_TOKEN}" \
-      --max-time 60 -o /dev/null 2>&1 &
+      --max-time 90 -o /dev/null 2>&1 &
   done
   wait
 

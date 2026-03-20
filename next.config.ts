@@ -22,7 +22,6 @@ const nextConfig: NextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3001'],
     },
-    optimizePackageImports: ['lucide-react'],
   },
   async headers() {
     return [
