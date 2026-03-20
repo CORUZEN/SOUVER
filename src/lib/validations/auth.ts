@@ -2,18 +2,18 @@ import { z } from 'zod'
 
 export const loginSchema = z.object({
   login: z
-    .string({ required_error: 'Login é obrigatório.' })
+    .string()
     .min(3, 'Login deve ter ao menos 3 caracteres.')
     .max(100, 'Login muito longo.'),
   password: z
-    .string({ required_error: 'Senha é obrigatória.' })
+    .string()
     .min(6, 'Senha deve ter ao menos 6 caracteres.'),
 })
 
 export const twoFactorSchema = z.object({
-  userId: z.string().cuid('ID inválido.'),
+  userId: z.string().min(1, 'ID inválido.'),
   token: z
-    .string({ required_error: 'Código 2FA é obrigatório.' })
+    .string()
     .length(6, 'Código deve ter 6 dígitos.')
     .regex(/^\d+$/, 'Código deve conter apenas dígitos.'),
 })

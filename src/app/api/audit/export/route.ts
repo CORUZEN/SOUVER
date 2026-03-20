@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search') ?? ''
-  const module = searchParams.get('module') || undefined
+  const moduleName = searchParams.get('module') || undefined
   const action = searchParams.get('action') || undefined
   const userId = searchParams.get('userId') || undefined
   const period = searchParams.get('period') ?? '7d'
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const where = {
     ...(since ? { createdAt: { gte: since } } : {}),
-    ...(module ? { module } : {}),
+    ...(moduleName ? { module: moduleName } : {}),
     ...(action ? { action } : {}),
     ...(userId ? { userId } : {}),
     ...(search

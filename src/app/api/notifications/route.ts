@@ -11,13 +11,13 @@ export async function GET(req: NextRequest) {
   const unreadOnly = searchParams.get('unread') === 'true'
   const limit      = Math.min(parseInt(searchParams.get('limit') ?? '30', 10), 100)
   const page       = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
-  const module     = searchParams.get('module') ?? undefined
+  const moduleName = searchParams.get('module') ?? undefined
   const skip       = (page - 1) * limit
 
   const where = {
     userId: user.id,
     ...(unreadOnly ? { isRead: false } : {}),
-    ...(module ? { module } : {}),
+    ...(moduleName ? { module: moduleName } : {}),
   }
 
   const [notifications, total, totalUnread] = await Promise.all([

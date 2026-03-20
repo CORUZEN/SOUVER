@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
-import { authenticator } from 'otplib'
+import { OTP } from 'otplib'
 import QRCode from 'qrcode'
 import { auditLog } from '@/domains/audit/audit.service'
 
-authenticator.options = { step: 30, digits: 6, window: 1 }
+const totp = new OTP()
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
@@ -16,13 +16,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Usa segredo existente (pendente de verificação) ou gera novo
-  const secret = user.twoFactorSecret ?? authenticator.generateSecret()
+  const secret = user.twoFactorSecret ?? totp.generateSecret()
 
   if (!user.twoFactorSecret) {
     await prisma.user.update({ where: { id: user.id }, data: { twoFactorSecret: secret } })
   }
 
-  const otpauthUrl = authenticator.keyuri(user.email, 'SOUVER — Ouro Verde', secret)
+  const otpauthUrl = totp.generateURI({ label: user.email, issuer: 'SOUVER — Ouro Verde', secret })
   const qrDataUrl = await QRCode.toDataURL(otpauthUrl)
 
   return NextResponse.json({ secret, qrDataUrl, otpauthUrl })
@@ -44,14 +44,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { totp } = body as { totp?: string }
+  const { totp: totpCode } = body as { totp?: string }
 
-  if (!totp || typeof totp !== 'string') {
+  if (!totpCode || typeof totpCode !== 'string') {
     return NextResponse.json({ message: 'Código TOTP é obrigatório.' }, { status: 400 })
   }
 
-  const isValid = authenticator.verify({ token: totp.replace(/\s/g, ''), secret: user.twoFactorSecret })
-  if (!isValid) {
+  const result = await totp.verify({ token: totpCode.replace(/\s/g, ''), secret: user.twoFactorSecret, epochTolerance: 30 })
+  if (!result.valid) {
     return NextResponse.json({ message: 'Código inválido. Tente novamente.' }, { status: 400 })
   }
 

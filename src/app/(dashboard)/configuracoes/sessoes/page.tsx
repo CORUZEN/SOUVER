@@ -156,7 +156,7 @@ export default function SessoesPage() {
 
       <Card className="border-amber-200 bg-amber-50">
         <p className="text-xs text-amber-800 leading-relaxed">
-          <strong>Dica de segurança:</strong> Se você reconhecer uma sessão suspeita ou que você não iniciou, clique em <em>"Encerrar sessão"</em> para revogá-la imediatamente. Se suspeitar de acesso não autorizado, altere sua senha em <Link href="/configuracoes/perfil" className="underline">Meu Perfil</Link>.
+          <strong>Dica de segurança:</strong> Se você reconhecer uma sessão suspeita ou que você não iniciou, clique em <em>&quot;Encerrar sessão&quot;</em> para revogá-la imediatamente. Se suspeitar de acesso não autorizado, altere sua senha em <Link href="/configuracoes/perfil" className="underline">Meu Perfil</Link>.
         </p>
       </Card>
     </div>
@@ -200,7 +200,7 @@ function SessionCard({
               <Clock size={11} />
               Iniciada {formatRelative(session.startedAt)}
               <span className="mx-1">·</span>
-              expira em {formatRelative(new Date(new Date(session.expiresAt).getTime() - Date.now() + Date.now()).toISOString())}
+              expira em {formatRelative(session.expiresAt)}
             </div>
           </div>
         </div>

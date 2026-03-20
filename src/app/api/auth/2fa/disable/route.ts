@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
-import { authenticator } from 'otplib'
+import { OTP } from 'otplib'
 import { auditLog } from '@/domains/audit/audit.service'
+
+const totp = new OTP()
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
@@ -16,14 +18,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { totp } = body as { totp?: string }
+  const { totp: totpCode } = body as { totp?: string }
 
-  if (!totp || !user.twoFactorSecret) {
+  if (!totpCode || !user.twoFactorSecret) {
     return NextResponse.json({ message: 'Código TOTP é obrigatório.' }, { status: 400 })
   }
 
-  const isValid = authenticator.verify({ token: totp.replace(/\s/g, ''), secret: user.twoFactorSecret })
-  if (!isValid) {
+  const result = await totp.verify({ token: totpCode.replace(/\s/g, ''), secret: user.twoFactorSecret, epochTolerance: 30 })
+  if (!result.valid) {
     return NextResponse.json({ message: 'Código inválido. Tente novamente.' }, { status: 400 })
   }
 
