@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
 
 // Rotas públicas que não exigem autenticação
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/health']
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/health', '/esqueci-senha', '/resetar-senha']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -12,6 +12,8 @@ export async function middleware(req: NextRequest) {
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/images') ||
+    pathname.startsWith('/fonts') ||
     pathname.includes('.')
   ) {
     return NextResponse.next()
@@ -31,9 +33,14 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  return NextResponse.next()
+  const response = NextResponse.next()
+
+  // Adicionar headers de performance
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+
+  return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|webp|woff2?|ttf|eot)$).*)'],
 }

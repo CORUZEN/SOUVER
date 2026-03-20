@@ -29,52 +29,43 @@ export async function GET(req: NextRequest) {
 
   const since = dates[0]
 
-  // Fetch paralelo — lotes criados, movimentações e NCs por dia
-  const [batches, movements, ncs] = await Promise.all([
-    prisma.productionBatch.findMany({
-      where: { createdAt: { gte: since } },
-      select: { createdAt: true },
-    }),
-    prisma.inventoryMovement.findMany({
-      where: { movedAt: { gte: since } },
-      select: { movedAt: true },
-    }),
-    prisma.nonConformance.findMany({
-      where: { openedAt: { gte: since } },
-      select: { openedAt: true },
-    }),
+  // Agregação direta no banco via GROUP BY (evita transferir milhares de linhas)
+  type DayCount = { day: Date; count: bigint }
+
+  const [batchRows, movementRows, ncRows] = await Promise.all([
+    prisma.$queryRaw<DayCount[]>`
+      SELECT date_trunc('day', created_at) AS day, COUNT(*)::bigint AS count
+      FROM production_batches
+      WHERE created_at >= ${since}
+      GROUP BY 1`,
+    prisma.$queryRaw<DayCount[]>`
+      SELECT date_trunc('day', moved_at) AS day, COUNT(*)::bigint AS count
+      FROM inventory_movements
+      WHERE moved_at >= ${since}
+      GROUP BY 1`,
+    prisma.$queryRaw<DayCount[]>`
+      SELECT date_trunc('day', opened_at) AS day, COUNT(*)::bigint AS count
+      FROM non_conformances
+      WHERE opened_at >= ${since}
+      GROUP BY 1`,
   ])
 
-  function dayKey(d: Date) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
-  function bucketize<T extends { [k: string]: Date }>(
-    records: T[],
-    dateField: keyof T,
-  ): Record<string, number> {
-    const m: Record<string, number> = {}
-    for (const r of records) {
-      const k = dayKey(r[dateField] as Date)
-      m[k] = (m[k] ?? 0) + 1
-    }
+  function toMap(rows: DayCount[]): Map<string, number> {
+    const m = new Map<string, number>()
+    for (const r of rows) m.set(new Date(r.day).toDateString(), Number(r.count))
     return m
   }
 
-  const bMap = bucketize(batches.map(b => ({ d: new Date(b.createdAt) })), 'd')
-  const mMap = bucketize(movements.map(m => ({ d: new Date(m.movedAt) })), 'd')
-  const nMap = bucketize(ncs.map(n => ({ d: new Date(n.openedAt) })), 'd')
+  const bMap = toMap(batchRows)
+  const mMap = toMap(movementRows)
+  const nMap = toMap(ncRows)
 
-  const result = dates.map(d => {
-    const k = dayKey(d)
-    const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-    return {
-      date:       label,
-      batches:    bMap[k] ?? 0,
-      movements:  mMap[k] ?? 0,
-      ncs:        nMap[k] ?? 0,
-    }
-  })
+  const result = dates.map(d => ({
+    date:       d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    batches:    bMap.get(d.toDateString()) ?? 0,
+    movements:  mMap.get(d.toDateString()) ?? 0,
+    ncs:        nMap.get(d.toDateString()) ?? 0,
+  }))
 
   return NextResponse.json(
     { days: result },

@@ -1,7 +1,7 @@
 'use client'
 
 import { Bell, ChevronDown, LogOut, CheckCheck, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 
 interface UserInfo {
@@ -41,6 +41,7 @@ export default function Header() {
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [showNotifs,   setShowNotifs]   = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -58,8 +59,8 @@ export default function Header() {
       .catch(() => null)
   }, [])
 
-  const loadNotifs = () => {
-    fetch('/api/notifications?limit=20')
+  const loadNotifs = useCallback(() => {
+    fetch('/api/notifications?limit=10')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) {
@@ -68,13 +69,31 @@ export default function Header() {
         }
       })
       .catch(() => null)
-  }
+  }, [])
 
   useEffect(() => {
     loadNotifs()
-    const t = setInterval(loadNotifs, 30000) // poll a cada 30s
-    return () => clearInterval(t)
-  }, [])
+
+    // Polling a cada 60s — apenas se a aba estiver visível
+    function startPolling() {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+      pollTimerRef.current = setInterval(loadNotifs, 60000)
+    }
+    function stopPolling() {
+      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+    }
+    function handleVisibility() {
+      if (document.hidden) stopPolling()
+      else { loadNotifs(); startPolling() }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [loadNotifs])
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {

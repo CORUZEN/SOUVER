@@ -16,16 +16,24 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  compress: true,
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3001'],
     },
+    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns'],
   },
   async headers() {
     return [
       {
         source: '/(.*)',
         headers: securityHeaders,
+      },
+      {
+        source: '/_next/static/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
       },
     ]
   },

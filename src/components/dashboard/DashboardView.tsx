@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Skeleton'
@@ -16,11 +17,21 @@ import {
   ShieldCheck,
   Minus,
 } from 'lucide-react'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-  LineChart, Line, CartesianGrid,
-} from 'recharts'
+
+// Lazy load recharts para reduzir o bundle do dashboard
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false })
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false })
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false })
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false })
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false })
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false })
+const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false })
+const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false })
+const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false })
+const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false })
+const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false })
+const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false })
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false })
 
 interface KPIData {
   production: {
@@ -115,32 +126,42 @@ export default function DashboardView() {
   const [userRole, setUserRole]     = useState<string | null>(null)
   const [trendData, setTrendData]   = useState<{ date: string; batches: number; movements: number; ncs: number }[]>([])
   const [loadingTrend, setLoadingTrend] = useState(true)
+  const abortRef = useRef<AbortController | null>(null)
 
-  async function loadKpis(p?: string) {
+  const loadKpis = useCallback(async (p?: string) => {
     const prd = p ?? period
     setLoadingKpis(true)
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
     try {
-      const res = await fetch(`/api/dashboard/kpis?period=${prd}&variation=true`)
+      const res = await fetch(`/api/dashboard/kpis?period=${prd}&variation=true`, { signal: ctrl.signal })
       if (res.ok) setKpis(await res.json())
-    } catch {
-      // silent — mostra "—" nos cards
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') { /* silent */ }
     } finally {
       setLoadingKpis(false)
     }
-  }
+  }, [period])
 
   useEffect(() => {
-    loadKpis()
-    fetch('/api/auth/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
-      .catch(() => null)
-    // Carregar tendência dos últimos 7 dias
-    fetch('/api/dashboard/trend?days=7')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.days) setTrendData(d.days) })
-      .catch(() => null)
-      .finally(() => setLoadingTrend(false))
+    // Buscar KPIs, perfil e tendência em PARALELO
+    const ctrl = new AbortController()
+
+    Promise.all([
+      loadKpis(),
+      fetch('/api/auth/me', { signal: ctrl.signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
+        .catch(() => null),
+      fetch('/api/dashboard/trend?days=7', { signal: ctrl.signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.days) setTrendData(d.days) })
+        .catch(() => null)
+        .finally(() => setLoadingTrend(false)),
+    ])
+
+    return () => ctrl.abort()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePeriodChange(p: string) {

@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
       },
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=30' },
     })
   } catch {
     return NextResponse.json({ authenticated: false }, { status: 401 })

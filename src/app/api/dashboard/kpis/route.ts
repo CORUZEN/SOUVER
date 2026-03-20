@@ -8,6 +8,33 @@ import { getHRKPIs } from '@/domains/hr/hr.service'
 
 type DashboardModule = 'production' | 'inventory' | 'quality' | 'hr'
 
+// ─── Cache em memória com TTL ────────────────────────────────────
+interface CacheEntry<T> { data: T; expiresAt: number }
+const kpiCache = new Map<string, CacheEntry<unknown>>()
+
+function getCached<T>(key: string): T | null {
+  const entry = kpiCache.get(key)
+  if (!entry || Date.now() > entry.expiresAt) { kpiCache.delete(key); return null }
+  return entry.data as T
+}
+
+function setCache<T>(key: string, data: T, ttlMs: number) {
+  kpiCache.set(key, { data, expiresAt: Date.now() + ttlMs })
+  // Limpa entradas expiradas periodicamente
+  if (kpiCache.size > 50) {
+    const now = Date.now()
+    for (const [k, v] of kpiCache) { if (now > v.expiresAt) kpiCache.delete(k) }
+  }
+}
+
+function cacheTTL(period: string): number {
+  if (period === 'today') return 15_000   // 15s
+  if (period === 'week')  return 60_000   // 1min
+  return 120_000                          // 2min
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
 function buildDateRange(period: string): KpiDateRange | undefined {
   const now = new Date()
   const to = new Date(now)
@@ -58,9 +85,9 @@ function delta(current: number, previous: number): number | null {
 }
 
 function cacheHeader(period: string): string {
-  if (period === 'today') return 'private, max-age=30, stale-while-revalidate=30'
-  if (period === 'week') return 'private, max-age=120, stale-while-revalidate=60'
-  return 'private, max-age=300, stale-while-revalidate=120'
+  if (period === 'today') return 'private, max-age=15, stale-while-revalidate=30'
+  if (period === 'week') return 'private, max-age=60, stale-while-revalidate=60'
+  return 'private, max-age=120, stale-while-revalidate=120'
 }
 
 async function getModuleData(moduleName: DashboardModule, dateRange?: KpiDateRange) {
@@ -68,6 +95,15 @@ async function getModuleData(moduleName: DashboardModule, dateRange?: KpiDateRan
   if (moduleName === 'inventory') return getInventoryKPIs(dateRange)
   if (moduleName === 'quality') return getQualityKPIs(dateRange)
   return getHRKPIs(dateRange)
+}
+
+async function cachedModuleData(moduleName: DashboardModule, dateRange: KpiDateRange | undefined, period: string) {
+  const key = `kpi:${moduleName}:${period}`
+  const cached = getCached(key)
+  if (cached) return cached
+  const data = await getModuleData(moduleName, dateRange)
+  setCache(key, data, cacheTTL(period))
+  return data
 }
 
 export async function GET(req: NextRequest) {
@@ -82,40 +118,47 @@ export async function GET(req: NextRequest) {
   const prevDateRange = buildPreviousDateRange(period)
 
   if (moduleParam) {
-    const moduleData = await getModuleData(moduleParam, dateRange)
+    const moduleData = await cachedModuleData(moduleParam, dateRange, period)
     let variation: Record<string, number | null> | undefined
 
     if (includeVariation && prevDateRange) {
+      const prevKey = `kpi:${moduleParam}:prev:${period}`
+      let previous = getCached<Awaited<ReturnType<typeof getModuleData>>>(prevKey)
+      if (!previous) {
+        previous = await getModuleData(moduleParam, prevDateRange)
+        setCache(prevKey, previous, cacheTTL(period))
+      }
+
       if (moduleParam === 'production') {
-        const previous = await getProductionKPIs(prevDateRange)
         const current = moduleData as Awaited<ReturnType<typeof getProductionKPIs>>
+        const prev = previous as Awaited<ReturnType<typeof getProductionKPIs>>
         variation = {
-          totalBatches: delta(current.totalBatches, previous.totalBatches),
-          finished: delta(current.finished, previous.finished),
-          totalProducedQty: delta(current.totalProducedQty ?? 0, previous.totalProducedQty ?? 0),
+          totalBatches: delta(current.totalBatches, prev.totalBatches),
+          finished: delta(current.finished, prev.finished),
+          totalProducedQty: delta(current.totalProducedQty ?? 0, prev.totalProducedQty ?? 0),
         }
       }
       if (moduleParam === 'inventory') {
-        const previous = await getInventoryKPIs(prevDateRange)
         const current = moduleData as Awaited<ReturnType<typeof getInventoryKPIs>>
+        const prev = previous as Awaited<ReturnType<typeof getInventoryKPIs>>
         variation = {
-          totalMovements: delta(current.totalMovements, previous.totalMovements),
-          lowStockCount: delta(current.lowStockCount, previous.lowStockCount),
+          totalMovements: delta(current.totalMovements, prev.totalMovements),
+          lowStockCount: delta(current.lowStockCount, prev.lowStockCount),
         }
       }
       if (moduleParam === 'quality') {
-        const previous = await getQualityKPIs(prevDateRange)
         const current = moduleData as Awaited<ReturnType<typeof getQualityKPIs>>
+        const prev = previous as Awaited<ReturnType<typeof getQualityKPIs>>
         variation = {
-          openNCs: delta(current.openNCs, previous.openNCs),
-          totalRecords: delta(current.totalRecords, previous.totalRecords),
+          openNCs: delta(current.openNCs, prev.openNCs),
+          totalRecords: delta(current.totalRecords, prev.totalRecords),
         }
       }
       if (moduleParam === 'hr') {
-        const previous = await getHRKPIs(prevDateRange)
         const current = moduleData as Awaited<ReturnType<typeof getHRKPIs>>
+        const prev = previous as Awaited<ReturnType<typeof getHRKPIs>>
         variation = {
-          loggedToday: delta(current.loggedToday, previous.loggedToday),
+          loggedToday: delta(current.loggedToday, prev.loggedToday),
         }
       }
     }
@@ -126,22 +169,34 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const [production, inventory, quality, hr, activeUsers] = await Promise.all([
-    getProductionKPIs(dateRange),
-    getInventoryKPIs(dateRange),
-    getQualityKPIs(dateRange),
-    getHRKPIs(dateRange),
-    prisma.user.count({ where: { status: 'ACTIVE' } }),
-  ])
+  // Busca todos os módulos em paralelo (atual + anterior ao mesmo tempo)
+  const activeUsersPromise = prisma.user.count({ where: { status: 'ACTIVE' } })
+
+  const [production, inventory, quality, hr] = await Promise.all([
+    cachedModuleData('production', dateRange, period),
+    cachedModuleData('inventory', dateRange, period),
+    cachedModuleData('quality', dateRange, period),
+    cachedModuleData('hr', dateRange, period),
+  ]) as [
+    Awaited<ReturnType<typeof getProductionKPIs>>,
+    Awaited<ReturnType<typeof getInventoryKPIs>>,
+    Awaited<ReturnType<typeof getQualityKPIs>>,
+    Awaited<ReturnType<typeof getHRKPIs>>,
+  ]
 
   let variation: Record<string, number | null> | undefined
   if (includeVariation && prevDateRange) {
     const [prevProd, prevInv, prevQuality, prevHr] = await Promise.all([
-      getProductionKPIs(prevDateRange),
-      getInventoryKPIs(prevDateRange),
-      getQualityKPIs(prevDateRange),
-      getHRKPIs(prevDateRange),
-    ])
+      cachedModuleData('production', prevDateRange, `prev:${period}`),
+      cachedModuleData('inventory', prevDateRange, `prev:${period}`),
+      cachedModuleData('quality', prevDateRange, `prev:${period}`),
+      cachedModuleData('hr', prevDateRange, `prev:${period}`),
+    ]) as [
+      Awaited<ReturnType<typeof getProductionKPIs>>,
+      Awaited<ReturnType<typeof getInventoryKPIs>>,
+      Awaited<ReturnType<typeof getQualityKPIs>>,
+      Awaited<ReturnType<typeof getHRKPIs>>,
+    ]
 
     variation = {
       totalBatches: delta(production.totalBatches, prevProd.totalBatches),
@@ -154,6 +209,8 @@ export async function GET(req: NextRequest) {
       loggedToday: delta(hr.loggedToday, prevHr.loggedToday),
     }
   }
+
+  const activeUsers = await activeUsersPromise
 
   return NextResponse.json(
     { production, inventory, quality, hr, activeUsers, period, variation },

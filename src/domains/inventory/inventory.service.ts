@@ -71,6 +71,8 @@ export async function listItems(filter: ItemFilter) {
     where.currentQty = { lte: prisma.inventoryItem.fields.minQty }
   }
 
+  const countPromise = prisma.inventoryItem.count({ where })
+
   const items = filter.compact
     ? await prisma.inventoryItem.findMany({
         where,
@@ -103,7 +105,7 @@ export async function listItems(filter: ItemFilter) {
         },
       })
 
-  const total = await prisma.inventoryItem.count({ where })
+  const total = await countPromise
   return {
     items,
     total,
@@ -288,18 +290,17 @@ export async function getInventoryKPIs(dateRange?: { from: Date; to: Date }) {
     ? { gte: dateRange.from, lte: dateRange.to }
     : { gte: today }
 
-  const [totalItems, totalMovements] = await Promise.all([
+  const [totalItems, totalMovements, lowCount] = await Promise.all([
     prisma.inventoryItem.count({ where: { isActive: true } }),
     prisma.inventoryMovement.count({ where: { movedAt: movedDateFilter } }),
+    prisma.inventoryItem.count({
+      where: {
+        isActive: true,
+        minQty: { not: null },
+        currentQty: { lte: prisma.inventoryItem.fields.minQty },
+      },
+    }),
   ])
-
-  const lowCount = await prisma.inventoryItem.count({
-    where: {
-      isActive: true,
-      minQty: { not: null },
-      currentQty: { lte: prisma.inventoryItem.fields.minQty },
-    },
-  })
 
   return {
     totalItems,

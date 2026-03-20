@@ -125,6 +125,10 @@ model User {
   passwordResetTokens  PasswordResetToken[]
 
   @@index([status, lastLoginAt])
+  @@index([departmentId])
+  @@index([roleId])
+  @@index([twoFactorEnabled, status])
+  @@index([lastLoginAt])
   @@map("users")
 }
 
@@ -254,6 +258,9 @@ model ProductionBatch {
   @@index([status, createdAt])
   @@index([departmentId, status])
   @@index([shift, status])
+  @@index([createdAt])
+  @@index([finishedAt])
+  @@index([batchCode])
   @@map("production_batches")
 }
 
@@ -354,6 +361,7 @@ model InventoryMovement {
   @@index([itemId, movedAt])
   @@index([type, movedAt])
   @@index([createdByUserId, createdAt])
+  @@index([movedAt])
   @@map("inventory_movements")
 }
 
@@ -385,6 +393,8 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, module])
+  @@index([userId, isRead, createdAt])
+  @@index([createdAt])
   @@map("notifications")
 }
 
@@ -455,6 +465,7 @@ model NonConformance {
   @@index([resolvedAt])
   @@index([departmentId, status])
   @@index([assignedToId, status])
+  @@index([openedAt])
   @@map("non_conformances")
 }
 

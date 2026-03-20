@@ -144,7 +144,7 @@ export default function ComunicacaoPage() {
 
   // Carrega usuários disponíveis para modal
   const loadUsers = useCallback(async () => {
-    const r = await fetch('/api/hr/collaborators?pageSize=200')
+    const r = await fetch('/api/hr/collaborators?pageSize=50&compact=true')
     if (!r.ok) return
     const d = await r.json()
     setAllUsers(d.collaborators ?? [])
@@ -158,20 +158,34 @@ export default function ComunicacaoPage() {
     setMessages(d.messages ?? [])
   }, [])
 
-  // Marca como lido + polling
+  // Marca como lido + polling inteligente (pausa quando aba inativa)
   useEffect(() => {
     if (!activeId) return
     loadMessages(activeId)
     fetch(`/api/chat/conversations/${activeId}/messages`, { method: 'PATCH' })
 
-    // Poll a cada 4 s para simular tempo real
-    if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(() => {
-      loadMessages(activeId)
-      loadConversations()
-    }, 4000)
+    function startPoll() {
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(() => {
+        if (document.hidden) return
+        loadMessages(activeId)
+        loadConversations()
+      }, 10000)
+    }
+    function handleVisibility() {
+      if (!document.hidden) {
+        loadMessages(activeId)
+        loadConversations()
+      }
+    }
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    startPoll()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [activeId, loadMessages, loadConversations])
 
   // Scroll automático
