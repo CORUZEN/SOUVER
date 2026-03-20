@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3001'],
     },
-    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns'],
+    optimizePackageImports: ['lucide-react'],
   },
   async headers() {
     return [

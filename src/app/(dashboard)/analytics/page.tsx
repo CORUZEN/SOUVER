@@ -138,8 +138,7 @@ export default function AnalyticsPage() {
               <TrendingUp className="h-5 w-5 text-blue-600" />
               Atividade Diária
             </h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
                 <LineChart data={data.dailyActivity}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" tick={{ fontSize: 12 }} tickFormatter={(v) => {
@@ -151,7 +150,6 @@ export default function AnalyticsPage() {
                   <Line type="monotone" dataKey="count" name="Ações" stroke="#2563eb" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
           </div>
 
           {/* Ações por Módulo + Top Usuários */}
@@ -159,8 +157,7 @@ export default function AnalyticsPage() {
             {/* Por Módulo */}
             <div className="bg-white rounded-lg border p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Ações por Módulo</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={256}>
                   <BarChart data={data.modules.map((m) => ({ ...m, label: MODULE_LABELS[m.module] ?? m.module }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -169,7 +166,6 @@ export default function AnalyticsPage() {
                     <Bar dataKey="count" name="Ações" fill="#2563eb" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
             </div>
 
             {/* Top Usuários */}
@@ -206,8 +202,7 @@ export default function AnalyticsPage() {
                 <Package className="h-4 w-4 text-purple-600" />
                 Produção por Status
               </h2>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={192}>
                   <PieChart>
                     <Pie
                       data={data.production.byStatus.map((b) => ({ ...b, label: STATUS_LABELS[b.status] ?? b.status }))}
@@ -220,7 +215,6 @@ export default function AnalyticsPage() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
               <div className="flex flex-wrap gap-2 mt-2 justify-center">
                 {data.production.byStatus.map((b, i) => (
                   <span key={b.status} className="flex items-center gap-1 text-xs text-gray-600">
@@ -237,8 +231,7 @@ export default function AnalyticsPage() {
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 NCs por Severidade
               </h2>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={192}>
                   <PieChart>
                     <Pie
                       data={data.quality.bySeverity.map((n) => ({ ...n, label: SEVERITY_LABELS[n.severity] ?? n.severity }))}
@@ -251,7 +244,6 @@ export default function AnalyticsPage() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
               <div className="flex flex-wrap gap-2 mt-2 justify-center">
                 {data.quality.bySeverity.map((n, i) => (
                   <span key={n.severity} className="flex items-center gap-1 text-xs text-gray-600">
@@ -268,8 +260,7 @@ export default function AnalyticsPage() {
                 <Truck className="h-4 w-4 text-cyan-600" />
                 Movimentações por Tipo
               </h2>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={192}>
                   <BarChart data={data.logistics.byType.map((m) => ({ ...m, label: MOVEMENT_LABELS[m.type] ?? m.type }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -278,7 +269,6 @@ export default function AnalyticsPage() {
                     <Bar dataKey="count" name="Qtd" fill="#06b6d4" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
             </div>
           </div>
 
