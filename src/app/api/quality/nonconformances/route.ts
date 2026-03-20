@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     createNotificationsForRole('QUALITY', {
       type,
       title:   `NC ${sevLabel} aberta: ${nc.title}`,
-      message: `Uma não conformidade de severidade ${parsed.data.severity} foi registrada por ${user.name ?? user.id}. Requer atenção.`,
+      message: `Uma não conformidade de severidade ${parsed.data.severity} foi registrada por ${user.fullName ?? user.id}. Requer atenção.`,
       module:  'quality',
       link:    '/qualidade',
     }).catch(() => null)
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       createNotificationsForRole('ADMIN', {
         type,
         title:   `NC CRÍTICA aberta: ${nc.title}`,
-        message: `Uma não conformidade crítica foi registrada no módulo de Qualidade por ${user.name ?? user.id}. Verifique imediatamente.`,
+        message: `Uma não conformidade crítica foi registrada no módulo de Qualidade por ${user.fullName ?? user.id}. Verifique imediatamente.`,
         module:  'quality',
         link:    '/qualidade',
       }).catch(() => null)

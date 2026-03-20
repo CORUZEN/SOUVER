@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-  if (!['DEVELOPER', 'ADMIN'].includes(user.role)) {
+  if (!['DEVELOPER', 'ADMIN'].includes(user.role?.code ?? '')) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 

@@ -55,6 +55,9 @@ export async function getCurrentUser(token: string) {
           departmentId: true,
           isActive: true,
           twoFactorEnabled: true,
+          twoFactorSecret: true,
+          phone: true,
+          avatarUrl: true,
           role: {
             select: {
               id: true,

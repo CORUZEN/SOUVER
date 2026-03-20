@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
-  if (!['DEVELOPER', 'ADMIN'].includes(user.role)) {
+  if (!['DEVELOPER', 'ADMIN'].includes(user.role?.code ?? '')) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 

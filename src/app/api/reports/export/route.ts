@@ -44,8 +44,8 @@ function xlsxResponse(
     const ws = XLSX.utils.json_to_sheet(rows)
     XLSX.utils.book_append_sheet(wb, ws, name)
   }
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
-  return new NextResponse(buf, {
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Uint8Array
+  return new NextResponse(buf.buffer as ArrayBuffer, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,

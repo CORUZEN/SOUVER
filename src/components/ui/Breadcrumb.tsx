@@ -21,7 +21,6 @@ const ROUTE_LABELS: Record<string, string> = {
   'acesso-negado': 'Acesso Negado',
   departamentos: 'Departamentos',
   perfil: 'Meu Perfil',
-  perfis: 'Perfis de Acesso',
   sessoes: 'Sessões Ativas',
   integracoes: 'Integrações',
   contabilidade: 'Contabilidade',

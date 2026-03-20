@@ -161,20 +161,21 @@ export default function ComunicacaoPage() {
   // Marca como lido + polling inteligente (pausa quando aba inativa)
   useEffect(() => {
     if (!activeId) return
-    loadMessages(activeId)
-    fetch(`/api/chat/conversations/${activeId}/messages`, { method: 'PATCH' })
+    const currentId = activeId
+    loadMessages(currentId)
+    fetch(`/api/chat/conversations/${currentId}/messages`, { method: 'PATCH' })
 
     function startPoll() {
       if (pollRef.current) clearInterval(pollRef.current)
       pollRef.current = setInterval(() => {
         if (document.hidden) return
-        loadMessages(activeId)
+        loadMessages(currentId)
         loadConversations()
       }, 10000)
     }
     function handleVisibility() {
       if (!document.hidden) {
-        loadMessages(activeId)
+        loadMessages(currentId)
         loadConversations()
       }
     }
