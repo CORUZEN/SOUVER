@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   experimental: {
+    webpackBuildWorker: true,
     serverActions: {
       allowedOrigins: ['localhost:3001'],
     },

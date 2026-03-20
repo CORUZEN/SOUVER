@@ -137,4 +137,64 @@ echo ""
 log_sep
 echo ""
 
-exec npm run dev
+# Iniciar servidor em background para poder executar pré-compilação de rotas
+npm run dev &
+DEV_PID=$!
+
+# Repassar INT/TERM para o processo filho (Ctrl+C encerra o servidor corretamente)
+trap "kill ${DEV_PID} 2>/dev/null; wait ${DEV_PID} 2>/dev/null; exit 0" INT TERM HUP
+
+# ─── Pré-compilação de rotas (warmup) ─────────────────────────────────────────
+# Aguarda o servidor estar pronto, gera um JWT de warmup e dispara requests para
+# todas as rotas principais em paralelo. Isso faz o webpack compilar todos os
+# bundles durante a inicialização, eliminando o atraso de 3-8s no primeiro acesso.
+(
+  set +e
+
+  # Aguardar health check responder (máximo 90s)
+  SERVER_READY=0
+  for i in $(seq 1 90); do
+    sleep 1
+    if curl -sf "http://localhost:${APP_PORT}/api/health" > /dev/null 2>&1; then
+      SERVER_READY=1
+      break
+    fi
+  done
+  [ "${SERVER_READY}" -eq 0 ] && exit 0
+
+  # Extrair JWT_SECRET do .env.local
+  JWT_VAL=$(grep "^JWT_SECRET=" .env.local 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'" | xargs 2>/dev/null || true)
+  [ -z "${JWT_VAL}" ] && exit 0
+
+  # Gerar token de warmup via jsonwebtoken (CommonJS, já instalado nas dependências)
+  WARMUP_TOKEN=$(JWT_SECRET="${JWT_VAL}" node -e "
+    try {
+      const j = require('jsonwebtoken');
+      process.stdout.write(j.sign(
+        { sub: 'warmup', sessionId: 'warmup' },
+        process.env.JWT_SECRET,
+        { expiresIn: '5m' }
+      ));
+    } catch (e) { process.exit(1); }
+  " 2>/dev/null || true)
+  [ -z "${WARMUP_TOKEN}" ] && exit 0
+
+  log_info "Pré-compilando rotas do sistema em segundo plano..."
+
+  # Disparar requests em paralelo — webpack compilará todos os bundles ao mesmo tempo
+  WARMUP_ROUTES=(
+    "/dashboard" "/producao" "/logistica" "/qualidade" "/rh"
+    "/auditoria" "/usuarios" "/departamentos" "/relatorios"
+    "/configuracoes" "/contabilidade" "/comunicacao" "/integracoes" "/analytics"
+  )
+  for route in "${WARMUP_ROUTES[@]}"; do
+    curl -sf "http://localhost:${APP_PORT}${route}" \
+      -H "Cookie: souver_token=${WARMUP_TOKEN}" \
+      --max-time 60 -o /dev/null 2>&1 &
+  done
+  wait
+
+  log_success "Pré-compilação concluída — todas as rotas carregarão instantaneamente"
+) &
+
+wait $DEV_PID || true
