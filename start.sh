@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+# Garantir execução a partir da raiz do projeto, mesmo chamando o script de outro diretório.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
 # ─── Cores para output ────────────────────────────────────────────────────────
 RESET='\033[0m'
 BOLD='\033[1m'
@@ -39,7 +43,7 @@ APP_PORT=3001
 REQUIRED_NODE_MAJOR=18
 
 # ─── 1. Verificar Node.js ─────────────────────────────────────────────────────
-log_header "[ 1/5 ] Verificando ambiente Node.js"
+log_header "[ 1/6 ] Verificando ambiente Node.js"
 log_sep
 
 if ! command -v node &>/dev/null; then
@@ -60,7 +64,7 @@ log_success "NPM v$(npm --version) detectado"
 
 # ─── 2. Verificar dependências ────────────────────────────────────────────────
 echo ""
-log_header "[ 2/5 ] Verificando dependências"
+log_header "[ 2/6 ] Verificando dependências"
 log_sep
 
 if [ ! -d "node_modules" ]; then
@@ -73,7 +77,7 @@ fi
 
 # ─── 3. Verificar variáveis de ambiente ───────────────────────────────────────
 echo ""
-log_header "[ 3/5 ] Verificando variáveis de ambiente"
+log_header "[ 3/6 ] Verificando variáveis de ambiente"
 log_sep
 
 if [ ! -f ".env.local" ]; then
@@ -96,7 +100,7 @@ fi
 
 # ─── 4. Verificar porta disponível ────────────────────────────────────────────
 echo ""
-log_header "[ 4/5 ] Verificando disponibilidade da porta ${APP_PORT}"
+log_header "[ 4/6 ] Verificando disponibilidade da porta ${APP_PORT}"
 log_sep
 
 if command -v lsof &>/dev/null; then
@@ -121,9 +125,16 @@ else
   log_info "Verificação de porta ignorada (lsof/netstat não disponíveis)"
 fi
 
+echo ""
+log_header "[ 5/6 ] Gerando Prisma Client"
+log_sep
+
+npm run db:generate
+log_success "Prisma Client gerado com sucesso"
+
 # ─── 5. Iniciar servidor ──────────────────────────────────────────────────────
 echo ""
-log_header "[ 5/5 ] Iniciando servidor de desenvolvimento"
+log_header "[ 6/6 ] Iniciando servidor de desenvolvimento"
 log_sep
 
 echo ""
