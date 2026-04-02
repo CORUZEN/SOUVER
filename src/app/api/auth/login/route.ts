@@ -11,6 +11,11 @@ import {
   NOTIFICATION_TYPES,
 } from '@/domains/notifications/notifications.service'
 
+function isLikelyDatabaseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return /(prisma|database|p10\d{2}|can't reach database|connection|timeout|econn|neon)/i.test(message)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -18,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { message: 'Dados inválidos.', errors: parsed.error.flatten().fieldErrors },
+        { message: 'Dados invalidos.', errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       )
     }
@@ -44,15 +49,11 @@ export async function POST(req: NextRequest) {
         userAgent,
       })
       emitDomainEvent('auth:login.failed', { login, ip })
-      return NextResponse.json(
-        { message: 'Credenciais inválidas.' },
-        { status: 401 }
-      )
+      return NextResponse.json({ message: 'Credenciais invalidas.' }, { status: 401 })
     }
 
-    // ── Bloqueio progressivo ──────────────────────────────────
     const MAX_ATTEMPTS = 5
-    const LOCK_DURATION_MS = 30 * 60 * 1000 // 30 min
+    const LOCK_DURATION_MS = 30 * 60 * 1000
 
     const recentFailures = await prisma.auditLog.findMany({
       where: {
@@ -72,19 +73,18 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           module: 'auth',
           action: 'LOGIN_BLOCKED',
-          description: `Login bloqueado por excesso de tentativas. Desbloqueio às ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+          description: `Login bloqueado por excesso de tentativas. Desbloqueio as ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
           ipAddress: ip,
           userAgent,
         })
         return NextResponse.json(
           {
-            message: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente às ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+            message: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente as ${unlockAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
           },
           { status: 429 }
         )
       }
     }
-    // ─────────────────────────────────────────────────────────
 
     const passwordValid = await verifyPassword(password, user.passwordHash)
     if (!passwordValid) {
@@ -97,13 +97,9 @@ export async function POST(req: NextRequest) {
         userAgent,
       })
       emitDomainEvent('auth:login.failed', { login: user.login, ip })
-      return NextResponse.json(
-        { message: 'Credenciais inválidas.' },
-        { status: 401 }
-      )
+      return NextResponse.json({ message: 'Credenciais invalidas.' }, { status: 401 })
     }
 
-    // 2FA: se o usuário já tem 2FA habilitado, redireciona para verificação
     if (user.twoFactorEnabled) {
       return NextResponse.json(
         { requiresTwoFactor: true, userId: user.id },
@@ -113,18 +109,22 @@ export async function POST(req: NextRequest) {
 
     const { token, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    })
+    // Atualizacao de ultimo login nao deve impedir autenticacao.
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      })
+    } catch (touchError) {
+      console.error('[AUTH/LOGIN] Failed to update lastLoginAt:', touchError)
+    }
 
-    // Perfil exige 2FA mas o usuário ainda não o configurou — cria sessão e redireciona para setup
     if (user.role?.requireTwoFactor) {
       await auditLog({
         userId: user.id,
         module: 'auth',
         action: 'LOGIN_SUCCESS',
-        description: 'Login realizado. Redirecionado para configuração obrigatória de 2FA.',
+        description: 'Login realizado. Redirecionado para configuracao obrigatoria de 2FA.',
         ipAddress: ip,
         userAgent,
       })
@@ -146,53 +146,6 @@ export async function POST(req: NextRequest) {
       return setupResponse
     }
 
-    // Captura IP do último login ANTES de registrar o atual (para comparação)
-    const previousLogin = await prisma.auditLog.findFirst({
-      where:   { userId: user.id, action: 'LOGIN_SUCCESS' },
-      orderBy: { createdAt: 'desc' },
-      select:  { ipAddress: true },
-    })
-
-    await auditLog({
-      userId: user.id,
-      module: 'auth',
-      action: 'LOGIN_SUCCESS',
-      description: 'Login realizado com sucesso.',
-      ipAddress: ip,
-      userAgent,
-    })
-
-    emitDomainEvent('auth:login.success', { userId: user.id, ip })
-
-    // ── Alerta de acesso suspeito (IP diferente do último login) ──
-    if (
-      previousLogin?.ipAddress &&
-      previousLogin.ipAddress !== 'unknown' &&
-      ip !== 'unknown' &&
-      previousLogin.ipAddress !== ip
-    ) {
-      const userName = user.fullName
-
-      // Notificação pessoal para o próprio usuário
-      createNotification(user.id, {
-        type:    NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
-        title:   'Acesso de novo endereço IP detectado',
-        message: `Seu acesso foi realizado de um IP diferente do usual. IP anterior: ${previousLogin.ipAddress} | IP atual: ${ip}. Se não foi você, contate o administrador.`,
-        module:  'auth',
-        link:    '/configuracoes/perfil',
-      }).catch(() => null)
-
-      // Alerta para administradores
-      createNotificationsForRole('ADMIN', {
-        type:    NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
-        title:   `Acesso suspeito — ${userName}`,
-        message: `O usuário ${userName} (${user.login}) acessou o sistema de um IP diferente. Anterior: ${previousLogin.ipAddress} | Atual: ${ip}.`,
-        module:  'auth',
-        link:    '/auditoria',
-      }).catch(() => null)
-    }
-    // ─────────────────────────────────────────────────────────────
-
     const response = NextResponse.json({
       message: 'Autenticado com sucesso.',
       user: {
@@ -213,12 +166,62 @@ export async function POST(req: NextRequest) {
       path: '/',
     })
 
+    // Efeitos secundarios de pos-login: nunca derrubar autenticacao.
+    try {
+      const previousLogin = await prisma.auditLog.findFirst({
+        where: { userId: user.id, action: 'LOGIN_SUCCESS' },
+        orderBy: { createdAt: 'desc' },
+        select: { ipAddress: true },
+      })
+
+      await auditLog({
+        userId: user.id,
+        module: 'auth',
+        action: 'LOGIN_SUCCESS',
+        description: 'Login realizado com sucesso.',
+        ipAddress: ip,
+        userAgent,
+      })
+
+      emitDomainEvent('auth:login.success', { userId: user.id, ip })
+
+      if (
+        previousLogin?.ipAddress &&
+        previousLogin.ipAddress !== 'unknown' &&
+        ip !== 'unknown' &&
+        previousLogin.ipAddress !== ip
+      ) {
+        const userName = user.fullName
+
+        createNotification(user.id, {
+          type: NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
+          title: 'Acesso de novo endereco IP detectado',
+          message: `Seu acesso foi realizado de um IP diferente do usual. IP anterior: ${previousLogin.ipAddress} | IP atual: ${ip}. Se nao foi voce, contate o administrador.`,
+          module: 'auth',
+          link: '/configuracoes/perfil',
+        }).catch(() => null)
+
+        createNotificationsForRole('ADMIN', {
+          type: NOTIFICATION_TYPES.LOGIN_SUSPICIOUS,
+          title: `Acesso suspeito - ${userName}`,
+          message: `O usuario ${userName} (${user.login}) acessou o sistema de um IP diferente. Anterior: ${previousLogin.ipAddress} | Atual: ${ip}.`,
+          module: 'auth',
+          link: '/auditoria',
+        }).catch(() => null)
+      }
+    } catch (postLoginError) {
+      console.error('[AUTH/LOGIN] Post-login side effects failed:', postLoginError)
+    }
+
     return response
   } catch (error) {
     console.error('[AUTH/LOGIN]', error)
-    return NextResponse.json(
-      { message: 'Erro interno do servidor.' },
-      { status: 500 }
-    )
+    if (isLikelyDatabaseError(error)) {
+      return NextResponse.json(
+        { message: 'Banco de dados indisponivel no momento. Tente novamente em instantes.' },
+        { status: 503 }
+      )
+    }
+    return NextResponse.json({ message: 'Erro interno do servidor.' }, { status: 500 })
   }
 }
