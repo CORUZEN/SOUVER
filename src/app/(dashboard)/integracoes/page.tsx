@@ -1,442 +1,422 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Plug, Plus, RefreshCw, ChevronRight, CheckCircle2, XCircle,
-  Clock, AlertTriangle, Loader2, Trash2, Settings2, Activity,
-  ExternalLink, X,
+  Activity,
+  CheckCircle2,
+  Clock3,
+  Eye,
+  EyeOff,
+  Loader2,
+  Pencil,
+  Plug,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  XCircle,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 
-// ─── Tipos ───────────────────────────────────────────────────────
-
 type IntegrationStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'PENDING'
+type AuthMode = 'BASIC' | 'OAUTH2'
+
+interface SankhyaConfig {
+  companyCode?: string | null
+  username?: string | null
+  password?: string | null
+  token?: string | null
+  clientId?: string | null
+  clientSecret?: string | null
+  authMode?: AuthMode | null
+}
 
 interface Integration {
-  id:             string
-  name:           string
-  provider:       string
-  description:    string | null
-  status:         IntegrationStatus
-  baseUrl:        string | null
-  lastSyncAt:     string | null
+  id: string
+  name: string
+  provider: string
+  description: string | null
+  status: IntegrationStatus
+  baseUrl: string | null
+  lastSyncAt: string | null
   lastSyncStatus: string | null
-  _count:         { logs: number }
-  logs:           { status: string; message: string | null; executedAt: string }[]
+  _count: { logs: number }
+  config?: SankhyaConfig
 }
 
 interface IntegrationLog {
-  id:              string
-  eventType:       string
-  status:          string
-  message:         string | null
-  durationMs:      number | null
-  recordsAffected: number | null
-  executedAt:      string
+  id: string
+  eventType: string
+  status: string
+  message: string | null
+  durationMs: number | null
+  executedAt: string
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<IntegrationStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  ACTIVE:   { label: 'Ativo',     color: 'bg-green-100 text-green-700 border-green-200',  icon: <CheckCircle2 size={12} /> },
-  INACTIVE: { label: 'Inativo',   color: 'bg-surface-100 text-surface-500 border-surface-200', icon: <Clock size={12} /> },
-  ERROR:    { label: 'Erro',      color: 'bg-red-100 text-red-700 border-red-200',         icon: <XCircle size={12} /> },
-  PENDING:  { label: 'Pendente',  color: 'bg-amber-100 text-amber-700 border-amber-200',   icon: <AlertTriangle size={12} /> },
+interface IntegrationForm {
+  name: string
+  status: IntegrationStatus
+  baseUrl: string
+  description: string
+  companyCode: string
+  username: string
+  password: string
+  token: string
+  clientId: string
+  clientSecret: string
+  authMode: AuthMode
 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  sankhya:    'Sankhya ERP',
-  erp:        'ERP Genérico',
-  api_custom: 'API Personalizada',
-  webhook:    'Webhook',
-  sftp:       'SFTP',
-  slack:      'Slack',
-  email:      'E-mail SMTP',
+const EMPTY_FORM: IntegrationForm = {
+  name: 'Sankhya',
+  status: 'INACTIVE',
+  baseUrl: '',
+  description: '',
+  companyCode: '',
+  username: '',
+  password: '',
+  token: '',
+  clientId: '',
+  clientSecret: '',
+  authMode: 'BASIC',
 }
 
-function formatRelative(date: string | null) {
-  if (!date) return 'nunca'
-  const diff = Date.now() - new Date(date).getTime()
-  const mins  = Math.floor(diff / 60_000)
-  const hours = Math.floor(mins / 60)
-  const days  = Math.floor(hours / 24)
-  if (mins < 1)   return 'agora mesmo'
-  if (mins < 60)  return `há ${mins}min`
-  if (hours < 24) return `há ${hours}h`
-  return `há ${days}d`
+function statusBadge(status: IntegrationStatus) {
+  if (status === 'ACTIVE') return { variant: 'success' as const, icon: <CheckCircle2 size={12} />, label: 'Ativa' }
+  if (status === 'ERROR') return { variant: 'error' as const, icon: <XCircle size={12} />, label: 'Erro' }
+  if (status === 'PENDING') return { variant: 'warning' as const, icon: <Clock3 size={12} />, label: 'Pendente' }
+  return { variant: 'secondary' as const, icon: <Clock3 size={12} />, label: 'Inativa' }
 }
 
-// ─── Modal de criar/editar integração ───────────────────────────
-
-const PROVIDERS = [
-  { value: 'sankhya',    label: 'Sankhya ERP' },
-  { value: 'erp',        label: 'ERP Genérico' },
-  { value: 'api_custom', label: 'API Personalizada' },
-  { value: 'webhook',    label: 'Webhook' },
-  { value: 'sftp',       label: 'SFTP' },
-  { value: 'email',      label: 'E-mail SMTP' },
-]
+function toForm(integration?: Integration | null): IntegrationForm {
+  if (!integration) return { ...EMPTY_FORM }
+  return {
+    name: integration.name ?? 'Sankhya',
+    status: integration.status ?? 'INACTIVE',
+    baseUrl: integration.baseUrl ?? '',
+    description: integration.description ?? '',
+    companyCode: integration.config?.companyCode ?? '',
+    username: integration.config?.username ?? '',
+    password: integration.config?.password ?? '',
+    token: integration.config?.token ?? '',
+    clientId: integration.config?.clientId ?? '',
+    clientSecret: integration.config?.clientSecret ?? '',
+    authMode: integration.config?.authMode === 'OAUTH2' ? 'OAUTH2' : 'BASIC',
+  }
+}
 
 function IntegrationModal({
-  editing,
-  onSave,
+  mode,
+  initial,
   onClose,
+  onSaved,
 }: {
-  editing:  Integration | null
-  onSave:   () => void
-  onClose:  () => void
+  mode: 'create' | 'edit'
+  initial: Integration | null
+  onClose: () => void
+  onSaved: () => void
 }) {
-  const [form,    setForm]    = useState({
-    name:        editing?.name        ?? '',
-    provider:    editing?.provider    ?? 'sankhya',
-    description: editing?.description ?? '',
-    baseUrl:     editing?.baseUrl     ?? '',
-  })
+  const [form, setForm] = useState<IntegrationForm>(() => toForm(initial))
   const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
+
+  useEffect(() => setForm(toForm(initial)), [initial])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
+
+    if (!form.name.trim() || !form.baseUrl.trim() || !form.username.trim() || !form.password.trim()) {
+      setError('Preencha nome, URL, usuario e senha para integrar com o Sankhya.')
+      return
+    }
+
     setSaving(true)
-    setError('')
-    const url    = editing ? `/api/integrations/${editing.id}` : '/api/integrations'
-    const method = editing ? 'PATCH' : 'POST'
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const d = await res.json()
-    if (!res.ok) { setError(d.error ?? 'Erro ao salvar.'); setSaving(false); return }
-    onSave()
+    const endpoint = mode === 'edit' && initial ? `/api/integrations/${initial.id}` : '/api/integrations'
+    const method = mode === 'edit' ? 'PATCH' : 'POST'
+    const payload = {
+      name: form.name.trim(),
+      provider: 'sankhya',
+      status: form.status,
+      baseUrl: form.baseUrl.trim(),
+      description: form.description.trim() || null,
+      config: {
+        companyCode: form.companyCode.trim() || null,
+        username: form.username.trim(),
+        password: form.password,
+        token: form.token.trim() || null,
+        clientId: form.clientId.trim() || null,
+        clientSecret: form.clientSecret.trim() || null,
+        authMode: form.authMode,
+      },
+    }
+
+    const res = await fetch(endpoint, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const data = await res.json().catch(() => ({}))
+    setSaving(false)
+    if (!res.ok) return setError(data?.error ?? 'Erro ao salvar integracao.')
+    onSaved()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-modal w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
-          <h3 className="font-semibold text-surface-900">
-            {editing ? 'Editar Integração' : 'Nova Integração'}
-          </h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-400">
-            <X size={16} />
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-surface-950/70 p-4 backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="w-full max-w-5xl rounded-2xl border border-surface-700 bg-linear-to-br from-surface-950 via-[#111d3a] to-[#102949] p-6 text-white shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">{mode === 'edit' ? 'Editar Integracao Sankhya' : 'Nova Integracao Sankhya'}</h2>
+            <p className="text-sm text-white/70">Conexao empresarial para dados, relatorios e consolidacao inteligente.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:bg-white/10">Fechar</button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-3">
+            <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Nome da integracao" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.baseUrl} onChange={(e) => setForm((p) => ({ ...p, baseUrl: e.target.value }))} placeholder="URL da API Sankhya" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.companyCode} onChange={(e) => setForm((p) => ({ ...p, companyCode: e.target.value }))} placeholder="Codigo da empresa (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} placeholder="Usuario da API" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <div className="flex items-center rounded-xl border border-white/15 bg-white/5 px-2">
+              <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Senha da API" className="w-full bg-transparent px-2 py-2.5 text-sm" />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} className="p-1.5 text-white/70">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-violet-300/25 bg-violet-500/10 p-3">
+            <div className="inline-flex rounded-lg border border-white/15 p-1 text-xs">
+              <button type="button" onClick={() => setForm((p) => ({ ...p, authMode: 'BASIC' }))} className={`rounded-md px-3 py-1 ${form.authMode === 'BASIC' ? 'bg-white/20' : 'text-white/70'}`}>Basic</button>
+              <button type="button" onClick={() => setForm((p) => ({ ...p, authMode: 'OAUTH2' }))} className={`rounded-md px-3 py-1 ${form.authMode === 'OAUTH2' ? 'bg-white/20' : 'text-white/70'}`}>OAuth2</button>
+            </div>
+            <input value={form.token} onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))} placeholder="Token / AppKey (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.clientId} onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))} placeholder="Client ID (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <div className="flex items-center rounded-xl border border-white/15 bg-white/5 px-2">
+              <input type={showSecret ? 'text' : 'password'} value={form.clientSecret} onChange={(e) => setForm((p) => ({ ...p, clientSecret: e.target.value }))} placeholder="Client Secret (opcional)" className="w-full bg-transparent px-2 py-2.5 text-sm" />
+              <button type="button" onClick={() => setShowSecret((v) => !v)} className="p-1.5 text-white/70">{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+            </div>
+            <textarea rows={3} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Descricao tecnica (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <label className="flex items-center justify-between rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm">
+              Ativar integrador
+              <button type="button" onClick={() => setForm((p) => ({ ...p, status: p.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }))} className={`relative h-6 w-11 rounded-full ${form.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-surface-600'}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${form.status === 'ACTIVE' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </label>
+          </div>
+        </div>
+
+        {error && <p className="mt-4 rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-sm text-red-100">{error}</p>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-xl border border-white/20 px-4 py-2 text-sm hover:bg-white/10">Cancelar</button>
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-blue-500 to-indigo-500 px-4 py-2 text-sm font-semibold disabled:opacity-60">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
+            {saving ? 'Salvando...' : mode === 'edit' ? 'Salvar Integracao' : 'Criar Integracao'}
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">Nome</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ex: Sankhya Produção"
-              className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">Provedor</label>
-            <select value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))}
-              className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-              {PROVIDERS.map(p => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">URL Base <span className="text-surface-400 font-normal">(opcional)</span></label>
-            <input value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))}
-              placeholder="https://api.exemplo.com"
-              type="url"
-              className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">Descrição <span className="text-surface-400 font-normal">(opcional)</span></label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={2} placeholder="Finalidade desta integração..."
-              className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
-          </div>
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2 border border-surface-200 rounded-xl text-sm text-surface-600 hover:bg-surface-50">
-              Cancelar
-            </button>
-            <button type="submit" disabled={saving || !form.name.trim()}
-              className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-colors">
-              {saving ? 'Salvando…' : editing ? 'Salvar' : 'Criar'}
-            </button>
-          </div>
-        </form>
-      </div>
+      </form>
     </div>
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────
-
 export default function IntegracoesPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [selected,     setSelected]     = useState<Integration | null>(null)
-  const [logs,         setLogs]         = useState<IntegrationLog[]>([])
-  const [logsLoading,  setLogsLoading]  = useState(false)
-  const [testing,      setTesting]      = useState<string | null>(null)
-  const [testResult,   setTestResult]   = useState<{ status: string; message: string } | null>(null)
-  const [showModal,    setShowModal]    = useState(false)
-  const [editing,      setEditing]      = useState<Integration | null>(null)
-  const [deleting,     setDeleting]     = useState<string | null>(null)
+  const [logs, setLogs] = useState<IntegrationLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [testingId, setTestingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [modalInitial, setModalInitial] = useState<Integration | null>(null)
+
+  const selected = useMemo(() => integrations.find((item) => item.id === selectedId) ?? null, [integrations, selectedId])
 
   const loadList = useCallback(async () => {
     setLoading(true)
-    const r = await fetch('/api/integrations')
-    if (r.ok) { const d = await r.json(); setIntegrations(d.integrations ?? []) }
+    const res = await fetch('/api/integrations')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setLoading(false)
+      setIntegrations([])
+      setFlash({ type: 'error', text: data?.error ?? 'Nao foi possivel carregar as integracoes.' })
+      return
+    }
+    const list: Integration[] = data.integrations ?? []
+    setIntegrations(list)
+    setSelectedId((prev) => (prev && list.some((i) => i.id === prev) ? prev : list[0]?.id ?? null))
     setLoading(false)
   }, [])
 
-  useEffect(() => { loadList() }, [loadList])
-
-  async function selectIntegration(item: Integration) {
-    setSelected(item)
-    setTestResult(null)
-    setLogsLoading(true)
-    const r = await fetch(`/api/integrations/${item.id}`)
-    if (r.ok) {
-      const d = await r.json()
-      setLogs(d.logs ?? [])
-      setSelected(d.integration)
+  const loadDetails = useCallback(async (id: string, modal = false) => {
+    const res = await fetch(`/api/integrations/${id}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setFlash({ type: 'error', text: data?.error ?? 'Falha ao carregar detalhes da integracao.' })
+      return null
     }
-    setLogsLoading(false)
-  }
+    if (modal) return data.integration as Integration
+    setLogs(data.logs ?? [])
+    return data.integration as Integration
+  }, [])
 
-  async function testConnection(id: string) {
-    setTesting(id)
-    setTestResult(null)
-    const r = await fetch(`/api/integrations/${id}/test`, { method: 'POST' })
-    const d = await r.json()
-    setTestResult({ status: d.status, message: d.message })
+  useEffect(() => { loadList() }, [loadList])
+  useEffect(() => {
+    if (!selectedId) return setLogs([])
+    setLogsLoading(true)
+    loadDetails(selectedId).finally(() => setLogsLoading(false))
+  }, [selectedId, loadDetails])
+
+  async function onToggle(item: Integration) {
+    setTogglingId(item.id)
+    const next = item.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    const res = await fetch(`/api/integrations/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }) })
+    const data = await res.json().catch(() => ({}))
+    setTogglingId(null)
+    if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Nao foi possivel alterar status.' })
+    setFlash({ type: 'success', text: next === 'ACTIVE' ? 'Integrador ativado.' : 'Integrador desativado.' })
     await loadList()
-    // Atualiza logs
-    const r2 = await fetch(`/api/integrations/${id}`)
-    if (r2.ok) { const d2 = await r2.json(); setLogs(d2.logs ?? []); setSelected(d2.integration) }
-    setTesting(null)
+    if (selectedId === item.id) await loadDetails(item.id)
   }
 
-  async function deleteIntegration(id: string) {
-    if (!confirm('Remover esta integração e todos os seus logs?')) return
-    setDeleting(id)
-    await fetch(`/api/integrations/${id}`, { method: 'DELETE' })
-    setDeleting(null)
-    setSelected(null)
-    setLogs([])
-    loadList()
+  async function onTest(item: Integration) {
+    setTestingId(item.id)
+    const res = await fetch(`/api/integrations/${item.id}/test`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    setTestingId(null)
+    if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Falha ao testar conexao.' })
+    setFlash({ type: data.status === 'success' ? 'success' : 'error', text: data.message ?? 'Teste finalizado.' })
+    await loadList()
+    if (selectedId === item.id) await loadDetails(item.id)
   }
 
-  async function toggleStatus(item: Integration) {
-    const newStatus = item.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    await fetch(`/api/integrations/${item.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    loadList()
-    if (selected?.id === item.id) selectIntegration({ ...item, status: newStatus })
+  async function onDelete(item: Integration) {
+    if (!confirm(`Remover a integracao ${item.name}?`)) return
+    setDeletingId(item.id)
+    const res = await fetch(`/api/integrations/${item.id}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    setDeletingId(null)
+    if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Erro ao remover integracao.' })
+    setFlash({ type: 'success', text: 'Integracao removida.' })
+    await loadList()
+  }
+
+  async function openCreate() {
+    setModalMode('create')
+    setModalInitial(null)
+    setModalOpen(true)
+  }
+
+  async function openEdit(item: Integration) {
+    const detail = await loadDetails(item.id, true)
+    if (!detail) return
+    setModalMode('edit')
+    setModalInitial(detail)
+    setModalOpen(true)
   }
 
   return (
-    <div className="space-y-5">
-      {/* Modal */}
-      {showModal && (
-        <IntegrationModal
-          editing={editing}
-          onSave={() => { setShowModal(false); setEditing(null); loadList() }}
-          onClose={() => { setShowModal(false); setEditing(null) }}
-        />
+    <div className="mx-auto w-full max-w-6xl space-y-4">
+      {modalOpen && <IntegrationModal mode={modalMode} initial={modalInitial} onClose={() => setModalOpen(false)} onSaved={async () => { setModalOpen(false); await loadList() }} />}
+
+      <Card className="relative overflow-hidden border-surface-200">
+        <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-500 to-emerald-500" />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">Conectividade Corporativa</p>
+            <h1 className="mt-1 text-2xl font-semibold text-surface-900">Integracoes ERP Sankhya</h1>
+            <p className="mt-1 text-sm text-surface-600">Ative o integrador para conectar seu ERP e liberar relatorios, estatisticas e consolidacao inteligente.</p>
+          </div>
+          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"><Plus size={15} /> Nova Integracao</button>
+        </div>
+      </Card>
+
+      <Card className="border-blue-100 bg-blue-50/60">
+        <p className="text-sm text-blue-900">
+          Esta area foi preparada para operacao profissional com Sankhya: cadastro de credenciais, ativacao do integrador, teste de conexao e historico tecnico.
+        </p>
+      </Card>
+
+      {flash && <div className={`rounded-xl border px-4 py-3 text-sm ${flash.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{flash.text}</div>}
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-surface-900">Integracoes ERP ({integrations.length})</h2>
+        <button onClick={loadList} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-100"><RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Atualizar</button>
+      </div>
+
+      {loading ? (
+        <Card className="h-28 animate-pulse bg-surface-100" />
+      ) : integrations.length === 0 ? (
+        <Card className="py-8 text-center text-sm text-surface-500">Nenhuma integracao cadastrada.</Card>
+      ) : (
+        <div className="space-y-3">
+          {integrations.map((item) => {
+            const info = statusBadge(item.status)
+            return (
+              <Card key={item.id} className={selectedId === item.id ? 'border-primary-300 bg-primary-50/35' : ''}>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <button onClick={() => setSelectedId(item.id)} className="text-left">
+                      <p className="text-xl font-semibold text-surface-900">{item.name}</p>
+                      <p className="text-sm text-surface-500">{item.baseUrl ?? 'Sem URL configurada'}</p>
+                    </button>
+                    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-surface-500">
+                      Ativar integrador
+                      <button onClick={() => onToggle(item)} disabled={togglingId === item.id} className={`relative h-6 w-11 rounded-full ${item.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-surface-300'} ${togglingId === item.id ? 'opacity-60' : ''}`}>
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${item.status === 'ACTIVE' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={info.variant} className="gap-1.5">{info.icon} {info.label}</Badge>
+                    <Badge variant={item.lastSyncStatus === 'success' ? 'success' : 'warning'}>{item.lastSyncStatus === 'success' ? 'Conexao OK' : 'Conexao pendente'}</Badge>
+                    <span className="text-xs text-surface-500">Ultimo teste: {item.lastSyncAt ? new Date(item.lastSyncAt).toLocaleString('pt-BR') : 'Nunca'}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex gap-2">
+                      <button onClick={() => onTest(item)} disabled={testingId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50 disabled:opacity-60">{testingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />} Testar conexao</button>
+                      <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50"><Pencil size={14} /> Editar</button>
+                    </div>
+                    <button onClick={() => onDelete(item)} disabled={deletingId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"><Trash2 size={14} /> Remover</button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Plug className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-surface-900 leading-tight">Integrações</h1>
-            <p className="text-xs text-surface-500">Gerencie conexões com sistemas externos</p>
-          </div>
-        </div>
-        <button onClick={() => { setEditing(null); setShowModal(true) }}
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">
-          <Plus size={15} /> Nova Integração
-        </button>
-      </div>
-
-      <div className="flex gap-5">
-        {/* Lista */}
-        <div className="w-72 shrink-0 space-y-2">
-          <button onClick={loadList} className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-700 mb-1">
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Atualizar
-          </button>
-          {loading ? (
-            <div className="space-y-2">
-              {[1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-surface-100 animate-pulse" />)}
-            </div>
-          ) : integrations.length === 0 ? (
-            <Card>
-              <div className="text-center py-6 text-surface-400">
-                <Plug size={28} className="opacity-20 mx-auto mb-2" />
-                <p className="text-xs">Nenhuma integração cadastrada.</p>
-                <button onClick={() => setShowModal(true)}
-                  className="mt-2 text-xs text-indigo-600 hover:underline">
-                  Criar a primeira
-                </button>
-              </div>
-            </Card>
+      {selected && (
+        <Card>
+          <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-surface-900"><Activity size={15} className="text-primary-600" /> Historico tecnico - {selected.name}</h3>
+          {logsLoading ? (
+            <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-surface-100" />)}</div>
+          ) : logs.length === 0 ? (
+            <p className="text-sm text-surface-500">Nenhum log de execucao.</p>
           ) : (
-            integrations.map(item => {
-              const sc = STATUS_CONFIG[item.status]
-              return (
-                <button key={item.id} onClick={() => selectIntegration(item)}
-                  className={`w-full text-left rounded-xl border p-4 hover:border-indigo-200 transition-colors ${
-                    selected?.id === item.id ? 'border-indigo-400 bg-indigo-50' : 'border-surface-200 bg-white'
-                  }`}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="font-semibold text-sm text-surface-900 truncate">{item.name}</span>
-                    <ChevronRight size={13} className="text-surface-400 shrink-0 mt-0.5" />
-                  </div>
-                  <p className="text-xs text-surface-500 mb-2">{PROVIDER_LABELS[item.provider] ?? item.provider}</p>
-                  <div className="flex items-center justify-between">
-                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-lg border ${sc.color}`}>
-                      {sc.icon} {sc.label}
-                    </span>
-                    <span className="text-[11px] text-surface-400">{formatRelative(item.lastSyncAt)}</span>
-                  </div>
-                </button>
-              )
-            })
-          )}
-        </div>
-
-        {/* Painel detalhe */}
-        {selected ? (
-          <div className="flex-1 space-y-4">
-            <Card>
-              {/* Header da integração */}
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-surface-900">{selected.name}</h2>
-                  <p className="text-sm text-surface-500 mt-0.5">
-                    {PROVIDER_LABELS[selected.provider] ?? selected.provider}
-                    {selected.baseUrl && (
-                      <a href={selected.baseUrl} target="_blank" rel="noopener noreferrer"
-                        className="ml-2 inline-flex items-center gap-0.5 text-indigo-600 hover:underline text-xs">
-                        <ExternalLink size={11} /> {selected.baseUrl}
-                      </a>
-                    )}
-                  </p>
-                  {selected.description && (
-                    <p className="text-xs text-surface-400 mt-1">{selected.description}</p>
-                  )}
+            <div className="space-y-2">
+              {logs.map((log) => (
+                <div key={log.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-surface-100 px-3 py-2">
+                  <span className={`h-2 w-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : log.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                  <span className="w-14 text-xs font-semibold text-surface-600">{log.eventType}</span>
+                  <span className="min-w-56 flex-1 text-xs text-surface-500">{log.message ?? '-'}</span>
+                  {log.durationMs != null && <span className="text-[11px] text-surface-400">{log.durationMs}ms</span>}
+                  <span className="text-[11px] text-surface-400">{new Date(log.executedAt).toLocaleString('pt-BR')}</span>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => { setEditing(selected); setShowModal(true) }}
-                    className="p-2 rounded-lg border border-surface-200 hover:bg-surface-50 text-surface-500"
-                    title="Editar">
-                    <Settings2 size={15} />
-                  </button>
-                  <button
-                    onClick={() => toggleStatus(selected)}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
-                      selected.status === 'ACTIVE'
-                        ? 'border-surface-200 text-surface-600 hover:bg-surface-50'
-                        : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
-                    }`}>
-                    {selected.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}
-                  </button>
-                  <button
-                    onClick={() => testConnection(selected.id)}
-                    disabled={testing === selected.id}
-                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg transition-colors">
-                    {testing === selected.id ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}
-                    {testing === selected.id ? 'Testando…' : 'Testar'}
-                  </button>
-                  <button
-                    disabled={deleting === selected.id}
-                    onClick={() => deleteIntegration(selected.id)}
-                    className="p-2 rounded-lg border border-red-100 hover:bg-red-50 text-red-400 hover:text-red-600"
-                    title="Remover">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Resultado do teste */}
-              {testResult && (
-                <div className={`flex items-center gap-2 mb-4 px-4 py-3 rounded-xl border text-sm ${
-                  testResult.status === 'success'
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-red-50 border-red-200 text-red-700'
-                }`}>
-                  {testResult.status === 'success' ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  {testResult.message}
-                </div>
-              )}
-
-              {/* KPIs */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Total de Logs',   value: selected._count.logs },
-                  { label: 'Último Sync',      value: formatRelative(selected.lastSyncAt) },
-                  { label: 'Último Status',    value: selected.lastSyncStatus ?? '—' },
-                ].map(k => (
-                  <div key={k.label} className="bg-surface-50 rounded-xl border border-surface-100 px-4 py-3">
-                    <p className="text-lg font-bold text-surface-900">{k.value}</p>
-                    <p className="text-xs text-surface-500 mt-0.5">{k.label}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Logs */}
-            <Card>
-              <h3 className="font-semibold text-surface-900 mb-3 flex items-center gap-2">
-                <Activity size={15} className="text-indigo-500" />
-                Histórico de Execuções
-              </h3>
-              {logsLoading ? (
-                <div className="space-y-2">
-                  {[1,2,3].map(i => <div key={i} className="h-10 rounded-lg bg-surface-100 animate-pulse" />)}
-                </div>
-              ) : logs.length === 0 ? (
-                <p className="text-sm text-surface-400 text-center py-6">Nenhuma execução registrada.</p>
-              ) : (
-                <div className="space-y-2">
-                  {logs.map(log => (
-                    <div key={log.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-50 border border-surface-100">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${
-                        log.status === 'success' ? 'bg-green-500' :
-                        log.status === 'error'   ? 'bg-red-500' : 'bg-amber-400'
-                      }`} />
-                      <span className="text-xs font-medium text-surface-600 w-16 shrink-0">{log.eventType}</span>
-                      <span className="flex-1 text-xs text-surface-500 truncate">{log.message ?? '—'}</span>
-                      {log.durationMs != null && (
-                        <span className="text-[11px] text-surface-400 shrink-0">{log.durationMs}ms</span>
-                      )}
-                      <span className="text-[11px] text-surface-400 shrink-0">
-                        {new Date(log.executedAt).toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-surface-400">
-            <div className="text-center space-y-2">
-              <Plug size={48} className="opacity-20 mx-auto" />
-              <p className="text-sm">Selecione uma integração para ver detalhes</p>
+              ))}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </Card>
+      )}
+
+      <Card className="border-surface-200 bg-surface-50/60">
+        <p className="flex items-start gap-2 text-xs text-surface-600"><ShieldCheck size={14} className="mt-0.5 text-emerald-600" /> Recomendacao: use credenciais dedicadas de servico e monitore regularmente os logs de conexao para manter padrao empresarial.</p>
+      </Card>
     </div>
   )
 }

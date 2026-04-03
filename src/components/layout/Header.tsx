@@ -186,6 +186,14 @@ export default function Header() {
       }
     }
 
+    if (pathname.startsWith('/integracoes')) {
+      return {
+        eyebrow: 'Configurações • Integrações',
+        title: 'Integrações ERP',
+        subtitle: 'Conectividade corporativa com Sankhya e sistemas externos',
+      }
+    }
+
     return {
       eyebrow: 'Sistema Empresarial',
       title: 'Fábrica Café Ouro Verde',
