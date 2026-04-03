@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -9,21 +9,21 @@ const ROUTE_LABELS: Record<string, string> = {
   dashboard: 'Painel Executivo',
   'em-desenvolvimento': 'Em Desenvolvimento',
   usuarios: 'Colaboradores',
-  producao: 'ProduÃ§Ã£o',
-  logistica: 'LogÃ­stica',
+  producao: 'Produ\u00E7\u00E3o',
+  logistica: 'Log\u00EDstica',
   qualidade: 'Qualidade',
   rh: 'Recursos Humanos',
-  relatorios: 'RelatÃ³rios',
-  comunicacao: 'ComunicaÃ§Ã£o',
-  configuracoes: 'ConfiguraÃ§Ãµes',
+  relatorios: 'Relat\u00F3rios',
+  comunicacao: 'Comunica\u00E7\u00E3o',
+  configuracoes: 'Configura\u00E7\u00F5es',
   perfis: 'Perfis de Acesso',
-  '2fa': 'AutenticaÃ§Ã£o de Dois Fatores',
+  '2fa': 'Autentica\u00E7\u00E3o de Dois Fatores',
   auditoria: 'Trilha de Auditoria',
   'acesso-negado': 'Acesso Negado',
   departamentos: 'Departamentos',
   perfil: 'Meu Perfil',
-  sessoes: 'SessÃµes Ativas',
-  integracoes: 'IntegraÃ§Ãµes',
+  sessoes: 'Sess\u00F5es Ativas',
+  integracoes: 'Integra\u00E7\u00F5es',
   contabilidade: 'Contabilidade',
   novo: 'Novo',
   editar: 'Editar',
@@ -43,11 +43,11 @@ export default function Breadcrumb({ className }: { className?: string }) {
   })
 
   return (
-    <nav aria-label="NavegaÃ§Ã£o" className={cn('flex items-center gap-1 text-sm', className)}>
+    <nav aria-label="Navega\u00E7\u00E3o" className={cn('flex items-center gap-1 text-sm', className)}>
       <Link
         href="/em-desenvolvimento?modulo=metas"
         className="text-surface-400 hover:text-surface-700 transition-colors"
-        aria-label="InÃ­cio"
+        aria-label="In\u00EDcio"
       >
         <Home className="w-3.5 h-3.5" />
       </Link>
@@ -66,5 +66,3 @@ export default function Breadcrumb({ className }: { className?: string }) {
     </nav>
   )
 }
-
-
