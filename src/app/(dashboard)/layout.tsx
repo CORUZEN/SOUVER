@@ -2,10 +2,8 @@ import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import { ToastProvider } from '@/components/ui/Toast'
-import packageJson from '../../../package.json'
+import { APP_VERSION } from '@/generated/app-version'
 import { Suspense } from 'react'
-
-const APP_VERSION = packageJson.version ?? '1.0.0'
 
 export default function DashboardLayout({
   children,

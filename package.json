@@ -4,8 +4,10 @@
   "description": "Sistema Ouro Verde — Plataforma Corporativa Integrada",
   "private": true,
   "scripts": {
+    "predev": "npm run version:sync",
     "dev": "next dev --port 3001 --webpack",
-    "prebuild": "prisma generate",
+    "version:sync": "node scripts/sync-app-version.mjs",
+    "prebuild": "npm run version:sync && prisma generate",
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "next lint",

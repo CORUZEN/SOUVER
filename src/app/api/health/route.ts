@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jobQueue } from '@/lib/jobs'
+import { APP_VERSION } from '@/generated/app-version'
 
 const startTime = Date.now()
 
@@ -44,7 +45,7 @@ export async function GET() {
     {
       status:      overallStatus,
       system:      'Sistema Ouro Verde',
-      version:     '1.0.0',
+      version:     APP_VERSION,
       timestamp:   new Date().toISOString(),
       environment: process.env.APP_ENV ?? process.env.NODE_ENV ?? 'development',
       uptime:      Math.round((Date.now() - startTime) / 1000),
