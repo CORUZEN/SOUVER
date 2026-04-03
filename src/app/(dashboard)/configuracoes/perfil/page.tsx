@@ -18,17 +18,28 @@ interface Profile {
 
 type AlertType = 'success' | 'error' | null
 
+const PHONE_MASK_REGEX = /^\(\d{2}\)\s\d\s\d{4}-\d{4}$/
+
+function formatBrazilPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+
+  if (digits.length === 0) return ''
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 3) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3)}`
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7, 11)}`
+}
+
 export default function PerfilPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [alert, setAlert] = useState<{ type: AlertType; msg: string } | null>(null)
 
-  // Campos de perfil
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
 
-  // Campos de senha
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -42,7 +53,7 @@ export default function PerfilPage() {
         const u: Profile = d.user
         setProfile(u)
         setFullName(u.fullName ?? '')
-        setPhone(u.phone ?? '')
+        setPhone(formatBrazilPhone(u.phone ?? ''))
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -55,6 +66,12 @@ export default function PerfilPage() {
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault()
+
+    if (phone && !PHONE_MASK_REGEX.test(phone)) {
+      showAlert('error', 'Telefone inválido. Use o formato (XX) X XXXX-XXXX.', setAlert)
+      return
+    }
+
     setSaving(true)
 
     const r = await fetch('/api/users/me', {
@@ -72,6 +89,7 @@ export default function PerfilPage() {
     }
 
     setProfile((prev) => (prev ? { ...prev, ...d.user } : d.user))
+    setPhone(formatBrazilPhone(d.user?.phone ?? phone))
     showAlert('success', 'Perfil atualizado com sucesso!', setAlert)
   }
 
@@ -162,9 +180,9 @@ export default function PerfilPage() {
           </div>
         )}
 
-        <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+        <form onSubmit={handleSaveProfile} className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
               <label className="mb-1.5 block text-xs font-medium text-surface-500">Nome completo *</label>
               <input
                 required
@@ -193,14 +211,17 @@ export default function PerfilPage() {
               </label>
               <input
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
                 className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="(00) 00000-0000"
+                placeholder="(00) 0 0000-0000"
+                inputMode="numeric"
+                maxLength={16}
               />
+              <p className="mt-1 text-xs text-surface-400">Formato obrigatório: (XX) X XXXX-XXXX</p>
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-1">
             <button
               type="submit"
               disabled={saving}
@@ -245,7 +266,7 @@ export default function PerfilPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-surface-500">Nova senha *</label>
               <input
