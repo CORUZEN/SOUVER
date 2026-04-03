@@ -1,4 +1,4 @@
-export type ModuleStatus = 'Planejamento' | 'Em desenvolvimento' | 'Validação'
+﻿export type ModuleStatus = 'Planejamento' | 'Em desenvolvimento' | 'Validação'
 
 export interface ModuleRoadmapItem {
   title: string
@@ -78,7 +78,7 @@ export const MODULE_PLANS: Record<string, ModulePlan> = {
     key: 'metas',
     label: 'Metas',
     section: 'Módulos',
-    headline: 'Visão estratégica de metas e performance corporativa.',
+    headline: 'Visão estratégica de metas e performance.',
     description:
       'Evolução de um sistema empresarial para metas da fábrica, equipe comercial e vendas, com regras claras, critérios de medição e acompanhamento por ciclo.',
     capabilities: [
@@ -535,3 +535,5 @@ export function getModulePlan(moduleKey: string | null): ModulePlan {
   }
   return MODULE_PLANS['painel-executivo']
 }
+
+

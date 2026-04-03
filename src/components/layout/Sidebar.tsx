@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -235,15 +235,19 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   return (
     <>
       <aside
+        onClick={() => {
+          if (isCollapsed) setIsCollapsed(false)
+        }}
         className={cn(
           'shrink-0 bg-surface-900 flex flex-col h-full border-r border-surface-700/40 transition-[width] duration-300 ease-out',
+          isCollapsed && 'cursor-pointer',
           isCollapsed ? 'w-20' : 'w-64'
         )}
       >
         <div
           className={cn(
-            'h-16 flex items-center border-b border-surface-700/50',
-            isCollapsed ? 'justify-between px-2' : 'gap-3 px-5'
+            'relative h-16 flex items-center border-b border-surface-700/50',
+            isCollapsed ? 'justify-center px-2' : 'gap-3 px-5'
           )}
         >
           <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
@@ -263,24 +267,26 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           </div>
 
           {!isCollapsed && (
-            <div className="overflow-hidden">
-              <p className="text-white text-sm font-semibold tracking-wide uppercase truncate leading-tight">OURO VERDE</p>
-              <p className="text-surface-400 text-[11px] tracking-wide uppercase truncate">SISTEMA CORPORATIVO</p>
+            <div className="min-w-0 flex-1 pr-10">
+              <p className="text-white text-sm font-semibold tracking-wide uppercase leading-tight">OURO VERDE</p>
+              <p className="text-surface-400 text-[11px] tracking-wide uppercase leading-tight break-words">SISTEMA CORPORATIVO</p>
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className={cn(
-              'ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-800 transition-colors',
-              isCollapsed && 'ml-0'
-            )}
-            aria-label={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-            title={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-          >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                toggleSidebar()
+              }}
+              className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-surface-400 transition-colors hover:bg-surface-800 hover:text-white"
+              aria-label="Recolher menu lateral"
+              title="Recolher menu lateral"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <nav className={cn('flex-1 overflow-y-auto py-4', isCollapsed ? 'px-2' : 'px-3', 'space-y-4')}>
@@ -402,3 +408,4 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     </>
   )
 }
+

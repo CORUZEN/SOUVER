@@ -1,6 +1,6 @@
-'use client'
+﻿'use client'
 
-import { Bell, ChevronDown, LogOut, CheckCheck, X } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, CheckCheck, X, User } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -11,7 +11,7 @@ interface UserInfo {
   name: string
   email: string
   role: string
-  initials: string
+  avatarUrl?: string | null
 }
 
 interface Notif {
@@ -49,7 +49,10 @@ export default function Header() {
   const [notifs, setNotifs] = useState<Notif[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifs, setShowNotifs] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+
   const notifRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -57,13 +60,13 @@ export default function Header() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.user) {
-          const { name, email, role } = data.user
-          const parts = (name as string).trim().split(' ')
-          const initials =
-            parts.length >= 2
-              ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-              : (name as string).slice(0, 2).toUpperCase()
-          setUser({ name, email, role: role?.name ?? role ?? 'Usuário', initials })
+          const { name, email, role, avatarUrl } = data.user
+          setUser({
+            name,
+            email,
+            role: role?.name ?? role ?? 'Usuário',
+            avatarUrl: avatarUrl ?? null,
+          })
         }
       })
       .catch(() => null)
@@ -97,8 +100,9 @@ export default function Header() {
     }
 
     function handleVisibility() {
-      if (document.hidden) stopPolling()
-      else {
+      if (document.hidden) {
+        stopPolling()
+      } else {
         loadNotifs()
         startPolling()
       }
@@ -106,6 +110,7 @@ export default function Header() {
 
     startPolling()
     document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
@@ -113,9 +118,15 @@ export default function Header() {
   }, [loadNotifs])
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+    function handler(event: MouseEvent) {
+      const target = event.target as Node
+
+      if (notifRef.current && !notifRef.current.contains(target)) {
         setShowNotifs(false)
+      }
+
+      if (profileRef.current && !profileRef.current.contains(target)) {
+        setShowProfileMenu(false)
       }
     }
 
@@ -142,7 +153,6 @@ export default function Header() {
 
   const displayName = user?.name ?? 'Usuário'
   const displayRole = user?.role ?? 'Carregando...'
-  const initials = user?.initials ?? 'U'
   const currentModuleParam = searchParams.get('modulo')
 
   const headerContext = (() => {
@@ -155,8 +165,16 @@ export default function Header() {
 
       return {
         eyebrow: `Módulo • ${modulePlan.label}`,
-        title: modulePlan.label === 'Metas' ? 'Gestão Corporativa de Metas' : modulePlan.label,
+        title: modulePlan.label === 'Metas' ? 'Gestão de Metas' : modulePlan.label,
         subtitle: modulePlan.headline,
+      }
+    }
+
+    if (pathname.startsWith('/notificacoes')) {
+      return {
+        eyebrow: 'Notificações • Sistema',
+        title: 'Central de Notificações',
+        subtitle: 'Acompanhamento inteligente de alertas, eventos e atualizações operacionais',
       }
     }
 
@@ -182,11 +200,9 @@ export default function Header() {
         <div className="absolute right-0 top-0 h-20 w-80 bg-emerald-400/10 blur-2xl" />
       </div>
 
-      <div className="relative h-full flex items-center justify-between gap-4">
+      <div className="relative flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/70 font-semibold">
-            {headerContext.eyebrow}
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{headerContext.eyebrow}</p>
           <p className="mt-1 text-lg font-semibold leading-tight">{headerContext.title}</p>
           <p className="text-xs text-white/75">{headerContext.subtitle}</p>
         </div>
@@ -194,39 +210,43 @@ export default function Header() {
         <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-2 py-1 backdrop-blur-md">
           <div className="relative" ref={notifRef}>
             <button
-              onClick={() => setShowNotifs(!showNotifs)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              onClick={() => setShowNotifs((prev) => !prev)}
+              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="Notificações"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-4 h-4 px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-surface-900">
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white ring-2 ring-surface-900">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
 
             {showNotifs && (
-              <div className="absolute right-0 top-11 z-50 flex max-h-120 w-80 flex-col rounded-2xl border border-surface-200 bg-white shadow-2xl text-surface-900">
+              <div className="absolute right-0 top-11 z-50 flex max-h-120 w-80 flex-col rounded-2xl border border-surface-200 bg-white text-surface-900 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-surface-100 px-4 py-3">
                   <span className="text-sm font-semibold">Notificações</span>
                   <div className="flex items-center gap-2">
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllRead}
-                        className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
+                        className="flex cursor-pointer items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
                         title="Marcar todas como lidas"
                       >
                         <CheckCheck size={13} /> Ler todas
                       </button>
                     )}
-                    <button onClick={() => setShowNotifs(false)} className="rounded-lg p-0.5 hover:bg-surface-100">
+                    <button
+                      onClick={() => setShowNotifs(false)}
+                      className="cursor-pointer rounded-lg p-0.5 hover:bg-surface-100"
+                      aria-label="Fechar notificações"
+                    >
                       <X size={14} className="text-surface-400" />
                     </button>
                   </div>
                 </div>
 
-                <ul className="flex-1 overflow-y-auto divide-y divide-surface-50">
+                <ul className="max-h-80 flex-1 divide-y divide-surface-50 overflow-y-auto">
                   {notifs.length === 0 ? (
                     <li className="px-4 py-8 text-center text-sm text-surface-400">Nenhuma notificação.</li>
                   ) : (
@@ -235,7 +255,7 @@ export default function Header() {
                         <button
                           onClick={() => markRead(n.id)}
                           className={cn(
-                            'w-full text-left px-4 py-3 hover:bg-surface-50 transition-colors flex gap-3',
+                            'flex w-full cursor-pointer gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50',
                             !n.isRead && 'bg-primary-50'
                           )}
                         >
@@ -262,7 +282,7 @@ export default function Header() {
                   <Link
                     href="/notificacoes"
                     onClick={() => setShowNotifs(false)}
-                    className="block w-full py-1 text-center text-xs font-medium text-primary-700 hover:text-primary-800"
+                    className="block w-full py-1 text-center text-xs font-medium text-primary-700 transition-colors hover:text-primary-800"
                   >
                     Ver todas as notificações
                   </Link>
@@ -271,27 +291,56 @@ export default function Header() {
             )}
           </div>
 
-          <Link
-            href="/configuracoes/perfil"
-            className="flex items-center gap-2 rounded-lg border border-white/10 px-2 py-1 transition-colors hover:bg-white/10"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
-              {initials}
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium leading-tight text-white">{displayName}</p>
-              <p className="text-xs leading-tight text-white/70">{displayRole}</p>
-            </div>
-            <ChevronDown className="hidden h-4 w-4 text-white/70 sm:block" />
-          </Link>
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((prev) => !prev)}
+              className="flex min-w-[210px] cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-1.5 transition-colors hover:bg-white/10"
+              aria-label="Abrir menu do perfil"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/10">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  <User className="h-4.5 w-4.5 text-white/75" />
+                )}
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="truncate text-sm font-semibold leading-tight text-white">{displayName}</p>
+                <p className="truncate text-xs leading-tight text-white/70">{displayRole}</p>
+              </div>
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-white/70 transition-transform', showProfileMenu && 'rotate-180')} />
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 top-12 z-50 w-52 overflow-hidden rounded-xl border border-surface-200 bg-white py-1.5 text-surface-900 shadow-2xl">
+                <Link
+                  href="/configuracoes/perfil"
+                  onClick={() => setShowProfileMenu(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
+                >
+                  <User className="h-4 w-4 text-surface-500" />
+                  Ver perfil
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm text-red-700 transition-colors hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleLogout}
-            className="ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-red-500/20 hover:text-red-100"
+            className="ml-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-red-500/20 hover:text-red-100"
             aria-label="Sair do sistema"
             title="Sair"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </div>
