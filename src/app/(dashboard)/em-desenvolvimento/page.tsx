@@ -6,23 +6,8 @@ export const metadata: Metadata = {
   title: 'Módulos em Desenvolvimento',
 }
 
-type SearchParamsShape = Record<string, string | string[] | undefined>
-
-interface DevelopmentPageProps {
-  searchParams?: Promise<SearchParamsShape>
-}
-
-function resolveModuleKey(searchParams: SearchParamsShape): string | null {
-  const moduleValue = searchParams.modulo
-  if (Array.isArray(moduleValue)) return moduleValue[0] ?? null
-  return moduleValue ?? null
-}
-
-export default async function DevelopmentPage({ searchParams }: DevelopmentPageProps) {
-  const resolvedSearchParams = (await searchParams) ?? {}
-  const moduleKey = resolveModuleKey(resolvedSearchParams)
-  const modulePlan = getModulePlan(moduleKey)
-
+export default function DevelopmentPage() {
+  const modulePlan = getModulePlan('painel-executivo')
   const nextDelivery =
     modulePlan.roadmap.find((item) => item.status === 'Em desenvolvimento')?.title ??
     'Entrega em andamento'
@@ -48,28 +33,20 @@ export default async function DevelopmentPage({ searchParams }: DevelopmentPageP
             <h1 className="text-2xl font-semibold leading-tight text-surface-900 md:text-4xl">
               Funcionalidades em evolução profissional
             </h1>
-            <p className="max-w-3xl text-sm text-surface-600 md:text-base">
-              {modulePlan.description}
-            </p>
+            <p className="max-w-3xl text-sm text-surface-600 md:text-base">{modulePlan.description}</p>
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">
-                Status
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Status</p>
               <p className="mt-1 text-sm font-semibold text-surface-900">Em breve</p>
             </div>
             <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">
-                Próxima entrega
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Próxima entrega</p>
               <p className="mt-1 text-sm font-semibold text-surface-900">{nextDelivery}</p>
             </div>
             <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">
-                Itens planejados
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Itens planejados</p>
               <p className="mt-1 text-sm font-semibold text-surface-900">
                 {modulePlan.capabilities.length + modulePlan.tools.length} funcionalidades
               </p>

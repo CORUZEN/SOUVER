@@ -32,7 +32,6 @@ export const MODULE_MENU_SECTIONS: Array<{
       'relatorios',
       'contabilidade',
       'comunicacao',
-      'integracoes',
     ],
   },
   {
@@ -172,7 +171,7 @@ export const MODULE_PLANS: Record<string, ModulePlan> = {
   },
   rh: {
     key: 'rh',
-    label: 'Recursos Humanos',
+    label: 'RH',
     section: 'Módulos',
     headline: 'Dados de colaboradores, performance e conformidade.',
     description:
