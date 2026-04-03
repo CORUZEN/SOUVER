@@ -180,9 +180,9 @@ export default function Header() {
 
     if (pathname.startsWith('/configuracoes')) {
       return {
-        eyebrow: 'Configurações • Sistema',
-        title: 'Governança e Perfil Corporativo',
-        subtitle: 'Administração de segurança, preferências e dados do colaborador',
+        eyebrow: 'Configurações • Perfil',
+        title: 'Perfil do colaborador',
+        subtitle: 'Preferências e dados do colaborador',
       }
     }
 

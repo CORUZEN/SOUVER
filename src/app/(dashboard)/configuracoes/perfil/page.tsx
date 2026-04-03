@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { User, Lock, Phone, Camera, CheckCircle, AlertCircle } from 'lucide-react'
+import { User, Lock, Phone, Camera, CheckCircle, AlertCircle, KeyRound } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 interface Profile {
@@ -34,6 +34,7 @@ function formatBrazilPhone(value: string) {
 export default function PerfilPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+
   const [saving, setSaving] = useState(false)
   const [alert, setAlert] = useState<{ type: AlertType; msg: string } | null>(null)
 
@@ -130,7 +131,7 @@ export default function PerfilPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-surface-400">
+      <div className="mx-auto flex h-64 w-full max-w-6xl items-center justify-center rounded-2xl border border-surface-200 bg-white text-sm text-surface-500 shadow-card">
         Carregando perfil...
       </div>
     )
@@ -138,176 +139,198 @@ export default function PerfilPage() {
 
   if (!profile) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-red-500">
+      <div className="mx-auto flex h-64 w-full max-w-6xl items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-sm text-red-700 shadow-card">
         Não foi possível carregar o perfil.
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-surface-200 bg-surface-100 text-surface-500">
-          {profile.avatarUrl ? (
-            <img src={profile.avatarUrl} alt={profile.fullName} className="h-full w-full object-cover" />
-          ) : (
-            <Camera size={24} />
+    <div className="mx-auto w-full max-w-6xl space-y-4">
+      <Card className="relative overflow-hidden border-surface-200">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-600 to-cyan-500" />
+
+        <div className="mt-1 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-surface-200 bg-surface-100 text-surface-500">
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt={profile.fullName} className="h-full w-full object-cover" />
+              ) : (
+                <Camera size={22} />
+              )}
+            </div>
+
+            <div>
+              <h1 className="text-2xl font-semibold text-surface-900">{profile.fullName}</h1>
+              <p className="text-sm font-medium text-surface-600">{profile.role ?? 'Usuário'}</p>
+              <p className="text-xs text-surface-500">{profile.email}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:min-w-[300px]">
+            <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Login</p>
+              <p className="mt-1 text-sm font-semibold text-surface-800">{profile.login}</p>
+            </div>
+
+            <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Segurança</p>
+              <p className="mt-1 text-sm font-semibold text-surface-800">{profile.twoFactorEnabled ? '2FA ativo' : '2FA pendente'}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <Card className="h-fit">
+          <div className="mb-4 flex items-center gap-2">
+            <User size={18} className="text-primary-600" />
+            <h2 className="font-semibold text-surface-900">Dados Pessoais</h2>
+          </div>
+
+          {alert && (
+            <div
+              className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
+                alert.type === 'success'
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {alert.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {alert.msg}
+            </div>
           )}
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-surface-900">{profile.fullName}</h1>
-          <p className="text-sm text-surface-500">{profile.role ?? 'Usuário'}</p>
-          <p className="mt-0.5 text-xs text-surface-400">{profile.email}</p>
-        </div>
+
+          <form onSubmit={handleSaveProfile} className="space-y-3">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-500">Nome completo *</label>
+                <input
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  placeholder="Seu nome completo"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-surface-500">E-mail</label>
+                <input
+                  disabled
+                  value={profile.email}
+                  className="w-full cursor-not-allowed rounded-xl border border-surface-100 bg-surface-50 px-3 py-2.5 text-sm text-surface-400"
+                />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-surface-500">
+                    <span className="flex items-center gap-1">
+                      <Phone size={12} /> Telefone
+                    </span>
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
+                    className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    placeholder="(00) 0 0000-0000"
+                    inputMode="numeric"
+                    maxLength={16}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
+              >
+                {saving ? 'Salvando...' : 'Salvar alterações'}
+              </button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="h-fit">
+          <div className="mb-4 flex items-center gap-2">
+            <Lock size={18} className="text-amber-500" />
+            <h2 className="font-semibold text-surface-900">Alterar Senha</h2>
+          </div>
+
+          {pwAlert && (
+            <div
+              className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
+                pwAlert.type === 'success'
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {pwAlert.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {pwAlert.msg}
+            </div>
+          )}
+
+          <form onSubmit={handleChangePassword} className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-surface-500">Senha atual *</label>
+              <input
+                type="password"
+                required
+                value={currentPw}
+                onChange={(e) => setCurrentPw(e.target.value)}
+                className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-500">Nova senha *</label>
+                <input
+                  type="password"
+                  required
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  placeholder="Mín. 8 caracteres"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-500">Confirmar senha *</label>
+                <input
+                  type="password"
+                  required
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 ${
+                    confirmPw && confirmPw !== newPw ? 'border-red-400' : 'border-surface-200'
+                  }`}
+                  placeholder="Repita a nova senha"
+                  autoComplete="new-password"
+                />
+                {confirmPw && confirmPw !== newPw && <p className="mt-1 text-xs text-red-500">As senhas não conferem</p>}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={savingPw}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+              >
+                <KeyRound className="h-4 w-4" />
+                {savingPw ? 'Alterando...' : 'Alterar senha'}
+              </button>
+            </div>
+          </form>
+        </Card>
       </div>
-
-      <Card>
-        <div className="mb-4 flex items-center gap-2">
-          <User size={18} className="text-brand-500" />
-          <h2 className="font-semibold text-surface-900">Dados Pessoais</h2>
-        </div>
-
-        {alert && (
-          <div
-            className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
-              alert.type === 'success'
-                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {alert.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
-            {alert.msg}
-          </div>
-        )}
-
-        <form onSubmit={handleSaveProfile} className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-surface-500">Nome completo *</label>
-              <input
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Seu nome completo"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-surface-500">E-mail</label>
-              <input
-                disabled
-                value={profile.email}
-                className="w-full cursor-not-allowed rounded-xl border border-surface-100 bg-surface-50 px-3 py-2.5 text-sm text-surface-400"
-              />
-              <p className="mt-1 text-xs text-surface-400">E-mail não pode ser alterado.</p>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-surface-500">
-                <span className="flex items-center gap-1">
-                  <Phone size={12} /> Telefone
-                </span>
-              </label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
-                className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="(00) 0 0000-0000"
-                inputMode="numeric"
-                maxLength={16}
-              />
-              <p className="mt-1 text-xs text-surface-400">Formato obrigatório: (XX) X XXXX-XXXX</p>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-1">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-            >
-              {saving ? 'Salvando...' : 'Salvar alterações'}
-            </button>
-          </div>
-        </form>
-      </Card>
-
-      <Card>
-        <div className="mb-4 flex items-center gap-2">
-          <Lock size={18} className="text-amber-500" />
-          <h2 className="font-semibold text-surface-900">Alterar Senha</h2>
-        </div>
-
-        {pwAlert && (
-          <div
-            className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
-              pwAlert.type === 'success'
-                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {pwAlert.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
-            {pwAlert.msg}
-          </div>
-        )}
-
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-surface-500">Senha atual *</label>
-            <input
-              type="password"
-              required
-              value={currentPw}
-              onChange={(e) => setCurrentPw(e.target.value)}
-              className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-surface-500">Nova senha *</label>
-              <input
-                type="password"
-                required
-                value={newPw}
-                onChange={(e) => setNewPw(e.target.value)}
-                className="w-full rounded-xl border border-surface-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Mín. 8 caracteres"
-                autoComplete="new-password"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-surface-500">Confirmar senha *</label>
-              <input
-                type="password"
-                required
-                value={confirmPw}
-                onChange={(e) => setConfirmPw(e.target.value)}
-                className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                  confirmPw && confirmPw !== newPw ? 'border-red-400' : 'border-surface-200'
-                }`}
-                placeholder="Repita a nova senha"
-                autoComplete="new-password"
-              />
-              {confirmPw && confirmPw !== newPw && <p className="mt-1 text-xs text-red-500">As senhas não conferem</p>}
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={savingPw}
-              className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
-            >
-              {savingPw ? 'Alterando...' : 'Alterar senha'}
-            </button>
-          </div>
-        </form>
-      </Card>
     </div>
   )
 }
