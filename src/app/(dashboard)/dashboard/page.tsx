@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import DashboardView from '@/components/dashboard/DashboardView'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
-  title: 'Painel Executivo',
+  title: 'Módulos em Desenvolvimento',
 }
 
 export default function DashboardPage() {
-  return <DashboardView />
+  redirect('/em-desenvolvimento?modulo=painel-executivo')
 }
