@@ -148,7 +148,7 @@ export default function PerfilPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <Card className="relative overflow-hidden border-surface-200">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-600 to-cyan-500" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary-600 to-cyan-500" />
 
         <div className="mt-1 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-4">
@@ -167,7 +167,7 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:min-w-[300px]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:min-w-75">
             <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Login</p>
               <p className="mt-1 text-sm font-semibold text-surface-800">{profile.login}</p>

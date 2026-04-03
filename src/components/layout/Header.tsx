@@ -194,7 +194,7 @@ export default function Header() {
   })()
 
   return (
-    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-surface-300/60 bg-gradient-to-r from-surface-950 via-surface-900 to-[#0f5b55] px-6 text-white">
+    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-surface-300/60 bg-linear-to-r from-surface-950 via-surface-900 to-[#0f5b55] px-6 text-white">
       <div className="pointer-events-none absolute inset-0 opacity-50">
         <div className="absolute -left-16 top-0 h-20 w-72 bg-cyan-400/10 blur-2xl" />
         <div className="absolute right-0 top-0 h-20 w-80 bg-emerald-400/10 blur-2xl" />
@@ -295,7 +295,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex min-w-[210px] cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-1.5 transition-colors hover:bg-white/10"
+              className="flex min-w-52.5 cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-1.5 transition-colors hover:bg-white/10"
               aria-label="Abrir menu do perfil"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/10">
