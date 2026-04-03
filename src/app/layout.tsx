@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 
@@ -10,8 +10,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'OURO VERDE | Sistema de Gestão Industrial',
-    template: '%s | OURO VERDE | Sistema de Gestão Industrial',
+    default: 'OURO VERDE | Sistema de Gestão',
+    template: '%s | OURO VERDE | Sistema de Gestão',
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
   robots: { index: false, follow: false },
