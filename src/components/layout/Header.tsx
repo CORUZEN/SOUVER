@@ -194,7 +194,7 @@ export default function Header() {
   })()
 
   return (
-    <header className="relative h-20 shrink-0 overflow-visible border-b border-surface-300/60 bg-gradient-to-r from-surface-950 via-surface-900 to-[#0f5b55] px-6 text-white">
+    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-surface-300/60 bg-gradient-to-r from-surface-950 via-surface-900 to-[#0f5b55] px-6 text-white">
       <div className="pointer-events-none absolute inset-0 opacity-50">
         <div className="absolute -left-16 top-0 h-20 w-72 bg-cyan-400/10 blur-2xl" />
         <div className="absolute right-0 top-0 h-20 w-80 bg-emerald-400/10 blur-2xl" />
