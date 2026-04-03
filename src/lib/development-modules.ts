@@ -25,6 +25,7 @@ export const MODULE_MENU_SECTIONS: Array<{
     label: 'Módulos',
     itemKeys: [
       'painel-executivo',
+      'metas',
       'producao',
       'logistica',
       'qualidade',
@@ -36,7 +37,7 @@ export const MODULE_MENU_SECTIONS: Array<{
   },
   {
     label: 'Sistema',
-    itemKeys: ['usuarios', 'departamentos', 'auditoria', 'analytics', 'configuracoes'],
+    itemKeys: ['configuracoes', 'integracoes'],
   },
 ]
 
@@ -69,6 +70,43 @@ export const MODULE_PLANS: Record<string, ModulePlan> = {
       {
         title: 'Inteligência operacional',
         description: 'Implementação de recomendações e insights automatizados.',
+        status: 'Planejamento',
+      },
+    ],
+  },
+  metas: {
+    key: 'metas',
+    label: 'Metas',
+    section: 'Módulos',
+    headline: 'Gestão estratégica de metas e performance corporativa.',
+    description:
+      'Evolução de um sistema empresarial para metas da fábrica, equipe comercial e vendas, com regras claras, critérios de medição e acompanhamento por ciclo.',
+    capabilities: [
+      'Metas corporativas, setoriais e individuais por período.',
+      'Acompanhamento de desempenho geral e por colaborador.',
+      'Regras de apuração com pesos, faixas e critérios de elegibilidade.',
+      'Painel de evolução com indicadores, desvios e ações corretivas.',
+    ],
+    tools: [
+      'Cadastro de metas por área',
+      'Medição individual e consolidada',
+      'Motor de regras e pontuação',
+      'Painel de acompanhamento de resultados',
+    ],
+    roadmap: [
+      {
+        title: 'Modelo de metas corporativas',
+        description: 'Estruturação dos tipos de metas, periodicidade e governança de critérios.',
+        status: 'Validação',
+      },
+      {
+        title: 'Motor de apuração e desempenho',
+        description: 'Implementação da lógica de cálculo para desempenho individual e geral.',
+        status: 'Em desenvolvimento',
+      },
+      {
+        title: 'Painel executivo de metas',
+        description: 'Consolidação de progresso, desvios e visão por área, vendedor e unidade.',
         status: 'Planejamento',
       },
     ],
@@ -331,7 +369,7 @@ export const MODULE_PLANS: Record<string, ModulePlan> = {
   },
   usuarios: {
     key: 'usuarios',
-    label: 'Usuários',
+    label: 'Colaboradores',
     section: 'Sistema',
     headline: 'Gestão de identidades, perfis e acessos.',
     description:

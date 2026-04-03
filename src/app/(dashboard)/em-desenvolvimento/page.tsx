@@ -6,8 +6,26 @@ export const metadata: Metadata = {
   title: 'Módulos em Desenvolvimento',
 }
 
-export default function DevelopmentPage() {
-  const modulePlan = getModulePlan('painel-executivo')
+type SearchParamsShape = Record<string, string | string[] | undefined>
+
+interface DevelopmentPageProps {
+  searchParams?: Promise<SearchParamsShape>
+}
+
+const ACCESSIBLE_MODULE_KEYS = new Set(['metas'])
+
+function resolveModuleKey(searchParams: SearchParamsShape): string {
+  const value = searchParams.modulo
+  const key = Array.isArray(value) ? value[0] : value
+  return key && ACCESSIBLE_MODULE_KEYS.has(key) ? key : 'metas'
+}
+
+export default async function DevelopmentPage({ searchParams }: DevelopmentPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const selectedModuleKey = resolveModuleKey(resolvedSearchParams)
+  const modulePlan = getModulePlan(selectedModuleKey)
+  const statusLabel = 'Em desenvolvimento'
+
   const nextDelivery =
     modulePlan.roadmap.find((item) => item.status === 'Em desenvolvimento')?.title ??
     'Entrega em andamento'
@@ -39,7 +57,7 @@ export default function DevelopmentPage() {
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Status</p>
-              <p className="mt-1 text-sm font-semibold text-surface-900">Em breve</p>
+              <p className="mt-1 text-sm font-semibold text-surface-900">{statusLabel}</p>
             </div>
             <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-500">Próxima entrega</p>

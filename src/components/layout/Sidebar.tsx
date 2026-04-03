@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { MODULE_MENU_SECTIONS, MODULE_PLANS } from '@/lib/development-modules'
 import {
   LayoutDashboard,
+  Target,
   Factory,
   Truck,
   ShieldCheck,
@@ -16,10 +17,8 @@ import {
   Settings,
   ClipboardList,
   UserCog,
-  Building2,
   Plug,
   DollarSign,
-  BarChart3,
   ChevronDown,
   ChevronRight,
   Construction,
@@ -31,6 +30,7 @@ type ModuleKey = keyof typeof MODULE_PLANS
 
 const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
   'painel-executivo': LayoutDashboard,
+  metas: Target,
   producao: Factory,
   logistica: Truck,
   qualidade: ShieldCheck,
@@ -40,14 +40,18 @@ const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
   comunicacao: MessageSquare,
   integracoes: Plug,
   usuarios: UserCog,
-  departamentos: Building2,
+  departamentos: UserCog,
   auditoria: ClipboardList,
-  analytics: BarChart3,
+  analytics: ClipboardList,
   configuracoes: Settings,
 }
 
-const DEFAULT_MODULE: ModuleKey = 'painel-executivo'
-const EXECUTIVE_ROUTE = '/em-desenvolvimento?modulo=painel-executivo'
+const DEFAULT_MODULE: ModuleKey = 'metas'
+const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
+
+function getModuleRoute(moduleKey: ModuleKey): string {
+  return `/em-desenvolvimento?modulo=${moduleKey}`
+}
 
 interface SidebarProps {
   appVersion: string
@@ -58,19 +62,16 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const searchParams = useSearchParams()
   const [showDevModal, setShowDevModal] = useState(false)
   const [devTargetLabel, setDevTargetLabel] = useState('')
-  const [isConfigExpanded, setIsConfigExpanded] = useState(false)
+  const [isRhExpanded, setIsRhExpanded] = useState(false)
+  const [isReportsExpanded, setIsReportsExpanded] = useState(false)
 
   const selectedModuloParam = searchParams.get('modulo')
-  const isExecutiveScreen =
-    pathname === '/em-desenvolvimento' &&
-    (!selectedModuloParam || selectedModuloParam === 'painel-executivo')
-
-  const sectionKeys = useMemo(() => {
-    return MODULE_MENU_SECTIONS.map((section) => ({
-      ...section,
-      itemKeys: section.itemKeys.filter((itemKey) => itemKey !== 'integracoes'),
-    }))
-  }, [])
+  const activeAccessibleModule: ModuleKey | null =
+    pathname !== '/em-desenvolvimento'
+      ? null
+      : selectedModuloParam && ACCESSIBLE_MODULES.includes(selectedModuloParam as ModuleKey)
+        ? (selectedModuloParam as ModuleKey)
+        : DEFAULT_MODULE
 
   function openDevelopmentModal(moduleLabel: string) {
     setDevTargetLabel(moduleLabel)
@@ -83,15 +84,6 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
   function handleUnavailableClick(moduleKey: ModuleKey) {
     openDevelopmentModal(MODULE_PLANS[moduleKey].label)
-  }
-
-  function handleConfigClick() {
-    setIsConfigExpanded((prev) => !prev)
-    openDevelopmentModal(MODULE_PLANS.configuracoes.label)
-  }
-
-  function toggleConfigOnly() {
-    setIsConfigExpanded((prev) => !prev)
   }
 
   useEffect(() => {
@@ -114,32 +106,38 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     }
   }, [showDevModal])
 
-  function renderStandardItem(moduleKey: ModuleKey, isSubmenu = false) {
+  function renderMenuItem(
+    moduleKey: ModuleKey,
+    options?: {
+      isSubmenu?: boolean
+      expandable?: boolean
+      expanded?: boolean
+      onToggleExpand?: () => void
+    }
+  ) {
+    const { isSubmenu = false, expandable = false, expanded = false, onToggleExpand } = options ?? {}
     const modulePlan = MODULE_PLANS[moduleKey]
     const Icon = MODULE_ICONS[moduleKey]
-    const isActive = moduleKey === 'painel-executivo' ? isExecutiveScreen : false
+    const isActive = ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
+    const badgeLabel = moduleKey === 'metas' ? '(Em desenvolvimento)' : '(Em breve)'
 
     const baseClass = cn(
       'w-full flex items-center gap-3 rounded-lg transition-all duration-150 cursor-pointer text-left',
-      isSubmenu ? 'pl-10 pr-3 py-2' : 'px-3 py-2.5',
+      isSubmenu ? 'pl-8 pr-3 py-2.5' : 'px-3 py-2.5',
       isActive
         ? 'bg-primary-600 text-white shadow-sm'
         : 'text-surface-400 hover:bg-surface-800 hover:text-white'
     )
 
-    if (moduleKey === 'painel-executivo') {
+    if (ACCESSIBLE_MODULES.includes(moduleKey)) {
       return (
-        <Link
-          key={moduleKey}
-          href={EXECUTIVE_ROUTE}
-          className={baseClass}
-        >
-          <Icon className={cn('shrink-0', isSubmenu ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
-          <span className={cn('flex-1 min-w-0 truncate font-medium', isSubmenu ? 'text-xs' : 'text-sm')}>
+        <Link key={moduleKey} href={getModuleRoute(moduleKey)} className={baseClass}>
+          <Icon className="w-4 h-4 shrink-0" />
+          <span className="flex-1 min-w-0 truncate text-sm font-medium">
             {modulePlan.label}
           </span>
           <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-            (Em breve)
+            {badgeLabel}
           </span>
         </Link>
       )
@@ -147,60 +145,35 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
     return (
       <button key={moduleKey} type="button" onClick={() => handleUnavailableClick(moduleKey)} className={baseClass}>
-        <Icon className={cn('shrink-0', isSubmenu ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
-        <span className={cn('flex-1 min-w-0 truncate font-medium', isSubmenu ? 'text-xs' : 'text-sm')}>
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="flex-1 min-w-0 truncate text-sm font-medium">
           {modulePlan.label}
         </span>
         <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-          (Em breve)
+          {badgeLabel}
         </span>
-      </button>
-    )
-  }
-
-  function renderConfigItem() {
-    const Icon = MODULE_ICONS.configuracoes
-    const isActive = false
-
-    return (
-      <button
-        key="configuracoes"
-        type="button"
-        onClick={handleConfigClick}
-        className={cn(
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer text-left',
-          isActive
-            ? 'bg-primary-600 text-white shadow-sm'
-            : 'text-surface-400 hover:bg-surface-800 hover:text-white'
-        )}
-      >
-        <Icon className="w-4 h-4 shrink-0" />
-        <span className="flex-1 min-w-0 truncate text-sm font-medium">{MODULE_PLANS.configuracoes.label}</span>
-        <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-          (Em breve)
-        </span>
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(event) => {
-            event.stopPropagation()
-            toggleConfigOnly()
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
+        {expandable && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              toggleConfigOnly()
-            }
-          }}
-          className={cn(
-            'ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors',
-            isActive ? 'hover:bg-white/15' : 'hover:bg-surface-700'
-          )}
-          aria-label={isConfigExpanded ? 'Recolher submenu' : 'Expandir submenu'}
-        >
-          {isConfigExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        </span>
+              onToggleExpand?.()
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                event.stopPropagation()
+                onToggleExpand?.()
+              }
+            }}
+            className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-surface-700"
+            aria-label={expanded ? 'Recolher submenu' : 'Expandir submenu'}
+          >
+            {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </span>
+        )}
       </button>
     )
   }
@@ -231,7 +204,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-          {sectionKeys.map(({ label, itemKeys }) => (
+          {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => (
             <div key={label}>
               <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">
                 {label}
@@ -239,16 +212,34 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               <div className="space-y-0.5">
                 {itemKeys.map((itemKey) => {
                   const moduleKey = itemKey as ModuleKey
-                  if (moduleKey === 'configuracoes') {
+
+                  if (moduleKey === 'rh') {
                     return (
                       <div key={moduleKey} className="space-y-0.5">
-                        {renderConfigItem()}
-                        {isConfigExpanded && renderStandardItem('integracoes', true)}
+                        {renderMenuItem('rh', {
+                          expandable: true,
+                          expanded: isRhExpanded,
+                          onToggleExpand: () => setIsRhExpanded((prev) => !prev),
+                        })}
+                        {isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
                       </div>
                     )
                   }
 
-                  return renderStandardItem(moduleKey)
+                  if (moduleKey === 'relatorios') {
+                    return (
+                      <div key={moduleKey} className="space-y-0.5">
+                        {renderMenuItem('relatorios', {
+                          expandable: true,
+                          expanded: isReportsExpanded,
+                          onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
+                        })}
+                        {isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
+                      </div>
+                    )
+                  }
+
+                  return renderMenuItem(moduleKey)
                 })}
               </div>
             </div>
@@ -298,8 +289,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
             <div className="px-5 py-4">
               <p className="text-sm text-surface-700 leading-relaxed">
-                Esta funcionalidade est{'\u00E1'} em planejamento t{'\u00E9'}cnico e ser{'\u00E1'} liberada em breve
-                no padr{'\u00E3'}o corporativo do Sistema Ouro Verde.
+                Esta funcionalidade está em planejamento técnico e será liberada em breve no padrão corporativo do
+                Sistema Ouro Verde.
               </p>
               <div className="mt-4 rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
                 <p className="text-xs font-medium text-surface-600">
