@@ -10,8 +10,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'OURO VERDE | Sistema de Gestão',
-    template: '%s | OURO VERDE | Sistema de Gestão',
+    default: 'OURO VERDE | Café pra vida inteira!',
+    template: '%s | OURO VERDE | Café pra vida inteira!',
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
   robots: { index: false, follow: false },
