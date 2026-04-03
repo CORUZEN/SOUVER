@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { OTP } from 'otplib'
@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     await prisma.user.update({ where: { id: user.id }, data: { twoFactorSecret: secret } })
   }
 
-  const otpauthUrl = totp.generateURI({ label: user.email, issuer: 'SOUVER — Ouro Verde', secret })
+  const issuer = 'Sistema Ouro Verde'
+  const otpauthUrl = totp.generateURI({ label: user.login, issuer, secret })
   const qrDataUrl = await QRCode.toDataURL(otpauthUrl)
 
   return NextResponse.json({ secret, qrDataUrl, otpauthUrl })

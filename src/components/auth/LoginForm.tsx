@@ -44,7 +44,7 @@ export default function LoginForm() {
       }
 
       if (data.requiresTwoFactor) {
-        window.location.href = `/login/2fa?userId=${data.userId}`
+        window.location.href = '/login/2fa'
         return
       }
 

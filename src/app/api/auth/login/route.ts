@@ -5,6 +5,7 @@ import { createSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
+import { createTwoFactorChallenge } from '@/lib/auth/two-factor-challenge'
 import {
   createNotification,
   createNotificationsForRole,
@@ -101,10 +102,22 @@ export async function POST(req: NextRequest) {
     }
 
     if (user.twoFactorEnabled) {
-      return NextResponse.json(
-        { requiresTwoFactor: true, userId: user.id },
+      const { token: challengeToken, expiresAt: challengeExpiresAt } = await createTwoFactorChallenge(user.id)
+
+      const challengeResponse = NextResponse.json(
+        { requiresTwoFactor: true, message: 'Informe o código do autenticador para concluir o acesso.' },
         { status: 200 }
       )
+
+      challengeResponse.cookies.set('souver_2fa_challenge', challengeToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        expires: challengeExpiresAt,
+        path: '/',
+      })
+
+      return challengeResponse
     }
 
     const { token, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
@@ -143,6 +156,7 @@ export async function POST(req: NextRequest) {
         expires: expiresAt,
         path: '/',
       })
+      setupResponse.cookies.delete('souver_2fa_challenge')
       return setupResponse
     }
 
@@ -165,6 +179,7 @@ export async function POST(req: NextRequest) {
       expires: expiresAt,
       path: '/',
     })
+    response.cookies.delete('souver_2fa_challenge')
 
     // Efeitos secundarios de pos-login: nunca derrubar autenticacao.
     try {

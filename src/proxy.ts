@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
 
 // Rotas públicas que não exigem autenticação
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/health', '/esqueci-senha', '/resetar-senha']
+const PUBLIC_PATHS = [
+  '/login',
+  '/api/auth/login',
+  '/api/auth/2fa/verify-login',
+  '/api/health',
+  '/esqueci-senha',
+  '/resetar-senha',
+]
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
