@@ -17,7 +17,9 @@ export default function DashboardLayout({
           <Sidebar appVersion={APP_VERSION} />
         </Suspense>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Header />
+          <Suspense fallback={<div className="h-20 shrink-0 border-b border-surface-300/60 bg-surface-950" />}>
+            <Header />
+          </Suspense>
           <main className="flex-1 overflow-y-auto bg-transparent">
             <div className="px-6 pt-4 pb-1">
               <Breadcrumb />
