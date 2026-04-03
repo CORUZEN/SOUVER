@@ -1,0 +1,43 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1F3F"/>
+      <stop offset="0.55" stop-color="#0F4C4A"/>
+      <stop offset="1" stop-color="#143A31"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1280 220) rotate(149.47) scale(570 480)">
+      <stop stop-color="#5EEAD4" stop-opacity="0.56"/>
+      <stop offset="1" stop-color="#5EEAD4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(360 920) rotate(-31.71) scale(610 520)">
+      <stop stop-color="#34D399" stop-opacity="0.52"/>
+      <stop offset="1" stop-color="#34D399" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D1FAE5" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#D1FAE5" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+  <rect width="1600" height="1200" fill="url(#glowA)"/>
+  <rect width="1600" height="1200" fill="url(#glowB)"/>
+
+  <g opacity="0.32">
+    <path d="M-40 240H1640" stroke="url(#line)" stroke-width="1"/>
+    <path d="M-40 420H1640" stroke="url(#line)" stroke-width="1"/>
+    <path d="M-40 600H1640" stroke="url(#line)" stroke-width="1"/>
+    <path d="M-40 780H1640" stroke="url(#line)" stroke-width="1"/>
+    <path d="M220 -40V1240" stroke="url(#line)" stroke-width="1"/>
+    <path d="M520 -40V1240" stroke="url(#line)" stroke-width="1"/>
+    <path d="M820 -40V1240" stroke="url(#line)" stroke-width="1"/>
+    <path d="M1120 -40V1240" stroke="url(#line)" stroke-width="1"/>
+    <path d="M1420 -40V1240" stroke="url(#line)" stroke-width="1"/>
+  </g>
+
+  <g opacity="0.4">
+    <rect x="920" y="160" width="420" height="220" rx="20" fill="#E2E8F0" fill-opacity="0.08" stroke="#E2E8F0" stroke-opacity="0.2"/>
+    <rect x="980" y="460" width="480" height="250" rx="20" fill="#E2E8F0" fill-opacity="0.06" stroke="#E2E8F0" stroke-opacity="0.18"/>
+    <rect x="660" y="780" width="380" height="200" rx="20" fill="#E2E8F0" fill-opacity="0.07" stroke="#E2E8F0" stroke-opacity="0.2"/>
+  </g>
+</svg>

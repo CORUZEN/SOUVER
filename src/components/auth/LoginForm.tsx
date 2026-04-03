@@ -48,7 +48,6 @@ export default function LoginForm() {
         return
       }
 
-      // Perfil obriga 2FA — sessão criada, redireciona para configuração
       if (data.requiresTwoFactorSetup) {
         window.location.href = '/configuracoes/2fa?setup=required'
         return
@@ -65,7 +64,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <Input
-        label="Login ou E-mail"
+        label="Login ou e-mail"
         name="login"
         type="text"
         autoComplete="username"
@@ -73,7 +72,8 @@ export default function LoginForm() {
         value={form.login}
         onChange={handleChange}
         error={errors.login}
-        leftIcon={<Mail className="w-4 h-4" />}
+        leftIcon={<Mail className="h-4 w-4" />}
+        className="h-11 rounded-xl border-slate-300/90 bg-white/90 text-slate-900 placeholder:text-slate-400 focus:ring-emerald-500"
         required
         autoFocus
       />
@@ -83,22 +83,19 @@ export default function LoginForm() {
         name="password"
         type={showPassword ? 'text' : 'password'}
         autoComplete="current-password"
-        placeholder="••••••••"
+        placeholder="Digite sua senha"
         value={form.password}
         onChange={handleChange}
         error={errors.password}
+        className="h-11 rounded-xl border-slate-300/90 bg-white/90 text-slate-900 placeholder:text-slate-400 focus:ring-emerald-500"
         rightIcon={
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="text-surface-400 hover:text-surface-600 focus:outline-none"
+            className="text-slate-400 transition-colors hover:text-slate-700 focus:outline-none"
             aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
           >
-            {showPassword ? (
-              <EyeOff className="w-4 h-4" />
-            ) : (
-              <Eye className="w-4 h-4" />
-            )}
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         }
         required
@@ -107,9 +104,9 @@ export default function LoginForm() {
       {apiError && (
         <div
           role="alert"
-          className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"
+          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
         >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
@@ -125,14 +122,17 @@ export default function LoginForm() {
         variant="primary"
         size="lg"
         loading={loading}
-        className="w-full mt-2"
+        className="mt-2 h-12 w-full rounded-xl bg-slate-900 text-white shadow-[0_10px_30px_rgba(15,23,42,0.22)] transition hover:bg-slate-800 focus-visible:ring-slate-900"
       >
-        <LogIn className="w-4 h-4" />
+        <LogIn className="h-4 w-4" />
         {loading ? 'Autenticando...' : 'Entrar'}
       </Button>
 
-      <div className="text-center pt-1">
-        <Link href="/esqueci-senha" className="text-xs text-brand-600 hover:underline">
+      <div className="pt-1 text-center">
+        <Link
+          href="/esqueci-senha"
+          className="text-xs font-medium text-slate-600 hover:text-emerald-700 hover:underline"
+        >
           Esqueci minha senha
         </Link>
       </div>
