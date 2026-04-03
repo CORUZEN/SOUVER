@@ -1,84 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
-
-type IntegrationStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'PENDING'
-
-interface SankhyaConfig {
-  companyCode?: string | null
-  username?: string | null
-  password?: string | null
-  token?: string | null
-  clientId?: string | null
-  clientSecret?: string | null
-  authMode?: 'BASIC' | 'OAUTH2' | null
-}
+import {
+  asTrimmedString,
+  normalizeBaseUrl,
+  isValidHttpUrl,
+  parseStoredConfig,
+  sanitizeConfig,
+  serializeConfig,
+  summarizeConfig,
+  validateSankhyaConfiguration,
+  type IntegrationStatus,
+  type SankhyaConfig,
+} from '@/lib/integrations/config'
 
 const ALLOWED_STATUS = new Set<IntegrationStatus>(['ACTIVE', 'INACTIVE', 'ERROR', 'PENDING'])
 
-function asTrimmedString(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
+function hasField(source: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(source, key)
 }
 
-function normalizeBaseUrl(value: unknown): string | null {
-  const parsed = asTrimmedString(value)
-  if (!parsed) return null
-  return parsed.replace(/\/+$/, '')
-}
+function mergeConfig(existing: SankhyaConfig, incomingRaw: unknown): SankhyaConfig {
+  if (!incomingRaw || typeof incomingRaw !== 'object' || Array.isArray(incomingRaw)) return existing
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
+  const incoming = incomingRaw as Record<string, unknown>
+  const sanitized = sanitizeConfig(incoming)
+  const next: SankhyaConfig = { ...existing }
 
-function parseStoredConfig(raw: string | null | undefined): SankhyaConfig {
-  if (!raw) return {}
-  try {
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    return parsed as SankhyaConfig
-  } catch {
-    return {}
-  }
-}
+  if (hasField(incoming, 'companyCode')) next.companyCode = sanitized.companyCode
+  if (hasField(incoming, 'username')) next.username = sanitized.username
+  if (hasField(incoming, 'clientId')) next.clientId = sanitized.clientId
+  if (hasField(incoming, 'authMode')) next.authMode = sanitized.authMode
 
-function sanitizeConfig(input: unknown): SankhyaConfig {
-  const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const token = asTrimmedString(source.token)
-  const clientId = asTrimmedString(source.clientId)
-  const clientSecret = asTrimmedString(source.clientSecret)
-
-  const authMode: SankhyaConfig['authMode'] =
-    source.authMode === 'BASIC' || source.authMode === 'OAUTH2'
-      ? source.authMode
-      : (token || clientId || clientSecret ? 'OAUTH2' : 'BASIC')
-
-  return {
-    companyCode: asTrimmedString(source.companyCode),
-    username: asTrimmedString(source.username),
-    password: asTrimmedString(source.password),
-    token,
-    clientId,
-    clientSecret,
-    authMode,
-  }
-}
-
-function validateSankhyaConfiguration(baseUrl: string | null, config: SankhyaConfig, status: IntegrationStatus): string | null {
-  if (!baseUrl) return 'A URL da API e obrigatoria para a integracao Sankhya.'
-  if (!isValidHttpUrl(baseUrl)) return 'A URL da API deve iniciar com http:// ou https://.'
-
-  if (status === 'ACTIVE' && (!config.username || !config.password)) {
-    return 'Para ativar a integracao Sankhya, informe usuario e senha da API.'
+  if (hasField(incoming, 'password')) {
+    if (incoming.password === null) next.password = null
+    else if (typeof incoming.password === 'string' && incoming.password.trim().length > 0) next.password = sanitized.password
   }
 
-  return null
+  if (hasField(incoming, 'appKey')) {
+    if (incoming.appKey === null) next.appKey = null
+    else if (typeof incoming.appKey === 'string' && incoming.appKey.trim().length > 0) next.appKey = sanitized.appKey
+  }
+
+  if (hasField(incoming, 'token')) {
+    if (incoming.token === null) next.token = null
+    else if (typeof incoming.token === 'string' && incoming.token.trim().length > 0) next.token = sanitized.token
+  }
+
+  if (hasField(incoming, 'clientSecret')) {
+    if (incoming.clientSecret === null) next.clientSecret = null
+    else if (typeof incoming.clientSecret === 'string' && incoming.clientSecret.trim().length > 0) next.clientSecret = sanitized.clientSecret
+  }
+
+  return next
 }
 
 // GET /api/integrations/[id] - detalhe + logs paginados
@@ -110,16 +84,19 @@ export async function GET(
   if (!integration) return NextResponse.json({ error: 'Integracao nao encontrada.' }, { status: 404 })
 
   const config = parseStoredConfig(integration.configEncrypted)
+  const safeConfig: SankhyaConfig = {
+    ...config,
+    password: null,
+    token: null,
+    clientSecret: null,
+    appKey: null,
+  }
 
   return NextResponse.json({
     integration: {
       ...integration,
-      config,
-      configSummary: {
-        authMode: config.authMode ?? 'BASIC',
-        companyCode: config.companyCode ?? null,
-        hasCredentials: Boolean((config.username && config.password) || config.token || config.clientId),
-      },
+      config: safeConfig,
+      configSummary: summarizeConfig(config),
     },
     logs,
     total,
@@ -153,8 +130,8 @@ export async function PATCH(
   const nextStatus = (incomingStatus as IntegrationStatus | undefined) ?? existing.status
   const nextBaseUrl = baseUrl !== undefined ? baseUrl : existing.baseUrl
   const existingConfig = parseStoredConfig(existing.configEncrypted)
-  const incomingConfig = body?.config !== undefined ? sanitizeConfig(body.config) : undefined
-  const mergedConfig: SankhyaConfig = incomingConfig ? { ...existingConfig, ...incomingConfig } : existingConfig
+  const incomingConfig = body?.config !== undefined ? body.config : undefined
+  const mergedConfig: SankhyaConfig = incomingConfig !== undefined ? mergeConfig(existingConfig, incomingConfig) : existingConfig
 
   if (nextBaseUrl && !isValidHttpUrl(nextBaseUrl)) {
     return NextResponse.json({ error: 'A URL da API deve iniciar com http:// ou https://.' }, { status: 400 })
@@ -172,7 +149,7 @@ export async function PATCH(
       ...(description !== undefined && { description }),
       ...(baseUrl !== undefined && { baseUrl }),
       ...(incomingStatus !== undefined && { status: incomingStatus as IntegrationStatus }),
-      ...(incomingConfig !== undefined && { configEncrypted: JSON.stringify(mergedConfig) }),
+      ...(incomingConfig !== undefined && { configEncrypted: serializeConfig(mergedConfig) }),
     },
   })
 

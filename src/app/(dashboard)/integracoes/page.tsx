@@ -26,6 +26,7 @@ interface SankhyaConfig {
   companyCode?: string | null
   username?: string | null
   password?: string | null
+  appKey?: string | null
   token?: string | null
   clientId?: string | null
   clientSecret?: string | null
@@ -43,6 +44,14 @@ interface Integration {
   lastSyncStatus: string | null
   _count: { logs: number }
   config?: SankhyaConfig
+  configSummary?: {
+    authMode?: AuthMode
+    hasCredentials?: boolean
+    hasPassword?: boolean
+    hasToken?: boolean
+    hasClientSecret?: boolean
+    hasAppKey?: boolean
+  }
 }
 
 interface IntegrationLog {
@@ -62,6 +71,7 @@ interface IntegrationForm {
   companyCode: string
   username: string
   password: string
+  appKey: string
   token: string
   clientId: string
   clientSecret: string
@@ -76,10 +86,11 @@ const EMPTY_FORM: IntegrationForm = {
   companyCode: '',
   username: '',
   password: '',
+  appKey: '',
   token: '',
   clientId: '',
   clientSecret: '',
-  authMode: 'BASIC',
+  authMode: 'OAUTH2',
 }
 
 function statusBadge(status: IntegrationStatus) {
@@ -99,10 +110,11 @@ function toForm(integration?: Integration | null): IntegrationForm {
     companyCode: integration.config?.companyCode ?? '',
     username: integration.config?.username ?? '',
     password: integration.config?.password ?? '',
+    appKey: integration.config?.appKey ?? '',
     token: integration.config?.token ?? '',
     clientId: integration.config?.clientId ?? '',
     clientSecret: integration.config?.clientSecret ?? '',
-    authMode: integration.config?.authMode === 'OAUTH2' ? 'OAUTH2' : 'BASIC',
+    authMode: integration.config?.authMode === 'BASIC' ? 'BASIC' : 'OAUTH2',
   }
 }
 
@@ -129,29 +141,60 @@ function IntegrationModal({
     e.preventDefault()
     setError(null)
 
-    if (!form.name.trim() || !form.baseUrl.trim() || !form.username.trim() || !form.password.trim()) {
-      setError('Preencha nome, URL, usuario e senha para integrar com o Sankhya.')
+    if (!form.name.trim() || !form.baseUrl.trim()) {
+      setError('Preencha nome e URL da API para configurar a integracao.')
+      return
+    }
+
+    const hasStoredPassword = Boolean(initial?.configSummary?.hasPassword)
+    const hasStoredToken = Boolean(initial?.configSummary?.hasToken)
+    const hasStoredClientSecret = Boolean(initial?.configSummary?.hasClientSecret)
+    const hasStoredAppKey = Boolean(initial?.configSummary?.hasAppKey)
+
+    const hasPassword = form.password.trim().length > 0 || (mode === 'edit' && hasStoredPassword)
+    const hasToken = form.token.trim().length > 0 || (mode === 'edit' && hasStoredToken)
+    const hasClientSecret = form.clientSecret.trim().length > 0 || (mode === 'edit' && hasStoredClientSecret)
+    const hasAppKey = form.appKey.trim().length > 0 || (mode === 'edit' && hasStoredAppKey)
+
+    if (form.authMode === 'OAUTH2' && (!hasToken || !form.clientId.trim() || !hasClientSecret)) {
+      setError('No modo OAuth2, informe token, client_id e client_secret.')
+      return
+    }
+
+    if (form.authMode === 'BASIC' && (!form.username.trim() || !hasPassword || !hasAppKey || !hasToken)) {
+      setError('No modo legado, informe usuario, senha, appKey e token.')
       return
     }
 
     setSaving(true)
     const endpoint = mode === 'edit' && initial ? `/api/integrations/${initial.id}` : '/api/integrations'
     const method = mode === 'edit' ? 'PATCH' : 'POST'
+    const configPayload: Record<string, string | null> = {
+      companyCode: form.companyCode.trim() || null,
+      username: form.username.trim() || null,
+      clientId: form.clientId.trim() || null,
+      authMode: form.authMode,
+    }
+
+    if (mode === 'create') {
+      configPayload.password = form.password || null
+      configPayload.appKey = form.appKey.trim() || null
+      configPayload.token = form.token.trim() || null
+      configPayload.clientSecret = form.clientSecret.trim() || null
+    } else {
+      if (form.password.trim().length > 0) configPayload.password = form.password
+      if (form.appKey.trim().length > 0) configPayload.appKey = form.appKey.trim()
+      if (form.token.trim().length > 0) configPayload.token = form.token.trim()
+      if (form.clientSecret.trim().length > 0) configPayload.clientSecret = form.clientSecret.trim()
+    }
+
     const payload = {
       name: form.name.trim(),
       provider: 'sankhya',
       status: form.status,
       baseUrl: form.baseUrl.trim(),
       description: form.description.trim() || null,
-      config: {
-        companyCode: form.companyCode.trim() || null,
-        username: form.username.trim(),
-        password: form.password,
-        token: form.token.trim() || null,
-        clientId: form.clientId.trim() || null,
-        clientSecret: form.clientSecret.trim() || null,
-        authMode: form.authMode,
-      },
+      config: configPayload,
     }
 
     const res = await fetch(endpoint, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -189,13 +232,22 @@ function IntegrationModal({
               <button type="button" onClick={() => setForm((p) => ({ ...p, authMode: 'BASIC' }))} className={`rounded-md px-3 py-1 ${form.authMode === 'BASIC' ? 'bg-white/20' : 'text-white/70'}`}>Basic</button>
               <button type="button" onClick={() => setForm((p) => ({ ...p, authMode: 'OAUTH2' }))} className={`rounded-md px-3 py-1 ${form.authMode === 'OAUTH2' ? 'bg-white/20' : 'text-white/70'}`}>OAuth2</button>
             </div>
-            <input value={form.token} onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))} placeholder="Token / AppKey (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
-            <input value={form.clientId} onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))} placeholder="Client ID (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.token} onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))} placeholder={form.authMode === 'OAUTH2' ? 'X-Token (obrigatorio)' : 'Token legado (obrigatorio)'} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.appKey} onChange={(e) => setForm((p) => ({ ...p, appKey: e.target.value }))} placeholder={form.authMode === 'BASIC' ? 'appKey legado (obrigatorio)' : 'appKey legado (opcional)'} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <input value={form.clientId} onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))} placeholder={form.authMode === 'OAUTH2' ? 'client_id (obrigatorio)' : 'client_id (opcional)'} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
             <div className="flex items-center rounded-xl border border-white/15 bg-white/5 px-2">
-              <input type={showSecret ? 'text' : 'password'} value={form.clientSecret} onChange={(e) => setForm((p) => ({ ...p, clientSecret: e.target.value }))} placeholder="Client Secret (opcional)" className="w-full bg-transparent px-2 py-2.5 text-sm" />
+              <input type={showSecret ? 'text' : 'password'} value={form.clientSecret} onChange={(e) => setForm((p) => ({ ...p, clientSecret: e.target.value }))} placeholder={form.authMode === 'OAUTH2' ? 'client_secret (obrigatorio)' : 'client_secret (opcional)'} className="w-full bg-transparent px-2 py-2.5 text-sm" />
               <button type="button" onClick={() => setShowSecret((v) => !v)} className="p-1.5 text-white/70">{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button>
             </div>
             <textarea rows={3} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Descricao tecnica (opcional)" className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm" />
+            <p className="text-xs text-white/65">
+              Recomendado pela Sankhya: usar OAuth2 (client_credentials). O modo Basic e legado.
+            </p>
+            {mode === 'edit' && (
+              <p className="text-xs text-white/65">
+                Campos sensiveis em branco mantem as credenciais atuais salvas.
+              </p>
+            )}
             <label className="flex items-center justify-between rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm">
               Ativar integrador
               <button type="button" onClick={() => setForm((p) => ({ ...p, status: p.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }))} className={`relative h-6 w-11 rounded-full ${form.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-surface-600'}`}>
