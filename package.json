@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001 --webpack",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "next lint",
