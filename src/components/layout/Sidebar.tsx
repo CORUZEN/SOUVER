@@ -50,8 +50,13 @@ const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
 
 const DEFAULT_MODULE: ModuleKey = 'metas'
 const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
+const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
+  integracoes: '/integracoes',
+}
 
 function getModuleRoute(moduleKey: ModuleKey): string {
+  const directRoute = DIRECT_ROUTES[moduleKey]
+  if (directRoute) return directRoute
   return `/em-desenvolvimento?modulo=${moduleKey}`
 }
 
@@ -140,8 +145,11 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const { isSubmenu = false, expandable = false, expanded = false, onToggleExpand } = options ?? {}
     const modulePlan = MODULE_PLANS[moduleKey]
     const Icon = MODULE_ICONS[moduleKey]
-    const isActive = ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' ? '(Em desenvolvimento)' : '(Em breve)'
+    const isAccessible = ACCESSIBLE_MODULES.includes(moduleKey) || Boolean(DIRECT_ROUTES[moduleKey])
+    const isActive = moduleKey === 'integracoes'
+      ? pathname.startsWith('/integracoes')
+      : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
+    const badgeLabel = moduleKey === 'metas' ? '(Em desenvolvimento)' : moduleKey === 'integracoes' ? null : '(Em breve)'
 
     const baseClass = cn(
       'w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left',
@@ -155,7 +163,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         : 'text-surface-400 hover:bg-surface-800 hover:text-white'
     )
 
-    if (ACCESSIBLE_MODULES.includes(moduleKey)) {
+    if (isAccessible) {
       return (
         <Link
           key={moduleKey}
@@ -174,9 +182,11 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           {!isCollapsed && (
             <>
               <span className="flex-1 min-w-0 truncate text-sm font-medium">{modulePlan.label}</span>
-              <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-                {badgeLabel}
-              </span>
+              {badgeLabel && (
+                <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
+                  {badgeLabel}
+                </span>
+              )}
             </>
           )}
         </Link>
