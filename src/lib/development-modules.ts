@@ -78,7 +78,7 @@ export const MODULE_PLANS: Record<string, ModulePlan> = {
     key: 'metas',
     label: 'Metas',
     section: 'Módulos',
-    headline: 'Gestão estratégica de metas e performance corporativa.',
+    headline: 'Visão estratégica de metas e performance corporativa.',
     description:
       'Evolução de um sistema empresarial para metas da fábrica, equipe comercial e vendas, com regras claras, critérios de medição e acompanhamento por ciclo.',
     capabilities: [

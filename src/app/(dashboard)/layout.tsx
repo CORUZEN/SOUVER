@@ -14,13 +14,13 @@ export default function DashboardLayout({
 }) {
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-surface-50 overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-gradient-to-br from-surface-100 via-slate-100 to-cyan-50/60">
         <Suspense fallback={<div className="w-64 shrink-0 bg-surface-900" />}>
           <Sidebar appVersion={APP_VERSION} />
         </Suspense>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto bg-transparent">
             <div className="px-6 pt-4 pb-1">
               <Breadcrumb />
             </div>

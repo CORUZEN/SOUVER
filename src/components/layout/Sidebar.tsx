@@ -21,6 +21,8 @@ import {
   DollarSign,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
   Construction,
   X,
   type LucideIcon,
@@ -60,10 +62,12 @@ interface SidebarProps {
 export default function Sidebar({ appVersion }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
   const [showDevModal, setShowDevModal] = useState(false)
   const [devTargetLabel, setDevTargetLabel] = useState('')
   const [isRhExpanded, setIsRhExpanded] = useState(false)
   const [isReportsExpanded, setIsReportsExpanded] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
@@ -72,6 +76,20 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       : selectedModuloParam && ACCESSIBLE_MODULES.includes(selectedModuloParam as ModuleKey)
         ? (selectedModuloParam as ModuleKey)
         : DEFAULT_MODULE
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mediaQuery = window.matchMedia('(max-width: 1360px)')
+    if (mediaQuery.matches) setIsCollapsed(true)
+
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setIsCollapsed(true)
+    }
+
+    mediaQuery.addEventListener('change', onChange)
+    return () => mediaQuery.removeEventListener('change', onChange)
+  }, [])
 
   function openDevelopmentModal(moduleLabel: string) {
     setDevTargetLabel(moduleLabel)
@@ -106,6 +124,10 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     }
   }, [showDevModal])
 
+  function toggleSidebar() {
+    setIsCollapsed((prev) => !prev)
+  }
+
   function renderMenuItem(
     moduleKey: ModuleKey,
     options?: {
@@ -122,8 +144,12 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const badgeLabel = moduleKey === 'metas' ? '(Em desenvolvimento)' : '(Em breve)'
 
     const baseClass = cn(
-      'w-full flex items-center gap-3 rounded-lg transition-all duration-150 cursor-pointer text-left',
-      isSubmenu ? 'pl-8 pr-3 py-2.5' : 'px-3 py-2.5',
+      'w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left',
+      isCollapsed
+        ? 'justify-center px-0 py-2.5'
+        : isSubmenu
+          ? 'gap-3 pl-8 pr-3 py-2.5'
+          : 'gap-3 px-3 py-2.5',
       isActive
         ? 'bg-primary-600 text-white shadow-sm'
         : 'text-surface-400 hover:bg-surface-800 hover:text-white'
@@ -131,48 +157,76 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
     if (ACCESSIBLE_MODULES.includes(moduleKey)) {
       return (
-        <Link key={moduleKey} href={getModuleRoute(moduleKey)} className={baseClass}>
+        <Link
+          key={moduleKey}
+          href={getModuleRoute(moduleKey)}
+          className={baseClass}
+          title={modulePlan.label}
+          onClick={(event) => {
+            if (isCollapsed) {
+              event.preventDefault()
+              event.stopPropagation()
+              setIsCollapsed(false)
+            }
+          }}
+        >
           <Icon className="w-4 h-4 shrink-0" />
-          <span className="flex-1 min-w-0 truncate text-sm font-medium">
-            {modulePlan.label}
-          </span>
-          <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-            {badgeLabel}
-          </span>
+          {!isCollapsed && (
+            <>
+              <span className="flex-1 min-w-0 truncate text-sm font-medium">{modulePlan.label}</span>
+              <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
+                {badgeLabel}
+              </span>
+            </>
+          )}
         </Link>
       )
     }
 
     return (
-      <button key={moduleKey} type="button" onClick={() => handleUnavailableClick(moduleKey)} className={baseClass}>
+      <button
+        key={moduleKey}
+        type="button"
+        onClick={() => {
+          if (isCollapsed) {
+            setIsCollapsed(false)
+            return
+          }
+          handleUnavailableClick(moduleKey)
+        }}
+        className={baseClass}
+        title={modulePlan.label}
+      >
         <Icon className="w-4 h-4 shrink-0" />
-        <span className="flex-1 min-w-0 truncate text-sm font-medium">
-          {modulePlan.label}
-        </span>
-        <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
-          {badgeLabel}
-        </span>
-        {expandable && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onToggleExpand?.()
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                event.stopPropagation()
-                onToggleExpand?.()
-              }
-            }}
-            className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-surface-700"
-            aria-label={expanded ? 'Recolher submenu' : 'Expandir submenu'}
-          >
-            {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          </span>
+        {!isCollapsed && (
+          <>
+            <span className="flex-1 min-w-0 truncate text-sm font-medium">{modulePlan.label}</span>
+            <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
+              {badgeLabel}
+            </span>
+            {expandable && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onToggleExpand?.()
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onToggleExpand?.()
+                  }
+                }}
+                className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-surface-700"
+                aria-label={expanded ? 'Recolher submenu' : 'Expandir submenu'}
+              >
+                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </span>
+            )}
+          </>
         )}
       </button>
     )
@@ -180,8 +234,18 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
   return (
     <>
-      <aside className="w-64 shrink-0 bg-surface-900 flex flex-col h-full">
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-surface-700/50">
+      <aside
+        className={cn(
+          'shrink-0 bg-surface-900 flex flex-col h-full border-r border-surface-700/40 transition-[width] duration-300 ease-out',
+          isCollapsed ? 'w-20' : 'w-64'
+        )}
+      >
+        <div
+          className={cn(
+            'h-16 flex items-center border-b border-surface-700/50',
+            isCollapsed ? 'justify-between px-2' : 'gap-3 px-5'
+          )}
+        >
           <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
             <svg
               className="w-4.5 h-4.5 text-white"
@@ -197,18 +261,37 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               <path d="M2 12l10 5 10-5" />
             </svg>
           </div>
-          <div className="overflow-hidden">
-            <p className="text-white text-sm font-semibold truncate leading-tight">Ouro Verde</p>
-            <p className="text-surface-400 text-xs truncate">Sistema Corporativo</p>
-          </div>
+
+          {!isCollapsed && (
+            <div className="overflow-hidden">
+              <p className="text-white text-sm font-semibold tracking-wide uppercase truncate leading-tight">OURO VERDE</p>
+              <p className="text-surface-400 text-[11px] tracking-wide uppercase truncate">SISTEMA CORPORATIVO</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className={cn(
+              'ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-800 transition-colors',
+              isCollapsed && 'ml-0'
+            )}
+            aria-label={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+            title={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        <nav className={cn('flex-1 overflow-y-auto py-4', isCollapsed ? 'px-2' : 'px-3', 'space-y-4')}>
           {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => (
             <div key={label}>
-              <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">
-                {label}
-              </p>
+              {!isCollapsed ? (
+                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">{label}</p>
+              ) : (
+                <div className="mx-2 mb-2 h-px bg-surface-800" />
+              )}
+
               <div className="space-y-0.5">
                 {itemKeys.map((itemKey) => {
                   const moduleKey = itemKey as ModuleKey
@@ -221,7 +304,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                           expanded: isRhExpanded,
                           onToggleExpand: () => setIsRhExpanded((prev) => !prev),
                         })}
-                        {isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
+                        {!isCollapsed && isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
                       </div>
                     )
                   }
@@ -234,7 +317,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                           expanded: isReportsExpanded,
                           onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
                         })}
-                        {isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
+                        {!isCollapsed && isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
                       </div>
                     )
                   }
@@ -246,13 +329,19 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-surface-700/50">
-          <p className="text-surface-500 text-[11px] text-center font-semibold tracking-wide uppercase">
-            SISTEMA OURO VERDE {'\u00A9'} 2026
-          </p>
-          <p className="text-surface-600 text-[11px] text-center mt-1">
-            Vers{'\u00E3'}o v{appVersion}
-          </p>
+        <div className={cn('border-t border-surface-700/50', isCollapsed ? 'p-2' : 'p-3')}>
+          {isCollapsed ? (
+            <div className="flex h-8 items-center justify-center rounded-lg text-surface-500">
+              <PanelLeftClose className="h-4 w-4" />
+            </div>
+          ) : (
+            <>
+              <p className="text-surface-500 text-[11px] text-center font-semibold tracking-wide uppercase">
+                SISTEMA OURO VERDE {'\u00A9'} 2026
+              </p>
+              <p className="text-surface-600 text-[11px] text-center mt-1">Vers{'\u00E3'}o v{appVersion}</p>
+            </>
+          )}
         </div>
       </aside>
 
