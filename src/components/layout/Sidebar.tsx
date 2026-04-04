@@ -149,7 +149,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const isActive = moduleKey === 'integracoes'
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' ? '(Em desenvolvimento)' : moduleKey === 'integracoes' ? null : '(Em breve)'
+    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : '(Em breve)'
 
     const baseClass = cn(
       'w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left',
