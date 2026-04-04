@@ -113,14 +113,6 @@ const DEFAULT_PRIZES: CampaignPrize[] = [
   { id: 'quarter', title: 'Campanha VDD do trimestre', frequency: 'QUARTERLY', type: 'BENEFIT', rewardValue: 0, minPoints: 18, active: true },
 ]
 
-const MOCK_SELLERS: Salesperson[] = [
-  { id: 's1', name: 'Ana Oliveira', login: 'ana.oliveira' },
-  { id: 's2', name: 'Bruno Santos', login: 'bruno.santos' },
-  { id: 's3', name: 'Carla Nascimento', login: 'carla.nascimento' },
-  { id: 's4', name: 'Diego Rocha', login: 'diego.rocha' },
-  { id: 's5', name: 'Elisa Mendes', login: 'elisa.mendes' },
-]
-
 function monthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}`
 }
@@ -291,8 +283,9 @@ export default function MetasWorkspace() {
   const [extraBonus, setExtraBonus] = useState(400)
   const [extraMinPoints, setExtraMinPoints] = useState(0.6)
   const [customDate, setCustomDate] = useState('')
-  const [sellers, setSellers] = useState<Salesperson[]>(MOCK_SELLERS)
-  const [selectedSellerId, setSelectedSellerId] = useState(MOCK_SELLERS[0].id)
+  const [sellers, setSellers] = useState<Salesperson[]>([])
+  const [selectedSellerId, setSelectedSellerId] = useState('')
+  const [sellersLoading, setSellersLoading] = useState(true)
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -347,9 +340,10 @@ export default function MetasWorkspace() {
         const mapped = users
           .filter((user) => user.isActive !== false)
           .map((user) => ({ id: user.id, name: user.fullName ?? user.name ?? user.login, login: user.login }))
-        if (mapped.length > 0) setSellers(mapped)
+        setSellers(mapped)
       })
-      .catch(() => null)
+      .catch(() => setSellers([]))
+      .finally(() => setSellersLoading(false))
   }, [])
 
   const blockedSet = useMemo(() => {
@@ -636,7 +630,71 @@ export default function MetasWorkspace() {
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-surface-200">
               <div className="mb-3 flex items-center gap-2"><Users size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">Desempenho individual de vendedores</h2></div>
-              <div className="space-y-2">{snapshots.map((snapshot) => { const ratio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0; return <button type="button" key={snapshot.seller.id} onClick={() => setSelectedSellerId(snapshot.seller.id)} className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${selectedSeller?.seller.id === snapshot.seller.id ? 'border-primary-300 bg-primary-50' : 'border-surface-200 bg-white hover:bg-surface-50'}`}><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-surface-900">{snapshot.seller.name}</p><p className="text-xs text-surface-500">{snapshot.seller.login}</p></div><Badge variant={snapshot.status === 'SUPEROU' || snapshot.status === 'NO_ALVO' ? 'success' : snapshot.status === 'ATENCAO' ? 'warning' : 'error'}>{statusLabel[snapshot.status]}</Badge></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-200"><div className={`h-full ${ratio >= 1 ? 'bg-emerald-500' : ratio >= 0.8 ? 'bg-blue-500' : ratio >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} /></div><div className="mt-1 flex items-center justify-between text-xs text-surface-600"><span>{num(snapshot.pointsAchieved, 3)} / {num(snapshot.pointsTarget, 3)} pts</span><span>Faltam {num(snapshot.gapToTarget, 3)} pts</span></div></button>})}</div>
+              <div className="space-y-2">
+                {sellersLoading ? (
+                  <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                    Carregando vendedores...
+                  </div>
+                ) : snapshots.length === 0 ? (
+                  <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                    Nenhum vendedor ativo encontrado.
+                  </div>
+                ) : (
+                  snapshots.map((snapshot) => {
+                    const ratio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+                    return (
+                      <button
+                        type="button"
+                        key={snapshot.seller.id}
+                        onClick={() => setSelectedSellerId(snapshot.seller.id)}
+                        className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                          selectedSeller?.seller.id === snapshot.seller.id
+                            ? 'border-primary-300 bg-primary-50'
+                            : 'border-surface-200 bg-white hover:bg-surface-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-surface-900">{snapshot.seller.name}</p>
+                            <p className="text-xs text-surface-500">{snapshot.seller.login}</p>
+                          </div>
+                          <Badge
+                            variant={
+                              snapshot.status === 'SUPEROU' || snapshot.status === 'NO_ALVO'
+                                ? 'success'
+                                : snapshot.status === 'ATENCAO'
+                                  ? 'warning'
+                                  : 'error'
+                            }
+                          >
+                            {statusLabel[snapshot.status]}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-200">
+                          <div
+                            className={`h-full ${
+                              ratio >= 1
+                                ? 'bg-emerald-500'
+                                : ratio >= 0.8
+                                  ? 'bg-blue-500'
+                                  : ratio >= 0.6
+                                    ? 'bg-amber-500'
+                                    : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+                          />
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-surface-600">
+                          <span>
+                            {num(snapshot.pointsAchieved, 3)} / {num(snapshot.pointsTarget, 3)} pts
+                          </span>
+                          <span>Faltam {num(snapshot.gapToTarget, 3)} pts</span>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
             </Card>
 
             <Card className="border-surface-200">
