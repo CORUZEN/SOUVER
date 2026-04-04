@@ -277,9 +277,9 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           </div>
 
           {!isCollapsed && (
-            <div className="min-w-0 flex-1 pr-10">
+            <div className="min-w-0 flex-1 pr-5">
               <p className="text-white text-sm font-semibold tracking-wide uppercase leading-tight">OURO VERDE</p>
-              <p className="text-surface-400 text-[11px] tracking-wide uppercase leading-tight break-words">SISTEMA INDUSTRIAL</p>
+              <p className="text-surface-400 text-[11px] tracking-wide uppercase leading-tight break-words">SISTEMA EMPRESARIAL</p>
             </div>
           )}
 

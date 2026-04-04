@@ -430,6 +430,13 @@ export default function MetasWorkspace() {
     }, 0)
   }, [prizes, selectedSeller])
 
+  const statusLabel: Record<SellerSnapshot['status'], string> = {
+    SUPEROU: 'Superou',
+    NO_ALVO: 'Meta Batida',
+    ATENCAO: 'Atenção',
+    CRITICO: 'Crítico',
+  }
+
   const onTargetCount = byStatus.superou + byStatus.noAlvo
   const factoryGoalRatio = snapshots.length > 0 ? onTargetCount / snapshots.length : 0
   const factoryGoalMet = snapshots.length > 0 && onTargetCount === snapshots.length
@@ -438,7 +445,7 @@ export default function MetasWorkspace() {
   const statusSeries = useMemo(
     () => [
       { label: 'Superou', value: byStatus.superou, color: 'bg-emerald-500' },
-      { label: 'No alvo', value: byStatus.noAlvo, color: 'bg-blue-500' },
+      { label: 'Meta Batida', value: byStatus.noAlvo, color: 'bg-blue-500' },
       { label: 'Atenção', value: byStatus.atencao, color: 'bg-amber-500' },
       { label: 'Crítico', value: byStatus.critico, color: 'bg-red-500' },
     ],
@@ -480,9 +487,9 @@ export default function MetasWorkspace() {
         <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary-600 via-emerald-500 to-cyan-500" />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">Módulo de metas comerciais</p>
-            <h1 className="mt-1 text-2xl font-semibold text-surface-900">Dashboard de metas por vendedor</h1>
-            <p className="mt-1 text-sm text-surface-600">Visão executiva de desempenho individual, progresso de metas e previsão de premiação.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">Metas comerciais</p>
+            <h1 className="mt-1 text-2xl font-semibold text-surface-900">PAINEL DE METAS - OURO VERDE</h1>
+            <p className="mt-1 text-sm text-surface-600">Visão executiva de desempenho, progresso de metas e previsão de premiação.</p>
           </div>
           <button
             type="button"
@@ -579,8 +586,8 @@ export default function MetasWorkspace() {
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Vendedores monitorados</p><p className="mt-1 text-2xl font-semibold text-surface-900">{snapshots.length}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p><p className={`mt-1 text-2xl font-semibold ${factoryGoalMet ? 'text-emerald-700' : 'text-amber-700'}`}>{num(factoryGoalRatio * 100, 1)}%</p><p className="mt-1 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores no alvo</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">No alvo ou acima</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{onTargetCount}</p></Card>
+            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p><p className={`mt-1 text-2xl font-semibold ${factoryGoalMet ? 'text-emerald-700' : 'text-amber-700'}`}>{num(factoryGoalRatio * 100, 1)}%</p><p className="mt-1 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores meta batida</p></Card>
+            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta Batida ou acima</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{onTargetCount}</p></Card>
             <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco operacional</p><p className="mt-1 text-2xl font-semibold text-red-700">{byStatus.critico + byStatus.atencao}</p></Card>
           </div>
 
@@ -590,7 +597,7 @@ export default function MetasWorkspace() {
               <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-surface-200">
                 <div className={`h-full ${factoryGoalMet ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(factoryGoalRatio * 100, 100)}%` }} />
               </div>
-              <p className="mt-2 text-sm text-surface-700">Critério: todos os vendedores precisam ficar em `No alvo` ou `Superou`.</p>
+              <p className="mt-2 text-sm text-surface-700">Critério: todos os vendedores precisam bater a meta.</p>
               <p className="mt-1 text-xs text-surface-600">{factoryGoalMet ? 'Meta geral atingida.' : `Faltam ${factoryGap} vendedor(es) para atingir a meta geral.`}</p>
             </Card>
 
@@ -626,14 +633,10 @@ export default function MetasWorkspace() {
             </Card>
           </div>
 
-          <Card className="border-surface-200">
-            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
-          </Card>
-
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-surface-200">
               <div className="mb-3 flex items-center gap-2"><Users size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">Desempenho individual de vendedores</h2></div>
-              <div className="space-y-2">{snapshots.map((snapshot) => { const ratio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0; return <button type="button" key={snapshot.seller.id} onClick={() => setSelectedSellerId(snapshot.seller.id)} className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${selectedSeller?.seller.id === snapshot.seller.id ? 'border-primary-300 bg-primary-50' : 'border-surface-200 bg-white hover:bg-surface-50'}`}><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-surface-900">{snapshot.seller.name}</p><p className="text-xs text-surface-500">{snapshot.seller.login}</p></div><Badge variant={snapshot.status === 'SUPEROU' || snapshot.status === 'NO_ALVO' ? 'success' : snapshot.status === 'ATENCAO' ? 'warning' : 'error'}>{snapshot.status}</Badge></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-200"><div className={`h-full ${ratio >= 1 ? 'bg-emerald-500' : ratio >= 0.8 ? 'bg-blue-500' : ratio >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} /></div><div className="mt-1 flex items-center justify-between text-xs text-surface-600"><span>{num(snapshot.pointsAchieved, 3)} / {num(snapshot.pointsTarget, 3)} pts</span><span>Faltam {num(snapshot.gapToTarget, 3)} pts</span></div></button>})}</div>
+              <div className="space-y-2">{snapshots.map((snapshot) => { const ratio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0; return <button type="button" key={snapshot.seller.id} onClick={() => setSelectedSellerId(snapshot.seller.id)} className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${selectedSeller?.seller.id === snapshot.seller.id ? 'border-primary-300 bg-primary-50' : 'border-surface-200 bg-white hover:bg-surface-50'}`}><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-surface-900">{snapshot.seller.name}</p><p className="text-xs text-surface-500">{snapshot.seller.login}</p></div><Badge variant={snapshot.status === 'SUPEROU' || snapshot.status === 'NO_ALVO' ? 'success' : snapshot.status === 'ATENCAO' ? 'warning' : 'error'}>{statusLabel[snapshot.status]}</Badge></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-200"><div className={`h-full ${ratio >= 1 ? 'bg-emerald-500' : ratio >= 0.8 ? 'bg-blue-500' : ratio >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} /></div><div className="mt-1 flex items-center justify-between text-xs text-surface-600"><span>{num(snapshot.pointsAchieved, 3)} / {num(snapshot.pointsTarget, 3)} pts</span><span>Faltam {num(snapshot.gapToTarget, 3)} pts</span></div></button>})}</div>
             </Card>
 
             <Card className="border-surface-200">
@@ -653,6 +656,10 @@ export default function MetasWorkspace() {
               )}
             </Card>
           </div>
+
+          <Card className="border-surface-200">
+            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
+          </Card>
         </>
       )}
     </div>

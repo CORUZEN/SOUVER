@@ -1,10 +1,10 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { Clock3 } from 'lucide-react'
 import MetasWorkspace from '@/components/metas/MetasWorkspace'
 import { getModulePlan } from '@/lib/development-modules'
 
 export const metadata: Metadata = {
-  title: 'Gestão de Metas',
+  title: 'Painel de Metas',
 }
 
 type SearchParamsShape = Record<string, string | string[] | undefined>
@@ -34,16 +34,17 @@ export default async function DevelopmentPage({ searchParams }: DevelopmentPageP
     <div className="min-h-[calc(100dvh-11rem)] flex items-center justify-center">
       <section className="w-full max-w-3xl rounded-3xl border border-surface-200 bg-white p-8 shadow-sm">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">
-          Módulo • {modulePlan.label}
+          MÃ³dulo â€¢ {modulePlan.label}
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-surface-900">Entrega em evolução</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-surface-900">Entrega em evoluÃ§Ã£o</h1>
         <p className="mt-2 text-sm text-surface-600">{modulePlan.description}</p>
         <p className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-surface-500">
           <Clock3 className="h-3.5 w-3.5" />
-          Em preparação para entrega corporativa.
+          Em preparaÃ§Ã£o para entrega corporativa.
         </p>
       </section>
     </div>
   )
 }
+
 

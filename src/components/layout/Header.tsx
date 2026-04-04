@@ -165,7 +165,7 @@ export default function Header() {
 
       return {
         eyebrow: `Módulo • ${modulePlan.label}`,
-        title: modulePlan.label === 'Metas' ? 'Gestão de Metas' : modulePlan.label,
+        title: modulePlan.label === 'Metas' ? 'PAINEL DE METAS' : modulePlan.label,
         subtitle: modulePlan.headline,
       }
     }
