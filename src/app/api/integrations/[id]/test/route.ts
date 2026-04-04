@@ -15,11 +15,22 @@ function getCircuit(id: string): CircuitBreaker {
   return circuits.get(id)!
 }
 
-function getSankhyaGatewayOrigin(baseUrl: string) {
+function getSankhyaAuthOrigins(baseUrl: string) {
   const url = new URL(baseUrl)
-  if (url.hostname.includes('sandbox.sankhya.com.br')) return 'https://api.sandbox.sankhya.com.br'
-  if (url.hostname.includes('sankhya.com.br')) return 'https://api.sankhya.com.br'
-  return url.origin
+  const host = url.hostname.toLowerCase()
+  const localOrigin = url.origin.replace(/\/+$/, '')
+
+  const production = 'https://api.sankhya.com.br'
+  const sandbox = 'https://api.sandbox.sankhya.com.br'
+
+  const candidates =
+    host.includes('sandbox.sankhya.com.br')
+      ? [sandbox, production, localOrigin]
+      : host.includes('sankhya.com.br')
+        ? [production, sandbox, localOrigin]
+        : [production, sandbox, localOrigin]
+
+  return [...new Set(candidates)]
 }
 
 function mapResponseToResult(status: number): { status: TestStatus; message: string } {
@@ -71,46 +82,51 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string) {
     }
   }
 
-  const authUrl = `${getSankhyaGatewayOrigin(baseUrl)}/authenticate`
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
     client_id: config.clientId,
     client_secret: config.clientSecret,
   })
+  const authOrigins = getSankhyaAuthOrigins(baseUrl)
+  const attemptMessages: string[] = []
 
-  const response = await fetch(authUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'X-Token': config.token,
-    },
-    body,
-    signal: AbortSignal.timeout(7000),
-  })
+  for (const origin of authOrigins) {
+    const authUrl = `${origin}/authenticate`
+    const response = await fetch(authUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Token': config.token,
+      },
+      body,
+      signal: AbortSignal.timeout(7000),
+    })
 
-  const payload = await response.json().catch(() => null)
-  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    if (response.ok) {
+      const bearerToken = extractBearerToken(payload)
+      if (!bearerToken) {
+        attemptMessages.push(`${authUrl} (200 sem access_token)`)
+        continue
+      }
+
+      return {
+        ok: true,
+        message: 'Autenticação OAuth2 validada com sucesso.',
+        bearerToken,
+      }
+    }
+
     const code = extractGatewayCode(payload)
-    return {
-      ok: false,
-      message: code ? `${mapGatewayCodeToMessage(code)} (${code})` : `Falha na autenticacao OAuth2 (HTTP ${response.status}).`,
-      bearerToken: null as string | null,
-    }
+    const reason = code ? `${mapGatewayCodeToMessage(code)} (${code})` : `HTTP ${response.status}`
+    attemptMessages.push(`${authUrl} (${reason})`)
   }
 
-  const bearerToken = extractBearerToken(payload)
-  if (!bearerToken) {
-    return {
-      ok: false,
-      message: 'Autenticacao OAuth2 realizada, mas token de acesso nao foi retornado.',
-      bearerToken: null as string | null,
-    }
-  }
-
+  const formattedAttempts = attemptMessages.slice(0, 3).join(' | ')
   return {
-    ok: true,
-    message: 'Autenticacao OAuth2 validada com sucesso.',
-    bearerToken,
+    ok: false,
+    message: `Falha na autenticação OAuth2. Verifique token/client_id/client_secret e ambiente do Gateway. Tentativas: ${formattedAttempts}`,
+    bearerToken: null as string | null,
   }
 }
 
@@ -232,4 +248,3 @@ export async function POST(
 
   return NextResponse.json({ status: testStatus, message: testMessage, durationMs, log })
 }
-

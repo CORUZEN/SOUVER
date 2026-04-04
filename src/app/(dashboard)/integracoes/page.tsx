@@ -243,7 +243,7 @@ function IntegrationModal({
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                   URL da API *
                   <input value={form.baseUrl} onChange={(e) => setForm((p) => ({ ...p, baseUrl: e.target.value }))} placeholder="https://servidor.empresa.com.br:10089" className="mt-1.5 w-full rounded-2xl border border-white/12 bg-white/6 px-3.5 py-2.5 text-sm placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
-                  <p className="mt-1 text-[11px] text-white/45">URL do servidor Sankhya sem / no final.</p>
+                  <p className="mt-1 text-[11px] text-white/45">URL do servidor SankhyaW — sem /mge/ no final.</p>
                 </label>
 
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
@@ -360,6 +360,10 @@ export default function IntegracoesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [modalInitial, setModalInitial] = useState<Integration | null>(null)
+  const [logsPage, setLogsPage] = useState(1)
+  const [logsHasMore, setLogsHasMore] = useState(false)
+  const [logsVisibleCount, setLogsVisibleCount] = useState(3)
+  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false)
 
   const selected = useMemo(() => integrations.find((item) => item.id === selectedId) ?? null, [integrations, selectedId])
 
@@ -379,23 +383,44 @@ export default function IntegracoesPage() {
     setLoading(false)
   }, [])
 
-  const loadDetails = useCallback(async (id: string, modal = false) => {
-    const res = await fetch(`/api/integrations/${id}`)
+  const loadDetails = useCallback(async (id: string, modal = false, page = 1) => {
+    const query = modal ? '' : `?page=${page}`
+    const res = await fetch(`/api/integrations/${id}${query}`)
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setFlash({ type: 'error', text: data?.error ?? 'Falha ao carregar detalhes da integração.' })
       return null
     }
     if (modal) return data.integration as Integration
-    setLogs(data.logs ?? [])
+    const incomingLogs: IntegrationLog[] = data.logs ?? []
+    setLogs((prev) => {
+      if (page === 1) return incomingLogs
+      const existingIds = new Set(prev.map((item) => item.id))
+      const merged = [...prev]
+      for (const log of incomingLogs) {
+        if (!existingIds.has(log.id)) merged.push(log)
+      }
+      return merged
+    })
+    setLogsPage(typeof data.page === 'number' ? data.page : page)
+    setLogsHasMore(typeof data.page === 'number' && typeof data.pages === 'number' ? data.page < data.pages : false)
     return data.integration as Integration
   }, [])
 
   useEffect(() => { loadList() }, [loadList])
   useEffect(() => {
-    if (!selectedId) return setLogs([])
+    if (!selectedId) {
+      setLogs([])
+      setLogsPage(1)
+      setLogsHasMore(false)
+      setLogsVisibleCount(3)
+      return
+    }
+    setLogsVisibleCount(3)
+    setLogsPage(1)
+    setLogsHasMore(false)
     setLogsLoading(true)
-    loadDetails(selectedId).finally(() => setLogsLoading(false))
+    loadDetails(selectedId, false, 1).finally(() => setLogsLoading(false))
   }, [selectedId, loadDetails])
 
   async function onToggle(item: Integration) {
@@ -407,7 +432,10 @@ export default function IntegracoesPage() {
     if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Não foi possível alterar o status.' })
     setFlash({ type: 'success', text: next === 'ACTIVE' ? 'Integrador ativado.' : 'Integrador desativado.' })
     await loadList()
-    if (selectedId === item.id) await loadDetails(item.id)
+    if (selectedId === item.id) {
+      setLogsVisibleCount(3)
+      await loadDetails(item.id, false, 1)
+    }
   }
 
   async function onTest(item: Integration) {
@@ -418,7 +446,10 @@ export default function IntegracoesPage() {
     if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Falha ao testar conexão.' })
     setFlash({ type: data.status === 'success' ? 'success' : 'error', text: data.message ?? 'Teste finalizado.' })
     await loadList()
-    if (selectedId === item.id) await loadDetails(item.id)
+    if (selectedId === item.id) {
+      setLogsVisibleCount(3)
+      await loadDetails(item.id, false, 1)
+    }
   }
 
   async function onDelete(item: Integration) {
@@ -446,6 +477,29 @@ export default function IntegracoesPage() {
     setModalOpen(true)
   }
 
+  async function onLoadMoreLogs() {
+    if (!selectedId || loadingMoreLogs) return
+
+    const nextVisibleTarget = logsVisibleCount + 3
+    if (nextVisibleTarget <= logs.length) {
+      setLogsVisibleCount(nextVisibleTarget)
+      return
+    }
+
+    if (!logsHasMore) {
+      setLogsVisibleCount(Math.min(nextVisibleTarget, logs.length))
+      return
+    }
+
+    setLoadingMoreLogs(true)
+    await loadDetails(selectedId, false, logsPage + 1)
+    setLoadingMoreLogs(false)
+    setLogsVisibleCount(nextVisibleTarget)
+  }
+
+  const visibleLogs = useMemo(() => logs.slice(0, logsVisibleCount), [logs, logsVisibleCount])
+  const canLoadMoreLogs = logsVisibleCount < logs.length || logsHasMore
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       {modalOpen && <IntegrationModal mode={modalMode} initial={modalInitial} onClose={() => setModalOpen(false)} onSaved={async () => { setModalOpen(false); await loadList() }} />}
@@ -461,13 +515,6 @@ export default function IntegracoesPage() {
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"><Plus size={15} /> Nova Integração</button>
         </div>
       </Card>
-
-      <Card className="border-blue-100 bg-blue-50/60">
-        <p className="text-sm text-blue-900">
-          Esta área foi preparada para operação profissional com Sankhya: cadastro de credenciais, ativação do integrador, teste de conexão e histórico técnico.
-        </p>
-      </Card>
-
       {flash && <div className={`rounded-xl border px-4 py-3 text-sm ${flash.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{flash.text}</div>}
 
       <div className="flex items-center justify-between">
@@ -535,7 +582,7 @@ export default function IntegracoesPage() {
             <p className="text-sm text-surface-500">Nenhum log de execução.</p>
           ) : (
             <div className="space-y-2">
-              {logs.map((log) => (
+              {visibleLogs.map((log) => (
                 <div key={log.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-surface-100 px-3 py-2">
                   <span className={`h-2 w-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : log.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
                   <span className="w-14 text-xs font-semibold text-surface-600">{log.eventType}</span>
@@ -544,6 +591,19 @@ export default function IntegracoesPage() {
                   <span className="text-[11px] text-surface-400">{new Date(log.executedAt).toLocaleString('pt-BR')}</span>
                 </div>
               ))}
+              {canLoadMoreLogs && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={onLoadMoreLogs}
+                    disabled={loadingMoreLogs}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-700 hover:bg-surface-50 disabled:opacity-60"
+                  >
+                    {loadingMoreLogs ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    {loadingMoreLogs ? 'Carregando...' : 'Carregar mais'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -555,4 +615,5 @@ export default function IntegracoesPage() {
     </div>
   )
 }
+
 

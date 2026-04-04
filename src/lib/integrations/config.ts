@@ -64,7 +64,8 @@ export function asTrimmedString(value: unknown): string | null {
 export function normalizeBaseUrl(value: unknown): string | null {
   const parsed = asTrimmedString(value)
   if (!parsed) return null
-  return parsed.replace(/\/+$/, '')
+  const withoutTrailingSlash = parsed.replace(/\/+$/, '')
+  return withoutTrailingSlash.replace(/\/mge$/i, '')
 }
 
 export function isValidHttpUrl(value: string): boolean {
@@ -133,6 +134,7 @@ export function validateSankhyaConfiguration(
 ): string | null {
   if (!baseUrl) return 'A URL da API e obrigatoria para a integracao Sankhya.'
   if (!isValidHttpUrl(baseUrl)) return 'A URL da API deve iniciar com http:// ou https://.'
+  if (/\/mge\/?$/i.test(baseUrl)) return 'Informe a URL do servidor SankhyaW sem /mge/ no final.'
 
   if (status !== 'ACTIVE') return null
 
@@ -163,4 +165,3 @@ export function summarizeConfig(config: SankhyaConfig) {
     hasAppKey: Boolean(config.appKey),
   }
 }
-
