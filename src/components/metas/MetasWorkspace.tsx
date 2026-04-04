@@ -162,6 +162,29 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+type ChartPoint = { x: number; y: number }
+
+function smoothLinePath(points: ChartPoint[]) {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[Math.max(i - 1, 0)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(i + 2, points.length - 1)]
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+
+    d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
+  }
+  return d
+}
+
 function hash(input: string) {
   let h = 0
   for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0
@@ -438,10 +461,10 @@ export default function MetasWorkspace() {
 
   const statusSeries = useMemo(
     () => [
-      { label: 'Superou', value: byStatus.superou, color: 'bg-surface-500' },
-      { label: 'Meta Batida', value: byStatus.noAlvo, color: 'bg-surface-500' },
-      { label: 'Atenção', value: byStatus.atencao, color: 'bg-surface-600' },
-      { label: 'Crítico', value: byStatus.critico, color: 'bg-surface-700' },
+      { label: 'Superou', value: byStatus.superou, color: 'bg-emerald-500' },
+      { label: 'Meta Batida', value: byStatus.noAlvo, color: 'bg-cyan-500' },
+      { label: 'Atenção', value: byStatus.atencao, color: 'bg-amber-500' },
+      { label: 'Crítico', value: byStatus.critico, color: 'bg-rose-500' },
     ],
     [byStatus]
   )
@@ -490,45 +513,57 @@ export default function MetasWorkspace() {
   )
 
   const lineChartData = useMemo(() => {
-    const width = 320
-    const height = 128
-    const padX = 18
-    const padY = 14
+    const width = 560
+    const height = 240
+    const padLeft = 54
+    const padRight = 18
+    const padTop = 18
+    const padBottom = 40
+    const plotWidth = width - padLeft - padRight
+    const plotHeight = height - padTop - padBottom
 
     const maxStagePoint = Math.max(
       0.001,
       ...stageSeries.flatMap((stage) => [stage.target, stage.achieved])
     )
 
+    const yFor = (value: number) =>
+      height - padBottom - (Math.min(value, maxStagePoint) / maxStagePoint) * plotHeight
+
     const buildPoints = (pick: (item: (typeof stageSeries)[number]) => number) =>
       stageSeries.map((stage, index) => {
-        const x =
-          padX + (index * (width - padX * 2)) / Math.max(stageSeries.length - 1, 1)
-        const y =
-          height -
-          padY -
-          (Math.min(pick(stage), maxStagePoint) / maxStagePoint) * (height - padY * 2)
+        const x = padLeft + (index * plotWidth) / Math.max(stageSeries.length - 1, 1)
+        const y = yFor(pick(stage))
         return { x, y }
       })
 
     const actualPoints = buildPoints((stage) => stage.achieved)
     const targetPoints = buildPoints((stage) => stage.target)
+    const actualPath = smoothLinePath(actualPoints)
+    const targetPath = smoothLinePath(targetPoints)
+    const areaPath = `${actualPath} L ${actualPoints.at(-1)?.x ?? 0} ${height - padBottom} L ${actualPoints[0]?.x ?? 0} ${height - padBottom} Z`
 
-    const toPath = (points: Array<{ x: number; y: number }>) =>
-      points
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
-        .join(' ')
-
-    const areaPath = `${toPath(actualPoints)} L ${actualPoints.at(-1)?.x ?? 0} ${height - padY} L ${actualPoints[0]?.x ?? 0} ${height - padY} Z`
+    const guideSteps = [1, 0.75, 0.5, 0.25, 0]
+    const guides = guideSteps.map((step) => {
+      const value = maxStagePoint * step
+      return {
+        y: yFor(value),
+        label: num(value, 2),
+      }
+    })
 
     return {
       width,
       height,
-      padY,
+      padLeft,
+      padRight,
+      padTop,
+      padBottom,
+      guides,
       actualPoints,
       targetPoints,
-      actualPath: toPath(actualPoints),
-      targetPath: toPath(targetPoints),
+      actualPath,
+      targetPath,
       areaPath,
     }
   }, [stageSeries])
@@ -543,7 +578,7 @@ export default function MetasWorkspace() {
     const radius = 44
     const circumference = 2 * Math.PI * radius
     const total = Math.max(1, statusSeries.reduce((sum, item) => sum + item.value, 0))
-    const palette = ['#334155', '#475569', '#64748b', '#94a3b8']
+    const palette = ['#10b981', '#06b6d4', '#f59e0b', '#f43f5e']
 
     let offset = 0
     const segments = statusSeries.map((item, index) => {
@@ -587,12 +622,19 @@ export default function MetasWorkspace() {
   )
 
   const heatCellClass = (ratio: number) => {
-    if (ratio >= 1) return 'bg-surface-800 text-white'
-    if (ratio >= 0.85) return 'bg-surface-700 text-white'
-    if (ratio >= 0.7) return 'bg-surface-600 text-white'
-    if (ratio >= 0.55) return 'bg-surface-500 text-white'
-    if (ratio >= 0.4) return 'bg-surface-300 text-surface-900'
-    return 'bg-surface-200 text-surface-700'
+    if (ratio >= 1) return 'bg-emerald-600 text-white'
+    if (ratio >= 0.85) return 'bg-cyan-600 text-white'
+    if (ratio >= 0.7) return 'bg-blue-600 text-white'
+    if (ratio >= 0.55) return 'bg-indigo-500 text-white'
+    if (ratio >= 0.4) return 'bg-amber-400 text-surface-950'
+    return 'bg-rose-300 text-surface-900'
+  }
+
+  const stageColorMap: Record<StageKey, string> = {
+    W1: 'bg-cyan-500',
+    W2: 'bg-blue-500',
+    W3: 'bg-indigo-500',
+    CLOSING: 'bg-emerald-500',
   }
 
   return (
@@ -734,33 +776,94 @@ export default function MetasWorkspace() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Tendência de evolução (linha)
               </p>
-              <div className="mt-4 rounded-xl border border-surface-200 bg-surface-50 p-3">
-                <svg viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`} className="h-36 w-full">
+              <div className="mt-4 rounded-xl border border-surface-200 bg-gradient-to-b from-slate-50 to-white p-4">
+                <svg
+                  viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`}
+                  className="h-52 w-full"
+                >
                   <defs>
                     <linearGradient id="line-area-gradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#64748b" stopOpacity="0.35" />
-                      <stop offset="100%" stopColor="#64748b" stopOpacity="0.04" />
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.28" />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
                     </linearGradient>
+                    <filter id="line-soft-shadow" x="-15%" y="-20%" width="130%" height="150%">
+                      <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#1e3a8a" floodOpacity="0.18" />
+                    </filter>
                   </defs>
-                  <line
-                    x1={18}
-                    x2={lineChartData.width - 18}
-                    y1={lineChartData.height - lineChartData.padY}
-                    y2={lineChartData.height - lineChartData.padY}
-                    stroke="#cbd5e1"
-                    strokeWidth="1"
-                  />
+
+                  {lineChartData.guides.map((guide) => (
+                    <g key={`guide-${guide.y}`}>
+                      <line
+                        x1={lineChartData.padLeft}
+                        x2={lineChartData.width - lineChartData.padRight}
+                        y1={guide.y}
+                        y2={guide.y}
+                        stroke="#dbe4ef"
+                        strokeWidth="1"
+                        strokeDasharray="4 4"
+                      />
+                      <text
+                        x={lineChartData.padLeft - 8}
+                        y={guide.y + 4}
+                        textAnchor="end"
+                        className="fill-surface-400 text-[9px] font-medium"
+                      >
+                        {guide.label}
+                      </text>
+                    </g>
+                  ))}
+
                   <path d={lineChartData.areaPath} fill="url(#line-area-gradient)" />
-                  <path d={lineChartData.targetPath} fill="none" stroke="#94a3b8" strokeDasharray="4 4" strokeWidth="2" />
-                  <path d={lineChartData.actualPath} fill="none" stroke="#334155" strokeWidth="2.4" />
+                  <path
+                    d={lineChartData.targetPath}
+                    fill="none"
+                    stroke="#0f766e"
+                    strokeDasharray="6 5"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={lineChartData.actualPath}
+                    fill="none"
+                    stroke="#1d4ed8"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    filter="url(#line-soft-shadow)"
+                  />
+                  {lineChartData.targetPoints.map((point, index) => (
+                    <circle
+                      key={`target-${STAGES[index].key}`}
+                      cx={point.x}
+                      cy={point.y}
+                      r="3.5"
+                      fill="#ffffff"
+                      stroke="#0f766e"
+                      strokeWidth="1.5"
+                    />
+                  ))}
                   {lineChartData.actualPoints.map((point, index) => (
-                    <circle key={`actual-${STAGES[index].key}`} cx={point.x} cy={point.y} r="3.2" fill="#334155" />
+                    <g key={`actual-${STAGES[index].key}`}>
+                      <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#bfdbfe" strokeWidth="1.4" />
+                      <circle cx={point.x} cy={point.y} r="2.8" fill="#1d4ed8" />
+                    </g>
+                  ))}
+
+                  {lineChartData.actualPoints.map((point, index) => (
+                    <text
+                      key={`label-${STAGES[index].key}`}
+                      x={point.x}
+                      y={lineChartData.height - 14}
+                      textAnchor="middle"
+                      className="fill-surface-500 text-[9px] font-semibold uppercase tracking-[0.06em]"
+                    >
+                      {STAGES[index].label}
+                    </text>
                   ))}
                 </svg>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-surface-600">
-                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-surface-700" />Atingido médio</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-surface-400" />Meta planejada</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Atingido médio</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-700" />Meta planejada</span>
               </div>
             </Card>
 
@@ -775,7 +878,7 @@ export default function MetasWorkspace() {
                     const ratio = seller.pointsAchieved / maxSellerPoints
                     return (
                       <div key={seller.seller.id} className="flex flex-1 flex-col items-center gap-2">
-                        <div className="relative w-full rounded-t-md bg-surface-700/90 transition-all duration-700" style={{ height: `${Math.max(8, ratio * 100)}%` }}>
+                        <div className="relative w-full rounded-t-md bg-gradient-to-t from-blue-700 to-cyan-500 transition-all duration-700" style={{ height: `${Math.max(8, ratio * 100)}%` }}>
                           <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-surface-600">
                             {num(seller.pointsAchieved, 2)}
                           </span>
@@ -897,7 +1000,10 @@ export default function MetasWorkspace() {
                   <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
                     <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{stage.label}</span><span className="font-semibold">{num(stage.achieved, 3)} / {num(stage.target, 3)} pts</span></div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                      <div className="h-full bg-surface-600 transition-[width] duration-700" style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }} />
+                      <div
+                        className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
+                        style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }}
+                      />
                     </div>
                   </div>
                 ))}
