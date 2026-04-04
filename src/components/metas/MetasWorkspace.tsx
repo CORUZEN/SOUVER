@@ -223,24 +223,40 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
     }
   }
 
-  let cursor = start < monthStart ? monthStart : start
+  const baseStart = start < monthStart ? monthStart : start
 
-  for (const stage of STAGES) {
+  STAGES.forEach((stage, index) => {
+    const stageStart = addDays(baseStart, index * 7)
+    if (stageStart > monthEnd) {
+      weeks.push({
+        key: stage.key,
+        label: stage.label,
+        start: null,
+        end: null,
+        businessDays: [],
+      })
+      return
+    }
+
+    const rawStageEnd = stage.key === 'CLOSING' ? monthEnd : addDays(stageStart, 4)
+    const stageEnd = rawStageEnd > monthEnd ? monthEnd : rawStageEnd
+    const visibleStart = stageStart < monthStart ? monthStart : stageStart
+
     const business: string[] = []
-    while (business.length < 5 && cursor <= monthEnd) {
+    for (let cursor = new Date(visibleStart); cursor <= stageEnd; cursor = addDays(cursor, 1)) {
       const weekday = cursor.getDay()
       const iso = toIsoDate(cursor)
       if (weekday >= 1 && weekday <= 5 && !blocked.has(iso)) business.push(iso)
-      cursor = addDays(cursor, 1)
     }
+
     weeks.push({
       key: stage.key,
       label: stage.label,
-      start: business[0] ?? null,
-      end: business.at(-1) ?? null,
+      start: toIsoDate(visibleStart),
+      end: toIsoDate(stageEnd),
       businessDays: business,
     })
-  }
+  })
 
   let lastBusinessDate: string | null = null
   for (let d = new Date(monthEnd); d >= monthStart; d = addDays(d, -1)) {
@@ -414,6 +430,50 @@ export default function MetasWorkspace() {
     }, 0)
   }, [prizes, selectedSeller])
 
+  const onTargetCount = byStatus.superou + byStatus.noAlvo
+  const factoryGoalRatio = snapshots.length > 0 ? onTargetCount / snapshots.length : 0
+  const factoryGoalMet = snapshots.length > 0 && onTargetCount === snapshots.length
+  const factoryGap = Math.max(snapshots.length - onTargetCount, 0)
+
+  const statusSeries = useMemo(
+    () => [
+      { label: 'Superou', value: byStatus.superou, color: 'bg-emerald-500' },
+      { label: 'No alvo', value: byStatus.noAlvo, color: 'bg-blue-500' },
+      { label: 'Atenção', value: byStatus.atencao, color: 'bg-amber-500' },
+      { label: 'Crítico', value: byStatus.critico, color: 'bg-red-500' },
+    ],
+    [byStatus]
+  )
+
+  const stageSeries = useMemo(
+    () =>
+      STAGES.map((stage) => {
+        const stageRules = rules.filter((rule) => rule.stage === stage.key)
+        const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
+        if (stageTarget <= 0 || snapshots.length === 0) {
+          return { key: stage.key, label: stage.label, target: stageTarget, achieved: 0, ratio: 0 }
+        }
+
+        const achievedAverage =
+          snapshots.reduce((sumSellers, snapshot) => {
+            const sellerStagePoints = stageRules.reduce((sumRules, rule) => {
+              const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+              return sumRules + rule.points * Math.min(progress, 1)
+            }, 0)
+            return sumSellers + sellerStagePoints
+          }, 0) / snapshots.length
+
+        return {
+          key: stage.key,
+          label: stage.label,
+          target: stageTarget,
+          achieved: achievedAverage,
+          ratio: stageTarget > 0 ? achievedAverage / stageTarget : 0,
+        }
+      }),
+    [rules, snapshots]
+  )
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
       <Card className="relative overflow-hidden border-surface-200">
@@ -519,13 +579,55 @@ export default function MetasWorkspace() {
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Vendedores monitorados</p><p className="mt-1 text-2xl font-semibold text-surface-900">{snapshots.length}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">No alvo ou acima</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{byStatus.superou + byStatus.noAlvo}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Precisam de atenção</p><p className="mt-1 text-2xl font-semibold text-amber-700">{byStatus.atencao}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco crítico</p><p className="mt-1 text-2xl font-semibold text-red-700">{byStatus.critico}</p></Card>
+            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p><p className={`mt-1 text-2xl font-semibold ${factoryGoalMet ? 'text-emerald-700' : 'text-amber-700'}`}>{num(factoryGoalRatio * 100, 1)}%</p><p className="mt-1 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores no alvo</p></Card>
+            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">No alvo ou acima</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{onTargetCount}</p></Card>
+            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco operacional</p><p className="mt-1 text-2xl font-semibold text-red-700">{byStatus.critico + byStatus.atencao}</p></Card>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card className="border-surface-200">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta corporativa da fábrica</p>
+              <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-surface-200">
+                <div className={`h-full ${factoryGoalMet ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(factoryGoalRatio * 100, 100)}%` }} />
+              </div>
+              <p className="mt-2 text-sm text-surface-700">Critério: todos os vendedores precisam ficar em `No alvo` ou `Superou`.</p>
+              <p className="mt-1 text-xs text-surface-600">{factoryGoalMet ? 'Meta geral atingida.' : `Faltam ${factoryGap} vendedor(es) para atingir a meta geral.`}</p>
+            </Card>
+
+            <Card className="border-surface-200">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Distribuição por status</p>
+              <div className="mt-3 space-y-2">
+                {statusSeries.map((item) => {
+                  const ratio = snapshots.length > 0 ? item.value / snapshots.length : 0
+                  return (
+                    <div key={item.label}>
+                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{item.label}</span><span>{item.value}</span></div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
+                        <div className={`h-full ${item.color}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+
+            <Card className="border-surface-200">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por etapa</p>
+              <div className="mt-3 space-y-2">
+                {stageSeries.map((stage) => (
+                  <div key={stage.key}>
+                    <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{stage.label}</span><span>{num(stage.achieved, 3)} / {num(stage.target, 3)} pts</span></div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
+                      <div className={`h-full ${stage.ratio >= 1 ? 'bg-emerald-500' : stage.ratio >= 0.8 ? 'bg-blue-500' : stage.ratio >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
 
           <Card className="border-surface-200">
-            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
+            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
           </Card>
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
