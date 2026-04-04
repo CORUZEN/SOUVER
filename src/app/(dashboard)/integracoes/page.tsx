@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Activity,
@@ -49,15 +49,6 @@ interface Integration {
     hasToken?: boolean
     hasClientSecret?: boolean
   }
-}
-
-interface IntegrationLog {
-  id: string
-  eventType: string
-  status: string
-  message: string | null
-  durationMs: number | null
-  executedAt: string
 }
 
 interface IntegrationForm {
@@ -349,10 +340,7 @@ function IntegrationModal({
 
 export default function IntegracoesPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
-  const [logs, setLogs] = useState<IntegrationLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [logsLoading, setLogsLoading] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -360,12 +348,6 @@ export default function IntegracoesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [modalInitial, setModalInitial] = useState<Integration | null>(null)
-  const [logsPage, setLogsPage] = useState(1)
-  const [logsHasMore, setLogsHasMore] = useState(false)
-  const [logsVisibleCount, setLogsVisibleCount] = useState(3)
-  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false)
-
-  const selected = useMemo(() => integrations.find((item) => item.id === selectedId) ?? null, [integrations, selectedId])
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -379,49 +361,20 @@ export default function IntegracoesPage() {
     }
     const list: Integration[] = data.integrations ?? []
     setIntegrations(list)
-    setSelectedId((prev) => (prev && list.some((i) => i.id === prev) ? prev : list[0]?.id ?? null))
     setLoading(false)
   }, [])
 
-  const loadDetails = useCallback(async (id: string, modal = false, page = 1) => {
-    const query = modal ? '' : `?page=${page}`
-    const res = await fetch(`/api/integrations/${id}${query}`)
+  const loadDetails = useCallback(async (id: string) => {
+    const res = await fetch(`/api/integrations/${id}`)
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setFlash({ type: 'error', text: data?.error ?? 'Falha ao carregar detalhes da integração.' })
       return null
     }
-    if (modal) return data.integration as Integration
-    const incomingLogs: IntegrationLog[] = data.logs ?? []
-    setLogs((prev) => {
-      if (page === 1) return incomingLogs
-      const existingIds = new Set(prev.map((item) => item.id))
-      const merged = [...prev]
-      for (const log of incomingLogs) {
-        if (!existingIds.has(log.id)) merged.push(log)
-      }
-      return merged
-    })
-    setLogsPage(typeof data.page === 'number' ? data.page : page)
-    setLogsHasMore(typeof data.page === 'number' && typeof data.pages === 'number' ? data.page < data.pages : false)
     return data.integration as Integration
   }, [])
 
   useEffect(() => { loadList() }, [loadList])
-  useEffect(() => {
-    if (!selectedId) {
-      setLogs([])
-      setLogsPage(1)
-      setLogsHasMore(false)
-      setLogsVisibleCount(3)
-      return
-    }
-    setLogsVisibleCount(3)
-    setLogsPage(1)
-    setLogsHasMore(false)
-    setLogsLoading(true)
-    loadDetails(selectedId, false, 1).finally(() => setLogsLoading(false))
-  }, [selectedId, loadDetails])
 
   async function onToggle(item: Integration) {
     setTogglingId(item.id)
@@ -432,10 +385,6 @@ export default function IntegracoesPage() {
     if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Não foi possível alterar o status.' })
     setFlash({ type: 'success', text: next === 'ACTIVE' ? 'Integrador ativado.' : 'Integrador desativado.' })
     await loadList()
-    if (selectedId === item.id) {
-      setLogsVisibleCount(3)
-      await loadDetails(item.id, false, 1)
-    }
   }
 
   async function onTest(item: Integration) {
@@ -446,10 +395,6 @@ export default function IntegracoesPage() {
     if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Falha ao testar conexão.' })
     setFlash({ type: data.status === 'success' ? 'success' : 'error', text: data.message ?? 'Teste finalizado.' })
     await loadList()
-    if (selectedId === item.id) {
-      setLogsVisibleCount(3)
-      await loadDetails(item.id, false, 1)
-    }
   }
 
   async function onDelete(item: Integration) {
@@ -470,35 +415,12 @@ export default function IntegracoesPage() {
   }
 
   async function openEdit(item: Integration) {
-    const detail = await loadDetails(item.id, true)
+    const detail = await loadDetails(item.id)
     if (!detail) return
     setModalMode('edit')
     setModalInitial(detail)
     setModalOpen(true)
   }
-
-  async function onLoadMoreLogs() {
-    if (!selectedId || loadingMoreLogs) return
-
-    const nextVisibleTarget = logsVisibleCount + 3
-    if (nextVisibleTarget <= logs.length) {
-      setLogsVisibleCount(nextVisibleTarget)
-      return
-    }
-
-    if (!logsHasMore) {
-      setLogsVisibleCount(Math.min(nextVisibleTarget, logs.length))
-      return
-    }
-
-    setLoadingMoreLogs(true)
-    await loadDetails(selectedId, false, logsPage + 1)
-    setLoadingMoreLogs(false)
-    setLogsVisibleCount(nextVisibleTarget)
-  }
-
-  const visibleLogs = useMemo(() => logs.slice(0, logsVisibleCount), [logs, logsVisibleCount])
-  const canLoadMoreLogs = logsVisibleCount < logs.length || logsHasMore
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
@@ -531,13 +453,13 @@ export default function IntegracoesPage() {
           {integrations.map((item) => {
             const info = statusBadge(item.status)
             return (
-              <Card key={item.id} className={selectedId === item.id ? 'border-primary-300 bg-primary-50/35' : ''}>
+              <Card key={item.id}>
                 <div className="space-y-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <button onClick={() => setSelectedId(item.id)} className="text-left">
+                    <div className="text-left">
                       <p className="text-xl font-semibold text-surface-900">{item.name}</p>
                       <p className="text-sm text-surface-500">{item.baseUrl ?? 'Sem URL configurada'}</p>
-                    </button>
+                    </div>
                     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-surface-500">
                       Ativar integrador
                       <button
@@ -573,44 +495,8 @@ export default function IntegracoesPage() {
         </div>
       )}
 
-      {selected && (
-        <Card>
-          <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-surface-900"><Activity size={15} className="text-primary-600" /> Histórico técnico - {selected.name}</h3>
-          {logsLoading ? (
-            <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-surface-100" />)}</div>
-          ) : logs.length === 0 ? (
-            <p className="text-sm text-surface-500">Nenhum log de execução.</p>
-          ) : (
-            <div className="space-y-2">
-              {visibleLogs.map((log) => (
-                <div key={log.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-surface-100 px-3 py-2">
-                  <span className={`h-2 w-2 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : log.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                  <span className="w-14 text-xs font-semibold text-surface-600">{log.eventType}</span>
-                  <span className="min-w-56 flex-1 text-xs text-surface-500">{log.message ?? '-'}</span>
-                  {log.durationMs != null && <span className="text-[11px] text-surface-400">{log.durationMs}ms</span>}
-                  <span className="text-[11px] text-surface-400">{new Date(log.executedAt).toLocaleString('pt-BR')}</span>
-                </div>
-              ))}
-              {canLoadMoreLogs && (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={onLoadMoreLogs}
-                    disabled={loadingMoreLogs}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-700 hover:bg-surface-50 disabled:opacity-60"
-                  >
-                    {loadingMoreLogs ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                    {loadingMoreLogs ? 'Carregando...' : 'Carregar mais'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-      )}
-
       <Card className="border-surface-200 bg-surface-50/60">
-        <p className="flex items-start gap-2 text-xs text-surface-600"><ShieldCheck size={14} className="mt-0.5 text-emerald-600" /> Recomendação: use credenciais dedicadas de serviço e monitore regularmente os logs de conexão para manter padrão empresarial.</p>
+        <p className="flex items-start gap-2 text-xs text-surface-600"><ShieldCheck size={14} className="mt-0.5 text-emerald-600" /> Recomendação: use credenciais dedicadas de serviço e execute testes de conexão periodicamente para manter padrão empresarial.</p>
       </Card>
     </div>
   )
