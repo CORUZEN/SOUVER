@@ -438,10 +438,10 @@ export default function MetasWorkspace() {
 
   const statusSeries = useMemo(
     () => [
-      { label: 'Superou', value: byStatus.superou, color: 'bg-emerald-500' },
-      { label: 'Meta Batida', value: byStatus.noAlvo, color: 'bg-blue-500' },
-      { label: 'Atenção', value: byStatus.atencao, color: 'bg-amber-500' },
-      { label: 'Crítico', value: byStatus.critico, color: 'bg-red-500' },
+      { label: 'Superou', value: byStatus.superou, color: 'bg-surface-500' },
+      { label: 'Meta Batida', value: byStatus.noAlvo, color: 'bg-surface-500' },
+      { label: 'Atenção', value: byStatus.atencao, color: 'bg-surface-600' },
+      { label: 'Crítico', value: byStatus.critico, color: 'bg-surface-700' },
     ],
     [byStatus]
   )
@@ -475,10 +475,130 @@ export default function MetasWorkspace() {
     [rules, snapshots]
   )
 
+  const executiveMetricCardClass =
+    'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+
+  const executivePanelCardClass =
+    'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+
+  const stageRuleMap = useMemo(
+    () =>
+      Object.fromEntries(
+        STAGES.map((stage) => [stage.key, rules.filter((rule) => rule.stage === stage.key)])
+      ) as Record<StageKey, GoalRule[]>,
+    [rules]
+  )
+
+  const lineChartData = useMemo(() => {
+    const width = 320
+    const height = 128
+    const padX = 18
+    const padY = 14
+
+    const maxStagePoint = Math.max(
+      0.001,
+      ...stageSeries.flatMap((stage) => [stage.target, stage.achieved])
+    )
+
+    const buildPoints = (pick: (item: (typeof stageSeries)[number]) => number) =>
+      stageSeries.map((stage, index) => {
+        const x =
+          padX + (index * (width - padX * 2)) / Math.max(stageSeries.length - 1, 1)
+        const y =
+          height -
+          padY -
+          (Math.min(pick(stage), maxStagePoint) / maxStagePoint) * (height - padY * 2)
+        return { x, y }
+      })
+
+    const actualPoints = buildPoints((stage) => stage.achieved)
+    const targetPoints = buildPoints((stage) => stage.target)
+
+    const toPath = (points: Array<{ x: number; y: number }>) =>
+      points
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+        .join(' ')
+
+    const areaPath = `${toPath(actualPoints)} L ${actualPoints.at(-1)?.x ?? 0} ${height - padY} L ${actualPoints[0]?.x ?? 0} ${height - padY} Z`
+
+    return {
+      width,
+      height,
+      padY,
+      actualPoints,
+      targetPoints,
+      actualPath: toPath(actualPoints),
+      targetPath: toPath(targetPoints),
+      areaPath,
+    }
+  }, [stageSeries])
+
+  const sellerBars = useMemo(() => snapshots.slice(0, 6), [snapshots])
+  const maxSellerPoints = useMemo(
+    () => Math.max(0.001, ...sellerBars.map((seller) => seller.pointsAchieved)),
+    [sellerBars]
+  )
+
+  const donutModel = useMemo(() => {
+    const radius = 44
+    const circumference = 2 * Math.PI * radius
+    const total = Math.max(1, statusSeries.reduce((sum, item) => sum + item.value, 0))
+    const palette = ['#334155', '#475569', '#64748b', '#94a3b8']
+
+    let offset = 0
+    const segments = statusSeries.map((item, index) => {
+      const ratio = item.value / total
+      const length = ratio * circumference
+      const segment = {
+        ...item,
+        color: palette[index % palette.length],
+        dash: `${length} ${circumference - length}`,
+        offset: -offset,
+      }
+      offset += length
+      return segment
+    })
+
+    return {
+      radius,
+      circumference,
+      total,
+      segments,
+    }
+  }, [statusSeries])
+
+  const sellerHeatmap = useMemo(
+    () =>
+      snapshots.slice(0, 5).map((snapshot) => {
+        const cells = STAGES.map((stage) => {
+          const stageRules = stageRuleMap[stage.key]
+          const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
+          const stageAchieved = stageRules.reduce((sum, rule) => {
+            const progress =
+              snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+            return sum + rule.points * Math.min(progress, 1)
+          }, 0)
+          const ratio = stageTarget > 0 ? stageAchieved / stageTarget : 0
+          return { stage: stage.label, ratio }
+        })
+        return { seller: snapshot.seller, cells }
+      }),
+    [snapshots, stageRuleMap]
+  )
+
+  const heatCellClass = (ratio: number) => {
+    if (ratio >= 1) return 'bg-surface-800 text-white'
+    if (ratio >= 0.85) return 'bg-surface-700 text-white'
+    if (ratio >= 0.7) return 'bg-surface-600 text-white'
+    if (ratio >= 0.55) return 'bg-surface-500 text-white'
+    if (ratio >= 0.4) return 'bg-surface-300 text-surface-900'
+    return 'bg-surface-200 text-surface-700'
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
       <Card className="relative overflow-hidden border-surface-200">
-        <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary-600 via-emerald-500 to-cyan-500" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-surface-400" />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">Metas comerciais</p>
@@ -578,33 +698,190 @@ export default function MetasWorkspace() {
         </>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Vendedores monitorados</p><p className="mt-1 text-2xl font-semibold text-surface-900">{snapshots.length}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p><p className={`mt-1 text-2xl font-semibold ${factoryGoalMet ? 'text-emerald-700' : 'text-amber-700'}`}>{num(factoryGoalRatio * 100, 1)}%</p><p className="mt-1 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores meta batida</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta Batida ou acima</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{onTargetCount}</p></Card>
-            <Card className="border-surface-200"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco operacional</p><p className="mt-1 text-2xl font-semibold text-red-700">{byStatus.critico + byStatus.atencao}</p></Card>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Vendedores monitorados</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900 transition-transform duration-300 group-hover:scale-[1.02]">{snapshots.length}</p>
+              <p className="mt-2 text-xs text-surface-500">Base ativa para gestão comercial</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{num(factoryGoalRatio * 100, 1)}%</p>
+              <p className="mt-2 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores meta batida</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta Batida ou acima</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{onTargetCount}</p>
+              <p className="mt-2 text-xs text-surface-500">Colaboradores com aderência positiva</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco operacional</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{byStatus.critico + byStatus.atencao}</p>
+              <p className="mt-2 text-xs text-surface-500">Vendedores que exigem acompanhamento</p>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                Tendência de evolução (linha)
+              </p>
+              <div className="mt-4 rounded-xl border border-surface-200 bg-surface-50 p-3">
+                <svg viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`} className="h-36 w-full">
+                  <defs>
+                    <linearGradient id="line-area-gradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#64748b" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#64748b" stopOpacity="0.04" />
+                    </linearGradient>
+                  </defs>
+                  <line
+                    x1={18}
+                    x2={lineChartData.width - 18}
+                    y1={lineChartData.height - lineChartData.padY}
+                    y2={lineChartData.height - lineChartData.padY}
+                    stroke="#cbd5e1"
+                    strokeWidth="1"
+                  />
+                  <path d={lineChartData.areaPath} fill="url(#line-area-gradient)" />
+                  <path d={lineChartData.targetPath} fill="none" stroke="#94a3b8" strokeDasharray="4 4" strokeWidth="2" />
+                  <path d={lineChartData.actualPath} fill="none" stroke="#334155" strokeWidth="2.4" />
+                  {lineChartData.actualPoints.map((point, index) => (
+                    <circle key={`actual-${STAGES[index].key}`} cx={point.x} cy={point.y} r="3.2" fill="#334155" />
+                  ))}
+                </svg>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-surface-600">
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-surface-700" />Atingido médio</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-surface-400" />Meta planejada</span>
+              </div>
+            </Card>
+
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                Pontuação por vendedor (barras)
+              </p>
+              <div className="mt-4 rounded-xl border border-surface-200 bg-surface-50 p-3">
+                <div className="flex h-36 items-end gap-2">
+                  {sellerBars.map((seller) => {
+                    const ratio = seller.pointsAchieved / maxSellerPoints
+                    return (
+                      <div key={seller.seller.id} className="flex flex-1 flex-col items-center gap-2">
+                        <div className="relative w-full rounded-t-md bg-surface-700/90 transition-all duration-700" style={{ height: `${Math.max(8, ratio * 100)}%` }}>
+                          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-surface-600">
+                            {num(seller.pointsAchieved, 2)}
+                          </span>
+                        </div>
+                        <span className="line-clamp-1 max-w-full text-[10px] text-surface-500">{seller.seller.name.split(' ')[0]}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </Card>
+
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                Composição de status (pizza)
+              </p>
+              <div className="mt-4 flex items-center gap-4 rounded-xl border border-surface-200 bg-surface-50 p-3">
+                <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0">
+                  <circle cx="60" cy="60" r={donutModel.radius} fill="none" stroke="#e2e8f0" strokeWidth="14" />
+                  <g transform="rotate(-90 60 60)">
+                    {donutModel.segments.map((segment) => (
+                      <circle
+                        key={segment.label}
+                        cx="60"
+                        cy="60"
+                        r={donutModel.radius}
+                        fill="none"
+                        stroke={segment.color}
+                        strokeWidth="14"
+                        strokeDasharray={segment.dash}
+                        strokeDashoffset={segment.offset}
+                      />
+                    ))}
+                  </g>
+                  <text x="60" y="56" textAnchor="middle" className="fill-surface-500 text-[9px] font-semibold uppercase tracking-[0.08em]">
+                    Geral
+                  </text>
+                  <text x="60" y="72" textAnchor="middle" className="fill-surface-900 text-[14px] font-bold">
+                    {num(factoryGoalRatio * 100, 0)}%
+                  </text>
+                </svg>
+                <div className="flex-1 space-y-2">
+                  {donutModel.segments.map((segment) => (
+                    <div key={`legend-${segment.label}`} className="flex items-center justify-between text-xs text-surface-600">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />
+                        {segment.label}
+                      </span>
+                      <span className="font-semibold">{segment.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                Mapa de calor por etapa
+              </p>
+              <div className="mt-4 overflow-x-auto rounded-xl border border-surface-200 bg-surface-50 p-3">
+                <div className="min-w-[420px] space-y-2">
+                  <div className="grid grid-cols-[1.3fr_repeat(4,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                    <span>Vendedor</span>
+                    {STAGES.map((stage) => (
+                      <span key={`head-${stage.key}`} className="text-center">{stage.label}</span>
+                    ))}
+                  </div>
+                  {sellerHeatmap.map((row) => (
+                    <div key={`heat-${row.seller.id}`} className="grid grid-cols-[1.3fr_repeat(4,1fr)] gap-2">
+                      <div className="truncate rounded-md border border-surface-200 bg-white px-2 py-1 text-xs text-surface-700">{row.seller.name}</div>
+                      {row.cells.map((cell) => (
+                        <div key={`cell-${row.seller.id}-${cell.stage}`} className={`rounded-md px-2 py-1 text-center text-[11px] font-semibold ${heatCellClass(cell.ratio)}`}>
+                          {num(cell.ratio * 100, 0)}%
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">
-            <Card className="border-surface-200">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta corporativa da fábrica</p>
-              <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-surface-200">
-                <div className={`h-full ${factoryGoalMet ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(factoryGoalRatio * 100, 100)}%` }} />
+              <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-surface-200/90">
+                <div className="h-full bg-surface-600 transition-[width] duration-700" style={{ width: `${Math.min(factoryGoalRatio * 100, 100)}%` }} />
               </div>
-              <p className="mt-2 text-sm text-surface-700">Critério: todos os vendedores precisam bater a meta.</p>
+              <p className="mt-3 text-sm font-medium text-surface-700">Critério: todos os vendedores precisam bater a meta.</p>
               <p className="mt-1 text-xs text-surface-600">{factoryGoalMet ? 'Meta geral atingida.' : `Faltam ${factoryGap} vendedor(es) para atingir a meta geral.`}</p>
             </Card>
 
-            <Card className="border-surface-200">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Distribuição por status</p>
-              <div className="mt-3 space-y-2">
+              <div className="mt-4 space-y-2.5">
                 {statusSeries.map((item) => {
                   const ratio = snapshots.length > 0 ? item.value / snapshots.length : 0
                   return (
-                    <div key={item.label}>
-                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{item.label}</span><span>{item.value}</span></div>
+                    <div key={item.label} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
+                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{item.label}</span><span className="font-semibold">{item.value}</span></div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                        <div className={`h-full ${item.color}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} />
+                        <div className={`h-full transition-[width] duration-700 ${item.color}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} />
                       </div>
                     </div>
                   )
@@ -612,14 +889,15 @@ export default function MetasWorkspace() {
               </div>
             </Card>
 
-            <Card className="border-surface-200">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por etapa</p>
-              <div className="mt-3 space-y-2">
+              <div className="mt-4 space-y-2.5">
                 {stageSeries.map((stage) => (
-                  <div key={stage.key}>
-                    <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{stage.label}</span><span>{num(stage.achieved, 3)} / {num(stage.target, 3)} pts</span></div>
+                  <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
+                    <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{stage.label}</span><span className="font-semibold">{num(stage.achieved, 3)} / {num(stage.target, 3)} pts</span></div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                      <div className={`h-full ${stage.ratio >= 1 ? 'bg-emerald-500' : stage.ratio >= 0.8 ? 'bg-blue-500' : stage.ratio >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }} />
+                      <div className="h-full bg-surface-600 transition-[width] duration-700" style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }} />
                     </div>
                   </div>
                 ))}
@@ -628,9 +906,10 @@ export default function MetasWorkspace() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card className="border-surface-200">
-              <div className="mb-3 flex items-center gap-2"><Users size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">Desempenho individual de vendedores</h2></div>
-              <div className="space-y-2">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <div className="mb-4 flex items-center gap-2"><Users size={16} className="text-surface-600" /><h2 className="text-lg font-semibold text-surface-900">Desempenho individual de vendedores</h2></div>
+              <div className="space-y-2.5">
                 {sellersLoading ? (
                   <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                     Carregando vendedores...
@@ -647,10 +926,10 @@ export default function MetasWorkspace() {
                         type="button"
                         key={snapshot.seller.id}
                         onClick={() => setSelectedSellerId(snapshot.seller.id)}
-                        className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all duration-300 ${
                           selectedSeller?.seller.id === snapshot.seller.id
-                            ? 'border-primary-300 bg-primary-50'
-                            : 'border-surface-200 bg-white hover:bg-surface-50'
+                            ? 'border-surface-300 bg-surface-50 shadow-sm'
+                            : 'border-surface-200 bg-white hover:border-surface-300 hover:bg-surface-50'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3">
@@ -671,20 +950,9 @@ export default function MetasWorkspace() {
                           </Badge>
                         </div>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-200">
-                          <div
-                            className={`h-full ${
-                              ratio >= 1
-                                ? 'bg-emerald-500'
-                                : ratio >= 0.8
-                                  ? 'bg-blue-500'
-                                  : ratio >= 0.6
-                                    ? 'bg-amber-500'
-                                    : 'bg-red-500'
-                            }`}
-                            style={{ width: `${Math.min(ratio * 100, 100)}%` }}
-                          />
+                          <div className="h-full bg-surface-600 transition-[width] duration-700" style={{ width: `${Math.min(ratio * 100, 100)}%` }} />
                         </div>
-                        <div className="mt-1 flex items-center justify-between text-xs text-surface-600">
+                        <div className="mt-1.5 flex items-center justify-between text-xs text-surface-600">
                           <span>
                             {num(snapshot.pointsAchieved, 3)} / {num(snapshot.pointsTarget, 3)} pts
                           </span>
@@ -697,17 +965,18 @@ export default function MetasWorkspace() {
               </div>
             </Card>
 
-            <Card className="border-surface-200">
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               {selectedSeller ? (
                 <>
-                  <div className="mb-3 flex items-center gap-2"><UserRound size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">{selectedSeller.seller.name}</h2></div>
+                  <div className="mb-4 flex items-center gap-2"><UserRound size={16} className="text-surface-600" /><h2 className="text-[1.65rem] font-semibold leading-none text-surface-900">{selectedSeller.seller.name}</h2></div>
                   <div className="grid gap-2">
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(selectedSeller.rewardAchieved)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(selectedSeller.rewardAchieved)}</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>
                   </div>
-                  <div className="mt-3 space-y-2">{rules.map((rule) => { const progress = selectedSeller.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0; const done = progress >= 1; return <div key={rule.id} className="rounded-lg border border-surface-200 bg-white px-3 py-2"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>{done ? <TrendingUp size={14} className="text-emerald-600" /> : <TrendingDown size={14} className="text-amber-600" />}</div><p className="text-[11px] text-surface-500">{rule.description}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200"><div className={`h-full ${done ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} /></div></div>})}</div>
+                  <div className="mt-3 space-y-2">{rules.map((rule) => { const progress = selectedSeller.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0; const done = progress >= 1; return <div key={rule.id} className="rounded-lg border border-surface-200 bg-white px-3 py-2 shadow-sm transition-colors hover:border-surface-300"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>{done ? <TrendingUp size={14} className="text-surface-600" /> : <TrendingDown size={14} className="text-surface-500" />}</div><p className="text-[11px] text-surface-500">{rule.description}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200"><div className={`h-full transition-[width] duration-700 ${done ? 'bg-surface-600' : 'bg-surface-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} /></div></div>})}</div>
                 </>
               ) : (
                 <p className="text-sm text-surface-500">Selecione um vendedor para ver detalhes.</p>
