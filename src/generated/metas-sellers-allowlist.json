@@ -6,12 +6,6 @@
     "active": true
   },
   {
-    "code": "5",
-    "partnerCode": "15473",
-    "name": "ALEXANDRE CAMARA DE MELO",
-    "active": false
-  },
-  {
     "code": "32",
     "partnerCode": "15555",
     "name": "ANDREA DUARTE COSTA",
@@ -63,19 +57,13 @@
     "code": "29",
     "partnerCode": "16643",
     "name": "JOSE CARLOS DIAS",
-    "active": false
-  },
-  {
-    "code": "11",
-    "partnerCode": "15560",
-    "name": "JOSE CICERO BEZERRA JUNIOR",
-    "active": false
+    "active": true
   },
   {
     "code": "16",
     "partnerCode": "16909",
     "name": "JOSE CLAUDIO FEITOSA",
-    "active": false
+    "active": true
   },
   {
     "code": "31",
@@ -87,13 +75,7 @@
     "code": "17",
     "partnerCode": "233",
     "name": "JOSELIA LOPES DE SIQUEIRA",
-    "active": false
-  },
-  {
-    "code": "13",
-    "partnerCode": "15311",
-    "name": "JULIANA PATRICIA DA SILVA",
-    "active": false
+    "active": true
   },
   {
     "code": "19",
@@ -114,12 +96,6 @@
     "active": false
   },
   {
-    "code": "25",
-    "partnerCode": "20",
-    "name": "PAULO BARBOSA",
-    "active": false
-  },
-  {
     "code": "12",
     "partnerCode": "16643",
     "name": "RICARDO HENRIQUE VIEIRA",
@@ -136,11 +112,5 @@
     "partnerCode": "16931",
     "name": "ROSILAINE FERREIRA",
     "active": true
-  },
-  {
-    "code": "14",
-    "partnerCode": "15568",
-    "name": "VICTOR EVERTON BEZERRA GONCALV",
-    "active": false
   }
 ]

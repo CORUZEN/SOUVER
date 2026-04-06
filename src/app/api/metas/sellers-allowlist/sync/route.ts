@@ -70,33 +70,80 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string): Promis
   return null
 }
 
+async function authenticateSession(config: SankhyaConfig, baseUrl: string): Promise<string | null> {
+  if (!config.username || !config.password) return null
+
+  const loginPayload = {
+    serviceName: 'MobileLoginSP.login',
+    requestBody: {
+      NOMUSU: { $: config.username },
+      INTERNO: { $: config.password },
+      KEEPCONNECTED: { $: 'S' },
+    },
+  }
+
+  const tokenHeader = config.appKey || config.token || ''
+  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=MobileLoginSP.login&outputType=json`
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(tokenHeader ? { token: tokenHeader } : {}),
+      },
+      body: JSON.stringify(loginPayload),
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data) return null
+
+    const body = data.responseBody ?? data
+    const sessionToken =
+      typeof body.jsessionid === 'string' ? body.jsessionid :
+      typeof body.JSESSIONID === 'string' ? body.JSESSIONID :
+      typeof body.callID === 'string' ? body.callID :
+      typeof body.bearerToken === 'string' ? body.bearerToken :
+      null
+
+    return sessionToken || extractBearerToken(body)
+  } catch {
+    return null
+  }
+}
+
 function buildHeaders(config: SankhyaConfig, bearerToken: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
-
-  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`
-  if (config.token) headers['X-Token'] = config.token
-  if (config.token) headers.token = config.token
-  if (config.appKey) {
-    headers.appkey = config.appKey
-    headers.AppKey = config.appKey
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`
+    headers.token = bearerToken
+  } else if (config.token) {
+    headers.token = config.token
   }
-
+  if (config.token) headers['X-Token'] = config.token
+  const appKeyValue = config.appKey || config.token
+  if (appKeyValue) {
+    headers.appkey = appKeyValue
+    headers.AppKey = appKeyValue
+  }
   return headers
 }
 
-function getSqlEndpoints(baseUrl: string, appKey?: string | null) {
+function getSqlEndpoints(baseUrl: string, appKey?: string | null, hasBearer = false) {
   const appKeyParam = appKey ? `&appkey=${encodeURIComponent(appKey)}` : ''
   const query = `serviceName=DbExplorerSP.executeQuery&outputType=json${appKeyParam}`
-  return [
-    `${baseUrl}/mge/service.sbr?${query}`,
-    `https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`,
-    `https://api.sankhya.com.br/mge/service.sbr?${query}`,
-    `https://api.sandbox.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`,
-    `https://api.sandbox.sankhya.com.br/mge/service.sbr?${query}`,
-  ]
+  if (hasBearer) {
+    return [
+      `https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`,
+      `${baseUrl}/mge/service.sbr?${query}`,
+    ]
+  }
+  return [`${baseUrl}/mge/service.sbr?${query}`]
 }
 
 function extractServiceError(payload: unknown): string | null {
@@ -117,7 +164,9 @@ function collectRecords(payload: unknown, bucket: RawRecord[]) {
   if (responseBody && typeof responseBody === 'object') {
     const body = responseBody as RawRecord
     const rowsRaw = body.rows
-    const fieldsRaw = Array.isArray(body.fields) ? body.fields : []
+    const fieldsRaw = Array.isArray(body.fields) ? body.fields
+      : Array.isArray(body.fieldsMetadata) ? body.fieldsMetadata
+      : []
 
     if (Array.isArray(rowsRaw) && rowsRaw.length > 0) {
       const row0 = rowsRaw[0]
@@ -154,9 +203,56 @@ function collectRecords(payload: unknown, bucket: RawRecord[]) {
   for (const value of Object.values(obj)) collectRecords(value, bucket)
 }
 
-function parseRows(payload: unknown): SellerRow[] {
-  const records: RawRecord[] = []
-  collectRecords(payload, records)
+async function queryRows(
+  baseUrl: string,
+  headers: Record<string, string>,
+  sql: string,
+  appKey?: string | null,
+  options?: { allowEmpty?: boolean }
+) {
+  const failures: string[] = []
+  let hadSuccessfulExecution = false
+  const payloadVariants = [
+    { serviceName: 'DbExplorerSP.executeQuery', requestBody: { sql } },
+    { requestBody: { sql } },
+    { serviceName: 'DbExplorerSP.executeQuery', requestBody: { statement: sql } },
+  ]
+
+  for (const endpoint of getSqlEndpoints(baseUrl, appKey, /^Bearer\s+/i.test(headers.Authorization ?? ''))) {
+    for (const payload of payloadVariants) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(25_000),
+        })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+          failures.push(`${endpoint}: HTTP ${response.status}`)
+          continue
+        }
+        const serviceError = extractServiceError(data)
+        if (serviceError) {
+          failures.push(`${endpoint}: ${serviceError}`)
+          continue
+        }
+        hadSuccessfulExecution = true
+        const records: RawRecord[] = []
+        collectRecords(data, records)
+        if (records.length > 0) return records
+      } catch (err) {
+        failures.push(`${endpoint}: ${err instanceof Error ? err.message : 'erro de rede'}`)
+      }
+    }
+  }
+
+  if (hadSuccessfulExecution && options?.allowEmpty) return []
+
+  throw new Error(`Nao foi possivel consultar vendedores no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
+}
+
+function parseSellerRecords(records: RawRecord[]): SellerRow[] {
   const dedup = new Map<string, SellerRow>()
 
   for (const record of records) {
@@ -175,11 +271,15 @@ function parseRows(payload: unknown): SellerRow[] {
     }
   }
 
-  return [...dedup.values()]
+  return [...dedup.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
-  const sqlPrimary = `
+  // --- Strategy: single combined query with TIPO and ATIVO filters in SQL ---
+  // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) — also accept full-text values
+  // TGFVEN.ATIVO: 'S' (Sim)
+  // LEFT JOIN TGFCAB to get the most recent partner code (CODPARC) from orders
+  const sqlCombined = `
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
@@ -189,89 +289,51 @@ LEFT JOIN TGFCAB CAB
   ON CAB.CODVEND = V.CODVEND
  AND CAB.TIPMOV IN ('V', 'P')
  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
-WHERE NVL(TRIM(V.APELIDO), '') <> ''
+WHERE TRIM(V.APELIDO) IS NOT NULL
+  AND UPPER(TRIM(V.TIPVEND)) IN ('V', 'S', 'VENDEDOR', 'SUPERVISOR')
+  AND V.ATIVO = 'S'
 GROUP BY V.CODVEND, TRIM(V.APELIDO)
-ORDER BY TRIM(V.APELIDO)
-`.trim()
+ORDER BY TRIM(V.APELIDO)`.trim()
 
-  const sqlFallbackFromCab = `
-SELECT
-  TO_CHAR(CAB.CODVEND) AS CODVEND,
-  NVL(MAX(VEN.APELIDO), 'SEM VENDEDOR') AS APELIDO,
-  TO_CHAR(MAX(CAB.CODPARC)) AS CODPARC
-FROM TGFCAB CAB
-LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
-WHERE CAB.TIPMOV IN ('V', 'P')
-  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
-  AND NVL(CAB.CODVEND, 0) > 0
-GROUP BY CAB.CODVEND
-ORDER BY NVL(MAX(VEN.APELIDO), 'SEM VENDEDOR')
-`.trim()
+  try {
+    const records = await queryRows(baseUrl, headers, sqlCombined, appKey, { allowEmpty: true })
+    if (records.length > 0) return parseSellerRecords(records)
+  } catch {
+    // combined query failed, try fallback
+  }
 
-  const sqlFallbackVenOnly = `
+  // --- Fallback: TGFVEN only (no JOIN), still filtered by TIPO and ATIVO ---
+  const sqlFallback = `
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
   CAST(NULL AS VARCHAR2(20)) AS CODPARC
 FROM TGFVEN V
-WHERE NVL(TRIM(V.APELIDO), '') <> ''
-ORDER BY TRIM(V.APELIDO)
-`.trim()
+WHERE TRIM(V.APELIDO) IS NOT NULL
+  AND UPPER(TRIM(V.TIPVEND)) IN ('V', 'S', 'VENDEDOR', 'SUPERVISOR')
+  AND V.ATIVO = 'S'
+ORDER BY TRIM(V.APELIDO)`.trim()
 
-  const sqlCandidates = [sqlPrimary, sqlFallbackFromCab, sqlFallbackVenOnly]
-  const failures: string[] = []
-  let hadAuthorizedResponse = false
-
-  for (const sql of sqlCandidates) {
-    for (const endpoint of getSqlEndpoints(baseUrl, appKey)) {
-      const payloadVariants = [
-        {
-          serviceName: 'DbExplorerSP.executeQuery',
-          requestBody: { sql },
-        },
-        {
-          requestBody: { sql },
-        },
-        {
-          serviceName: 'DbExplorerSP.executeQuery',
-          requestBody: { statement: sql },
-        },
-      ]
-
-      for (const payload of payloadVariants) {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(25_000),
-        })
-        const data = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          failures.push(`${endpoint}: HTTP ${response.status}`)
-          continue
-        }
-
-        const serviceError = extractServiceError(data)
-        if (serviceError) {
-          failures.push(`${endpoint}: ${serviceError}`)
-          continue
-        }
-
-        hadAuthorizedResponse = true
-        const rows = parseRows(data)
-        if (rows.length > 0) return rows
-      }
-    }
+  try {
+    const records = await queryRows(baseUrl, headers, sqlFallback, appKey, { allowEmpty: true })
+    if (records.length > 0) return parseSellerRecords(records)
+  } catch {
+    // fallback also failed
   }
 
-  if (hadAuthorizedResponse) {
-    throw new Error(
-      'Consulta autorizada, mas sem vendedores retornados. Verifique se o usuario OAuth tem acesso de leitura a TGFVEN/TGFCAB.'
-    )
-  }
+  // --- Last resort: all active sellers without type filter (TIPVEND column may not exist) ---
+  const sqlLastResort = `
+SELECT
+  TO_CHAR(V.CODVEND) AS CODVEND,
+  TRIM(V.APELIDO) AS APELIDO,
+  CAST(NULL AS VARCHAR2(20)) AS CODPARC
+FROM TGFVEN V
+WHERE TRIM(V.APELIDO) IS NOT NULL
+  AND V.ATIVO = 'S'
+ORDER BY TRIM(V.APELIDO)`.trim()
 
-  throw new Error(`Nao foi possivel consultar vendedores no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
+  const records = await queryRows(baseUrl, headers, sqlLastResort, appKey)
+  return parseSellerRecords(records)
 }
 
 export async function POST(req: NextRequest) {
@@ -294,7 +356,13 @@ export async function POST(req: NextRequest) {
   const config = parseStoredConfig(integration.configEncrypted)
 
   try {
-    const bearerToken = (config.authMode ?? 'OAUTH2') === 'OAUTH2' ? await authenticateOAuth(config, baseUrl) : null
+    let bearerToken: string | null = null
+    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
+      bearerToken = await authenticateOAuth(config, baseUrl)
+    }
+    if (!bearerToken) {
+      bearerToken = await authenticateSession(config, baseUrl)
+    }
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey ?? config.token ?? null
     const remoteSellers = await querySellers(baseUrl, headers, appKey)

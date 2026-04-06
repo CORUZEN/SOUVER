@@ -614,6 +614,40 @@ export default function MetasWorkspace() {
     }
   }
 
+  async function removeSellerAndSave(removeIndex: number) {
+    const updated = allowlist.filter((_, i) => i !== removeIndex)
+    setAllowlist(updated)
+    setAllowlistError('')
+    setAllowlistSuccess('')
+    try {
+      const response = await fetch('/api/metas/sellers-allowlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellers: updated.map((s) => ({
+            code: s.code && s.code.trim().length > 0 ? s.code.trim() : null,
+            partnerCode: s.partnerCode && s.partnerCode.trim().length > 0 ? s.partnerCode.trim() : null,
+            name: s.name.trim(),
+            active: s.active,
+          })),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.message ?? 'Falha ao salvar.')
+      setAllowlist(
+        (Array.isArray(data?.sellers) ? data.sellers : []).map((item: Record<string, unknown>) => ({
+          code: item.code == null ? null : String(item.code),
+          partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
+          name: String(item.name ?? ''),
+          active: Boolean(item.active),
+        }))
+      )
+    } catch (error) {
+      setAllowlistError(error instanceof Error ? error.message : 'Falha ao remover vendedor.')
+      void loadAllowlist()
+    }
+  }
+
   async function syncAllowlistFromSankhya() {
     setAllowlistSyncing(true)
     setAllowlistError('')
@@ -723,6 +757,47 @@ export default function MetasWorkspace() {
       setProductAllowlistError(error instanceof Error ? error.message : 'Falha ao salvar produtos da meta.')
     } finally {
       setProductAllowlistSaving(false)
+    }
+  }
+
+  async function removeProductAndSave(code: string, description: string) {
+    const updated = productAllowlist.filter(
+      (item) => !(item.code === code && item.description === description)
+    )
+    setProductAllowlist(updated)
+    setProductAllowlistError('')
+    setProductAllowlistSuccess('')
+    try {
+      const response = await fetch('/api/metas/products-allowlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: updated.map((p) => ({
+            code: String(p.code ?? '').trim(),
+            description: String(p.description ?? '').trim(),
+            brand: String(p.brand ?? '').trim(),
+            unit: String(p.unit ?? '').trim().toUpperCase(),
+            mobility: p.mobility === 'SIM' ? 'SIM' : 'NAO',
+            active: p.active,
+          })),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.message ?? 'Falha ao salvar.')
+      const list = Array.isArray(data?.products) ? data.products : []
+      setProductAllowlist(
+        list.map((item: Record<string, unknown>) => ({
+          code: String(item.code ?? ''),
+          description: String(item.description ?? ''),
+          brand: String(item.brand ?? ''),
+          unit: String(item.unit ?? ''),
+          mobility: String(item.mobility ?? '').toUpperCase() === 'SIM' ? 'SIM' : 'NAO',
+          active: Boolean(item.active),
+        }))
+      )
+    } catch (error) {
+      setProductAllowlistError(error instanceof Error ? error.message : 'Falha ao remover produto.')
+      void loadProductAllowlist()
     }
   }
 
@@ -1314,48 +1389,18 @@ export default function MetasWorkspace() {
                             />
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={seller.name}
-                              onChange={(event) =>
-                                setAllowlist((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, name: event.target.value } : item
-                                  )
-                                )
-                              }
-                            />
+                            <span className="text-xs text-surface-700">{seller.name}</span>
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={seller.code ?? ''}
-                              onChange={(event) =>
-                                setAllowlist((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, code: event.target.value || null } : item
-                                  )
-                                )
-                              }
-                            />
+                            <span className="text-xs text-surface-700">{seller.code ?? '—'}</span>
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={seller.partnerCode ?? ''}
-                              onChange={(event) =>
-                                setAllowlist((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, partnerCode: event.target.value || null } : item
-                                  )
-                                )
-                              }
-                            />
+                            <span className="text-xs text-surface-700">{seller.partnerCode ?? '—'}</span>
                           </td>
                           <td className="px-3 py-2">
                             <button
                               type="button"
-                              onClick={() => setAllowlist((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                              onClick={() => removeSellerAndSave(index)}
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                             >
                               Remover
@@ -1495,13 +1540,7 @@ export default function MetasWorkspace() {
                           <td className="px-3 py-2">
                             <button
                               type="button"
-                              onClick={() =>
-                                setProductAllowlist((prev) =>
-                                  prev.filter(
-                                    (item) => !(item.code === product.code && item.description === product.description)
-                                  )
-                                )
-                              }
+                              onClick={() => removeProductAndSave(product.code, product.description)}
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                             >
                               Remover
