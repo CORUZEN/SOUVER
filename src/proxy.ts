@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/2fa/verify-login',
   '/api/health',
+  '/api/integrations/sankhya/data-dictionary',
   '/esqueci-senha',
   '/resetar-senha',
 ]

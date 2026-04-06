@@ -45,10 +45,19 @@ interface MonthConfig {
   customOffDates: string[]
 }
 
+interface SellerOrder {
+  orderNumber: string
+  negotiatedAt: string
+  totalValue: number
+}
+
 interface Salesperson {
   id: string
   name: string
   login: string
+  orders: SellerOrder[]
+  totalValue: number
+  totalOrders: number
 }
 
 interface RuleProgress {
@@ -58,6 +67,9 @@ interface RuleProgress {
 
 interface SellerSnapshot {
   seller: Salesperson
+  totalOrders: number
+  totalValue: number
+  averageTicket: number
   pointsAchieved: number
   pointsTarget: number
   rewardAchieved: number
@@ -162,6 +174,12 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function parseTargetNumber(targetText: string) {
+  const match = targetText.match(/(\d+(?:[.,]\d+)?)/)
+  if (!match) return null
+  return parseDecimal(match[1], 0)
+}
+
 type ChartPoint = { x: number; y: number }
 
 function smoothLinePath(points: ChartPoint[]) {
@@ -185,11 +203,16 @@ function smoothLinePath(points: ChartPoint[]) {
   return d
 }
 
-function hash(input: string) {
-  let h = 0
-  for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0
-  return h
+function isDateWithinRange(isoDate: string, startIso: string | null, endIso: string | null) {
+  if (!startIso || !endIso) return false
+  return isoDate >= startIso && isoDate <= endIso
 }
+
+function findStageForDate(isoDate: string, weeks: CycleWeek[]): StageKey | null {
+  const withWindow = weeks.find((week) => isDateWithinRange(isoDate, week.start, week.end))
+  return withWindow?.key ?? null
+}
+
 function easterSunday(year: number) {
   const a = year % 19
   const b = Math.floor(year / 100)
@@ -309,6 +332,7 @@ export default function MetasWorkspace() {
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellersLoading, setSellersLoading] = useState(true)
+  const [sellersError, setSellersError] = useState('')
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -356,18 +380,60 @@ export default function MetasWorkspace() {
   }, [basePremiation, extraBonus, extraMinPoints, includeNational, month, monthConfigs, prizes, rules, salaryBase, year])
 
   useEffect(() => {
-    fetch('/api/users?limit=50')
-      .then((response) => (response.ok ? response.json() : null))
+    const controller = new AbortController()
+    setSellersLoading(true)
+    setSellersError('')
+
+    fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar desempenho por vendedor.')
+        }
+        return payload
+      })
       .then((data) => {
-        const users = (data?.users ?? []) as Array<{ id: string; fullName?: string; name?: string; login: string; isActive?: boolean }>
-        const mapped = users
-          .filter((user) => user.isActive !== false)
-          .map((user) => ({ id: user.id, name: user.fullName ?? user.name ?? user.login, login: user.login }))
+        const remoteSellers = (data?.sellers ?? []) as Array<{
+          id: string
+          name: string
+          login: string
+          totalValue?: number
+          totalOrders?: number
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number }>
+        }>
+
+        const mapped = remoteSellers.map((seller) => {
+          const normalizedOrders = (seller.orders ?? [])
+            .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
+            .map((order) => ({
+              orderNumber: String(order.orderNumber ?? ''),
+              negotiatedAt: String(order.negotiatedAt).slice(0, 10),
+              totalValue: Number(order.totalValue ?? 0),
+            }))
+
+          return {
+            id: seller.id,
+            name: seller.name,
+            login: seller.login,
+            totalValue: Number(seller.totalValue ?? 0),
+            totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+            orders: normalizedOrders,
+          }
+        })
+
         setSellers(mapped)
       })
-      .catch(() => setSellers([]))
-      .finally(() => setSellersLoading(false))
-  }, [])
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setSellers([])
+        setSellersError(error instanceof Error ? error.message : 'Falha ao carregar dados de vendedores.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSellersLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [month, year])
 
   const blockedSet = useMemo(() => {
     const set = new Set<string>()
@@ -386,12 +452,64 @@ export default function MetasWorkspace() {
   const standby = !activeMonth?.week1StartDate || (hasMonthEnded(year, month) && !nextConfigured)
 
   const snapshots = useMemo<SellerSnapshot[]>(() => {
+    const teamAverageValue =
+      sellers.length > 0 ? sellers.reduce((sum, seller) => sum + seller.totalValue, 0) / sellers.length : 0
+
+    const teamAverageTicket = (() => {
+      const tickets = sellers
+        .filter((seller) => seller.totalOrders > 0)
+        .map((seller) => seller.totalValue / Math.max(seller.totalOrders, 1))
+      if (tickets.length === 0) return 0
+      return tickets.reduce((sum, value) => sum + value, 0) / tickets.length
+    })()
+
     return sellers
       .map((seller) => {
-        const ruleProgress = rules.map((rule) => ({
-          ruleId: rule.id,
-          progress: 0.45 + (hash(`${activeKey}-${seller.id}-${rule.id}`) % 70) / 100,
-        }))
+        const stageMetrics = STAGES.reduce(
+          (acc, stage) => {
+            acc[stage.key] = { orderCount: 0, totalValue: 0 }
+            return acc
+          },
+          {} as Record<StageKey, { orderCount: number; totalValue: number }>
+        )
+
+        for (const order of seller.orders) {
+          const stage = findStageForDate(order.negotiatedAt, cycle.weeks)
+          if (!stage) continue
+          stageMetrics[stage].orderCount += 1
+          stageMetrics[stage].totalValue += order.totalValue
+        }
+
+        const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
+        const totalValueSafe = Math.max(seller.totalValue, 0.00001)
+        const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
+        const teamAverageTicketSafe = Math.max(teamAverageTicket, 0.00001)
+
+        const ruleProgress = rules.map((rule) => {
+          const targetPct =
+            rule.targetText.includes('%') && parseTargetNumber(rule.targetText)
+              ? Math.max((parseTargetNumber(rule.targetText) ?? 0) / 100, 0.00001)
+              : null
+          const targetAmount = parseTargetNumber(rule.targetText)
+          const stage = stageMetrics[rule.stage]
+          const kpi = rule.kpi.toLowerCase()
+          let progress = 0
+
+          if (kpi.includes('meta financeira')) {
+            progress = seller.totalValue / teamAverageValueSafe
+          } else if (kpi.includes('rentabilidade')) {
+            progress = (averageTicket / teamAverageTicketSafe) / (targetPct ?? 1)
+          } else if (targetPct !== null) {
+            const stageShare = stage.totalValue / totalValueSafe
+            progress = stageShare / targetPct
+          } else if (targetAmount && targetAmount > 0) {
+            progress = stage.orderCount / targetAmount
+          } else {
+            progress = stage.orderCount > 0 ? 1 : 0
+          }
+
+          return { ruleId: rule.id, progress: Math.max(0, Math.min(progress, 1.4)) }
+        })
 
         const pointsAchieved = rules.reduce((sum, rule) => {
           const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
@@ -408,6 +526,9 @@ export default function MetasWorkspace() {
 
         return {
           seller,
+          totalOrders: seller.totalOrders,
+          totalValue: seller.totalValue,
+          averageTicket,
           pointsAchieved,
           pointsTarget,
           rewardAchieved,
@@ -418,7 +539,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [activeKey, pointsTarget, rewardTarget, rules, sellers])
+  }, [cycle.weeks, pointsTarget, rewardTarget, rules, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) return
@@ -1020,6 +1141,10 @@ export default function MetasWorkspace() {
                   <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                     Carregando vendedores...
                   </div>
+                ) : sellersError ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-sm text-rose-700">
+                    {sellersError}
+                  </div>
                 ) : snapshots.length === 0 ? (
                   <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                     Nenhum vendedor ativo encontrado.
@@ -1078,6 +1203,8 @@ export default function MetasWorkspace() {
                   <div className="mb-4 flex items-center gap-2"><UserRound size={16} className="text-surface-600" /><h2 className="text-[1.65rem] font-semibold leading-none text-surface-900">{selectedSeller.seller.name}</h2></div>
                   <div className="grid gap-2">
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(selectedSeller.totalOrders, 0)}</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Faturamento no mês:</span> {currency(selectedSeller.totalValue)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(selectedSeller.rewardAchieved)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>

@@ -12,6 +12,8 @@
     "start": "next start --port 3001",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "sankhya:dictionary:sync": "tsx scripts/sync-sankhya-data-dictionary.ts",
+    "sankhya:live:sync": "tsx scripts/sync-sankhya-live-tables.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

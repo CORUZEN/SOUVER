@@ -1,0 +1,115 @@
+{
+  "sourceUrl": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados",
+  "fetchedAt": "2026-04-06T12:11:05.107Z",
+  "tableCount": 18,
+  "tables": [
+    {
+      "code": "TDDCAM",
+      "anchor": "tddcam",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddcam",
+      "description": "Contém informações relativas ao mapeamento dos campos das tabelas. A chave natural desta tabela é NOMETAB e NOMECAMPO ."
+    },
+    {
+      "code": "TDDCAMI18N",
+      "anchor": "tddcami18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddcami18n",
+      "description": "Internacionalização para a descrição dos campos: TDDCAM.DESCRCAMPO"
+    },
+    {
+      "code": "TDDI18N",
+      "anchor": "tddi18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddi18n",
+      "description": "Internacionalização para abas, agrupadores de campo e qualquer outra situação não prevista nas demais tabelas de internacionalização."
+    },
+    {
+      "code": "TDDIAC",
+      "anchor": "tddiac",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddiac",
+      "description": "Contém informações relativas aos acessos especiais de controle."
+    },
+    {
+      "code": "TDDINS",
+      "anchor": "tddins",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddins",
+      "description": "Contém informações relativas ao mapeamento de instâncias. A chave natural e única desta tabela é a NOMEINSTANCIA ."
+    },
+    {
+      "code": "TDDINSI18N",
+      "anchor": "tddinsi18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddinsi18n",
+      "description": "Internacionalização para a descrição das instâncias (TDDINS.DESCRINSTANCIA)"
+    },
+    {
+      "code": "TDDLGC",
+      "anchor": "tddlgc",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddlgc",
+      "description": "Contém informações relativas ao mapeamento dos campos de ligação entre as instâncias."
+    },
+    {
+      "code": "TDDLIG",
+      "anchor": "tddlig",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddlig",
+      "description": "Contém informações relativas ao mapeamento das ligações entre as instâncias. Este processo é usado para mapear FKs para se tornar um campo de pesquisa dentro das telas da plataforma."
+    },
+    {
+      "code": "TDDOPC",
+      "anchor": "tddopc",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddopc",
+      "description": "Contém informações relativas ao mapeamento das opções dos campos."
+    },
+    {
+      "code": "TDDOPCI18N",
+      "anchor": "tddopci18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddopci18n",
+      "description": "Internacionalização para as opções de campo (TDDOPC.OPCAO)"
+    },
+    {
+      "code": "TDDPCO",
+      "anchor": "tddpco",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddpco",
+      "description": "Contém informações relativas ao mapeamento de propriedades dos campos."
+    },
+    {
+      "code": "TDDTAB",
+      "anchor": "tddtab",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddtab",
+      "description": "A TDDTAB contém informações relativas ao mapeamento das tabelas. A chave natural desta tabela é NOMETAB ."
+    },
+    {
+      "code": "TDDTABI18N",
+      "anchor": "tddtabi18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#tddtabi18n",
+      "description": "Internacionalização para a descrição das tabelas: TDDTAB.DESCRTAB"
+    },
+    {
+      "code": "TRDCON",
+      "anchor": "trdcon",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#trdcon",
+      "description": "Contém informações relativas aos controles de menu."
+    },
+    {
+      "code": "TRDCONI18N",
+      "anchor": "trdconi18n",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#trdconi18n",
+      "description": "Internacionalização para a descrição dos controles (TRDCON.DESCRCONTROLE)"
+    },
+    {
+      "code": "TRDEVE",
+      "anchor": "trdeve",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#trdeve",
+      "description": "Contém informações relativas aos eventos de controle."
+    },
+    {
+      "code": "TRDFCO",
+      "anchor": "trdfco",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#trdfco",
+      "description": "Contém o mapeamento das ligações dos controles."
+    },
+    {
+      "code": "TRDPCO",
+      "anchor": "trdpco",
+      "url": "https://developer.sankhya.com.br/docs/dicion%C3%A1rio-de-dados#trdpco",
+      "description": "Contém informações relativas às propriedades dos controles."
+    }
+  ]
+}
