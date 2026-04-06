@@ -40,7 +40,46 @@ function collectObjectArrays(payload: unknown, bucket: RawRow[][]) {
   for (const value of Object.values(payload as RawRow)) collectObjectArrays(value, bucket)
 }
 
+function collectMatrixRows(payload: unknown, bucket: RawRow[]) {
+  if (!payload || typeof payload !== 'object') return
+  const obj = payload as RawRow
+
+  const responseBody = (obj.responseBody ?? null) as RawRow | null
+  const rows = responseBody?.rows
+  const fieldsRaw = responseBody?.fields
+
+  if (Array.isArray(rows) && rows.length > 0 && Array.isArray(rows[0])) {
+    const fields =
+      Array.isArray(fieldsRaw) && fieldsRaw.length > 0
+        ? fieldsRaw.map((field) => {
+            if (typeof field === 'string') return field
+            if (field && typeof field === 'object') {
+              const mapped = field as RawRow
+              return String(mapped.name ?? mapped.fieldName ?? mapped.FIELD_NAME ?? '')
+            }
+            return ''
+          })
+        : []
+
+    for (const row of rows) {
+      if (!Array.isArray(row)) continue
+      const mapped: RawRow = {}
+      for (let i = 0; i < row.length; i += 1) {
+        const key = String(fields[i] ?? `COL_${i + 1}`).toUpperCase()
+        mapped[key] = row[i]
+      }
+      bucket.push(mapped)
+    }
+  }
+
+  for (const value of Object.values(obj)) collectMatrixRows(value, bucket)
+}
+
 function extractRows(payload: unknown): RawRow[] {
+  const matrixRows: RawRow[] = []
+  collectMatrixRows(payload, matrixRows)
+  if (matrixRows.length > 0) return matrixRows
+
   const arrays: RawRow[][] = []
   collectObjectArrays(payload, arrays)
   return arrays.flat()
@@ -296,16 +335,24 @@ function mapRowsToTables(rows: RawRow[]) {
   return rows
     .map((row) => {
       const record = normalizeObjectKeys(row)
-      const tableName = String(record.TABLE_NAME ?? record.NOMETAB ?? '').trim()
+      const inferredOwner = String(record.OWNER ?? record.SCHEMA_OWNER ?? record.COL_1 ?? '').trim()
+      const inferredTableName = String(record.TABLE_NAME ?? record.NOMETAB ?? record.COL_2 ?? '').trim()
+      const inferredDescription = record.DESCRTAB ?? record.COL_3
+
+      const tableName = inferredTableName || String(record.COL_1 ?? '').trim()
       if (!tableName || tableName.startsWith('BIN$')) return null
+      if (/^\d+$/.test(tableName)) return null
 
       return {
-        owner: String(record.OWNER ?? record.SCHEMA_OWNER ?? '').trim() || 'UNKNOWN',
+        owner: inferredOwner || 'UNKNOWN',
         tableName,
-        description: (record.DESCRTAB == null ? null : String(record.DESCRTAB).trim() || null),
+        description: (inferredDescription == null ? null : String(inferredDescription).trim() || null),
         status: (record.STATUS == null ? null : String(record.STATUS).trim() || null),
         tablespace: (record.TABLESPACE_NAME == null ? null : String(record.TABLESPACE_NAME).trim() || null),
-        columnCount: record.COLUMN_COUNT == null ? null : parseNumber(record.COLUMN_COUNT),
+        columnCount:
+          record.COLUMN_COUNT == null
+            ? (record.COL_3 == null ? null : parseNumber(record.COL_3))
+            : parseNumber(record.COLUMN_COUNT),
       }
     })
     .filter((item): item is SankhyaLiveTable => Boolean(item))
@@ -376,6 +423,17 @@ FROM TDDTAB
 ORDER BY NOMETAB
 `.trim()
 
+  const allColumnsSql = `
+SELECT
+  C.OWNER,
+  C.TABLE_NAME,
+  COUNT(*) AS COLUMN_COUNT
+FROM ALL_TAB_COLUMNS C
+WHERE C.OWNER NOT IN ('SYS', 'SYSTEM')
+GROUP BY C.OWNER, C.TABLE_NAME
+ORDER BY C.OWNER, C.TABLE_NAME
+`.trim()
+
   let rows: RawRow[] = []
   try {
     rows = await runSankhyaSql(baseUrl, headers, allTablesSql, { appKey: config.appKey ?? config.token ?? null })
@@ -386,7 +444,11 @@ ORDER BY NOMETAB
       try {
         rows = await runSankhyaSql(baseUrl, headers, tddtabSql, { appKey: config.appKey ?? config.token ?? null })
       } catch {
-        rows = await runSankhyaCrudDictionary(baseUrl, headers)
+        try {
+          rows = await runSankhyaSql(baseUrl, headers, allColumnsSql, { appKey: config.appKey ?? config.token ?? null })
+        } catch {
+          rows = await runSankhyaCrudDictionary(baseUrl, headers)
+        }
       }
     }
   }
