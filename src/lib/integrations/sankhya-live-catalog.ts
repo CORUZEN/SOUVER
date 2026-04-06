@@ -337,7 +337,10 @@ function mapRowsToTables(rows: RawRow[]) {
       const record = normalizeObjectKeys(row)
       const inferredOwner = String(record.OWNER ?? record.SCHEMA_OWNER ?? record.COL_1 ?? '').trim()
       const inferredTableName = String(record.TABLE_NAME ?? record.NOMETAB ?? record.COL_2 ?? '').trim()
-      const inferredDescription = record.DESCRTAB ?? record.COL_3
+      const rawCol3 = record.COL_3 == null ? null : String(record.COL_3).trim()
+      const looksLikeStatus = rawCol3 === 'VALID' || rawCol3 === 'INVALID'
+      const inferredDescription = record.DESCRTAB ?? (looksLikeStatus ? null : record.COL_3)
+      const inferredStatus = record.STATUS ?? (looksLikeStatus ? rawCol3 : null)
 
       const tableName = inferredTableName || String(record.COL_1 ?? '').trim()
       if (!tableName || tableName.startsWith('BIN$')) return null
@@ -347,7 +350,7 @@ function mapRowsToTables(rows: RawRow[]) {
         owner: inferredOwner || 'UNKNOWN',
         tableName,
         description: (inferredDescription == null ? null : String(inferredDescription).trim() || null),
-        status: (record.STATUS == null ? null : String(record.STATUS).trim() || null),
+        status: (inferredStatus == null ? null : String(inferredStatus).trim() || null),
         tablespace: (record.TABLESPACE_NAME == null ? null : String(record.TABLESPACE_NAME).trim() || null),
         columnCount:
           record.COLUMN_COUNT == null
@@ -378,14 +381,17 @@ export async function fetchSankhyaLiveCatalog(): Promise<SankhyaLiveCatalogPaylo
   const bearerToken = authMode === 'OAUTH2' ? await authenticateOAuth(config, baseUrl) : null
   const headers = buildSankhyaHeaders(config, bearerToken)
 
-  const allTablesSql = `
+const allTablesSql = `
 SELECT
   T.OWNER,
   T.TABLE_NAME,
+  DD.DESCRTAB,
   T.STATUS,
   T.TABLESPACE_NAME,
   NVL(C.COLUMN_COUNT, 0) AS COLUMN_COUNT
 FROM ALL_TABLES T
+LEFT JOIN TDDTAB DD
+  ON DD.NOMETAB = T.TABLE_NAME
 LEFT JOIN (
   SELECT OWNER, TABLE_NAME, COUNT(*) AS COLUMN_COUNT
   FROM ALL_TAB_COLUMNS
@@ -397,14 +403,17 @@ WHERE T.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
 ORDER BY T.TABLE_NAME
 `.trim()
 
-  const userTablesSql = `
+const userTablesSql = `
 SELECT
   USER AS OWNER,
   T.TABLE_NAME,
+  DD.DESCRTAB,
   T.STATUS,
   T.TABLESPACE_NAME,
   NVL(C.COLUMN_COUNT, 0) AS COLUMN_COUNT
 FROM USER_TABLES T
+LEFT JOIN TDDTAB DD
+  ON DD.NOMETAB = T.TABLE_NAME
 LEFT JOIN (
   SELECT TABLE_NAME, COUNT(*) AS COLUMN_COUNT
   FROM USER_TAB_COLUMNS
