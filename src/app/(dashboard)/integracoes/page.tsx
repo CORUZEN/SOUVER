@@ -113,9 +113,19 @@ function IntegrationModal({
   const [error, setError] = useState<string | null>(null)
   const [showSecret, setShowSecret] = useState(false)
   const [showLegacyPassword, setShowLegacyPassword] = useState(false)
+  const [clearUsername, setClearUsername] = useState(false)
+  const [clearPassword, setClearPassword] = useState(false)
+  const [clearToken, setClearToken] = useState(false)
+  const [clearClientSecret, setClearClientSecret] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => setForm(toForm(initial)), [initial])
+  useEffect(() => {
+    setForm(toForm(initial))
+    setClearUsername(false)
+    setClearPassword(false)
+    setClearToken(false)
+    setClearClientSecret(false)
+  }, [initial])
   useEffect(() => setMounted(true), [])
 
   useEffect(() => {
@@ -143,8 +153,8 @@ function IntegrationModal({
       return
     }
 
-    const hasStoredToken = Boolean(initial?.configSummary?.hasToken)
-    const hasStoredClientSecret = Boolean(initial?.configSummary?.hasClientSecret)
+    const hasStoredToken = Boolean(initial?.configSummary?.hasToken) && !clearToken
+    const hasStoredClientSecret = Boolean(initial?.configSummary?.hasClientSecret) && !clearClientSecret
     const hasToken = form.token.trim().length > 0 || (mode === 'edit' && hasStoredToken)
     const hasClientSecret = form.clientSecret.trim().length > 0 || (mode === 'edit' && hasStoredClientSecret)
 
@@ -156,9 +166,10 @@ function IntegrationModal({
     setSaving(true)
     const endpoint = mode === 'edit' && initial ? `/api/integrations/${initial.id}` : '/api/integrations'
     const method = mode === 'edit' ? 'PATCH' : 'POST'
+    const usernameValue = clearUsername ? null : form.username.trim() || null
     const configPayload: Record<string, string | null> = {
       companyCode: form.companyCode.trim() || null,
-      username: form.username.trim() || null,
+      username: usernameValue,
       clientId: form.clientId.trim() || null,
       authMode: 'OAUTH2',
     }
@@ -168,9 +179,14 @@ function IntegrationModal({
       configPayload.token = form.token.trim() || null
       configPayload.clientSecret = form.clientSecret.trim() || null
     } else {
-      if (form.password.trim().length > 0) configPayload.password = form.password.trim()
-      if (form.token.trim().length > 0) configPayload.token = form.token.trim()
-      if (form.clientSecret.trim().length > 0) configPayload.clientSecret = form.clientSecret.trim()
+      if (clearPassword) configPayload.password = null
+      else if (form.password.trim().length > 0) configPayload.password = form.password.trim()
+
+      if (clearToken) configPayload.token = null
+      else if (form.token.trim().length > 0) configPayload.token = form.token.trim()
+
+      if (clearClientSecret) configPayload.clientSecret = null
+      else if (form.clientSecret.trim().length > 0) configPayload.clientSecret = form.clientSecret.trim()
     }
 
     const payload = {
@@ -244,16 +260,41 @@ function IntegrationModal({
 
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                   Usuário (opcional)
-                  <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} placeholder="usuario.api" className="mt-1.5 w-full rounded-2xl border border-white/12 bg-white/6 px-3.5 py-2.5 text-sm placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <input value={form.username} onChange={(e) => { setClearUsername(false); setForm((p) => ({ ...p, username: e.target.value })) }} placeholder="usuario.api" className="w-full rounded-2xl border border-white/12 bg-white/6 px-3.5 py-2.5 text-sm placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+                    {mode === 'edit' && (
+                      <button
+                        type="button"
+                        onClick={() => { setClearUsername(true); setForm((p) => ({ ...p, username: '' })) }}
+                        className="rounded-lg border border-red-300/40 px-2.5 py-2 text-[11px] font-semibold text-red-200 hover:bg-red-500/10"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
                   <p className="mt-1 text-[11px] text-white/45">Usado como credencial secundária para login legado sem OAuth2.</p>
                 </label>
 
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                   Senha {mode === 'edit' ? '(vazio = manter)' : '(opcional)'}
-                  <div className="mt-1.5 flex items-center rounded-2xl border border-white/12 bg-white/6 px-2.5">
-                    <input type={showLegacyPassword ? 'text' : 'password'} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Senha da API" className="w-full bg-transparent px-1 py-2.5 text-sm placeholder:text-white/35 focus:outline-none" />
-                    <button type="button" onClick={() => setShowLegacyPassword((v) => !v)} className="rounded-md p-1.5 text-white/60 transition-colors hover:bg-white/8 hover:text-white">{showLegacyPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="flex w-full items-center rounded-2xl border border-white/12 bg-white/6 px-2.5">
+                      <input type={showLegacyPassword ? 'text' : 'password'} value={form.password} onChange={(e) => { setClearPassword(false); setForm((p) => ({ ...p, password: e.target.value })) }} placeholder="Senha da API" className="w-full bg-transparent px-1 py-2.5 text-sm placeholder:text-white/35 focus:outline-none" />
+                      <button type="button" onClick={() => setShowLegacyPassword((v) => !v)} className="rounded-md p-1.5 text-white/60 transition-colors hover:bg-white/8 hover:text-white">{showLegacyPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                    </div>
+                    {mode === 'edit' && (
+                      <button
+                        type="button"
+                        onClick={() => { setClearPassword(true); setForm((p) => ({ ...p, password: '' })) }}
+                        className="rounded-lg border border-red-300/40 px-2.5 py-2 text-[11px] font-semibold text-red-200 hover:bg-red-500/10"
+                      >
+                        Remover
+                      </button>
+                    )}
                   </div>
+                  {clearPassword && mode === 'edit' && (
+                    <p className="mt-1 text-[11px] text-amber-200">Senha sera removida ao salvar.</p>
+                  )}
                 </label>
               </section>
 
@@ -275,7 +316,24 @@ function IntegrationModal({
 
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                     Token de Integração (obrigatório)
-                    <input value={form.token} onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))} placeholder="X-Token (obrigatorio)" className="mt-1.5 w-full rounded-2xl border border-white/12 bg-white/6 px-3.5 py-2.5 text-sm placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-violet-400/50" />
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input value={form.token} onChange={(e) => { setClearToken(false); setForm((p) => ({ ...p, token: e.target.value })) }} placeholder={mode === 'edit' && initial?.configSummary?.hasToken ? '******** (ja configurado)' : 'X-Token (obrigatorio)'} className="w-full rounded-2xl border border-white/12 bg-white/6 px-3.5 py-2.5 text-sm placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-violet-400/50" />
+                      {mode === 'edit' && (
+                        <button
+                          type="button"
+                          onClick={() => { setClearToken(true); setForm((p) => ({ ...p, token: '' })) }}
+                          className="rounded-lg border border-red-300/40 px-2.5 py-2 text-[11px] font-semibold text-red-200 hover:bg-red-500/10"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    {mode === 'edit' && initial?.configSummary?.hasToken && !clearToken && (
+                      <p className="mt-1 text-[11px] text-emerald-200">Token salvo no sistema.</p>
+                    )}
+                    {clearToken && mode === 'edit' && (
+                      <p className="mt-1 text-[11px] text-amber-200">Token sera removido ao salvar.</p>
+                    )}
                   </label>
 
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
@@ -285,10 +343,27 @@ function IntegrationModal({
 
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                     Client Secret {mode === 'edit' ? '(vazio = manter)' : ''}
-                    <div className="mt-1.5 flex items-center rounded-2xl border border-white/12 bg-white/6 px-2.5">
-                      <input type={showSecret ? 'text' : 'password'} value={form.clientSecret} onChange={(e) => setForm((p) => ({ ...p, clientSecret: e.target.value }))} placeholder="client_secret (obrigatório)" className="w-full bg-transparent px-1 py-2.5 text-sm placeholder:text-white/35 focus:outline-none" />
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="flex w-full items-center rounded-2xl border border-white/12 bg-white/6 px-2.5">
+                      <input type={showSecret ? 'text' : 'password'} value={form.clientSecret} onChange={(e) => { setClearClientSecret(false); setForm((p) => ({ ...p, clientSecret: e.target.value })) }} placeholder={mode === 'edit' && initial?.configSummary?.hasClientSecret ? '******** (ja configurado)' : 'client_secret (obrigatorio)'} className="w-full bg-transparent px-1 py-2.5 text-sm placeholder:text-white/35 focus:outline-none" />
                       <button type="button" onClick={() => setShowSecret((v) => !v)} className="rounded-md p-1.5 text-white/60 transition-colors hover:bg-white/8 hover:text-white">{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                      </div>
+                      {mode === 'edit' && (
+                        <button
+                          type="button"
+                          onClick={() => { setClearClientSecret(true); setForm((p) => ({ ...p, clientSecret: '' })) }}
+                          className="rounded-lg border border-red-300/40 px-2.5 py-2 text-[11px] font-semibold text-red-200 hover:bg-red-500/10"
+                        >
+                          Remover
+                        </button>
+                      )}
                     </div>
+                    {mode === 'edit' && initial?.configSummary?.hasClientSecret && !clearClientSecret && (
+                      <p className="mt-1 text-[11px] text-emerald-200">Client secret salvo no sistema.</p>
+                    )}
+                    {clearClientSecret && mode === 'edit' && (
+                      <p className="mt-1 text-[11px] text-amber-200">Client secret sera removido ao salvar.</p>
+                    )}
                   </label>
 
                   <p className="text-xs leading-relaxed text-white/65">

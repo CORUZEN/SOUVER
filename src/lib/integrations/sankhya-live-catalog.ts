@@ -132,7 +132,23 @@ function buildSankhyaHeaders(config: SankhyaConfig, bearerToken: string | null):
     headers.AppKey = config.appKey
   }
   if (config.token) headers['X-Token'] = config.token
+  if (config.token) headers.token = config.token
   return headers
+}
+
+function getSankhyaSqlEndpoints(baseUrl: string, opts?: { appKey?: string | null; hasBearer?: boolean }) {
+  const appKeyParam = opts?.appKey ? `&appkey=${encodeURIComponent(opts.appKey)}` : ''
+  const query = `serviceName=DbExplorerSP.executeQuery&outputType=json${appKeyParam}`
+  const endpoints = [`${baseUrl}/mge/service.sbr?${query}`]
+
+  if (opts?.hasBearer) {
+    endpoints.push(`https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sankhya.com.br/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/mge/service.sbr?${query}`)
+  }
+
+  return [...new Set(endpoints)]
 }
 
 function extractServiceErrorMessage(payload: unknown): string | null {
@@ -145,8 +161,16 @@ function extractServiceErrorMessage(payload: unknown): string | null {
   return statusMessage || `Falha no serviço Sankhya (status ${status || 'desconhecido'}).`
 }
 
-async function runSankhyaSql(baseUrl: string, headers: Record<string, string>, sql: string): Promise<RawRow[]> {
-  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`
+async function runSankhyaSql(
+  baseUrl: string,
+  headers: Record<string, string>,
+  sql: string,
+  opts?: { appKey?: string | null }
+): Promise<RawRow[]> {
+  const endpoints = getSankhyaSqlEndpoints(baseUrl, {
+    appKey: opts?.appKey,
+    hasBearer: /^Bearer\s+/i.test(headers.Authorization ?? ''),
+  })
   const payloads: unknown[] = [
     {
       serviceName: 'DbExplorerSP.executeQuery',
@@ -163,30 +187,32 @@ async function runSankhyaSql(baseUrl: string, headers: Record<string, string>, s
 
   const failures: string[] = []
 
-  for (const payload of payloads) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(25_000),
-    })
+  for (const endpoint of endpoints) {
+    for (const payload of payloads) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(25_000),
+      })
 
-    const data = await response.json().catch(() => null)
-    if (!response.ok) {
-      failures.push(`HTTP ${response.status}`)
-      continue
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        failures.push(`${endpoint}: HTTP ${response.status}`)
+        continue
+      }
+
+      const serviceError = extractServiceErrorMessage(data)
+      if (serviceError) {
+        failures.push(`${endpoint}: ${serviceError}`)
+        continue
+      }
+
+      const rows = extractRows(data)
+      if (rows.length > 0) return rows
+
+      failures.push(`${endpoint}: resposta sem linhas`)
     }
-
-    const serviceError = extractServiceErrorMessage(data)
-    if (serviceError) {
-      failures.push(serviceError)
-      continue
-    }
-
-    const rows = extractRows(data)
-    if (rows.length > 0) return rows
-
-    failures.push('resposta sem linhas')
   }
 
   const normalized = failures.join(' | ') || 'sem detalhes'
@@ -352,13 +378,13 @@ ORDER BY NOMETAB
 
   let rows: RawRow[] = []
   try {
-    rows = await runSankhyaSql(baseUrl, headers, allTablesSql)
+    rows = await runSankhyaSql(baseUrl, headers, allTablesSql, { appKey: config.appKey ?? config.token ?? null })
   } catch {
     try {
-      rows = await runSankhyaSql(baseUrl, headers, userTablesSql)
+      rows = await runSankhyaSql(baseUrl, headers, userTablesSql, { appKey: config.appKey ?? config.token ?? null })
     } catch {
       try {
-        rows = await runSankhyaSql(baseUrl, headers, tddtabSql)
+        rows = await runSankhyaSql(baseUrl, headers, tddtabSql, { appKey: config.appKey ?? config.token ?? null })
       } catch {
         rows = await runSankhyaCrudDictionary(baseUrl, headers)
       }

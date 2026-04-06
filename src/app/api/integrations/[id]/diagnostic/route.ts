@@ -43,12 +43,7 @@ function extractBearerToken(payload: unknown): string | null {
 function extractGatewayCode(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
   const obj = payload as RawObject
-  const possible = [
-    obj.code,
-    obj.errorCode,
-    obj?.error && (obj.error as RawObject).code,
-    obj?.statusMessage,
-  ]
+  const possible = [obj.code, obj.errorCode, obj?.error && (obj.error as RawObject).code, obj?.statusMessage]
   for (const value of possible) {
     if (typeof value === 'string' && (value.startsWith('GTW') || value.startsWith('CORE_'))) return value
   }
@@ -107,12 +102,7 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string) {
       if (response.ok && bearer) {
         result.ok = true
         result.bearerToken = bearer
-        result.attempts.push({
-          authUrl,
-          ok: true,
-          httpStatus: response.status,
-          reason: 'access_token recebido',
-        })
+        result.attempts.push({ authUrl, ok: true, httpStatus: response.status, reason: 'access_token recebido' })
         result.message = `OAuth validado em ${authUrl}.`
         return result
       }
@@ -150,6 +140,7 @@ function buildProbeHeaders(config: SankhyaConfig, bearerToken: string | null): R
   }
 
   if (config.token) headers['X-Token'] = config.token
+  if (config.token) headers.token = config.token
   if (config.appKey) {
     headers.appkey = config.appKey
     headers.AppKey = config.appKey
@@ -157,35 +148,83 @@ function buildProbeHeaders(config: SankhyaConfig, bearerToken: string | null): R
   return headers
 }
 
-async function runSqlAuthorizationProbe(baseUrl: string, headers: Record<string, string>) {
-  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`
-  const sql = "SELECT 'OK' AS STATUS FROM DUAL"
-  const payload = {
-    serviceName: 'DbExplorerSP.executeQuery',
-    requestBody: { sql },
+function getSqlProbeEndpoints(
+  baseUrl: string,
+  opts?: { appKey?: string | null; hasBearer?: boolean }
+) {
+  const appKeyParam = opts?.appKey ? `&appkey=${encodeURIComponent(opts.appKey)}` : ''
+  const query = `serviceName=DbExplorerSP.executeQuery&outputType=json${appKeyParam}`
+  const endpoints = [`${baseUrl}/mge/service.sbr?${query}`]
+
+  // Compatibilidade PALETIN/OAuth: tenta tambem gateway fixo Sankhya.
+  if (opts?.hasBearer) {
+    endpoints.push(`https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sankhya.com.br/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/mge/service.sbr?${query}`)
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(15_000),
-  })
+  return [...new Set(endpoints)]
+}
 
-  const data = await response.json().catch(() => null)
-  const service = extractServiceStatus(data)
-  const unauthorizedMessage = `${service.status ?? ''} ${service.statusMessage ?? ''}`.toLowerCase()
-  const unauthorized =
-    unauthorizedMessage.includes('nao autorizado') ||
-    unauthorizedMessage.includes('não autorizado')
+async function runSqlAuthorizationProbe(
+  baseUrl: string,
+  headers: Record<string, string>,
+  opts?: { appKey?: string | null }
+) {
+  const endpoints = getSqlProbeEndpoints(baseUrl, {
+    appKey: opts?.appKey,
+    hasBearer: /^Bearer\s+/i.test(headers.Authorization ?? ''),
+  })
+  const sql = "SELECT 'OK' AS STATUS FROM DUAL"
+  const payload = { serviceName: 'DbExplorerSP.executeQuery', requestBody: { sql } }
+  const failures: string[] = []
+
+  for (const endpoint of endpoints) {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    const data = await response.json().catch(() => null)
+    const service = extractServiceStatus(data)
+    const unauthorizedMessage = `${service.status ?? ''} ${service.statusMessage ?? ''}`.toLowerCase()
+    const unauthorized =
+      unauthorizedMessage.includes('nao autorizado') || unauthorizedMessage.includes('não autorizado')
+
+    if (response.ok && !unauthorized && service.status !== '3') {
+      return {
+        ok: true,
+        httpStatus: response.status,
+        status: service.status,
+        statusMessage: service.statusMessage,
+        unauthorized: false,
+        endpoint,
+      }
+    }
+
+    failures.push(`${endpoint}: HTTP ${response.status} / ${service.statusMessage ?? 'sem mensagem'}`)
+    if (unauthorized) {
+      return {
+        ok: false,
+        httpStatus: response.status,
+        status: service.status,
+        statusMessage: service.statusMessage,
+        unauthorized: true,
+        endpoint,
+      }
+    }
+  }
 
   return {
-    ok: response.ok && !unauthorized && service.status !== '3',
-    httpStatus: response.status,
-    status: service.status,
-    statusMessage: service.statusMessage,
-    unauthorized,
-    endpoint,
+    ok: false,
+    httpStatus: null,
+    status: null,
+    statusMessage: failures.join(' | ') || 'Falha no probe SQL',
+    unauthorized: false,
+    endpoint: endpoints[0] ?? `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`,
   }
 }
 
@@ -201,7 +240,6 @@ function extractRequestContext(req: NextRequest) {
   }
 }
 
-// POST /api/integrations/[id]/diagnostic - valida host atual + OAuth + autorizacao SQL
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -232,6 +270,7 @@ export async function POST(
 
   const oauth = await authenticateOAuth(config, baseUrl)
   const headers = buildProbeHeaders(config, oauth.bearerToken)
+  const defaultEndpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`
 
   let sqlProbe:
     | Awaited<ReturnType<typeof runSqlAuthorizationProbe>>
@@ -241,12 +280,12 @@ export async function POST(
       httpStatus: null,
       status: null,
       statusMessage: 'Teste SQL nao executado.',
-      endpoint: `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`,
+      endpoint: defaultEndpoint,
     }
 
   if (oauth.ok || Boolean(config.username && config.password)) {
     try {
-      sqlProbe = await runSqlAuthorizationProbe(baseUrl, headers)
+      sqlProbe = await runSqlAuthorizationProbe(baseUrl, headers, { appKey: config.appKey ?? config.token ?? null })
     } catch (error) {
       sqlProbe = {
         ok: false,
@@ -254,7 +293,7 @@ export async function POST(
         httpStatus: null,
         status: null,
         statusMessage: error instanceof Error ? error.message : 'Falha ao executar teste SQL.',
-        endpoint: `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`,
+        endpoint: defaultEndpoint,
       }
     }
   }
@@ -281,6 +320,7 @@ export async function POST(
           oauthOk: oauth.ok,
           sqlOk: sqlProbe.ok,
           sqlUnauthorized: sqlProbe.unauthorized,
+          sqlEndpoint: sqlProbe.endpoint,
         },
       },
     },

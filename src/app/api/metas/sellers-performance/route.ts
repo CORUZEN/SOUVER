@@ -295,7 +295,28 @@ function buildSankhyaHeaders(config: SankhyaConfig, bearerToken: string | null):
     headers.AppKey = config.appKey
   }
   if (config.token) headers['X-Token'] = config.token
+  if (config.token) headers.token = config.token
   return headers
+}
+
+function getSankhyaQueryEndpoints(
+  baseUrl: string,
+  opts?: { appKey?: string | null; jsessionid?: string | null; hasBearer?: boolean }
+) {
+  const appKeyParam = opts?.appKey ? `&appkey=${encodeURIComponent(opts.appKey)}` : ''
+  const jsessionParam = opts?.jsessionid ? `&jsessionid=${encodeURIComponent(opts.jsessionid)}` : ''
+  const query = `serviceName=DbExplorerSP.executeQuery&outputType=json${jsessionParam}${appKeyParam}`
+  const endpoints = [`${baseUrl}/mge/service.sbr?${query}`]
+
+  // Compatibilidade PALETIN/OAuth: tenta tambem gateway fixo Sankhya.
+  if (opts?.hasBearer && !opts?.jsessionid) {
+    endpoints.push(`https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sankhya.com.br/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`)
+    endpoints.push(`https://api.sandbox.sankhya.com.br/mge/service.sbr?${query}`)
+  }
+
+  return [...new Set(endpoints)]
 }
 
 async function runSankhyaQuery(
@@ -304,9 +325,11 @@ async function runSankhyaQuery(
   sql: string,
   opts?: { jsessionid?: string | null; appKey?: string | null }
 ) {
-  const appKeyParam = opts?.appKey ? `&appkey=${encodeURIComponent(opts.appKey)}` : ''
-  const jsessionParam = opts?.jsessionid ? `&jsessionid=${encodeURIComponent(opts.jsessionid)}` : ''
-  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json${jsessionParam}${appKeyParam}`
+  const endpoints = getSankhyaQueryEndpoints(baseUrl, {
+    appKey: opts?.appKey,
+    jsessionid: opts?.jsessionid,
+    hasBearer: /^Bearer\s+/i.test(headers.Authorization ?? ''),
+  })
   const payloads: unknown[] = [
     {
       serviceName: 'DbExplorerSP.executeQuery',
@@ -323,29 +346,31 @@ async function runSankhyaQuery(
 
   const failures: string[] = []
 
-  for (const payload of payloads) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(18_000),
-    })
+  for (const endpoint of endpoints) {
+    for (const payload of payloads) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(18_000),
+      })
 
-    const data = await response.json().catch(() => null)
-    if (!response.ok) {
-      failures.push(`HTTP ${response.status}`)
-      continue
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        failures.push(`${endpoint}: HTTP ${response.status}`)
+        continue
+      }
+
+      const serviceError = extractServiceErrorMessage(data)
+      if (serviceError) {
+        failures.push(`${endpoint}: ${serviceError}`)
+        continue
+      }
+
+      const orders = extractOrders(data)
+      if (orders.length > 0) return orders
+      failures.push(`${endpoint}: resposta sem linhas de pedidos`)
     }
-
-    const serviceError = extractServiceErrorMessage(data)
-    if (serviceError) {
-      failures.push(serviceError)
-      continue
-    }
-
-    const orders = extractOrders(data)
-    if (orders.length > 0) return orders
-    failures.push('resposta sem linhas de pedidos')
   }
 
   const normalized = failures.join(' | ') || 'sem detalhes'
@@ -427,7 +452,7 @@ export async function GET(req: NextRequest) {
     let orders: SankhyaOrder[] = []
 
     try {
-      orders = await runSankhyaQuery(baseUrl, headers, sql)
+      orders = await runSankhyaQuery(baseUrl, headers, sql, { appKey: config.appKey ?? config.token ?? null })
     } catch (primaryError) {
       const message = primaryError instanceof Error ? primaryError.message : String(primaryError ?? '')
       if (!isUnauthorizedMessage(message) || !hasLegacyCredentials(config)) throw primaryError
