@@ -81,13 +81,6 @@ interface ProductAllowlistEntry {
 
 interface PerformanceDiagnostics {
   selectedMonthOrders: number
-  selectedMonthOrdersAllSellers: number
-  recentOrdersHint: {
-    lookbackStartDate: string
-    lookbackEndDateExclusive: string
-    totalOrders: number
-    lastOrderDate: string | null
-  } | null
 }
 
 interface RuleProgress {
@@ -475,8 +468,6 @@ export default function MetasWorkspace() {
         setPerformanceDiagnostics(
           (data?.diagnostics as PerformanceDiagnostics | undefined) ?? {
             selectedMonthOrders: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
-            selectedMonthOrdersAllSellers: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
-            recentOrdersHint: null,
           }
         )
       })
@@ -601,8 +592,6 @@ export default function MetasWorkspace() {
         setPerformanceDiagnostics(
           (perfData?.diagnostics as PerformanceDiagnostics | undefined) ?? {
             selectedMonthOrders: 0,
-            selectedMonthOrdersAllSellers: 0,
-            recentOrdersHint: null,
           }
         )
       }
@@ -1002,7 +991,7 @@ export default function MetasWorkspace() {
     !sellersLoading &&
     !sellersError &&
     corporateTotalOrders === 0 &&
-    (performanceDiagnostics?.recentOrdersHint?.totalOrders ?? 0) > 0
+    sellers.length > 0
   const filteredProductAllowlist = useMemo(() => {
     const codeFilter = productCodeFilter.trim().toUpperCase()
     const descriptionFilter = productDescriptionFilter.trim().toUpperCase()
@@ -1626,8 +1615,7 @@ export default function MetasWorkspace() {
               <p className="text-sm font-semibold text-amber-900">Sem pedidos no período selecionado</p>
               <p className="mt-1 text-xs text-amber-800">
                 No mês selecionado ({MONTHS[month]}/{year}) não houve pedidos para os vendedores da lista.
-                Nos últimos 90 dias foram encontrados {num(performanceDiagnostics?.recentOrdersHint?.totalOrders ?? 0, 0)} pedidos,
-                com último pedido em {formatDateBr(performanceDiagnostics?.recentOrdersHint?.lastOrderDate ?? null)}.
+                Verifique se os vendedores ativos possuem movimentações comerciais no período.
               </p>
             </Card>
           ) : null}
