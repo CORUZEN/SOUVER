@@ -3,7 +3,7 @@
     "code": "9",
     "description": "ALPISTE GRAO VERDE 20X500G",
     "brand": "RACAO PASSAROS",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -11,7 +11,7 @@
     "code": "9910",
     "description": "CAFE CRUZEIRO DO SUL 20X194G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -19,7 +19,15 @@
     "code": "4",
     "description": "CAFE CRUZEIRO DO SUL 20X250G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "10008",
+    "description": "CAFE GRAO VERDE EXTRA FORTE 20X250G",
+    "brand": "CAFES",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -27,7 +35,7 @@
     "code": "2",
     "description": "CAFE GRAO VERDE MOIDO 50X100G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -43,7 +51,7 @@
     "code": "6",
     "description": "CAFE OURO VERDE A VACUO 20X250G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -51,7 +59,7 @@
     "code": "8089",
     "description": "CAFE OURO VERDE A VACUO DESCAFEINADO 20X250G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -59,7 +67,7 @@
     "code": "1",
     "description": "CAFE OURO VERDE MOIDO 20X250G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -67,7 +75,7 @@
     "code": "5",
     "description": "CAFE OURO VERDE PREMIUM 20X250G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -75,7 +83,7 @@
     "code": "9932",
     "description": "CAFE OURO VERDE SOLUVEL 24X40G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "CX",
     "mobility": "SIM",
     "active": true
   },
@@ -83,7 +91,7 @@
     "code": "9933",
     "description": "CAFE OURO VERDE SOLUVEL DESCAFEINADO 24X40G",
     "brand": "CAFES",
-    "unit": "UN",
+    "unit": "CX",
     "mobility": "SIM",
     "active": true
   },
@@ -92,6 +100,14 @@
     "description": "COLORIFICO GRAO VERDE 100X100G",
     "brand": "COLORIFICOS/TEMPEROS",
     "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "2270",
+    "description": "COLORIFICO GRAO VERDE 10KG",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "UN",
     "mobility": "SIM",
     "active": true
   },
@@ -112,10 +128,26 @@
     "active": true
   },
   {
+    "code": "9997",
+    "description": "COLORIFICO GRAO VERDE SEM SAL 10KG",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "KG",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "9987",
+    "description": "COLORIFICO GRAO VERDE SEM SAL 20X500G",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
     "code": "623",
     "description": "FLOCAO DE MILHO GRAO VERDE 20X400G",
     "brand": "GRAOS",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -123,7 +155,7 @@
     "code": "5093",
     "description": "FLOCAO DE MILHO GRAO VERDE 20X500G",
     "brand": "GRAOS",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -131,7 +163,7 @@
     "code": "3585",
     "description": "FLOCAO DE MILHO MILHOTTO 20X400G",
     "brand": "GRAOS",
-    "unit": "UN",
+    "unit": "FD",
     "mobility": "SIM",
     "active": true
   },
@@ -139,6 +171,238 @@
     "code": "11",
     "description": "GIRASSOL MIUDO GRAO VERDE 10X500G",
     "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "9981",
+    "description": "MILHO COMUM 10X1KG",
+    "brand": "GRAOS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "7094",
+    "description": "MILHO PIPOCA GRAO VERDE 20X400G",
+    "brand": "GRAOS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "13",
+    "description": "MILHO PIPOCA GRAO VERDE 20X500G",
+    "brand": "GRAOS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "7252",
+    "description": "MUNGUNZA DE MILHO BRANCO GRAO VERDE 20X500G",
+    "brand": "GRAOS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "16",
+    "description": "MUNGUNZA DE MILHO GRAO VERDE 20X500G",
+    "brand": "GRAOS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "10",
+    "description": "PAINCO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "29",
+    "description": "RACAO 4 EM 1 GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "30",
+    "description": "RACAO CALOPSITA GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "17",
+    "description": "RACAO CANARIO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "20",
+    "description": "RACAO CARDEAL/GALO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "31",
+    "description": "RACAO CURIO BICUDO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "5502",
+    "description": "RACAO GRAO VERDE PREMIUM CAO ADULTO CARNE E VEGETAIS 10X900G",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "5501",
+    "description": "RACAO GRAO VERDE PREMIUM CAO ADULTO CARNE E VEGETAIS 14KG",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4316",
+    "description": "RACAO GRAO VERDE PREMIUM CAO ADULTO CARNE, FRANGO E BATATA 10X900G",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4347",
+    "description": "RACAO GRAO VERDE PREMIUM CAO ADULTO CARNE, FRANGO E BATATA 14KG",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4356",
+    "description": "RACAO GRAO VERDE PREMIUM CAO ADULTO CARNE, FRANGO E BATATA 24KG",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4312",
+    "description": "RACAO GRAO VERDE PREMIUM CAO FILHOTE CARNE, FIGADO E CEREAIS 10X900G",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4345",
+    "description": "RACAO GRAO VERDE PREMIUM CAO FILHOTE CARNE, FIGADO E CEREAIS 14KG",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4319",
+    "description": "RACAO GRAO VERDE PREMIUM CAT MIX CARNE, FRANGO E CEREAIS 10X900G",
+    "brand": "RACAO PET - GATO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4349",
+    "description": "RACAO GRAO VERDE PREMIUM CAT MIX CARNE, FRANGO E CEREAIS 14KG",
+    "brand": "RACAO PET - GATO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4360",
+    "description": "RACAO GRAO VERDE PREMIUM GATO CASTRADO SALMAO 10,1KG",
+    "brand": "RACAO PET - GATO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4337",
+    "description": "RACAO GRAO VERDE PREMIUM GATO CASTRADO SALMAO 10X900G",
+    "brand": "RACAO PET - GATO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "8474",
+    "description": "RACAO GRAO VERDE PREMIUM RACAS PEQUENA ADULTO FRANGO E FIGADO 10X900G",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "6808",
+    "description": "RACAO GRAO VERDE TRADICIONAL RACAS PEQUENAS ADULTO FRANGO 10,1KG",
+    "brand": "RACAO PET - CACHORRO",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "19",
+    "description": "RACAO PAPAGAIO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "18",
+    "description": "RACAO PERIQUITO GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "12",
+    "description": "RACAO TRITURADA C/DENDE GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "24",
+    "description": "TEMPERO MISTO GRAO VERDE 100X100G",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "15",
+    "description": "XEREM DE MILHO GRAO VERDE 20X500G",
+    "brand": "GRAOS",
     "unit": "FD",
     "mobility": "SIM",
     "active": true

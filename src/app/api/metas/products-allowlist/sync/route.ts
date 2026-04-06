@@ -329,18 +329,72 @@ function parseProducts(
 
 async function queryProducts(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   const failures: string[] = []
-  const unitCandidates = ['CODVOL', 'UNIDPADRAO', 'UNDPADRAO', 'UNIDADEPADRAO', 'CODVOLPADRAO', 'CODVOLVEND']
-  const mobilityCandidates = ['AD_MOBILIDADE', 'AD_MOBILIDA', 'MOBILIDADE', 'MOBILIDA']
-  const groupCodeCandidates = ['CODGRUPOPROD', 'CODGRUPO', 'CODGRUPOPRO', 'CODGRUPPROD']
 
+  // Mobility column candidates — only one will exist in the target database
+  const mobilityCandidates = ['AD_MOBILIDADE', 'AD_MOBILIDA', 'MOBILIDADE', 'MOBILIDA']
+  // Brand column candidates
+  const brandCandidates = ['MARCA', 'AD_MARCA']
+  // Unit column candidates
+  const unitCandidates = ['CODVOL', 'UNIDPADRAO', 'UNDPADRAO', 'UNIDADEPADRAO', 'CODVOLPADRAO']
+
+  // --- Strategy: single combined query filtered by mobility in SQL -------
+  // This avoids the 5000-row API limit by bringing back only eligible rows.
+  for (const mobCol of mobilityCandidates) {
+    for (const brandCol of brandCandidates) {
+      for (const unitCol of unitCandidates) {
+        const sql = `
+SELECT
+  TO_CHAR(P.CODPROD) AS CODIGO,
+  TRIM(P.DESCRPROD) AS DESCRICAO,
+  TRIM(P.${brandCol}) AS MARCA,
+  UPPER(TRIM(TO_CHAR(P.${unitCol}))) AS UNIDADE,
+  UPPER(TRIM(TO_CHAR(P.${mobCol}))) AS MOBILIDADE
+FROM TGFPRO P
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
+  AND UPPER(TRIM(TO_CHAR(P.${mobCol}))) IN ('SIM', 'S', '1', 'Y')
+ORDER BY TRIM(P.DESCRPROD)`.trim()
+
+        try {
+          const records = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+          if (records.length === 0) continue
+
+          const dedup = new Map<string, ProductRow>()
+          for (const raw of records) {
+            const row: RawRecord = {}
+            for (const [key, value] of Object.entries(raw)) row[key.toUpperCase()] = value
+
+            const code = String(row.CODIGO ?? row.COL_1 ?? '').trim()
+            const description = String(row.DESCRICAO ?? row.COL_2 ?? '').trim()
+            const brandRaw = String(row.MARCA ?? row.COL_3 ?? '').trim()
+            const brand = normalizeBrand(brandRaw || inferBrandFromDescription(description))
+            const unit = String(row.UNIDADE ?? row.COL_4 ?? '').trim().toUpperCase() || 'UN'
+
+            if (!code || !description) continue
+            if (!isAllowedProductBrand(brand)) continue
+
+            const key = `${code}|${description.toUpperCase()}|${brand}|${unit}`
+            if (!dedup.has(key)) {
+              dedup.set(key, { code, description, brand, unit, mobility: 'SIM' })
+            }
+          }
+
+          const products = [...dedup.values()].sort((a, b) => a.description.localeCompare(b.description))
+          if (products.length > 0) return products
+        } catch {
+          // column combination invalid, try next
+        }
+      }
+    }
+  }
+
+  // --- Fallback: separate queries (legacy) when combined query fails -----
   const productSql = `
 SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   TRIM(P.DESCRPROD) AS DESCRICAO
 FROM TGFPRO P
 WHERE TRIM(P.DESCRPROD) IS NOT NULL
-ORDER BY TRIM(P.DESCRPROD)
-`.trim()
+ORDER BY TRIM(P.DESCRPROD)`.trim()
 
   let productRecords: RawRecord[] = []
   try {
@@ -355,7 +409,6 @@ ORDER BY TRIM(P.DESCRPROD)
     )
   }
 
-  const groupBrandByCode = new Map<string, string>()
   const brandByProductCode = new Map<string, string>()
   const unitByProductCode = new Map<string, string>()
   const mobilityByProductCode = new Map<string, 'SIM' | 'NAO'>()
@@ -367,8 +420,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   UPPER(TRIM(TO_CHAR(P.${unitColumn}))) AS UNIDADE
 FROM TGFPRO P
-WHERE TRIM(P.DESCRPROD) IS NOT NULL
-`.trim()
+WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
     try {
       const rows = await queryRows(baseUrl, headers, unitSql, appKey, { allowEmpty: true })
       for (const row of rows) {
@@ -383,14 +435,13 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL
     }
   }
 
-  for (const brandProductColumn of ['MARCA', 'AD_MARCA']) {
+  for (const brandProductColumn of brandCandidates) {
     const brandSql = `
 SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   P.${brandProductColumn} AS MARCA
 FROM TGFPRO P
-WHERE TRIM(P.DESCRPROD) IS NOT NULL
-`.trim()
+WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
     try {
       const brandRows = await queryRows(baseUrl, headers, brandSql, appKey, { allowEmpty: true })
       for (const raw of brandRows) {
@@ -405,78 +456,13 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL
     }
   }
 
-  let groupCodeColumnFound: string | null = null
-  for (const groupCodeColumn of groupCodeCandidates) {
-    const groupRefSql = `
-SELECT
-  TO_CHAR(P.CODPROD) AS CODIGO,
-  TO_CHAR(P.${groupCodeColumn}) AS CODGRUPO_REF
-FROM TGFPRO P
-WHERE TRIM(P.DESCRPROD) IS NOT NULL
-`.trim()
-    try {
-      const rows = await queryRows(baseUrl, headers, groupRefSql, appKey, { allowEmpty: true })
-      for (const row of rows) {
-        const code = String(row.CODIGO ?? row.COL_1 ?? '').trim()
-        const grp = String(row.CODGRUPO_REF ?? row.COL_2 ?? '').trim()
-        if (!code || !grp) continue
-        groupBrandByCode.set(`__PRODUCT__${code}`, grp)
-      }
-      groupCodeColumnFound = groupCodeColumn
-      break
-    } catch {
-      // tenta próxima coluna
-    }
-  }
-
-  if (groupCodeColumnFound) {
-    const groupDescByCode = new Map<string, string>()
-    for (const groupDescColumn of ['DESCRGRUPOPROD', 'DESCRGRUPOPRODUTO', 'DESCRGRUPO', 'DESCRICAO']) {
-      const groupSql = `
-SELECT
-  TO_CHAR(G.${groupCodeColumnFound}) AS CODGRUPO_REF,
-  TRIM(G.${groupDescColumn}) AS MARCA
-FROM TGFGRU G
-WHERE TRIM(G.${groupDescColumn}) IS NOT NULL
-`.trim()
-      try {
-        const groupRows = await queryRows(baseUrl, headers, groupSql, appKey, { allowEmpty: true })
-        for (const raw of groupRows) {
-          const code = String(raw.CODGRUPO_REF ?? raw.COL_1 ?? '').trim()
-          const brand = String(raw.MARCA ?? raw.COL_2 ?? '').trim()
-          if (!code || !brand) continue
-          groupDescByCode.set(code, brand)
-        }
-        if (groupDescByCode.size > 0) break
-      } catch {
-        // tenta proxima coluna candidata
-      }
-    }
-
-    if (groupDescByCode.size > 0) {
-      for (const [k, v] of groupBrandByCode.entries()) {
-        if (!k.startsWith('__PRODUCT__')) continue
-        const prodCode = k.replace('__PRODUCT__', '')
-        const grpCode = v
-        const grpDesc = groupDescByCode.get(grpCode)
-        if (grpDesc) groupBrandByCode.set(prodCode, grpDesc)
-      }
-      for (const key of [...groupBrandByCode.keys()]) {
-        if (key.startsWith('__PRODUCT__')) groupBrandByCode.delete(key)
-      }
-    } else {
-      groupBrandByCode.clear()
-    }
-  }
-
   for (const mobilityColumn of mobilityCandidates) {
     const mobilitySql = `
 SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   UPPER(TRIM(TO_CHAR(P.${mobilityColumn}))) AS MOBILIDADE
 FROM TGFPRO P
-WHERE TRIM(P.DESCRPROD) IS NOT NULL
-`.trim()
+WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
     try {
       const rows = await queryRows(baseUrl, headers, mobilitySql, appKey, { allowEmpty: true })
       mobilityColumnFound = true
@@ -496,6 +482,7 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL
     }
   }
 
+  const groupBrandByCode = new Map<string, string>()
   const parsed = parseProducts(productRecords, groupBrandByCode, brandByProductCode, unitByProductCode, mobilityByProductCode, mobilityColumnFound)
   if (parsed.length === 0) {
     throw new Error(
