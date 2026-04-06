@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Boxes,
   CalendarDays,
   CircleDollarSign,
   Plus,
@@ -49,6 +50,7 @@ interface SellerOrder {
   orderNumber: string
   negotiatedAt: string
   totalValue: number
+  grossWeight: number
 }
 
 interface Salesperson {
@@ -57,6 +59,7 @@ interface Salesperson {
   login: string
   orders: SellerOrder[]
   totalValue: number
+  totalGrossWeight: number
   totalOrders: number
 }
 
@@ -65,6 +68,26 @@ interface SellerAllowlistEntry {
   partnerCode: string | null
   name: string
   active: boolean
+}
+
+interface ProductAllowlistEntry {
+  code: string
+  description: string
+  brand: string
+  unit: string
+  mobility: 'SIM' | 'NAO'
+  active: boolean
+}
+
+interface PerformanceDiagnostics {
+  selectedMonthOrders: number
+  selectedMonthOrdersAllSellers: number
+  recentOrdersHint: {
+    lookbackStartDate: string
+    lookbackEndDateExclusive: string
+    totalOrders: number
+    lastOrderDate: string | null
+  } | null
 }
 
 interface RuleProgress {
@@ -76,6 +99,7 @@ interface SellerSnapshot {
   seller: Salesperson
   totalOrders: number
   totalValue: number
+  totalGrossWeight: number
   averageTicket: number
   pointsAchieved: number
   pointsTarget: number
@@ -324,7 +348,7 @@ function hasMonthEnded(year: number, month: number) {
 
 export default function MetasWorkspace() {
   const now = new Date()
-  const [view, setView] = useState<'dashboard' | 'config' | 'sellers'>('dashboard')
+  const [view, setView] = useState<'dashboard' | 'config' | 'sellers' | 'products'>('dashboard')
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
   const [includeNational, setIncludeNational] = useState(true)
@@ -340,12 +364,22 @@ export default function MetasWorkspace() {
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
+  const [performanceDiagnostics, setPerformanceDiagnostics] = useState<PerformanceDiagnostics | null>(null)
   const [allowlist, setAllowlist] = useState<SellerAllowlistEntry[]>([])
   const [allowlistLoading, setAllowlistLoading] = useState(false)
   const [allowlistSaving, setAllowlistSaving] = useState(false)
   const [allowlistSyncing, setAllowlistSyncing] = useState(false)
   const [allowlistError, setAllowlistError] = useState('')
   const [allowlistSuccess, setAllowlistSuccess] = useState('')
+  const [productAllowlist, setProductAllowlist] = useState<ProductAllowlistEntry[]>([])
+  const [productAllowlistLoading, setProductAllowlistLoading] = useState(false)
+  const [productAllowlistSaving, setProductAllowlistSaving] = useState(false)
+  const [productAllowlistSyncing, setProductAllowlistSyncing] = useState(false)
+  const [productAllowlistError, setProductAllowlistError] = useState('')
+  const [productAllowlistSuccess, setProductAllowlistSuccess] = useState('')
+  const [productCodeFilter, setProductCodeFilter] = useState('')
+  const [productDescriptionFilter, setProductDescriptionFilter] = useState('')
+  const [productBrandFilter, setProductBrandFilter] = useState('')
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -411,8 +445,9 @@ export default function MetasWorkspace() {
           name: string
           login: string
           totalValue?: number
+          totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number }>
         }>
 
         const mapped = remoteSellers.map((seller) => {
@@ -422,6 +457,7 @@ export default function MetasWorkspace() {
               orderNumber: String(order.orderNumber ?? ''),
               negotiatedAt: String(order.negotiatedAt).slice(0, 10),
               totalValue: Number(order.totalValue ?? 0),
+              grossWeight: Number(order.grossWeight ?? 0),
             }))
 
           return {
@@ -429,16 +465,25 @@ export default function MetasWorkspace() {
             name: seller.name,
             login: seller.login,
             totalValue: Number(seller.totalValue ?? 0),
+            totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
             totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
             orders: normalizedOrders,
           }
         })
 
         setSellers(mapped)
+        setPerformanceDiagnostics(
+          (data?.diagnostics as PerformanceDiagnostics | undefined) ?? {
+            selectedMonthOrders: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
+            selectedMonthOrdersAllSellers: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
+            recentOrdersHint: null,
+          }
+        )
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         setSellers([])
+        setPerformanceDiagnostics(null)
         setSellersError(error instanceof Error ? error.message : 'Falha ao carregar dados de vendedores.')
       })
       .finally(() => {
@@ -480,6 +525,11 @@ export default function MetasWorkspace() {
   useEffect(() => {
     if (view !== 'sellers') return
     void loadAllowlist()
+  }, [view])
+
+  useEffect(() => {
+    if (view !== 'products') return
+    void loadProductAllowlist()
   }, [view])
 
   async function saveAllowlist() {
@@ -526,8 +576,9 @@ export default function MetasWorkspace() {
           name: string
           login: string
           totalValue?: number
+          totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number }>
         }>
         setSellers(
           remoteSellers.map((seller) => ({
@@ -535,6 +586,7 @@ export default function MetasWorkspace() {
             name: seller.name,
             login: seller.login,
             totalValue: Number(seller.totalValue ?? 0),
+            totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
             totalOrders: Number(seller.totalOrders ?? (seller.orders ?? []).length),
             orders: (seller.orders ?? [])
               .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
@@ -542,8 +594,16 @@ export default function MetasWorkspace() {
                 orderNumber: String(order.orderNumber ?? ''),
                 negotiatedAt: String(order.negotiatedAt).slice(0, 10),
                 totalValue: Number(order.totalValue ?? 0),
+                grossWeight: Number(order.grossWeight ?? 0),
               })),
           }))
+        )
+        setPerformanceDiagnostics(
+          (perfData?.diagnostics as PerformanceDiagnostics | undefined) ?? {
+            selectedMonthOrders: 0,
+            selectedMonthOrdersAllSellers: 0,
+            recentOrdersHint: null,
+          }
         )
       }
       setSellersLoading(false)
@@ -586,6 +646,119 @@ export default function MetasWorkspace() {
       setAllowlistError(error instanceof Error ? error.message : 'Falha ao sincronizar vendedores do Sankhya.')
     } finally {
       setAllowlistSyncing(false)
+    }
+  }
+
+  async function loadProductAllowlist() {
+    setProductAllowlistLoading(true)
+    setProductAllowlistError('')
+    setProductAllowlistSuccess('')
+
+    try {
+      const response = await fetch('/api/metas/products-allowlist')
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar produtos da meta.')
+      }
+
+      const list = Array.isArray(payload?.products) ? payload.products : []
+      setProductAllowlist(
+        list.map((item: Record<string, unknown>) => ({
+          code: String(item.code ?? ''),
+          description: String(item.description ?? ''),
+          brand: String(item.brand ?? ''),
+          unit: String(item.unit ?? ''),
+          mobility: String(item.mobility ?? '').toUpperCase() === 'SIM' ? 'SIM' : 'NAO',
+          active: Boolean(item.active),
+        }))
+      )
+    } catch (error) {
+      setProductAllowlistError(error instanceof Error ? error.message : 'Falha ao carregar produtos da meta.')
+      setProductAllowlist([])
+    } finally {
+      setProductAllowlistLoading(false)
+    }
+  }
+
+  async function saveProductAllowlist() {
+    setProductAllowlistSaving(true)
+    setProductAllowlistError('')
+    setProductAllowlistSuccess('')
+
+    const payload = {
+      products: productAllowlist.map((product) => ({
+        code: String(product.code ?? '').trim(),
+        description: String(product.description ?? '').trim(),
+        brand: String(product.brand ?? '').trim(),
+        unit: String(product.unit ?? '').trim().toUpperCase(),
+        mobility: product.mobility === 'SIM' ? 'SIM' : 'NAO',
+        active: product.active,
+      })),
+    }
+
+    try {
+      const response = await fetch('/api/metas/products-allowlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof data?.message === 'string' ? data.message : 'Falha ao salvar produtos da meta.')
+      }
+
+      const list = Array.isArray(data?.products) ? data.products : []
+      setProductAllowlist(
+        list.map((item: Record<string, unknown>) => ({
+          code: String(item.code ?? ''),
+          description: String(item.description ?? ''),
+          brand: String(item.brand ?? ''),
+          unit: String(item.unit ?? ''),
+          mobility: String(item.mobility ?? '').toUpperCase() === 'SIM' ? 'SIM' : 'NAO',
+          active: Boolean(item.active),
+        }))
+      )
+      setProductAllowlistSuccess('Lista de produtos da meta atualizada.')
+    } catch (error) {
+      setProductAllowlistError(error instanceof Error ? error.message : 'Falha ao salvar produtos da meta.')
+    } finally {
+      setProductAllowlistSaving(false)
+    }
+  }
+
+  async function syncProductAllowlistFromSankhya() {
+    setProductAllowlistSyncing(true)
+    setProductAllowlistError('')
+    setProductAllowlistSuccess('')
+
+    try {
+      const response = await fetch('/api/metas/products-allowlist/sync', { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof data?.message === 'string' ? data.message : 'Falha ao sincronizar produtos do Sankhya.')
+      }
+
+      const list = Array.isArray(data?.products) ? data.products : []
+      setProductAllowlist(
+        list.map((item: Record<string, unknown>) => ({
+          code: String(item.code ?? ''),
+          description: String(item.description ?? ''),
+          brand: String(item.brand ?? ''),
+          unit: String(item.unit ?? ''),
+          mobility: String(item.mobility ?? '').toUpperCase() === 'SIM' ? 'SIM' : 'NAO',
+          active: Boolean(item.active),
+        }))
+      )
+      const imported = Number(data?.imported ?? 0)
+      setProductAllowlistSuccess(
+        imported > 0
+          ? `Sincronizacao concluida: ${imported} produtos importados do Sankhya.`
+          : 'Sincronizacao concluida, sem produtos novos.'
+      )
+    } catch (error) {
+      setProductAllowlistError(error instanceof Error ? error.message : 'Falha ao sincronizar produtos do Sankhya.')
+    } finally {
+      setProductAllowlistSyncing(false)
     }
   }
 
@@ -682,6 +855,7 @@ export default function MetasWorkspace() {
           seller,
           totalOrders: seller.totalOrders,
           totalValue: seller.totalValue,
+          totalGrossWeight: seller.totalGrossWeight,
           averageTicket,
           pointsAchieved,
           pointsTarget,
@@ -733,6 +907,40 @@ export default function MetasWorkspace() {
   const factoryGoalRatio = snapshots.length > 0 ? onTargetCount / snapshots.length : 0
   const factoryGoalMet = snapshots.length > 0 && onTargetCount === snapshots.length
   const factoryGap = Math.max(snapshots.length - onTargetCount, 0)
+  const corporateTotalOrders = useMemo(
+    () => snapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0),
+    [snapshots]
+  )
+  const corporateTotalGrossWeight = useMemo(
+    () => snapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0),
+    [snapshots]
+  )
+  const corporateTotalRevenue = useMemo(
+    () => snapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0),
+    [snapshots]
+  )
+  const corporateAverageTicket = useMemo(
+    () => (corporateTotalOrders > 0 ? corporateTotalRevenue / corporateTotalOrders : 0),
+    [corporateTotalOrders, corporateTotalRevenue]
+  )
+  const showPeriodHint =
+    !sellersLoading &&
+    !sellersError &&
+    corporateTotalOrders === 0 &&
+    (performanceDiagnostics?.recentOrdersHint?.totalOrders ?? 0) > 0
+  const filteredProductAllowlist = useMemo(() => {
+    const codeFilter = productCodeFilter.trim().toUpperCase()
+    const descriptionFilter = productDescriptionFilter.trim().toUpperCase()
+    const brandFilter = productBrandFilter.trim().toUpperCase()
+
+    return productAllowlist.filter((product) => {
+      const codeOk = codeFilter.length === 0 || product.code.toUpperCase().includes(codeFilter)
+      const descriptionOk =
+        descriptionFilter.length === 0 || product.description.toUpperCase().includes(descriptionFilter)
+      const brandOk = brandFilter.length === 0 || product.brand.toUpperCase().includes(brandFilter)
+      return codeOk && descriptionOk && brandOk
+    })
+  }, [productAllowlist, productCodeFilter, productDescriptionFilter, productBrandFilter])
 
   const statusSeries = useMemo(
     () => [
@@ -938,6 +1146,14 @@ export default function MetasWorkspace() {
             >
               <Users size={14} />
               {view === 'sellers' ? 'Voltar para dashboard' : 'Vendedores da meta'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView((current) => (current === 'products' ? 'dashboard' : 'products'))}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+            >
+              <Boxes size={14} />
+              {view === 'products' ? 'Voltar para dashboard' : 'Produtos da meta'}
             </button>
           </div>
         </div>
@@ -1158,6 +1374,225 @@ export default function MetasWorkspace() {
             )}
           </Card>
         </>
+      ) : view === 'products' ? (
+        <>
+          <Card className="border-surface-200">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Configuração específica</p>
+                <h2 className="text-base font-semibold text-surface-900">Produtos considerados no painel de metas</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={syncProductAllowlistFromSankhya}
+                  disabled={productAllowlistSyncing}
+                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  {productAllowlistSyncing ? 'Sincronizando...' : 'Sincronizar Sankhya'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProductAllowlist((prev) => [
+                      ...prev,
+                      { code: '', description: '', brand: 'CAFES', unit: 'UN', mobility: 'SIM', active: true },
+                    ])
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+                >
+                  <Plus size={12} /> Adicionar produto
+                </button>
+                <button
+                  type="button"
+                  onClick={saveProductAllowlist}
+                  disabled={productAllowlistSaving}
+                  className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+                >
+                  {productAllowlistSaving ? 'Salvando...' : 'Salvar lista'}
+                </button>
+              </div>
+            </div>
+
+            {productAllowlistLoading ? (
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">Carregando produtos da meta...</div>
+            ) : (
+              <div className="space-y-3">
+                {productAllowlistError ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{productAllowlistError}</div>
+                ) : null}
+                {productAllowlistSuccess ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{productAllowlistSuccess}</div>
+                ) : null}
+
+                <div className="grid gap-2 md:grid-cols-3">
+                  <label className={label}>
+                    Filtro por código
+                    <input
+                      className={input}
+                      value={productCodeFilter}
+                      onChange={(event) => setProductCodeFilter(event.target.value)}
+                      placeholder="Ex.: 910"
+                    />
+                  </label>
+                  <label className={label}>
+                    Filtro por descrição
+                    <input
+                      className={input}
+                      value={productDescriptionFilter}
+                      onChange={(event) => setProductDescriptionFilter(event.target.value)}
+                      placeholder="Ex.: CAFE"
+                    />
+                  </label>
+                  <label className={label}>
+                    Filtro por marca/categoria
+                    <input
+                      className={input}
+                      value={productBrandFilter}
+                      onChange={(event) => setProductBrandFilter(event.target.value)}
+                      placeholder="Ex.: GRAOS"
+                    />
+                  </label>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-surface-200 text-sm">
+                    <thead>
+                      <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                        <th className="px-3 py-2">Ativo</th>
+                        <th className="px-3 py-2">Código</th>
+                        <th className="px-3 py-2">Descrição</th>
+                        <th className="px-3 py-2">Marca</th>
+                        <th className="px-3 py-2">Unidade padrão</th>
+                        <th className="px-3 py-2">Mobilidade</th>
+                        <th className="px-3 py-2">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-100">
+                      {filteredProductAllowlist.map((product, index) => (
+                        <tr key={`product-allow-${product.code}-${index}`}>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary-600"
+                              checked={product.active}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, active: event.target.checked }
+                                      : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={product.code}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, code: event.target.value }
+                                      : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={product.description}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, description: event.target.value }
+                                      : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={product.brand}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, brand: event.target.value }
+                                      : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={product.unit}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, unit: event.target.value.toUpperCase() }
+                                      : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={product.mobility}
+                              onChange={(event) =>
+                                setProductAllowlist((prev) =>
+                                  prev.map((item) =>
+                                    item.code === product.code && item.description === product.description
+                                      ? { ...item, mobility: event.target.value === 'SIM' ? 'SIM' : 'NAO' }
+                                      : item
+                                  )
+                                )
+                              }
+                            >
+                              <option value="SIM">SIM</option>
+                              <option value="NAO">NAO</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProductAllowlist((prev) =>
+                                  prev.filter(
+                                    (item) => !(item.code === product.code && item.description === product.description)
+                                  )
+                                )
+                              }
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                            >
+                              Remover
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-xs text-surface-500">
+                  Filtros corporativos aplicados na sincronização: Mobilidade = SIM, e marcas permitidas: CAFÉS, COLORÍFICOS/TEMPEROS, GRÃOS, RAÇÃO PASSAROS, RAÇÃO PET - CACHORRO e RAÇÃO PET - GATO.
+                </p>
+              </div>
+            )}
+          </Card>
+        </>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
@@ -1189,6 +1624,47 @@ export default function MetasWorkspace() {
               <p className="mt-2 text-xs text-surface-500">Vendedores que exigem acompanhamento</p>
             </Card>
           </div>
+
+          <div className="mt-1 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Pedidos no mês</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalOrders, 0)}</p>
+              <p className="mt-2 text-xs text-surface-500">Consolidado empresarial dos vendedores monitorados</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Peso bruto total</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalGrossWeight, 2)} kg</p>
+              <p className="mt-2 text-xs text-surface-500">Soma do peso bruto dos pedidos no período</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Faturamento total</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(corporateTotalRevenue)}</p>
+              <p className="mt-2 text-xs text-surface-500">Valor total dos pedidos no mês selecionado</p>
+            </Card>
+
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-violet-500" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Ticket médio</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(corporateAverageTicket)}</p>
+              <p className="mt-2 text-xs text-surface-500">Faturamento médio por pedido consolidado</p>
+            </Card>
+          </div>
+
+          {showPeriodHint ? (
+            <Card className="border-amber-200 bg-amber-50">
+              <p className="text-sm font-semibold text-amber-900">Sem pedidos no período selecionado</p>
+              <p className="mt-1 text-xs text-amber-800">
+                No mês selecionado ({MONTHS[month]}/{year}) não houve pedidos para os vendedores da lista.
+                Nos últimos 90 dias foram encontrados {num(performanceDiagnostics?.recentOrdersHint?.totalOrders ?? 0, 0)} pedidos,
+                com último pedido em {formatDateBr(performanceDiagnostics?.recentOrdersHint?.lastOrderDate ?? null)}.
+              </p>
+            </Card>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className={executivePanelCardClass}>
@@ -1504,6 +1980,7 @@ export default function MetasWorkspace() {
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(selectedSeller.totalOrders, 0)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Faturamento no mês:</span> {currency(selectedSeller.totalValue)}</div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Peso bruto no mês:</span> {num(selectedSeller.totalGrossWeight, 2)} kg</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(selectedSeller.rewardAchieved)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>

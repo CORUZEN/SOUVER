@@ -109,52 +109,77 @@ function extractServiceError(payload: unknown): string | null {
   return statusMessage || `Falha no servico Sankhya (status ${status || 'desconhecido'}).`
 }
 
-function parseRows(payload: unknown): SellerRow[] {
-  if (!payload || typeof payload !== 'object') return []
+function collectRecords(payload: unknown, bucket: RawRecord[]) {
+  if (!payload || typeof payload !== 'object') return
   const obj = payload as RawRecord
+
   const responseBody = obj.responseBody
-  if (!responseBody || typeof responseBody !== 'object') return []
+  if (responseBody && typeof responseBody === 'object') {
+    const body = responseBody as RawRecord
+    const rowsRaw = body.rows
+    const fieldsRaw = Array.isArray(body.fields) ? body.fields : []
 
-  const body = responseBody as RawRecord
-  const rowsRaw = body.rows
-  if (!Array.isArray(rowsRaw) || rowsRaw.length === 0) return []
+    if (Array.isArray(rowsRaw) && rowsRaw.length > 0) {
+      const row0 = rowsRaw[0]
+      if (row0 && typeof row0 === 'object' && !Array.isArray(row0)) {
+        for (const row of rowsRaw) {
+          if (row && typeof row === 'object' && !Array.isArray(row)) {
+            const normalized: RawRecord = {}
+            for (const [key, value] of Object.entries(row as RawRecord)) normalized[key.toUpperCase()] = value
+            bucket.push(normalized)
+          }
+        }
+      } else if (Array.isArray(row0)) {
+        const fields = fieldsRaw.map((field, index) => {
+          if (typeof field === 'string') return field.toUpperCase()
+          if (field && typeof field === 'object') {
+            const f = field as RawRecord
+            return String(f.name ?? f.fieldName ?? f.FIELD_NAME ?? `COL_${index + 1}`).toUpperCase()
+          }
+          return `COL_${index + 1}`
+        })
 
-  const fieldsRaw = Array.isArray(body.fields) ? body.fields : []
-  const fields = fieldsRaw.map((field, index) => {
-    if (typeof field === 'string') return field.toUpperCase()
-    if (field && typeof field === 'object') {
-      const f = field as RawRecord
-      return String(f.name ?? f.fieldName ?? f.FIELD_NAME ?? `COL_${index + 1}`).toUpperCase()
+        for (const row of rowsRaw) {
+          if (!Array.isArray(row)) continue
+          const mapped: RawRecord = {}
+          for (let i = 0; i < row.length; i += 1) {
+            mapped[fields[i] ?? `COL_${i + 1}`] = row[i]
+          }
+          bucket.push(mapped)
+        }
+      }
     }
-    return `COL_${index + 1}`
-  })
-
-  const sellers: SellerRow[] = []
-  for (const row of rowsRaw) {
-    if (!Array.isArray(row)) continue
-
-    const mapped: RawRecord = {}
-    for (let i = 0; i < row.length; i += 1) {
-      mapped[fields[i] ?? `COL_${i + 1}`] = row[i]
-    }
-
-    const code = String(mapped.CODVEND ?? '').trim()
-    const name = String(mapped.APELIDO ?? '').trim()
-    const partnerCodeRaw = String(mapped.CODPARC ?? '').trim()
-    if (!code || !name) continue
-
-    sellers.push({
-      code,
-      name,
-      partnerCode: partnerCodeRaw.length > 0 ? partnerCodeRaw : null,
-    })
   }
 
-  return sellers
+  for (const value of Object.values(obj)) collectRecords(value, bucket)
+}
+
+function parseRows(payload: unknown): SellerRow[] {
+  const records: RawRecord[] = []
+  collectRecords(payload, records)
+  const dedup = new Map<string, SellerRow>()
+
+  for (const record of records) {
+    const code = String(record.CODVEND ?? record.COL_1 ?? '').trim()
+    const name = String(record.APELIDO ?? record.NOMEVEND ?? record.COL_2 ?? '').trim()
+    const partnerCodeRaw = String(record.CODPARC ?? record.COL_3 ?? '').trim()
+    if (!code || !name) continue
+
+    const key = `${code}|${name.toUpperCase()}`
+    if (!dedup.has(key)) {
+      dedup.set(key, {
+        code,
+        name,
+        partnerCode: partnerCodeRaw.length > 0 ? partnerCodeRaw : null,
+      })
+    }
+  }
+
+  return [...dedup.values()]
 }
 
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
-  const sql = `
+  const sqlPrimary = `
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
@@ -169,35 +194,81 @@ GROUP BY V.CODVEND, TRIM(V.APELIDO)
 ORDER BY TRIM(V.APELIDO)
 `.trim()
 
-  const payload = {
-    serviceName: 'DbExplorerSP.executeQuery',
-    requestBody: { sql },
+  const sqlFallbackFromCab = `
+SELECT
+  TO_CHAR(CAB.CODVEND) AS CODVEND,
+  NVL(MAX(VEN.APELIDO), 'SEM VENDEDOR') AS APELIDO,
+  TO_CHAR(MAX(CAB.CODPARC)) AS CODPARC
+FROM TGFCAB CAB
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+WHERE CAB.TIPMOV IN ('V', 'P')
+  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
+  AND NVL(CAB.CODVEND, 0) > 0
+GROUP BY CAB.CODVEND
+ORDER BY NVL(MAX(VEN.APELIDO), 'SEM VENDEDOR')
+`.trim()
+
+  const sqlFallbackVenOnly = `
+SELECT
+  TO_CHAR(V.CODVEND) AS CODVEND,
+  TRIM(V.APELIDO) AS APELIDO,
+  CAST(NULL AS VARCHAR2(20)) AS CODPARC
+FROM TGFVEN V
+WHERE NVL(TRIM(V.APELIDO), '') <> ''
+ORDER BY TRIM(V.APELIDO)
+`.trim()
+
+  const sqlCandidates = [sqlPrimary, sqlFallbackFromCab, sqlFallbackVenOnly]
+  const failures: string[] = []
+  let hadAuthorizedResponse = false
+
+  for (const sql of sqlCandidates) {
+    for (const endpoint of getSqlEndpoints(baseUrl, appKey)) {
+      const payloadVariants = [
+        {
+          serviceName: 'DbExplorerSP.executeQuery',
+          requestBody: { sql },
+        },
+        {
+          requestBody: { sql },
+        },
+        {
+          serviceName: 'DbExplorerSP.executeQuery',
+          requestBody: { statement: sql },
+        },
+      ]
+
+      for (const payload of payloadVariants) {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(25_000),
+        })
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          failures.push(`${endpoint}: HTTP ${response.status}`)
+          continue
+        }
+
+        const serviceError = extractServiceError(data)
+        if (serviceError) {
+          failures.push(`${endpoint}: ${serviceError}`)
+          continue
+        }
+
+        hadAuthorizedResponse = true
+        const rows = parseRows(data)
+        if (rows.length > 0) return rows
+      }
+    }
   }
 
-  const failures: string[] = []
-  for (const endpoint of getSqlEndpoints(baseUrl, appKey)) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(25_000),
-    })
-    const data = await response.json().catch(() => null)
-
-    if (!response.ok) {
-      failures.push(`${endpoint}: HTTP ${response.status}`)
-      continue
-    }
-
-    const serviceError = extractServiceError(data)
-    if (serviceError) {
-      failures.push(`${endpoint}: ${serviceError}`)
-      continue
-    }
-
-    const rows = parseRows(data)
-    if (rows.length > 0) return rows
-    failures.push(`${endpoint}: resposta sem linhas`)
+  if (hadAuthorizedResponse) {
+    throw new Error(
+      'Consulta autorizada, mas sem vendedores retornados. Verifique se o usuario OAuth tem acesso de leitura a TGFVEN/TGFCAB.'
+    )
   }
 
   throw new Error(`Nao foi possivel consultar vendedores no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)

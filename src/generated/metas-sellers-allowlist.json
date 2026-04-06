@@ -1,0 +1,146 @@
+[
+  {
+    "code": "34",
+    "partnerCode": "14377",
+    "name": "ALEX SOUSA",
+    "active": true
+  },
+  {
+    "code": "5",
+    "partnerCode": "15473",
+    "name": "ALEXANDRE CAMARA DE MELO",
+    "active": false
+  },
+  {
+    "code": "32",
+    "partnerCode": "15555",
+    "name": "ANDREA DUARTE COSTA",
+    "active": true
+  },
+  {
+    "code": "6",
+    "partnerCode": "16443",
+    "name": "CAIO CESAR DE JESUS DE BRITO L",
+    "active": true
+  },
+  {
+    "code": "28",
+    "partnerCode": "15873",
+    "name": "CRISLAINE DA SILVA LIMA",
+    "active": true
+  },
+  {
+    "code": "7",
+    "partnerCode": "15594",
+    "name": "EDER CRUZ DE LIMA",
+    "active": true
+  },
+  {
+    "code": "15",
+    "partnerCode": "231",
+    "name": "EGLINAURIA VIEIRA CAVALCANTE",
+    "active": true
+  },
+  {
+    "code": "8",
+    "partnerCode": "16944",
+    "name": "EUFRASIA MARISIA VIEIRA GOMES",
+    "active": true
+  },
+  {
+    "code": "9",
+    "partnerCode": "15559",
+    "name": "EVANDSON DOS SANTOS FERRO",
+    "active": true
+  },
+  {
+    "code": "10",
+    "partnerCode": "16737",
+    "name": "IZABEL CRISTINA BAHIA DOS SANT",
+    "active": true
+  },
+  {
+    "code": "29",
+    "partnerCode": "16643",
+    "name": "JOSE CARLOS DIAS",
+    "active": false
+  },
+  {
+    "code": "11",
+    "partnerCode": "15560",
+    "name": "JOSE CICERO BEZERRA JUNIOR",
+    "active": false
+  },
+  {
+    "code": "16",
+    "partnerCode": "16909",
+    "name": "JOSE CLAUDIO FEITOSA",
+    "active": false
+  },
+  {
+    "code": "31",
+    "partnerCode": "16737",
+    "name": "JOSE PAULO DA SILVA",
+    "active": true
+  },
+  {
+    "code": "17",
+    "partnerCode": "233",
+    "name": "JOSELIA LOPES DE SIQUEIRA",
+    "active": false
+  },
+  {
+    "code": "13",
+    "partnerCode": "15311",
+    "name": "JULIANA PATRICIA DA SILVA",
+    "active": false
+  },
+  {
+    "code": "19",
+    "partnerCode": "15557",
+    "name": "MARIA JAILMA GALDINO DE MOURA",
+    "active": true
+  },
+  {
+    "code": "20",
+    "partnerCode": "15503",
+    "name": "MARIA JOSE",
+    "active": true
+  },
+  {
+    "code": "23",
+    "partnerCode": "17018",
+    "name": "MOAGEM OURO VERDE",
+    "active": false
+  },
+  {
+    "code": "25",
+    "partnerCode": "20",
+    "name": "PAULO BARBOSA",
+    "active": false
+  },
+  {
+    "code": "12",
+    "partnerCode": "16643",
+    "name": "RICARDO HENRIQUE VIEIRA",
+    "active": true
+  },
+  {
+    "code": "18",
+    "partnerCode": "15567",
+    "name": "ROGERIO CORREIA DA SILVA",
+    "active": true
+  },
+  {
+    "code": "22",
+    "partnerCode": "16931",
+    "name": "ROSILAINE FERREIRA",
+    "active": true
+  },
+  {
+    "code": "14",
+    "partnerCode": "15568",
+    "name": "VICTOR EVERTON BEZERRA GONCALV",
+    "active": false
+  }
+]

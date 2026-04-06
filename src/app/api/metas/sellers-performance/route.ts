@@ -14,6 +14,7 @@ type SankhyaOrder = {
   orderNumber: string
   negotiatedAt: string
   totalValue: number
+  grossWeight: number
 }
 
 function hasLegacyCredentials(config: SankhyaConfig) {
@@ -134,6 +135,7 @@ function toOrder(recordInput: SankhyaRawRecord): SankhyaOrder | null {
   if (!negotiatedAt) return null
 
   const totalValue = parseNumber(record.VLRNOTA ?? record.VALOR_NOTA ?? record.VLR_TOTAL ?? record.VALORTOTAL)
+  const grossWeight = parseNumber(record.PESOBRUTO ?? record.PESO_BRUTO ?? record.PESO)
   const sellerCode = String(record.CODVEND ?? record.VENDEDOR_CODIGO ?? record.CODIGO_VENDEDOR ?? '').trim()
   const partnerCode = String(record.CODPARC ?? record.PARCEIRO_CODIGO ?? '').trim()
   const orderNumber = String(record.NUNOTA ?? record.NUMNOTA ?? record.NUMERO_PEDIDO ?? record.PEDIDO ?? '').trim()
@@ -145,6 +147,7 @@ function toOrder(recordInput: SankhyaRawRecord): SankhyaOrder | null {
     orderNumber,
     negotiatedAt,
     totalValue,
+    grossWeight,
   }
 }
 
@@ -426,7 +429,21 @@ function parseYearMonth(req: NextRequest) {
   return { year, month, startDate, endDateExclusive }
 }
 
-function makeSql(startDate: string, endDateExclusive: string) {
+function makeSql(
+  startDate: string,
+  endDateExclusive: string,
+  mode: 'STRICT_SALES' | 'FALLBACK_ANY_MOVEMENT' = 'STRICT_SALES'
+) {
+  const filters = [
+    mode === 'STRICT_SALES' ? "CAB.TIPMOV IN ('V', 'P', 'O')" : null,
+    `CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')`,
+    `CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')`,
+    `NVL(CAB.STATUSNOTA, 'L') <> 'C'`,
+    `NVL(CAB.CODVEND, 0) > 0`,
+  ]
+    .filter(Boolean)
+    .join('\n  AND ')
+
   return `
 SELECT
   TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD') AS DTNEG,
@@ -434,16 +451,20 @@ SELECT
   TO_CHAR(NVL(CAB.CODVEND, 0)) AS CODVEND,
   TO_CHAR(NVL(CAB.CODPARC, 0)) AS CODPARC,
   TO_CHAR(CAB.NUNOTA) AS NUNOTA,
-  NVL(CAB.VLRNOTA, 0) AS VLRNOTA
+  NVL(CAB.VLRNOTA, 0) AS VLRNOTA,
+  NVL(CAB.PESOBRUTO, 0) AS PESOBRUTO
 FROM TGFCAB CAB
 LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
-WHERE CAB.TIPMOV IN ('V', 'P')
-  AND CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
-  AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
-  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
-  AND NVL(CAB.CODVEND, 0) > 0
+WHERE ${filters}
 ORDER BY CAB.DTNEG DESC
 `.trim()
+}
+
+function shiftIsoDate(isoDate: string, days: number) {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + days)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 export async function GET(req: NextRequest) {
@@ -475,7 +496,7 @@ export async function GET(req: NextRequest) {
     const authMode = config.authMode ?? 'OAUTH2'
     const bearerToken = authMode === 'OAUTH2' ? await authenticateOAuth(config, baseUrl) : null
     const headers = buildSankhyaHeaders(config, bearerToken)
-    const sql = makeSql(startDate, endDateExclusive)
+    const sql = makeSql(startDate, endDateExclusive, 'STRICT_SALES')
     let orders: SankhyaOrder[] = []
 
     try {
@@ -498,11 +519,58 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Fallback: se o ambiente usar TIPMOV fora do padrão comercial, tenta sem filtro de TIPMOV.
+    if (orders.length === 0) {
+      const fallbackSql = makeSql(startDate, endDateExclusive, 'FALLBACK_ANY_MOVEMENT')
+      try {
+        orders = await runSankhyaQuery(baseUrl, headers, fallbackSql, {
+          appKey: config.appKey ?? config.token ?? null,
+        })
+      } catch {
+        // mantém vazio para seguir diagnóstico normal sem quebrar resposta
+      }
+    }
+
     const allowlist = await readSellerAllowlist()
     const allowedSellers = getActiveAllowedSellersFromList(allowlist)
     const filteredOrders = orders.filter((order) =>
       matchesAllowedSeller(order.sellerCode, order.sellerName, order.partnerCode, allowlist)
     )
+
+    let recentOrdersHint: {
+      lookbackStartDate: string
+      lookbackEndDateExclusive: string
+      totalOrders: number
+      lastOrderDate: string | null
+    } | null = null
+
+    if (filteredOrders.length === 0) {
+      const lookbackStartDate = shiftIsoDate(startDate, -90)
+      try {
+        const lookbackSql = makeSql(lookbackStartDate, endDateExclusive)
+        const lookbackOrders = await runSankhyaQuery(baseUrl, headers, lookbackSql, {
+          appKey: config.appKey ?? config.token ?? null,
+        })
+        const filteredLookback = lookbackOrders.filter((order) =>
+          matchesAllowedSeller(order.sellerCode, order.sellerName, order.partnerCode, allowlist)
+        )
+        const lastOrderDate =
+          filteredLookback.length > 0
+            ? filteredLookback
+                .map((order) => order.negotiatedAt)
+                .sort((a, b) => b.localeCompare(a))[0] ?? null
+            : null
+
+        recentOrdersHint = {
+          lookbackStartDate,
+          lookbackEndDateExclusive: endDateExclusive,
+          totalOrders: filteredLookback.length,
+          lastOrderDate,
+        }
+      } catch {
+        recentOrdersHint = null
+      }
+    }
 
     const sellersMap = new Map<
       string,
@@ -510,8 +578,9 @@ export async function GET(req: NextRequest) {
         id: string
         name: string
         login: string
-        orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number }>
+        orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number }>
         totalValue: number
+        totalGrossWeight: number
       }
     >()
 
@@ -530,6 +599,7 @@ export async function GET(req: NextRequest) {
           login: sellerLogin || sellerId,
           orders: [],
           totalValue: 0,
+          totalGrossWeight: 0,
         })
       }
 
@@ -538,8 +608,10 @@ export async function GET(req: NextRequest) {
         orderNumber: order.orderNumber,
         negotiatedAt: order.negotiatedAt,
         totalValue: order.totalValue,
+        grossWeight: order.grossWeight,
       })
       seller.totalValue += order.totalValue
+      seller.totalGrossWeight += order.grossWeight
     }
 
     // Garante presenca da lista corporativa mesmo quando o vendedor estiver sem pedidos no periodo.
@@ -558,6 +630,7 @@ export async function GET(req: NextRequest) {
         login: makeSellerLogin(normalizedName, sellerId),
         orders: [],
         totalValue: 0,
+        totalGrossWeight: 0,
       })
     }
 
@@ -577,6 +650,11 @@ export async function GET(req: NextRequest) {
       policy: {
         allowlistEnabled: allowedSellers.length > 0,
         allowlistCount: allowedSellers.length,
+      },
+      diagnostics: {
+        selectedMonthOrders: filteredOrders.length,
+        selectedMonthOrdersAllSellers: orders.length,
+        recentOrdersHint,
       },
       sellers,
     })
