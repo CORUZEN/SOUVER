@@ -64,7 +64,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <Input
-        label="Login ou e-mail"
+        label="Login ou E-mail"
         name="login"
         type="text"
         autoComplete="username"
