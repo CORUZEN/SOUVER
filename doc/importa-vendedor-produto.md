@@ -16,8 +16,9 @@
 8. [Consulta de produtos](#consulta-de-produtos)
 9. [Consulta de vendedores](#consulta-de-vendedores)
 10. [Padrão de fallback em cascata](#padrão-de-fallback-em-cascata)
-11. [Comportamento da UI (importação read-only)](#comportamento-da-ui-importação-read-only)
-12. [Referência de arquivos](#referência-de-arquivos)
+11. [Desempenho de vendedores (tela principal)](#desempenho-de-vendedores-tela-principal)
+12. [Comportamento da UI (importação read-only)](#comportamento-da-ui-importação-read-only)
+13. [Referência de arquivos](#referência-de-arquivos)
 
 ---
 
@@ -378,7 +379,111 @@ Toda consulta ao Sankhya segue esta hierarquia de tentativas:
 → Se nenhum SQL funcionou → lançar erro com detalhes
 ```
 
-A função `queryRows` centraliza essa lógica e é reutilizada por ambos os fluxos (produtos e vendedores).
+A função `queryRows` centraliza essa lógica e é reutilizada por todos os fluxos (produtos, vendedores e desempenho).
+
+---
+
+## Desempenho de vendedores (tela principal)
+
+A tela principal do Painel de Metas (`/em-desenvolvimento?modulo=metas`) carrega o desempenho mensal de cada vendedor em tempo real a partir do Sankhya.
+
+### Fluxo de dados
+
+```
+MetasWorkspace (useEffect) → GET /api/metas/sellers-performance?year=2026&month=4
+  → authenticateOAuth + authenticateSession fallback
+  → buildHeaders (bearer no token, appkey fallback)
+  → readSellerAllowlist → extrair códigos dos vendedores ativos
+  → buildOrdersSql (CODVEND IN (...) + date range)
+  → queryRows → toOrder → agrupar por vendedor
+  → JSON response com sellers[]
+```
+
+### Otimização: filtragem no SQL
+
+O problema original era que a consulta buscava **todos os pedidos** do mês (milhares de linhas de todos os vendedores) e filtrava no JavaScript, descartando ~99% dos resultados.
+
+**Antes (lento)**:
+```sql
+-- Trazia TODOS os pedidos do mês (~5000+ linhas)
+SELECT ... FROM TGFCAB CAB
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+WHERE CAB.DTNEG >= '2026-04-01' AND CAB.DTNEG < '2026-05-01'
+  AND NVL(CAB.CODVEND, 0) > 0
+ORDER BY CAB.DTNEG DESC  -- sort caro e desnecessário
+```
+→ Depois filtrava por allowlist em JS: `orders.filter(o => matchesAllowedSeller(...))`
+
+**Depois (eficiente)**:
+```sql
+-- Traz APENAS pedidos dos 18 vendedores ativos (~dezenas de linhas)
+SELECT
+  TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD') AS DTNEG,
+  NVL(VEN.APELIDO, 'SEM VENDEDOR') AS VENDEDOR,
+  TO_CHAR(CAB.CODVEND) AS CODVEND,
+  TO_CHAR(NVL(CAB.CODPARC, 0)) AS CODPARC,
+  TO_CHAR(CAB.NUNOTA) AS NUNOTA,
+  NVL(CAB.VLRNOTA, 0) AS VLRNOTA,
+  NVL(CAB.PESOBRUTO, 0) AS PESOBRUTO
+FROM TGFCAB CAB
+INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+WHERE CAB.DTNEG >= TO_DATE('2026-04-01', 'YYYY-MM-DD')
+  AND CAB.DTNEG < TO_DATE('2026-05-01', 'YYYY-MM-DD')
+  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
+  AND CAB.CODVEND > 0
+  AND CAB.TIPMOV IN ('V', 'P', 'O')
+  AND CAB.CODVEND IN ('5', '32', '6', '28', '7', '15', '8', '9', '10', ...)
+ORDER BY CAB.CODVEND
+```
+
+### Mudanças-chave
+
+| Aspecto | Antes | Depois |
+|---------|-------|--------|
+| **Filtro de vendedores** | Client-side (JS) | SQL (`CODVEND IN (...)`) |
+| **JOIN** | `LEFT JOIN` (inclui sem vendedor) | `INNER JOIN` (só vendedores válidos) |
+| **ORDER BY** | `DTNEG DESC` (sort caro) | `CODVEND` (agrupamento natural) |
+| **Endpoints tentados** | 5 (on-premise + 4 cloud) | 2 (cloud gateway + on-premise) |
+| **Query de lookback 90 dias** | Executada quando 0 pedidos | Removida (desnecessária) |
+| **Rows transferidos** | ~5000 (todos os vendedores) | ~dezenas (só allowlist ativos) |
+| **Headers** | `token` com API key estático | `token` com bearer JWT |
+| **Auth fallback** | Legacy login separado | `authenticateSession` integrado |
+| **Tamanho do arquivo** | 665 linhas | 370 linhas |
+
+### Fallback sem TIPMOV
+
+Se a query principal retornar 0 resultados (algumas instalações usam tipos de movimento diferentes), tenta a mesma query sem o filtro `CAB.TIPMOV IN ('V', 'P', 'O')`.
+
+### Resposta JSON
+
+```typescript
+{
+  source: 'sankhya',
+  year: 2026,
+  month: 4,
+  range: { startDate: '2026-04-01', endDateExclusive: '2026-05-01' },
+  integration: { id, name },
+  policy: { allowlistEnabled: true, allowlistCount: 18 },
+  diagnostics: { selectedMonthOrders: 42 },
+  sellers: [
+    {
+      id: 'sankhya-5',
+      name: 'ALEXANDRE CAMARA DE MELO',
+      login: 'alexandre.camara.de.melo',
+      totalValue: 15230.50,
+      totalGrossWeight: 480.2,
+      totalOrders: 3,
+      orders: [
+        { orderNumber: '12345', negotiatedAt: '2026-04-02', totalValue: 5100.00, grossWeight: 160.0 },
+        ...
+      ]
+    },
+    ...
+  ]
+}
+```
+
+Vendedores ativos na allowlist **sem pedidos no período** aparecem com `totalOrders: 0` e `orders: []`.
 
 ---
 
@@ -420,6 +525,7 @@ Se o save falhar, recarrega do servidor para manter consistência.
 
 | Arquivo | Função |
 |---------|--------|
+| `src/app/api/metas/sellers-performance/route.ts` | Desempenho mensal dos vendedores (tela principal) |
 | `src/app/api/metas/products-allowlist/sync/route.ts` | Sync de produtos do Sankhya |
 | `src/app/api/metas/sellers-allowlist/sync/route.ts` | Sync de vendedores do Sankhya |
 | `src/app/api/metas/products-allowlist/route.ts` | CRUD da allowlist de produtos (GET/PUT) |
