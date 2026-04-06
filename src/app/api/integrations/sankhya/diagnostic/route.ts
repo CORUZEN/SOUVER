@@ -6,6 +6,10 @@ import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/i
 type RawRecord = Record<string, unknown>
 type MatrixRow = unknown[]
 
+function escapeSqlLiteral(input: string) {
+  return input.replace(/'/g, "''")
+}
+
 function getSankhyaAuthOrigins(baseUrl: string) {
   const url = new URL(baseUrl)
   const host = url.hostname.toLowerCase()
@@ -195,6 +199,7 @@ export async function GET(req: NextRequest) {
   if (!baseUrl) return NextResponse.json({ message: 'URL da integracao Sankhya invalida.' }, { status: 412 })
 
   const tablesRaw = req.nextUrl.searchParams.get('tables') ?? 'TGFCAB'
+  const sellerNameRaw = req.nextUrl.searchParams.get('sellerName')
   const tables = [...new Set(tablesRaw.split(',').map((entry) => sanitizeTableName(entry)).filter(Boolean))].slice(0, 10)
 
   try {
@@ -216,6 +221,38 @@ ORDER BY COLUMN_ID
       const result = await runDiagnosticSql(baseUrl, headers, sql, { appKey })
       resultados[`cols_${tableName}`] = { rows: result.rows }
       endpointsUsed.push(result.endpoint)
+    }
+
+    if (sellerNameRaw && sellerNameRaw.trim().length > 0) {
+      const sellerName = sellerNameRaw.trim()
+      const sellerSqlPrimary = `
+SELECT
+  TO_CHAR(V.CODVEND) AS CODVEND,
+  V.APELIDO AS APELIDO_VENDEDOR,
+  CAST(NULL AS VARCHAR2(1)) AS NOMEVEND
+FROM TGFVEN V
+WHERE UPPER(V.APELIDO) LIKE UPPER('%${escapeSqlLiteral(sellerName)}%')
+ORDER BY V.APELIDO
+`.trim()
+
+      const sellerSqlFallback = `
+SELECT
+  TO_CHAR(V.CODVEND) AS CODVEND,
+  CAST(NULL AS VARCHAR2(1)) AS APELIDO_VENDEDOR,
+  CAST(NULL AS VARCHAR2(1)) AS NOMEVEND
+FROM TGFVEN V
+WHERE TO_CHAR(V.CODVEND) = '${escapeSqlLiteral(sellerName)}'
+ORDER BY V.CODVEND
+`.trim()
+
+      let sellerResult: { rows: MatrixRow[]; endpoint: string }
+      try {
+        sellerResult = await runDiagnosticSql(baseUrl, headers, sellerSqlPrimary, { appKey })
+      } catch {
+        sellerResult = await runDiagnosticSql(baseUrl, headers, sellerSqlFallback, { appKey })
+      }
+      resultados.sellers_lookup = { rows: sellerResult.rows }
+      endpointsUsed.push(sellerResult.endpoint)
     }
 
     return NextResponse.json({
