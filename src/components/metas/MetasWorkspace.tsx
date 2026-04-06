@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Boxes,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Plus,
   Settings2,
@@ -1550,6 +1552,112 @@ export default function MetasWorkspace() {
         </>
       ) : (
         <>
+          {/* ── Period selector ────────────────────────────────────── */}
+          <Card className="relative overflow-hidden border-surface-200">
+            <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Left: month / year navigation */}
+              <div className="flex items-center gap-3">
+                <CalendarDays size={18} className="text-primary-600" />
+                <button
+                  type="button"
+                  aria-label="Mês anterior"
+                  onClick={() => {
+                    if (month === 0) { setMonth(11); setYear((y) => y - 1) } else { setMonth((m) => m - 1) }
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-white text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                <div className="flex items-baseline gap-2">
+                  <select
+                    value={month}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                    className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                  >
+                    {MONTHS.map((name, idx) => (
+                      <option key={name} value={idx}>{name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Próximo mês"
+                  onClick={() => {
+                    if (month === 11) { setMonth(0); setYear((y) => y + 1) } else { setMonth((m) => m + 1) }
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-white text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                >
+                  <ChevronRight size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { const now = new Date(); setMonth(now.getMonth()); setYear(now.getFullYear()) }}
+                  className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-semibold text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                >
+                  Hoje
+                </button>
+              </div>
+
+              {/* Right: status badge + business days */}
+              <div className="flex items-center gap-3">
+                {standby ? (
+                  <Badge variant="secondary">
+                    Período em standby — configure o calendário operacional
+                  </Badge>
+                ) : (
+                  <>
+                    <Badge variant="secondary">
+                      {cycle.totalBusinessDays} dias úteis
+                    </Badge>
+                    {sellersLoading && (
+                      <span className="text-xs text-surface-400">Carregando dados…</span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Cycle weeks mini-bar */}
+            {!standby && cycle.weeks.length > 0 && (
+              <div className="mt-3 flex gap-2">
+                {cycle.weeks.map((week) => {
+                  const today = toIsoDate(new Date())
+                  const isActive = week.start && week.end && today >= week.start && today <= week.end
+                  return (
+                    <div
+                      key={week.key}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-center transition-all ${
+                        isActive
+                          ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
+                          : 'border-surface-200 bg-surface-50'
+                      }`}
+                    >
+                      <div className={`mx-auto mb-1 h-1 w-8 rounded-full ${stageColorMap[week.key]}`} />
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-500">{week.label}</p>
+                      <p className="text-xs font-medium text-surface-700">
+                        {week.start ? `${formatDateBr(week.start)} – ${formatDateBr(week.end)}` : '—'}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-surface-400">{week.businessDays.length} dias úteis</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
