@@ -21,11 +21,13 @@ import Badge from '@/components/ui/Badge'
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING'
 type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
 type PrizeType = 'CASH' | 'BENEFIT'
+type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
 
 interface GoalRule {
   id: string
   stage: StageKey
   frequency: RuleFrequency
+  kpiType: KpiType
   kpi: string
   description: string
   targetText: string
@@ -137,13 +139,53 @@ const STAGES: Array<{ key: StageKey; label: string }> = [
   { key: 'CLOSING', label: 'Fechamento' },
 ]
 
+const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: string }> = [
+  { type: 'BASE_CLIENTES', label: 'Base de clientes', defaultDescription: 'Cobertura da base de clientes no período.' },
+  { type: 'VOLUME', label: 'Volume', defaultDescription: 'Categorias trafegando no período.' },
+  { type: 'META_FINANCEIRA', label: 'Meta financeira', defaultDescription: 'Atingir a meta financeira no fechamento do período.' },
+  { type: 'DISTRIBUICAO', label: 'Distribuição de itens', defaultDescription: 'Positivação de itens na base de clientes.' },
+  { type: 'DEVOLUCAO', label: 'Devolução', defaultDescription: 'Racional sobre os valores devolvidos x valores faturados.' },
+  { type: 'INADIMPLENCIA', label: 'Inadimplência acumulativa', defaultDescription: 'Racional sobre o percentual x valores faturados.' },
+  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume e positivação.' },
+  { type: 'RENTABILIDADE', label: 'Rentabilidade', defaultDescription: 'Margem de contribuição dentro do percentual parametrizado.' },
+  { type: 'CUSTOM', label: 'Personalizado', defaultDescription: '' },
+]
+
+function inferKpiType(kpi: string): KpiType {
+  const lower = kpi.toLowerCase()
+  if (lower.includes('base de clientes')) return 'BASE_CLIENTES'
+  if (lower.includes('volume') || lower.includes('categori')) return 'VOLUME'
+  if (lower.includes('meta financeira')) return 'META_FINANCEIRA'
+  if (lower.includes('distribuição') || lower.includes('distribuicao') || lower.includes('distribuição de itens')) return 'DISTRIBUICAO'
+  if (lower.includes('devolução') || lower.includes('devolucao')) return 'DEVOLUCAO'
+  if (lower.includes('inadimplência') || lower.includes('inadimplencia')) return 'INADIMPLENCIA'
+  if (lower.includes('item foco')) return 'ITEM_FOCO'
+  if (lower.includes('rentabilidade')) return 'RENTABILIDADE'
+  return 'CUSTOM'
+}
+
 const DEFAULT_RULES: GoalRule[] = [
-  { id: 'w1-base', stage: 'W1', frequency: 'WEEKLY', kpi: 'Base de clientes', description: 'Cobertura da base até o fechamento da 1ª semana.', targetText: '40%', rewardValue: 193.49, points: 0.04 },
-  { id: 'w1-volume', stage: 'W1', frequency: 'WEEKLY', kpi: 'Volume', description: 'Categorias no período da 1ª semana.', targetText: '2 categorias', rewardValue: 145.12, points: 0.03 },
-  { id: 'w2-base', stage: 'W2', frequency: 'WEEKLY', kpi: 'Base de clientes', description: 'Cobertura da base até o fechamento da 2ª semana.', targetText: '80%', rewardValue: 193.49, points: 0.04 },
-  { id: 'w3-dist', stage: 'W3', frequency: 'WEEKLY', kpi: 'Distribuição de itens', description: 'Positivação da base na 3ª semana.', targetText: '27 itens', rewardValue: 483.73, points: 0.1 },
-  { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpi: 'Meta financeira', description: 'Atingir meta financeira no fechamento do mês.', targetText: '100%', rewardValue: 96.75, points: 0.02 },
-  { id: 'closing-margin', stage: 'CLOSING', frequency: 'MONTHLY', kpi: 'Rentabilidade', description: 'Margem de contribuição dentro da parametrização.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
+  // ── 1ª Semana ──
+  { id: 'w1-base', stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento da 1ª semana.', targetText: '40%', rewardValue: 193.49, points: 0.04 },
+  { id: 'w1-volume', stage: 'W1', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 1ª semana.', targetText: '2 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w1-fin', stage: 'W1', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 1ª semana.', targetText: '30%', rewardValue: 96.75, points: 0.02 },
+  // ── 2ª Semana ──
+  { id: 'w2-base', stage: 'W2', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento da 2ª semana.', targetText: '80%', rewardValue: 193.49, points: 0.04 },
+  { id: 'w2-volume', stage: 'W2', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 2ª semana.', targetText: '3 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w2-fin', stage: 'W2', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 2ª semana.', targetText: '60%', rewardValue: 96.75, points: 0.02 },
+  // ── 3ª Semana ──
+  { id: 'w3-volume', stage: 'W3', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 3ª semana.', targetText: '4 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w3-dist', stage: 'W3', frequency: 'WEEKLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 50% dos itens positivados em 30% da base de clientes.', targetText: '27 itens', rewardValue: 483.73, points: 0.1 },
+  { id: 'w3-fin', stage: 'W3', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 3ª semana.', targetText: '80%', rewardValue: 241.87, points: 0.05 },
+  // ── Fechamento ──
+  { id: 'closing-base', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento do mês.', targetText: '85%', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias entregues até o fechamento do mês.', targetText: '6 categorias', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '43 itens', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
+  { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
+  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume e positivação.', targetText: '100% V + 40% D', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado).', targetText: '120%', rewardValue: 96.75, points: 0.02 },
+  { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
 
 const DEFAULT_PRIZES: CampaignPrize[] = [
@@ -391,7 +433,7 @@ export default function MetasWorkspace() {
       if (typeof data.month === 'number') setMonth(data.month)
       if (typeof data.includeNational === 'boolean') setIncludeNational(data.includeNational)
       if (data.monthConfigs && typeof data.monthConfigs === 'object') setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
-      if (Array.isArray(data.rules)) setRules(data.rules as GoalRule[])
+      if (Array.isArray(data.rules)) setRules((data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })))
       if (Array.isArray(data.prizes)) setPrizes(data.prizes as CampaignPrize[])
       if (typeof data.salaryBase === 'number') setSalaryBase(data.salaryBase)
       if (typeof data.basePremiation === 'number') setBasePremiation(data.basePremiation)
@@ -873,6 +915,16 @@ export default function MetasWorkspace() {
           stageMetrics[stage].totalValue += order.totalValue
         }
 
+        const stageOrder: StageKey[] = ['W1', 'W2', 'W3', 'CLOSING']
+        const cumulativeMetrics: Record<StageKey, { orderCount: number; totalValue: number }> = { W1: { orderCount: 0, totalValue: 0 }, W2: { orderCount: 0, totalValue: 0 }, W3: { orderCount: 0, totalValue: 0 }, CLOSING: { orderCount: 0, totalValue: 0 } }
+        let cumOrders = 0
+        let cumValue = 0
+        for (const sk of stageOrder) {
+          cumOrders += stageMetrics[sk].orderCount
+          cumValue += stageMetrics[sk].totalValue
+          cumulativeMetrics[sk] = { orderCount: cumOrders, totalValue: cumValue }
+        }
+
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
@@ -884,21 +936,58 @@ export default function MetasWorkspace() {
               ? Math.max((parseTargetNumber(rule.targetText) ?? 0) / 100, 0.00001)
               : null
           const targetAmount = parseTargetNumber(rule.targetText)
+          const cumStage = cumulativeMetrics[rule.stage]
           const stage = stageMetrics[rule.stage]
-          const kpi = rule.kpi.toLowerCase()
+          const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
           let progress = 0
 
-          if (kpi.includes('meta financeira')) {
-            progress = seller.totalValue / teamAverageValueSafe
-          } else if (kpi.includes('rentabilidade')) {
-            progress = (averageTicket / teamAverageTicketSafe) / (targetPct ?? 1)
-          } else if (targetPct !== null) {
-            const stageShare = stage.totalValue / totalValueSafe
-            progress = stageShare / targetPct
-          } else if (targetAmount && targetAmount > 0) {
-            progress = stage.orderCount / targetAmount
-          } else {
-            progress = stage.orderCount > 0 ? 1 : 0
+          switch (kpiType) {
+            case 'META_FINANCEIRA':
+              progress = targetPct ? (seller.totalValue / teamAverageValueSafe) / targetPct : seller.totalValue / teamAverageValueSafe
+              break
+            case 'RENTABILIDADE':
+              progress = (averageTicket / teamAverageTicketSafe) / (targetPct ?? 1)
+              break
+            case 'BASE_CLIENTES':
+              if (targetPct) {
+                const cumShare = cumStage.orderCount / Math.max(seller.totalOrders, 1)
+                progress = cumShare / targetPct
+              } else {
+                progress = cumStage.orderCount > 0 ? 1 : 0
+              }
+              break
+            case 'VOLUME':
+              if (targetAmount && targetAmount > 0) {
+                progress = cumStage.orderCount / targetAmount
+              } else if (targetPct) {
+                progress = (cumStage.totalValue / totalValueSafe) / targetPct
+              } else {
+                progress = cumStage.orderCount > 0 ? 1 : 0
+              }
+              break
+            case 'DISTRIBUICAO':
+              if (targetAmount && targetAmount > 0) {
+                progress = cumStage.orderCount / targetAmount
+              } else {
+                progress = cumStage.orderCount > 0 ? 1 : 0
+              }
+              break
+            case 'DEVOLUCAO':
+            case 'INADIMPLENCIA':
+              progress = 0
+              break
+            case 'ITEM_FOCO':
+              progress = stage.orderCount > 0 ? Math.min(stage.totalValue / totalValueSafe, 1) : 0
+              break
+            default:
+              if (targetPct !== null) {
+                const stageShare = stage.totalValue / totalValueSafe
+                progress = stageShare / targetPct
+              } else if (targetAmount && targetAmount > 0) {
+                progress = stage.orderCount / targetAmount
+              } else {
+                progress = stage.orderCount > 0 ? 1 : 0
+              }
           }
 
           return { ruleId: rule.id, progress: Math.max(0, Math.min(progress, 1.4)) }
@@ -1287,13 +1376,32 @@ export default function MetasWorkspace() {
           <Card className="border-surface-200">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2"><Target size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">Matriz de KPIs e metas</h2></div>
-              <button type="button" onClick={() => setRules((prev) => [...prev, { id: `rule-${Date.now()}`, stage: 'W1', frequency: 'WEEKLY', kpi: 'Novo KPI', description: 'Descreva a regra', targetText: '0%', rewardValue: 0, points: 0 }])} className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"><Plus size={12} /> Novo KPI</button>
+              <button type="button" onClick={() => setRules((prev) => [...prev, { id: `rule-${Date.now()}`, stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES' as KpiType, kpi: 'Base de clientes', description: 'Cobertura da base de clientes no período.', targetText: '0%', rewardValue: 0, points: 0 }])} className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"><Plus size={12} /> Novo KPI</button>
             </div>
 
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-surface-200 text-sm">
-                <thead><tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500"><th className="px-3 py-2">Período</th><th className="px-3 py-2">Freq.</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th></tr></thead>
-                <tbody className="divide-y divide-surface-100">{rules.map((rule) => <tr key={rule.id}><td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, stage: event.target.value as StageKey } : item))}>{STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}</select></td><td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.frequency} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, frequency: event.target.value as RuleFrequency } : item))}><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></td><td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpi} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, kpi: event.target.value } : item))} /></td><td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, description: event.target.value } : item))} /></td><td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, targetText: event.target.value } : item))} /></td><td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></td><td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, points: parseDecimal(event.target.value, 0) } : item))} /></td></tr>)}</tbody>
+                <thead><tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500"><th className="px-3 py-2">Período</th><th className="px-3 py-2">Freq.</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th></tr></thead>
+                <tbody className="divide-y divide-surface-100">
+                  {rules.map((rule) => (
+                    <tr key={rule.id} className="hover:bg-surface-50/50">
+                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, stage: event.target.value as StageKey } : item))}>{STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}</select></td>
+                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.frequency} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, frequency: event.target.value as RuleFrequency } : item))}><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></td>
+                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(event) => { const selected = KPI_CATALOG.find((k) => k.type === event.target.value); setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, kpiType: event.target.value as KpiType, kpi: selected?.label ?? item.kpi, description: selected?.defaultDescription || item.description } : item)) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
+                      <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, description: event.target.value } : item))} /></td>
+                      <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, targetText: event.target.value } : item))} /></td>
+                      <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></td>
+                      <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, points: parseDecimal(event.target.value, 0) } : item))} /></td>
+                      <td className="px-3 py-2"><button type="button" onClick={() => setRules((prev) => prev.filter((item) => item.id !== rule.id))} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
+                    </tr>
+                  ))}
+                  <tr className="bg-surface-50 font-semibold">
+                    <td className="px-3 py-2 text-xs text-surface-500" colSpan={5}>Totais — {rules.length} KPIs configurados</td>
+                    <td className="px-3 py-2 text-xs text-surface-700">{currency(rules.reduce((s, r) => s + r.rewardValue, 0))}</td>
+                    <td className="px-3 py-2 text-xs text-surface-700">{num(rules.reduce((s, r) => s + r.points, 0), 3)}</td>
+                    <td className="px-3 py-2"></td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </Card>
