@@ -60,6 +60,13 @@ interface Salesperson {
   totalOrders: number
 }
 
+interface SellerAllowlistEntry {
+  code: string | null
+  partnerCode: string | null
+  name: string
+  active: boolean
+}
+
 interface RuleProgress {
   ruleId: string
   progress: number
@@ -317,7 +324,7 @@ function hasMonthEnded(year: number, month: number) {
 
 export default function MetasWorkspace() {
   const now = new Date()
-  const [view, setView] = useState<'dashboard' | 'config'>('dashboard')
+  const [view, setView] = useState<'dashboard' | 'config' | 'sellers'>('dashboard')
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
   const [includeNational, setIncludeNational] = useState(true)
@@ -333,6 +340,11 @@ export default function MetasWorkspace() {
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
+  const [allowlist, setAllowlist] = useState<SellerAllowlistEntry[]>([])
+  const [allowlistLoading, setAllowlistLoading] = useState(false)
+  const [allowlistSaving, setAllowlistSaving] = useState(false)
+  const [allowlistError, setAllowlistError] = useState('')
+  const [allowlistSuccess, setAllowlistSuccess] = useState('')
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -434,6 +446,112 @@ export default function MetasWorkspace() {
 
     return () => controller.abort()
   }, [month, year])
+
+  async function loadAllowlist() {
+    setAllowlistLoading(true)
+    setAllowlistError('')
+    setAllowlistSuccess('')
+
+    try {
+      const response = await fetch('/api/metas/sellers-allowlist')
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar vendedores da meta.')
+      }
+
+      const list = Array.isArray(payload?.sellers) ? payload.sellers : []
+      setAllowlist(
+        list.map((item: Record<string, unknown>) => ({
+          code: item.code == null ? null : String(item.code),
+          partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
+          name: String(item.name ?? ''),
+          active: Boolean(item.active),
+        }))
+      )
+    } catch (error) {
+      setAllowlistError(error instanceof Error ? error.message : 'Falha ao carregar vendedores da meta.')
+      setAllowlist([])
+    } finally {
+      setAllowlistLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (view !== 'sellers') return
+    void loadAllowlist()
+  }, [view])
+
+  async function saveAllowlist() {
+    setAllowlistSaving(true)
+    setAllowlistError('')
+    setAllowlistSuccess('')
+
+    const payload = {
+      sellers: allowlist.map((seller) => ({
+        code: seller.code && seller.code.trim().length > 0 ? seller.code.trim() : null,
+        partnerCode: seller.partnerCode && seller.partnerCode.trim().length > 0 ? seller.partnerCode.trim() : null,
+        name: seller.name.trim(),
+        active: seller.active,
+      })),
+    }
+
+    try {
+      const response = await fetch('/api/metas/sellers-allowlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof data?.message === 'string' ? data.message : 'Falha ao salvar vendedores da meta.')
+      }
+      setAllowlist(
+        (Array.isArray(data?.sellers) ? data.sellers : []).map((item: Record<string, unknown>) => ({
+          code: item.code == null ? null : String(item.code),
+          partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
+          name: String(item.name ?? ''),
+          active: Boolean(item.active),
+        }))
+      )
+      setAllowlistSuccess('Lista de vendedores da meta atualizada.')
+      // Recarrega visao de desempenho imediatamente.
+      setSellersLoading(true)
+      setSellersError('')
+      const perfResponse = await fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}`)
+      const perfData = await perfResponse.json().catch(() => ({}))
+      if (perfResponse.ok) {
+        const remoteSellers = (perfData?.sellers ?? []) as Array<{
+          id: string
+          name: string
+          login: string
+          totalValue?: number
+          totalOrders?: number
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number }>
+        }>
+        setSellers(
+          remoteSellers.map((seller) => ({
+            id: seller.id,
+            name: seller.name,
+            login: seller.login,
+            totalValue: Number(seller.totalValue ?? 0),
+            totalOrders: Number(seller.totalOrders ?? (seller.orders ?? []).length),
+            orders: (seller.orders ?? [])
+              .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
+              .map((order) => ({
+                orderNumber: String(order.orderNumber ?? ''),
+                negotiatedAt: String(order.negotiatedAt).slice(0, 10),
+                totalValue: Number(order.totalValue ?? 0),
+              })),
+          }))
+        )
+      }
+      setSellersLoading(false)
+    } catch (error) {
+      setAllowlistError(error instanceof Error ? error.message : 'Falha ao salvar vendedores da meta.')
+    } finally {
+      setAllowlistSaving(false)
+    }
+  }
 
   const blockedSet = useMemo(() => {
     const set = new Set<string>()
@@ -768,14 +886,24 @@ export default function MetasWorkspace() {
             <h1 className="mt-1 text-2xl font-semibold text-surface-900">PAINEL DE METAS - OURO VERDE</h1>
             <p className="mt-1 text-sm text-surface-600">Visão executiva de desempenho, progresso de metas e previsão de premiação.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setView((current) => (current === 'dashboard' ? 'config' : 'dashboard'))}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
-          >
-            <Settings2 size={14} />
-            {view === 'dashboard' ? 'Configuração geral de metas' : 'Voltar para dashboard'}
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={() => setView((current) => (current === 'config' ? 'dashboard' : 'config'))}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+            >
+              <Settings2 size={14} />
+              {view === 'config' ? 'Voltar para dashboard' : 'Configuração geral de metas'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView((current) => (current === 'sellers' ? 'dashboard' : 'sellers'))}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+            >
+              <Users size={14} />
+              {view === 'sellers' ? 'Voltar para dashboard' : 'Vendedores da meta'}
+            </button>
+          </div>
         </div>
       </Card>
 
@@ -857,6 +985,133 @@ export default function MetasWorkspace() {
             <div className="space-y-2">
               {prizes.map((prize) => <div key={prize.id} className="grid gap-2 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-6 md:items-end"><label className={label}>Campanha<input className={input} value={prize.title} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, title: event.target.value } : item))} /></label><label className={label}>Frequência<select className={input} value={prize.frequency} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, frequency: event.target.value as CampaignPrize['frequency'] } : item))}><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></label><label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, type: event.target.value as PrizeType } : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label><label className={label}>Valor<input className={input} type="number" step="0.01" value={prize.rewardValue} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></label><label className={label}>Pontos mínimos<input className={input} type="number" step="0.01" value={prize.minPoints} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, minPoints: parseDecimal(event.target.value, 0) } : item))} /></label><label className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-700"><input type="checkbox" className="h-4 w-4 accent-primary-600" checked={prize.active} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label></div>)}
             </div>
+          </Card>
+        </>
+      ) : view === 'sellers' ? (
+        <>
+          <Card className="border-surface-200">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Configuração específica</p>
+                <h2 className="text-base font-semibold text-surface-900">Vendedores considerados no painel de metas</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAllowlist((prev) => [...prev, { code: null, partnerCode: null, name: '', active: true }])}
+                  className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+                >
+                  <Plus size={12} /> Adicionar vendedor
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAllowlist}
+                  disabled={allowlistSaving}
+                  className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+                >
+                  {allowlistSaving ? 'Salvando...' : 'Salvar lista'}
+                </button>
+              </div>
+            </div>
+
+            {allowlistLoading ? (
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">Carregando vendedores da meta...</div>
+            ) : (
+              <div className="space-y-2">
+                {allowlistError ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{allowlistError}</div>
+                ) : null}
+                {allowlistSuccess ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{allowlistSuccess}</div>
+                ) : null}
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-surface-200 text-sm">
+                    <thead>
+                      <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                        <th className="px-3 py-2">Ativo</th>
+                        <th className="px-3 py-2">Nome do vendedor</th>
+                        <th className="px-3 py-2">Código vendedor</th>
+                        <th className="px-3 py-2">Código parceiro</th>
+                        <th className="px-3 py-2">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-100">
+                      {allowlist.map((seller, index) => (
+                        <tr key={`seller-allow-${index}`}>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary-600"
+                              checked={seller.active}
+                              onChange={(event) =>
+                                setAllowlist((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, active: event.target.checked } : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={seller.name}
+                              onChange={(event) =>
+                                setAllowlist((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, name: event.target.value } : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={seller.code ?? ''}
+                              onChange={(event) =>
+                                setAllowlist((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, code: event.target.value || null } : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
+                              value={seller.partnerCode ?? ''}
+                              onChange={(event) =>
+                                setAllowlist((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, partnerCode: event.target.value || null } : item
+                                  )
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setAllowlist((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                            >
+                              Remover
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-xs text-surface-500">
+                  Critério de correspondência: código de vendedor, código de parceiro ou nome (normalizado).
+                </p>
+              </div>
+            )}
           </Card>
         </>
       ) : (

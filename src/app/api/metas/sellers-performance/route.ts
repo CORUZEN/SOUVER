@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { getActiveAllowedSellersFromList, matchesAllowedSeller } from '@/lib/metas/seller-allowlist'
+import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 type SankhyaRawRecord = Record<string, unknown>
 
 type SankhyaOrder = {
   sellerCode: string
   sellerName: string
+  partnerCode: string
   orderNumber: string
   negotiatedAt: string
   totalValue: number
@@ -132,11 +135,13 @@ function toOrder(recordInput: SankhyaRawRecord): SankhyaOrder | null {
 
   const totalValue = parseNumber(record.VLRNOTA ?? record.VALOR_NOTA ?? record.VLR_TOTAL ?? record.VALORTOTAL)
   const sellerCode = String(record.CODVEND ?? record.VENDEDOR_CODIGO ?? record.CODIGO_VENDEDOR ?? '').trim()
+  const partnerCode = String(record.CODPARC ?? record.PARCEIRO_CODIGO ?? '').trim()
   const orderNumber = String(record.NUNOTA ?? record.NUMNOTA ?? record.NUMERO_PEDIDO ?? record.PEDIDO ?? '').trim()
 
   return {
     sellerCode,
     sellerName,
+    partnerCode,
     orderNumber,
     negotiatedAt,
     totalValue,
@@ -147,6 +152,17 @@ function extractOrders(payload: unknown): SankhyaOrder[] {
   const records: SankhyaRawRecord[] = []
   collectRecords(payload, records)
   return records.map(toOrder).filter((entry): entry is SankhyaOrder => Boolean(entry))
+}
+
+function makeSellerLogin(name: string, fallbackId: string) {
+  const normalized = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+
+  return normalized || fallbackId
 }
 
 function getSankhyaAuthOrigins(baseUrl: string) {
@@ -345,6 +361,8 @@ async function runSankhyaQuery(
   ]
 
   const failures: string[] = []
+  let hadAuthorizedResponse = false
+  let unauthorizedFailures = 0
 
   for (const endpoint of endpoints) {
     for (const payload of payloads) {
@@ -363,18 +381,25 @@ async function runSankhyaQuery(
 
       const serviceError = extractServiceErrorMessage(data)
       if (serviceError) {
+        if (isUnauthorizedMessage(serviceError)) unauthorizedFailures += 1
         failures.push(`${endpoint}: ${serviceError}`)
         continue
       }
 
+      hadAuthorizedResponse = true
       const orders = extractOrders(data)
       if (orders.length > 0) return orders
       failures.push(`${endpoint}: resposta sem linhas de pedidos`)
     }
   }
 
+  if (hadAuthorizedResponse) {
+    // Houve consulta autorizada, apenas sem dados no período/filtro.
+    return []
+  }
+
   const normalized = failures.join(' | ') || 'sem detalhes'
-  if (isUnauthorizedMessage(normalized)) {
+  if (unauthorizedFailures > 0 && unauthorizedFailures === failures.length) {
     throw new Error(
       'Sankhya recusou a consulta SQL (Nao autorizado). Verifique permissoes do integrador para DbExplorerSP.executeQuery.'
     )
@@ -407,14 +432,16 @@ SELECT
   TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD') AS DTNEG,
   NVL(VEN.APELIDO, 'SEM VENDEDOR') AS VENDEDOR,
   TO_CHAR(NVL(CAB.CODVEND, 0)) AS CODVEND,
+  TO_CHAR(NVL(CAB.CODPARC, 0)) AS CODPARC,
   TO_CHAR(CAB.NUNOTA) AS NUNOTA,
   NVL(CAB.VLRNOTA, 0) AS VLRNOTA
 FROM TGFCAB CAB
 LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
-WHERE CAB.TIPMOV = 'P'
+WHERE CAB.TIPMOV IN ('V', 'P')
   AND CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
+  AND NVL(CAB.CODVEND, 0) > 0
 ORDER BY CAB.DTNEG DESC
 `.trim()
 }
@@ -471,6 +498,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const allowlist = await readSellerAllowlist()
+    const allowedSellers = getActiveAllowedSellersFromList(allowlist)
+    const filteredOrders = orders.filter((order) =>
+      matchesAllowedSeller(order.sellerCode, order.sellerName, order.partnerCode, allowlist)
+    )
+
     const sellersMap = new Map<
       string,
       {
@@ -482,18 +515,13 @@ export async function GET(req: NextRequest) {
       }
     >()
 
-    for (const order of orders) {
+    for (const order of filteredOrders) {
       const normalizedName = order.sellerName.trim() || 'Sem vendedor'
       const sellerKey = `${order.sellerCode || '0'}::${normalizedName.toUpperCase()}`
       const sellerId = order.sellerCode
         ? `sankhya-${order.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
-      const sellerLogin = normalizedName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '.')
-        .replace(/^\.+|\.+$/g, '')
+      const sellerLogin = makeSellerLogin(normalizedName, sellerId)
 
       if (!sellersMap.has(sellerKey)) {
         sellersMap.set(sellerKey, {
@@ -514,6 +542,25 @@ export async function GET(req: NextRequest) {
       seller.totalValue += order.totalValue
     }
 
+    // Garante presenca da lista corporativa mesmo quando o vendedor estiver sem pedidos no periodo.
+    for (const allowedSeller of allowedSellers) {
+      const normalizedName = allowedSeller.name.trim() || 'Sem vendedor'
+      const sellerKey = `${allowedSeller.code || '0'}::${normalizedName.toUpperCase()}`
+      if (sellersMap.has(sellerKey)) continue
+
+      const sellerId = allowedSeller.code
+        ? `sankhya-${allowedSeller.code}`
+        : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+
+      sellersMap.set(sellerKey, {
+        id: sellerId,
+        name: normalizedName,
+        login: makeSellerLogin(normalizedName, sellerId),
+        orders: [],
+        totalValue: 0,
+      })
+    }
+
     const sellers = [...sellersMap.values()]
       .map((seller) => ({
         ...seller,
@@ -527,6 +574,10 @@ export async function GET(req: NextRequest) {
       month,
       range: { startDate, endDateExclusive },
       integration: { id: integration.id, name: integration.name },
+      policy: {
+        allowlistEnabled: allowedSellers.length > 0,
+        allowlistCount: allowedSellers.length,
+      },
       sellers,
     })
   } catch (error) {
