@@ -9,7 +9,7 @@ export interface AllowedSeller {
 // Atualize este arquivo para incluir/remover vendedores elegiveis.
 export const METAS_ALLOWED_SELLERS: AllowedSeller[] = [
   {
-    code: null,
+    code: '22',
     partnerCode: '230',
     name: 'ROSILAINE FERREIRA',
     active: true,

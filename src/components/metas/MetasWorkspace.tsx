@@ -343,6 +343,7 @@ export default function MetasWorkspace() {
   const [allowlist, setAllowlist] = useState<SellerAllowlistEntry[]>([])
   const [allowlistLoading, setAllowlistLoading] = useState(false)
   const [allowlistSaving, setAllowlistSaving] = useState(false)
+  const [allowlistSyncing, setAllowlistSyncing] = useState(false)
   const [allowlistError, setAllowlistError] = useState('')
   const [allowlistSuccess, setAllowlistSuccess] = useState('')
 
@@ -550,6 +551,41 @@ export default function MetasWorkspace() {
       setAllowlistError(error instanceof Error ? error.message : 'Falha ao salvar vendedores da meta.')
     } finally {
       setAllowlistSaving(false)
+    }
+  }
+
+  async function syncAllowlistFromSankhya() {
+    setAllowlistSyncing(true)
+    setAllowlistError('')
+    setAllowlistSuccess('')
+
+    try {
+      const response = await fetch('/api/metas/sellers-allowlist/sync', {
+        method: 'POST',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof data?.message === 'string' ? data.message : 'Falha ao sincronizar vendedores do Sankhya.')
+      }
+
+      setAllowlist(
+        (Array.isArray(data?.sellers) ? data.sellers : []).map((item: Record<string, unknown>) => ({
+          code: item.code == null ? null : String(item.code),
+          partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
+          name: String(item.name ?? ''),
+          active: Boolean(item.active),
+        }))
+      )
+      const imported = Number(data?.imported ?? 0)
+      setAllowlistSuccess(
+        imported > 0
+          ? `Sincronizacao concluida: ${imported} vendedores importados do Sankhya.`
+          : 'Sincronizacao concluida, sem vendedores novos.'
+      )
+    } catch (error) {
+      setAllowlistError(error instanceof Error ? error.message : 'Falha ao sincronizar vendedores do Sankhya.')
+    } finally {
+      setAllowlistSyncing(false)
     }
   }
 
@@ -996,6 +1032,14 @@ export default function MetasWorkspace() {
                 <h2 className="text-base font-semibold text-surface-900">Vendedores considerados no painel de metas</h2>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={syncAllowlistFromSankhya}
+                  disabled={allowlistSyncing}
+                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  {allowlistSyncing ? 'Sincronizando...' : 'Sincronizar Sankhya'}
+                </button>
                 <button
                   type="button"
                   onClick={() => setAllowlist((prev) => [...prev, { code: null, partnerCode: null, name: '', active: true }])}
