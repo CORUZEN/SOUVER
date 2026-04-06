@@ -22,9 +22,11 @@ type ProductRow = {
 
 function simplifyErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? 'erro desconhecido')
-  const idx = raw.indexOf('(')
-  if (idx <= 0) return raw
-  return raw.slice(0, idx).trim()
+  const marker = 'Nao foi possivel consultar produtos no Sankhya'
+  if (raw.startsWith(marker) && raw.includes('(')) {
+    return raw.slice(raw.indexOf('(') + 1, raw.lastIndexOf(')')).trim()
+  }
+  return raw.trim()
 }
 
 function getSankhyaAuthOrigins(baseUrl: string) {
@@ -224,6 +226,7 @@ function parseProducts(
   records: RawRecord[],
   groupBrandByCode: Map<string, string>,
   brandByProductCode: Map<string, string>,
+  unitByProductCode: Map<string, string>,
   mobilityByProductCode: Map<string, 'SIM' | 'NAO'>,
   mobilityColumnFound: boolean
 ) {
@@ -241,7 +244,10 @@ function parseProducts(
       groupBrandByCode.get(groupCode) ||
       inferBrandFromDescription(description)
     const brand = normalizeBrand(brandRaw)
-    const unit = String(row.UNIDADE ?? row.CODVOL ?? row.COL_3 ?? '').trim().toUpperCase()
+    const unit =
+      String(row.UNIDADE ?? row.CODVOL ?? row.COL_3 ?? '').trim().toUpperCase() ||
+      unitByProductCode.get(code) ||
+      'UN'
     const mobility = mobilityByProductCode.get(code) ?? (mobilityColumnFound ? 'NAO' : 'SIM')
 
     if (!code || !description || !unit) continue
@@ -259,33 +265,24 @@ function parseProducts(
 
 async function queryProducts(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   const failures: string[] = []
-
-  const unitCandidates = ['CODVOL', 'UNIDPADRAO', 'UNDPADRAO', 'UNIDADEPADRAO', 'CODVOLPADRAO']
+  const unitCandidates = ['CODVOL', 'UNIDPADRAO', 'UNDPADRAO', 'UNIDADEPADRAO', 'CODVOLPADRAO', 'CODVOLVEND']
   const mobilityCandidates = ['AD_MOBILIDADE', 'AD_MOBILIDA', 'MOBILIDADE', 'MOBILIDA']
   const groupCodeCandidates = ['CODGRUPOPROD', 'CODGRUPO', 'CODGRUPOPRO', 'CODGRUPPROD']
 
-  let productRecords: RawRecord[] = []
-
-  for (const unitColumn of unitCandidates) {
-    const productSql = `
+  const productSql = `
 SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
-  TRIM(P.DESCRPROD) AS DESCRICAO,
-  P.${unitColumn} AS UNIDADE
+  TRIM(P.DESCRPROD) AS DESCRICAO
 FROM TGFPRO P
 WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
 ORDER BY TRIM(P.DESCRPROD)
 `.trim()
-    try {
-      const rows = await queryRows(baseUrl, headers, productSql, appKey, { allowEmpty: true })
-      if (rows.length > 0) {
-        productRecords = rows
-        break
-      }
-    } catch (error) {
-      failures.push(simplifyErrorMessage(error))
-    }
-    if (productRecords.length > 0) break
+
+  let productRecords: RawRecord[] = []
+  try {
+    productRecords = await queryRows(baseUrl, headers, productSql, appKey)
+  } catch (error) {
+    failures.push(simplifyErrorMessage(error))
   }
 
   if (productRecords.length === 0) {
@@ -296,8 +293,31 @@ ORDER BY TRIM(P.DESCRPROD)
 
   const groupBrandByCode = new Map<string, string>()
   const brandByProductCode = new Map<string, string>()
+  const unitByProductCode = new Map<string, string>()
   const mobilityByProductCode = new Map<string, 'SIM' | 'NAO'>()
   let mobilityColumnFound = false
+
+  for (const unitColumn of unitCandidates) {
+    const unitSql = `
+SELECT
+  TO_CHAR(P.CODPROD) AS CODIGO,
+  UPPER(TRIM(TO_CHAR(P.${unitColumn}))) AS UNIDADE
+FROM TGFPRO P
+WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+`.trim()
+    try {
+      const rows = await queryRows(baseUrl, headers, unitSql, appKey, { allowEmpty: true })
+      for (const row of rows) {
+        const code = String(row.CODIGO ?? row.COL_1 ?? '').trim()
+        const unit = String(row.UNIDADE ?? row.COL_2 ?? '').trim().toUpperCase()
+        if (!code || !unit) continue
+        unitByProductCode.set(code, unit)
+      }
+      if (unitByProductCode.size > 0) break
+    } catch {
+      // tenta próxima coluna
+    }
+  }
 
   for (const brandProductColumn of ['MARCA', 'AD_MARCA']) {
     const brandSql = `
@@ -412,13 +432,7 @@ WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
     }
   }
 
-  const parsed = parseProducts(
-    productRecords,
-    groupBrandByCode,
-    brandByProductCode,
-    mobilityByProductCode,
-    mobilityColumnFound
-  )
+  const parsed = parseProducts(productRecords, groupBrandByCode, brandByProductCode, unitByProductCode, mobilityByProductCode, mobilityColumnFound)
   if (parsed.length === 0) {
     throw new Error(
       'Consulta autorizada, mas sem produtos elegiveis. Verifique mobilidade = SIM e categorias de marca permitidas.'
