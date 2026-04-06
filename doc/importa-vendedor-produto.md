@@ -75,15 +75,11 @@ POST {baseUrl}/mge/service.sbr?serviceName=MobileLoginSP.login&outputType=json
 
 Retorna `jsessionid` ou `bearerToken` no `responseBody`.
 
-### Credenciais atuais (Ouro Verde)
+### Credenciais
 
-| Campo          | Valor                                    |
-|----------------|------------------------------------------|
-| `token`        | `b1ea155e-a82a-4752-b955-98a88051dbbc`   |
-| `clientId`     | `81e6c345-7fe3-4d6b-80b8-ef0cc0d18bfd`  |
-| `clientSecret` | `xyo19h6n0iowsmXBl2lJoRHnRGGMhXB3`     |
-| `authMode`     | `OAUTH2`                                 |
-| On-premise     | `http://ouroverde.nuvemdatacom.com.br:10089` |
+As credenciais (`token`, `clientId`, `clientSecret`, URL on-premise) ficam armazenadas no banco de dados na tabela `Integration` (campo `configEncrypted`). **Nunca commitar credenciais em código ou documentação.**
+
+Para consultar as credenciais configuradas, acesse **Integrações → Sankhya** na interface do sistema.
 
 ---
 
