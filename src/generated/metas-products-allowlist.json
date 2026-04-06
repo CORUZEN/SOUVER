@@ -1,0 +1,146 @@
+[
+  {
+    "code": "9",
+    "description": "ALPISTE GRAO VERDE 20X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "9910",
+    "description": "CAFE CRUZEIRO DO SUL 20X194G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "4",
+    "description": "CAFE CRUZEIRO DO SUL 20X250G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "2",
+    "description": "CAFE GRAO VERDE MOIDO 50X100G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "3",
+    "description": "CAFE GRAO VERDE TORRADO GRAO 5KG",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "6",
+    "description": "CAFE OURO VERDE A VACUO 20X250G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "8089",
+    "description": "CAFE OURO VERDE A VACUO DESCAFEINADO 20X250G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "1",
+    "description": "CAFE OURO VERDE MOIDO 20X250G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "5",
+    "description": "CAFE OURO VERDE PREMIUM 20X250G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "9932",
+    "description": "CAFE OURO VERDE SOLUVEL 24X40G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "9933",
+    "description": "CAFE OURO VERDE SOLUVEL DESCAFEINADO 24X40G",
+    "brand": "CAFES",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "21",
+    "description": "COLORIFICO GRAO VERDE 100X100G",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "22",
+    "description": "COLORIFICO GRAO VERDE 20X500G",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "23",
+    "description": "COLORIFICO GRAO VERDE 40X250G",
+    "brand": "COLORIFICOS/TEMPEROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "623",
+    "description": "FLOCAO DE MILHO GRAO VERDE 20X400G",
+    "brand": "GRAOS",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "5093",
+    "description": "FLOCAO DE MILHO GRAO VERDE 20X500G",
+    "brand": "GRAOS",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "3585",
+    "description": "FLOCAO DE MILHO MILHOTTO 20X400G",
+    "brand": "GRAOS",
+    "unit": "UN",
+    "mobility": "SIM",
+    "active": true
+  },
+  {
+    "code": "11",
+    "description": "GIRASSOL MIUDO GRAO VERDE 10X500G",
+    "brand": "RACAO PASSAROS",
+    "unit": "FD",
+    "mobility": "SIM",
+    "active": true
+  }
+]

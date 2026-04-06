@@ -1487,84 +1487,11 @@ export default function MetasWorkspace() {
                               }
                             />
                           </td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={product.code}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, code: event.target.value }
-                                      : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={product.description}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, description: event.target.value }
-                                      : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={product.brand}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, brand: event.target.value }
-                                      : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={product.unit}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, unit: event.target.value.toUpperCase() }
-                                      : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <select
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs"
-                              value={product.mobility}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, mobility: event.target.value === 'SIM' ? 'SIM' : 'NAO' }
-                                      : item
-                                  )
-                                )
-                              }
-                            >
-                              <option value="SIM">SIM</option>
-                              <option value="NAO">NAO</option>
-                            </select>
-                          </td>
+                          <td className="px-3 py-2 text-xs text-surface-700">{product.code}</td>
+                          <td className="px-3 py-2 text-xs text-surface-700">{product.description}</td>
+                          <td className="px-3 py-2 text-xs text-surface-700">{product.brand}</td>
+                          <td className="px-3 py-2 text-xs text-surface-700">{product.unit}</td>
+                          <td className="px-3 py-2 text-xs text-surface-700">{product.mobility}</td>
                           <td className="px-3 py-2">
                             <button
                               type="button"

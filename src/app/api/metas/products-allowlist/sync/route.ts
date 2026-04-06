@@ -86,17 +86,75 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string): Promis
   return null
 }
 
+async function authenticateSession(config: SankhyaConfig, baseUrl: string): Promise<string | null> {
+  if (!config.username || !config.password) return null
+
+  const loginPayload = {
+    serviceName: 'MobileLoginSP.login',
+    requestBody: {
+      NOMUSU: { $: config.username },
+      INTERNO: { $: config.password },
+      KEEPCONNECTED: { $: 'S' },
+    },
+  }
+
+  const tokenHeader = config.appKey || config.token || ''
+  const endpoints = [
+    `${baseUrl}/mge/service.sbr?serviceName=MobileLoginSP.login&outputType=json`,
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(tokenHeader ? { token: tokenHeader } : {}),
+        },
+        body: JSON.stringify(loginPayload),
+        signal: AbortSignal.timeout(15_000),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data) continue
+
+      const body = data.responseBody ?? data
+      const sessionToken =
+        typeof body.jsessionid === 'string' ? body.jsessionid :
+        typeof body.JSESSIONID === 'string' ? body.JSESSIONID :
+        typeof body.callID === 'string' ? body.callID :
+        typeof body.bearerToken === 'string' ? body.bearerToken :
+        null
+
+      const cookieToken = extractBearerToken(body)
+      const token = sessionToken || cookieToken
+      if (token) return token
+    } catch {
+      // tenta proximo endpoint
+    }
+  }
+
+  return null
+}
+
 function buildHeaders(config: SankhyaConfig, bearerToken: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
-  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`
+    headers.token = bearerToken
+  } else if (config.token) {
+    headers.token = config.token
+  }
   if (config.token) headers['X-Token'] = config.token
-  if (config.token) headers.token = config.token
-  if (config.appKey) {
-    headers.appkey = config.appKey
-    headers.AppKey = config.appKey
+  // appkey header: use explicit appKey, fall back to token (Sankhya cloud needs this)
+  const appKeyValue = config.appKey || config.token
+  if (appKeyValue) {
+    headers.appkey = appKeyValue
+    headers.AppKey = appKeyValue
   }
   return headers
 }
@@ -131,7 +189,9 @@ function collectRecords(payload: unknown, bucket: RawRecord[]) {
   if (responseBody && typeof responseBody === 'object') {
     const body = responseBody as RawRecord
     const rowsRaw = body.rows
-    const fieldsRaw = Array.isArray(body.fields) ? body.fields : []
+    const fieldsRaw = Array.isArray(body.fields) ? body.fields
+      : Array.isArray(body.fieldsMetadata) ? body.fieldsMetadata
+      : []
 
     if (Array.isArray(rowsRaw) && rowsRaw.length > 0) {
       const row0 = rowsRaw[0]
@@ -183,26 +243,30 @@ async function queryRows(
 
   for (const endpoint of getSqlEndpoints(baseUrl, appKey, /^Bearer\s+/i.test(headers.Authorization ?? ''))) {
     for (const payload of payloadVariants) {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(25_000),
-      })
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        failures.push(`${endpoint}: HTTP ${response.status}`)
-        continue
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(25_000),
+        })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+          failures.push(`${endpoint}: HTTP ${response.status}`)
+          continue
+        }
+        const serviceError = extractServiceError(data)
+        if (serviceError) {
+          failures.push(`${endpoint}: ${serviceError}`)
+          continue
+        }
+        hadSuccessfulExecution = true
+        const records: RawRecord[] = []
+        collectRecords(data, records)
+        if (records.length > 0) return records
+      } catch (err) {
+        failures.push(`${endpoint}: ${err instanceof Error ? err.message : 'erro de rede'}`)
       }
-      const serviceError = extractServiceError(data)
-      if (serviceError) {
-        failures.push(`${endpoint}: ${serviceError}`)
-        continue
-      }
-      hadSuccessfulExecution = true
-      const records: RawRecord[] = []
-      collectRecords(data, records)
-      if (records.length > 0) return records
     }
   }
 
@@ -274,7 +338,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   TRIM(P.DESCRPROD) AS DESCRICAO
 FROM TGFPRO P
-WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
 ORDER BY TRIM(P.DESCRPROD)
 `.trim()
 
@@ -303,7 +367,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   UPPER(TRIM(TO_CHAR(P.${unitColumn}))) AS UNIDADE
 FROM TGFPRO P
-WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
 `.trim()
     try {
       const rows = await queryRows(baseUrl, headers, unitSql, appKey, { allowEmpty: true })
@@ -325,7 +389,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   P.${brandProductColumn} AS MARCA
 FROM TGFPRO P
-WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
 `.trim()
     try {
       const brandRows = await queryRows(baseUrl, headers, brandSql, appKey, { allowEmpty: true })
@@ -348,7 +412,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   TO_CHAR(P.${groupCodeColumn}) AS CODGRUPO_REF
 FROM TGFPRO P
-WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
 `.trim()
     try {
       const rows = await queryRows(baseUrl, headers, groupRefSql, appKey, { allowEmpty: true })
@@ -373,7 +437,7 @@ SELECT
   TO_CHAR(G.${groupCodeColumnFound}) AS CODGRUPO_REF,
   TRIM(G.${groupDescColumn}) AS MARCA
 FROM TGFGRU G
-WHERE NVL(TRIM(G.${groupDescColumn}), '') <> ''
+WHERE TRIM(G.${groupDescColumn}) IS NOT NULL
 `.trim()
       try {
         const groupRows = await queryRows(baseUrl, headers, groupSql, appKey, { allowEmpty: true })
@@ -411,7 +475,7 @@ SELECT
   TO_CHAR(P.CODPROD) AS CODIGO,
   UPPER(TRIM(TO_CHAR(P.${mobilityColumn}))) AS MOBILIDADE
 FROM TGFPRO P
-WHERE NVL(TRIM(P.DESCRPROD), '') <> ''
+WHERE TRIM(P.DESCRPROD) IS NOT NULL
 `.trim()
     try {
       const rows = await queryRows(baseUrl, headers, mobilitySql, appKey, { allowEmpty: true })
@@ -461,7 +525,16 @@ export async function POST(req: NextRequest) {
   const config = parseStoredConfig(integration.configEncrypted)
 
   try {
-    const bearerToken = (config.authMode ?? 'OAUTH2') === 'OAUTH2' ? await authenticateOAuth(config, baseUrl) : null
+    let bearerToken: string | null = null
+
+    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
+      bearerToken = await authenticateOAuth(config, baseUrl)
+    }
+
+    if (!bearerToken) {
+      bearerToken = await authenticateSession(config, baseUrl)
+    }
+
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey ?? config.token ?? null
     const remoteProducts = await queryProducts(baseUrl, headers, appKey)
