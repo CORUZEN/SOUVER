@@ -3,12 +3,18 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 
+type SankhyaRawRecord = Record<string, unknown>
+
 type SankhyaOrder = {
   sellerCode: string
   sellerName: string
   orderNumber: string
   negotiatedAt: string
   totalValue: number
+}
+
+function hasLegacyCredentials(config: SankhyaConfig) {
+  return Boolean(config.username && config.password)
 }
 
 function toIsoDate(value: unknown): string | null {
@@ -38,27 +44,77 @@ function parseNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function normalizeObjectKeys(record: Record<string, unknown>) {
-  const normalized: Record<string, unknown> = {}
+function normalizeObjectKeys(record: SankhyaRawRecord) {
+  const normalized: SankhyaRawRecord = {}
   for (const [key, value] of Object.entries(record)) normalized[key.toUpperCase()] = value
   return normalized
 }
 
-function collectObjectArrays(payload: unknown, bucket: Array<Record<string, unknown>[]>) {
-  if (!payload) return
-  if (Array.isArray(payload)) {
-    if (payload.length > 0 && payload.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))) {
-      bucket.push(payload as Array<Record<string, unknown>>)
-    }
-    for (const entry of payload) collectObjectArrays(entry, bucket)
-    return
-  }
-  if (typeof payload !== 'object') return
-  for (const value of Object.values(payload as Record<string, unknown>)) collectObjectArrays(value, bucket)
+function extractServiceErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const obj = payload as SankhyaRawRecord
+  const status = String(obj.status ?? '').trim()
+  const statusMessage = String(obj.statusMessage ?? '').trim()
+  if (!status && !statusMessage) return null
+  if (status === '1' || status.toUpperCase() === 'SUCCESS') return null
+  return statusMessage || `Falha no servico Sankhya (status ${status || 'desconhecido'}).`
 }
 
-function toOrder(row: Record<string, unknown>): SankhyaOrder | null {
-  const record = normalizeObjectKeys(row)
+function isUnauthorizedMessage(message: string) {
+  return /n.o autorizado/i.test(message)
+}
+
+function collectRecords(payload: unknown, bucket: SankhyaRawRecord[]) {
+  if (!payload || typeof payload !== 'object') return
+  const obj = payload as SankhyaRawRecord
+
+  const responseBody = (obj.responseBody ?? null) as SankhyaRawRecord | null
+  const rows = responseBody?.rows
+  const fieldsRaw = responseBody?.fields
+
+  if (Array.isArray(rows) && rows.length > 0) {
+    const row0 = rows[0]
+
+    if (row0 && typeof row0 === 'object' && !Array.isArray(row0)) {
+      for (const row of rows) {
+        if (row && typeof row === 'object' && !Array.isArray(row)) {
+          bucket.push(normalizeObjectKeys(row as SankhyaRawRecord))
+        }
+      }
+    } else if (Array.isArray(row0)) {
+      const fields =
+        Array.isArray(fieldsRaw) && fieldsRaw.length > 0
+          ? fieldsRaw.map((field) => {
+              if (typeof field === 'string') return field
+              if (field && typeof field === 'object') {
+                const f = field as SankhyaRawRecord
+                return String(f.name ?? f.fieldName ?? f.FIELD_NAME ?? '')
+              }
+              return ''
+            })
+          : []
+
+      for (const row of rows) {
+        if (!Array.isArray(row)) continue
+        const mapped: SankhyaRawRecord = {}
+        if (fields.length > 0) {
+          for (let i = 0; i < row.length; i += 1) {
+            const key = String(fields[i] ?? `COL_${i + 1}`).toUpperCase()
+            mapped[key] = row[i]
+          }
+        } else {
+          for (let i = 0; i < row.length; i += 1) mapped[`COL_${i + 1}`] = row[i]
+        }
+        bucket.push(mapped)
+      }
+    }
+  }
+
+  for (const value of Object.values(obj)) collectRecords(value, bucket)
+}
+
+function toOrder(recordInput: SankhyaRawRecord): SankhyaOrder | null {
+  const record = normalizeObjectKeys(recordInput)
   const sellerName =
     String(
       record.VENDEDOR ??
@@ -88,10 +144,9 @@ function toOrder(row: Record<string, unknown>): SankhyaOrder | null {
 }
 
 function extractOrders(payload: unknown): SankhyaOrder[] {
-  const arrays: Array<Record<string, unknown>[]> = []
-  collectObjectArrays(payload, arrays)
-  const orders = arrays.flatMap((rows) => rows.map(toOrder).filter((entry): entry is SankhyaOrder => Boolean(entry)))
-  return orders
+  const records: SankhyaRawRecord[] = []
+  collectRecords(payload, records)
+  return records.map(toOrder).filter((entry): entry is SankhyaOrder => Boolean(entry))
 }
 
 function getSankhyaAuthOrigins(baseUrl: string) {
@@ -114,7 +169,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
 
 function extractBearerToken(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
-  const obj = payload as Record<string, unknown>
+  const obj = payload as SankhyaRawRecord
   const candidates = [obj.access_token, obj.bearerToken, obj.token, obj.jwt]
   for (const token of candidates) {
     if (typeof token === 'string' && token.trim().length > 0) return token.trim()
@@ -153,6 +208,73 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string): Promis
   return null
 }
 
+function extractJsessionId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const obj = payload as SankhyaRawRecord
+
+  const directCandidates = [
+    obj.jsessionid,
+    (obj.responseBody as SankhyaRawRecord | undefined)?.jsessionid,
+    (obj.responseBody as SankhyaRawRecord | undefined)?.JSESSIONID,
+  ]
+
+  for (const value of directCandidates) {
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim()
+    if (value && typeof value === 'object') {
+      const boxed = value as SankhyaRawRecord
+      if (typeof boxed.$ === 'string' && boxed.$.trim().length > 0) return boxed.$.trim()
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    const nested = extractJsessionId(value)
+    if (nested) return nested
+  }
+  return null
+}
+
+async function loginLegacy(config: SankhyaConfig, baseUrl: string): Promise<string> {
+  if (!config.username || !config.password) {
+    throw new Error('Credenciais legadas incompletas (username/password).')
+  }
+
+  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=MobileLoginSP.login&outputType=json`
+  const payload = {
+    serviceName: 'MobileLoginSP.login',
+    requestBody: {
+      NOMUSU: { $: config.username },
+      INTERNO: { $: config.password },
+    },
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(`Falha no login legado (HTTP ${response.status}).`)
+
+  const serviceError = extractServiceErrorMessage(data)
+  if (serviceError) throw new Error(`Falha no login legado: ${serviceError}`)
+
+  const jsessionid = extractJsessionId(data)
+  if (!jsessionid) throw new Error('Login legado sem jsessionid retornado.')
+  return jsessionid
+}
+
+async function logoutLegacy(baseUrl: string, jsessionid: string, appKey?: string | null) {
+  const appKeyParam = appKey ? `&appkey=${encodeURIComponent(appKey)}` : ''
+  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=MobileLoginSP.logout&outputType=json&jsessionid=${encodeURIComponent(jsessionid)}${appKeyParam}`
+  await fetch(endpoint, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serviceName: 'MobileLoginSP.logout', requestBody: {} }),
+    signal: AbortSignal.timeout(5_000),
+  }).catch(() => null)
+}
+
 function buildSankhyaHeaders(config: SankhyaConfig, bearerToken: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -176,8 +298,15 @@ function buildSankhyaHeaders(config: SankhyaConfig, bearerToken: string | null):
   return headers
 }
 
-async function runSankhyaQuery(baseUrl: string, headers: Record<string, string>, sql: string) {
-  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json`
+async function runSankhyaQuery(
+  baseUrl: string,
+  headers: Record<string, string>,
+  sql: string,
+  opts?: { jsessionid?: string | null; appKey?: string | null }
+) {
+  const appKeyParam = opts?.appKey ? `&appkey=${encodeURIComponent(opts.appKey)}` : ''
+  const jsessionParam = opts?.jsessionid ? `&jsessionid=${encodeURIComponent(opts.jsessionid)}` : ''
+  const endpoint = `${baseUrl}/mge/service.sbr?serviceName=DbExplorerSP.executeQuery&outputType=json${jsessionParam}${appKeyParam}`
   const payloads: unknown[] = [
     {
       serviceName: 'DbExplorerSP.executeQuery',
@@ -208,13 +337,25 @@ async function runSankhyaQuery(baseUrl: string, headers: Record<string, string>,
       continue
     }
 
+    const serviceError = extractServiceErrorMessage(data)
+    if (serviceError) {
+      failures.push(serviceError)
+      continue
+    }
+
     const orders = extractOrders(data)
     if (orders.length > 0) return orders
-
     failures.push('resposta sem linhas de pedidos')
   }
 
-  throw new Error(`Não foi possível consultar pedidos no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
+  const normalized = failures.join(' | ') || 'sem detalhes'
+  if (isUnauthorizedMessage(normalized)) {
+    throw new Error(
+      'Sankhya recusou a consulta SQL (Nao autorizado). Verifique permissoes do integrador para DbExplorerSP.executeQuery.'
+    )
+  }
+
+  throw new Error(`Nao foi possivel consultar pedidos no Sankhya (${normalized}).`)
 }
 
 function parseYearMonth(req: NextRequest) {
@@ -266,7 +407,7 @@ export async function GET(req: NextRequest) {
   if (!integration || !integration.baseUrl) {
     return NextResponse.json(
       {
-        message: 'Nenhuma integração Sankhya ativa foi encontrada.',
+        message: 'Nenhuma integracao Sankhya ativa foi encontrada.',
       },
       { status: 412 }
     )
@@ -275,7 +416,7 @@ export async function GET(req: NextRequest) {
   const config = parseStoredConfig(integration.configEncrypted)
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
   if (!baseUrl) {
-    return NextResponse.json({ message: 'A integração Sankhya ativa está sem URL válida.' }, { status: 412 })
+    return NextResponse.json({ message: 'A integracao Sankhya ativa esta sem URL valida.' }, { status: 412 })
   }
 
   try {
@@ -283,7 +424,27 @@ export async function GET(req: NextRequest) {
     const bearerToken = authMode === 'OAUTH2' ? await authenticateOAuth(config, baseUrl) : null
     const headers = buildSankhyaHeaders(config, bearerToken)
     const sql = makeSql(startDate, endDateExclusive)
-    const orders = await runSankhyaQuery(baseUrl, headers, sql)
+    let orders: SankhyaOrder[] = []
+
+    try {
+      orders = await runSankhyaQuery(baseUrl, headers, sql)
+    } catch (primaryError) {
+      const message = primaryError instanceof Error ? primaryError.message : String(primaryError ?? '')
+      if (!isUnauthorizedMessage(message) || !hasLegacyCredentials(config)) throw primaryError
+
+      const appKey = config.appKey ?? config.token ?? null
+      const jsessionid = await loginLegacy(config, baseUrl)
+      try {
+        orders = await runSankhyaQuery(
+          baseUrl,
+          { Accept: 'application/json', 'Content-Type': 'application/json' },
+          sql,
+          { jsessionid, appKey }
+        )
+      } finally {
+        await logoutLegacy(baseUrl, jsessionid, appKey)
+      }
+    }
 
     const sellersMap = new Map<
       string,
@@ -299,8 +460,15 @@ export async function GET(req: NextRequest) {
     for (const order of orders) {
       const normalizedName = order.sellerName.trim() || 'Sem vendedor'
       const sellerKey = `${order.sellerCode || '0'}::${normalizedName.toUpperCase()}`
-      const sellerId = order.sellerCode ? `sankhya-${order.sellerCode}` : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
-      const sellerLogin = normalizedName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')
+      const sellerId = order.sellerCode
+        ? `sankhya-${order.sellerCode}`
+        : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+      const sellerLogin = normalizedName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '.')
+        .replace(/^\.+|\.+$/g, '')
 
       if (!sellersMap.has(sellerKey)) {
         sellersMap.set(sellerKey, {

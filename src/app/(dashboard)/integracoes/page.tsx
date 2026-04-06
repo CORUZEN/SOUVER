@@ -342,6 +342,7 @@ export default function IntegracoesPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [testingId, setTestingId] = useState<string | null>(null)
+  const [diagnosingId, setDiagnosingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -394,6 +395,30 @@ export default function IntegracoesPage() {
     setTestingId(null)
     if (!res.ok) return setFlash({ type: 'error', text: data?.error ?? 'Falha ao testar conexão.' })
     setFlash({ type: data.status === 'success' ? 'success' : 'error', text: data.message ?? 'Teste finalizado.' })
+    await loadList()
+  }
+
+  async function onDiagnostic(item: Integration) {
+    setDiagnosingId(item.id)
+    const res = await fetch(`/api/integrations/${item.id}/diagnostic`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    setDiagnosingId(null)
+
+    if (!res.ok) {
+      setFlash({ type: 'error', text: data?.error ?? 'Falha ao executar diagnostico.' })
+      return
+    }
+
+    const host = data?.diagnostic?.context?.requestHost ?? 'host-desconhecido'
+    const oauthOk = Boolean(data?.diagnostic?.oauth?.ok)
+    const sqlOk = Boolean(data?.diagnostic?.sqlProbe?.ok)
+    const summary = `Host: ${host} | OAuth: ${oauthOk ? 'OK' : 'falhou'} | SQL: ${sqlOk ? 'OK' : 'bloqueado'}`
+
+    setFlash({
+      type: data?.status === 'success' ? 'success' : 'error',
+      text: `${data?.message ?? 'Diagnostico concluido.'} (${summary})`,
+    })
+
     await loadList()
   }
 
@@ -484,6 +509,7 @@ export default function IntegracoesPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex gap-2">
                       <button onClick={() => onTest(item)} disabled={testingId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50 disabled:opacity-60">{testingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />} Testar conexão</button>
+                      <button onClick={() => onDiagnostic(item)} disabled={diagnosingId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50 disabled:opacity-60">{diagnosingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Diagnóstico OAuth/Host</button>
                       <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-50"><Pencil size={14} /> Editar</button>
                     </div>
                     <button onClick={() => onDelete(item)} disabled={deletingId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"><Trash2 size={14} /> Remover</button>
