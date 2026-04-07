@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Boxes,
   CalendarDays,
@@ -18,7 +18,7 @@ import {
 import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 
-type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING'
+type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
 type PrizeType = 'CASH' | 'BENEFIT'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
@@ -50,11 +50,22 @@ interface MonthConfig {
   customOffDates: string[]
 }
 
+interface MetaConfig {
+  ruleBlocks: RuleBlock[]
+  prizes: CampaignPrize[]
+  includeNational: boolean
+  salaryBase: number
+  basePremiation: number
+  extraBonus: number
+  extraMinPoints: number
+}
+
 interface SellerOrder {
   orderNumber: string
   negotiatedAt: string
   totalValue: number
   grossWeight: number
+  clientCode: string
 }
 
 interface Salesperson {
@@ -105,6 +116,15 @@ interface SellerSnapshot {
   status: 'SUPEROU' | 'NO_ALVO' | 'ATENCAO' | 'CRITICO'
   gapToTarget: number
   ruleProgress: RuleProgress[]
+  blockId: string
+}
+
+interface RuleBlock {
+  id: string
+  title: string
+  monthlyTarget: number
+  sellerIds: string[]
+  rules: GoalRule[]
 }
 
 interface CycleWeek {
@@ -137,6 +157,7 @@ const STAGES: Array<{ key: StageKey; label: string }> = [
   { key: 'W2', label: '2ª Semana' },
   { key: 'W3', label: '3ª Semana' },
   { key: 'CLOSING', label: 'Fechamento' },
+  { key: 'FULL', label: 'Todo o período' },
 ]
 
 const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: string }> = [
@@ -175,18 +196,28 @@ const DEFAULT_RULES: GoalRule[] = [
   { id: 'w2-fin', stage: 'W2', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 2ª semana.', targetText: '60%', rewardValue: 96.75, points: 0.02 },
   // ── 3ª Semana ──
   { id: 'w3-volume', stage: 'W3', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 3ª semana.', targetText: '4 categorias', rewardValue: 145.12, points: 0.03 },
-  { id: 'w3-dist', stage: 'W3', frequency: 'WEEKLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 50% dos itens positivados em 30% da base de clientes.', targetText: '27 itens', rewardValue: 483.73, points: 0.1 },
+  { id: 'w3-dist', stage: 'W3', frequency: 'WEEKLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 50% dos itens positivados em 30% da base de clientes.', targetText: '50%|30', rewardValue: 483.73, points: 0.1 },
   { id: 'w3-fin', stage: 'W3', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 3ª semana.', targetText: '80%', rewardValue: 241.87, points: 0.05 },
   // ── Fechamento ──
   { id: 'closing-base', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento do mês.', targetText: '85%', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias entregues até o fechamento do mês.', targetText: '6 categorias', rewardValue: 483.73, points: 0.1 },
-  { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '43 itens', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume e positivação.', targetText: '100% V + 40% D', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado).', targetText: '120%', rewardValue: 96.75, points: 0.02 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
+
+const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
+  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES },
+]
+
+function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
+  const specific = blocks.find((b) => b.sellerIds.includes(sellerId))
+  if (specific) return specific
+  return blocks.find((b) => b.sellerIds.length === 0) ?? blocks[0]
+}
 
 const DEFAULT_PRIZES: CampaignPrize[] = [
   { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', rewardValue: 1000, minPoints: 0.6, active: true },
@@ -330,8 +361,9 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
   }
 
   const baseStart = start < monthStart ? monthStart : start
+  const weekStages = STAGES.filter((s) => s.key !== 'FULL')
 
-  STAGES.forEach((stage, index) => {
+  weekStages.forEach((stage, index) => {
     const stageStart = addDays(baseStart, index * 7)
     if (stageStart > monthEnd) {
       weeks.push({
@@ -364,6 +396,21 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
     })
   })
 
+  // FULL stage: entire month
+  const fullBusiness: string[] = []
+  for (let cursor = new Date(monthStart); cursor <= monthEnd; cursor = addDays(cursor, 1)) {
+    const weekday = cursor.getDay()
+    const iso = toIsoDate(cursor)
+    if (weekday >= 1 && weekday <= 5 && !blocked.has(iso)) fullBusiness.push(iso)
+  }
+  weeks.push({
+    key: 'FULL',
+    label: 'Todo o período',
+    start: toIsoDate(monthStart),
+    end: toIsoDate(monthEnd),
+    businessDays: fullBusiness,
+  })
+
   let lastBusinessDate: string | null = null
   for (let d = new Date(monthEnd); d >= monthStart; d = addDays(d, -1)) {
     const wd = d.getDay()
@@ -374,7 +421,7 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
     }
   }
 
-  const totalBusinessDays = weeks.reduce((sum, week) => sum + week.businessDays.length, 0)
+  const totalBusinessDays = weeks.filter((w) => w.key !== 'FULL').reduce((sum, week) => sum + week.businessDays.length, 0)
   return { weeks, totalBusinessDays, lastBusinessDate }
 }
 
@@ -390,7 +437,9 @@ export default function MetasWorkspace() {
   const [month, setMonth] = useState(now.getMonth())
   const [includeNational, setIncludeNational] = useState(true)
   const [monthConfigs, setMonthConfigs] = useState<Record<string, MonthConfig>>({})
-  const [rules, setRules] = useState<GoalRule[]>(DEFAULT_RULES)
+  const [metaConfigs, setMetaConfigs] = useState<Record<string, MetaConfig>>({})
+  const [ruleBlocks, setRuleBlocks] = useState<RuleBlock[]>(DEFAULT_RULE_BLOCKS)
+  const rules = useMemo(() => ruleBlocks.flatMap((b) => b.rules), [ruleBlocks])
   const [prizes, setPrizes] = useState<CampaignPrize[]>(DEFAULT_PRIZES)
   const [salaryBase, setSalaryBase] = useState(1612.44)
   const [basePremiation, setBasePremiation] = useState(4837.32)
@@ -420,6 +469,7 @@ export default function MetasWorkspace() {
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
+  const prevActiveKeyRef = useRef(activeKey)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
 
@@ -429,16 +479,68 @@ export default function MetasWorkspace() {
     if (!raw) return
     try {
       const data = JSON.parse(raw) as Record<string, unknown>
+      const loadedYear = typeof data.year === 'number' ? data.year : now.getFullYear()
+      const loadedMonth = typeof data.month === 'number' ? data.month : now.getMonth()
       if (typeof data.year === 'number') setYear(data.year)
       if (typeof data.month === 'number') setMonth(data.month)
-      if (typeof data.includeNational === 'boolean') setIncludeNational(data.includeNational)
       if (data.monthConfigs && typeof data.monthConfigs === 'object') setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
-      if (Array.isArray(data.rules)) setRules((data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })))
-      if (Array.isArray(data.prizes)) setPrizes(data.prizes as CampaignPrize[])
-      if (typeof data.salaryBase === 'number') setSalaryBase(data.salaryBase)
-      if (typeof data.basePremiation === 'number') setBasePremiation(data.basePremiation)
-      if (typeof data.extraBonus === 'number') setExtraBonus(data.extraBonus)
-      if (typeof data.extraMinPoints === 'number') setExtraMinPoints(data.extraMinPoints)
+
+      const migrateBlocks = (raw: unknown): RuleBlock[] => {
+        if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
+          ...b,
+          monthlyTarget: b.monthlyTarget ?? 0,
+          sellerIds: b.sellerIds ?? [],
+          rules: b.rules.map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
+        }))
+        return DEFAULT_RULE_BLOCKS
+      }
+
+      if (data.metaConfigs && typeof data.metaConfigs === 'object') {
+        const mc = data.metaConfigs as Record<string, MetaConfig>
+        // Normalize blocks inside each meta config
+        const normalized = Object.fromEntries(
+          Object.entries(mc).map(([k, v]) => [k, { ...v, ruleBlocks: migrateBlocks(v.ruleBlocks) }])
+        )
+        setMetaConfigs(normalized)
+        const key = monthKey(loadedYear, loadedMonth)
+        const cfg = normalized[key]
+        if (cfg) {
+          setRuleBlocks(cfg.ruleBlocks)
+          setPrizes(cfg.prizes)
+          setIncludeNational(cfg.includeNational)
+          setSalaryBase(cfg.salaryBase)
+          setBasePremiation(cfg.basePremiation)
+          setExtraBonus(cfg.extraBonus)
+          setExtraMinPoints(cfg.extraMinPoints)
+        }
+      } else {
+        // Legacy migration: flat ruleBlocks/rules at root level → create single metaConfig entry
+        let blocks = DEFAULT_RULE_BLOCKS
+        if (Array.isArray(data.ruleBlocks)) {
+          blocks = migrateBlocks(data.ruleBlocks)
+        } else if (Array.isArray(data.rules)) {
+          blocks = [{ id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: (data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })) }]
+        }
+        const legacyPrizes = Array.isArray(data.prizes) ? (data.prizes as CampaignPrize[]) : DEFAULT_PRIZES
+        const cfg: MetaConfig = {
+          ruleBlocks: blocks,
+          prizes: legacyPrizes,
+          includeNational: typeof data.includeNational === 'boolean' ? data.includeNational : true,
+          salaryBase: typeof data.salaryBase === 'number' ? data.salaryBase : 1612.44,
+          basePremiation: typeof data.basePremiation === 'number' ? data.basePremiation : 4837.32,
+          extraBonus: typeof data.extraBonus === 'number' ? data.extraBonus : 400,
+          extraMinPoints: typeof data.extraMinPoints === 'number' ? data.extraMinPoints : 0.6,
+        }
+        const key = monthKey(loadedYear, loadedMonth)
+        setMetaConfigs({ [key]: cfg })
+        setRuleBlocks(cfg.ruleBlocks)
+        setPrizes(cfg.prizes)
+        setIncludeNational(cfg.includeNational)
+        setSalaryBase(cfg.salaryBase)
+        setBasePremiation(cfg.basePremiation)
+        setExtraBonus(cfg.extraBonus)
+        setExtraMinPoints(cfg.extraMinPoints)
+      }
     } catch {
       // ignore bad payload
     }
@@ -455,13 +557,61 @@ export default function MetasWorkspace() {
     }))
   }, [activeKey, activeMonth, month, year])
 
+  // ── Month-switch: save old month config, load new month (or inherit from previous) ──
+  useEffect(() => {
+    if (prevActiveKeyRef.current === activeKey) return
+    const oldKey = prevActiveKeyRef.current
+    prevActiveKeyRef.current = activeKey
+
+    // Save current working state into the old month
+    setMetaConfigs((prev) => {
+      const updated = {
+        ...prev,
+        [oldKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+      }
+
+      // Load new month's config
+      const cfg = updated[activeKey]
+      if (cfg) {
+        setRuleBlocks(cfg.ruleBlocks)
+        setPrizes(cfg.prizes)
+        setIncludeNational(cfg.includeNational)
+        setSalaryBase(cfg.salaryBase)
+        setBasePremiation(cfg.basePremiation)
+        setExtraBonus(cfg.extraBonus)
+        setExtraMinPoints(cfg.extraMinPoints)
+      } else {
+        // Inherit from closest previous month that has config
+        const source = Object.keys(updated).sort().reverse().find((k) => k < activeKey)
+        if (source) {
+          const src = updated[source]
+          setRuleBlocks(src.ruleBlocks)
+          setPrizes(src.prizes)
+          setIncludeNational(src.includeNational)
+          setSalaryBase(src.salaryBase)
+          setBasePremiation(src.basePremiation)
+          setExtraBonus(src.extraBonus)
+          setExtraMinPoints(src.extraMinPoints)
+        }
+        // If no previous month exists, keep current defaults
+      }
+
+      return updated
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
+    const merged: Record<string, MetaConfig> = {
+      ...metaConfigs,
+      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+    }
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ year, month, includeNational, monthConfigs, rules, prizes, salaryBase, basePremiation, extraBonus, extraMinPoints })
+      JSON.stringify({ year, month, monthConfigs, metaConfigs: merged })
     )
-  }, [basePremiation, extraBonus, extraMinPoints, includeNational, month, monthConfigs, prizes, rules, salaryBase, year])
+  }, [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -484,7 +634,7 @@ export default function MetasWorkspace() {
           totalValue?: number
           totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
         }>
 
         const mapped = remoteSellers.map((seller) => {
@@ -495,6 +645,7 @@ export default function MetasWorkspace() {
               negotiatedAt: String(order.negotiatedAt).slice(0, 10),
               totalValue: Number(order.totalValue ?? 0),
               grossWeight: Number(order.grossWeight ?? 0),
+              clientCode: String(order.clientCode ?? ''),
             }))
 
           return {
@@ -613,7 +764,7 @@ export default function MetasWorkspace() {
           totalValue?: number
           totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
         }>
         setSellers(
           remoteSellers.map((seller) => ({
@@ -630,6 +781,7 @@ export default function MetasWorkspace() {
                 negotiatedAt: String(order.negotiatedAt).slice(0, 10),
                 totalValue: Number(order.totalValue ?? 0),
                 grossWeight: Number(order.grossWeight ?? 0),
+                clientCode: String(order.clientCode ?? ''),
               })),
           }))
         )
@@ -890,6 +1042,8 @@ export default function MetasWorkspace() {
     const teamAverageValue =
       sellers.length > 0 ? sellers.reduce((sum, seller) => sum + seller.totalValue, 0) / sellers.length : 0
 
+    const totalActiveProducts = productAllowlist.filter((p) => p.active).length
+
     const teamAverageTicket = (() => {
       const tickets = sellers
         .filter((seller) => seller.totalOrders > 0)
@@ -900,12 +1054,17 @@ export default function MetasWorkspace() {
 
     return sellers
       .map((seller) => {
+        const block = findBlockForSeller(seller.id, ruleBlocks)
+        const blockRules = block.rules
+        const blockPointsTarget = blockRules.reduce((sum, rule) => sum + rule.points, 0)
+        const blockRewardTarget = blockRules.reduce((sum, rule) => sum + rule.rewardValue, 0)
+
         const stageMetrics = STAGES.reduce(
           (acc, stage) => {
-            acc[stage.key] = { orderCount: 0, totalValue: 0 }
+            acc[stage.key] = { orderCount: 0, totalValue: 0, clientCodes: new Set<string>() }
             return acc
           },
-          {} as Record<StageKey, { orderCount: number; totalValue: number }>
+          {} as Record<StageKey, { orderCount: number; totalValue: number; clientCodes: Set<string> }>
         )
 
         for (const order of seller.orders) {
@@ -913,65 +1072,103 @@ export default function MetasWorkspace() {
           if (!stage) continue
           stageMetrics[stage].orderCount += 1
           stageMetrics[stage].totalValue += order.totalValue
+          if (order.clientCode) stageMetrics[stage].clientCodes.add(order.clientCode)
+          // FULL stage always accumulates everything
+          if (stage !== 'FULL') {
+            stageMetrics.FULL.orderCount += 1
+            stageMetrics.FULL.totalValue += order.totalValue
+            if (order.clientCode) stageMetrics.FULL.clientCodes.add(order.clientCode)
+          }
         }
 
         const stageOrder: StageKey[] = ['W1', 'W2', 'W3', 'CLOSING']
-        const cumulativeMetrics: Record<StageKey, { orderCount: number; totalValue: number }> = { W1: { orderCount: 0, totalValue: 0 }, W2: { orderCount: 0, totalValue: 0 }, W3: { orderCount: 0, totalValue: 0 }, CLOSING: { orderCount: 0, totalValue: 0 } }
+        const cumulativeMetrics: Record<StageKey, { orderCount: number; totalValue: number; distinctClients: number }> = {
+          W1: { orderCount: 0, totalValue: 0, distinctClients: 0 }, W2: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+          W3: { orderCount: 0, totalValue: 0, distinctClients: 0 }, CLOSING: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+          FULL: { orderCount: stageMetrics.FULL.orderCount, totalValue: stageMetrics.FULL.totalValue, distinctClients: stageMetrics.FULL.clientCodes.size },
+        }
         let cumOrders = 0
         let cumValue = 0
+        const cumClients = new Set<string>()
         for (const sk of stageOrder) {
           cumOrders += stageMetrics[sk].orderCount
           cumValue += stageMetrics[sk].totalValue
-          cumulativeMetrics[sk] = { orderCount: cumOrders, totalValue: cumValue }
+          for (const c of stageMetrics[sk].clientCodes) cumClients.add(c)
+          cumulativeMetrics[sk] = { orderCount: cumOrders, totalValue: cumValue, distinctClients: cumClients.size }
         }
+
+        const totalDistinctClients = stageMetrics.FULL.clientCodes.size
 
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
         const teamAverageTicketSafe = Math.max(teamAverageTicket, 0.00001)
+        const monthlyTargetSafe = block.monthlyTarget > 0 ? block.monthlyTarget : teamAverageValueSafe
 
-        const ruleProgress = rules.map((rule) => {
-          const targetPct =
-            rule.targetText.includes('%') && parseTargetNumber(rule.targetText)
-              ? Math.max((parseTargetNumber(rule.targetText) ?? 0) / 100, 0.00001)
-              : null
-          const targetAmount = parseTargetNumber(rule.targetText)
+        const ruleProgress = blockRules.map((rule) => {
+          const rawNumber = parseTargetNumber(rule.targetText) ?? 0
           const cumStage = cumulativeMetrics[rule.stage]
           const stage = stageMetrics[rule.stage]
           const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
+
+          // KPIs that always interpret parameter as percentage
+          const pctKpis: KpiType[] = ['BASE_CLIENTES', 'META_FINANCEIRA', 'RENTABILIDADE', 'DEVOLUCAO', 'INADIMPLENCIA']
+          const asPct = pctKpis.includes(kpiType) && rawNumber > 0
+            ? Math.max(rawNumber / 100, 0.00001)
+            : (rule.targetText.includes('%') && rawNumber > 0 ? Math.max(rawNumber / 100, 0.00001) : null)
+
           let progress = 0
 
           switch (kpiType) {
             case 'META_FINANCEIRA':
-              progress = targetPct ? (seller.totalValue / teamAverageValueSafe) / targetPct : seller.totalValue / teamAverageValueSafe
+              if (asPct) {
+                progress = cumStage.totalValue / (monthlyTargetSafe * asPct)
+              } else {
+                progress = cumStage.totalValue / monthlyTargetSafe
+              }
               break
             case 'RENTABILIDADE':
-              progress = (averageTicket / teamAverageTicketSafe) / (targetPct ?? 1)
+              progress = (averageTicket / teamAverageTicketSafe) / (asPct ?? 1)
               break
             case 'BASE_CLIENTES':
-              if (targetPct) {
+              if (asPct) {
                 const cumShare = cumStage.orderCount / Math.max(seller.totalOrders, 1)
-                progress = cumShare / targetPct
+                progress = cumShare / asPct
               } else {
                 progress = cumStage.orderCount > 0 ? 1 : 0
               }
               break
             case 'VOLUME':
-              if (targetAmount && targetAmount > 0) {
-                progress = cumStage.orderCount / targetAmount
-              } else if (targetPct) {
-                progress = (cumStage.totalValue / totalValueSafe) / targetPct
+              if (rawNumber > 0 && !rule.targetText.includes('%')) {
+                progress = cumStage.orderCount / rawNumber
+              } else if (asPct) {
+                progress = (cumStage.totalValue / totalValueSafe) / asPct
               } else {
                 progress = cumStage.orderCount > 0 ? 1 : 0
               }
               break
-            case 'DISTRIBUICAO':
-              if (targetAmount && targetAmount > 0) {
-                progress = cumStage.orderCount / targetAmount
+            case 'DISTRIBUICAO': {
+              // targetText format: "X|Y" where X = items target (number or "N%" of total products), Y = clients% of seller base
+              // e.g. "27|30" = 27 items in 30% of clients, "50%|30" = 50% of products in 30% of clients
+              const parts = rule.targetText.split('|').map((s) => s.trim())
+              const itemsPart = parts[0] ?? '0'
+              const itemsIsPercent = itemsPart.includes('%')
+              const itemsNum = parseDecimal(itemsPart.replace('%', ''), 0)
+              const resolvedItems = itemsIsPercent && totalActiveProducts > 0
+                ? Math.ceil(totalActiveProducts * itemsNum / 100)
+                : itemsNum
+              const clientsPct = parseDecimal(parts[1] ?? '0', 0) / 100
+              if (resolvedItems > 0 && clientsPct > 0 && totalDistinctClients > 0) {
+                const requiredClients = Math.ceil(totalDistinctClients * clientsPct)
+                const clientsAchieved = cumStage.distinctClients
+                progress = clientsAchieved / Math.max(requiredClients, 1)
+              } else if (resolvedItems > 0) {
+                progress = cumStage.orderCount / resolvedItems
               } else {
                 progress = cumStage.orderCount > 0 ? 1 : 0
               }
               break
+            }
             case 'DEVOLUCAO':
             case 'INADIMPLENCIA':
               progress = 0
@@ -980,11 +1177,11 @@ export default function MetasWorkspace() {
               progress = stage.orderCount > 0 ? Math.min(stage.totalValue / totalValueSafe, 1) : 0
               break
             default:
-              if (targetPct !== null) {
+              if (asPct !== null) {
                 const stageShare = stage.totalValue / totalValueSafe
-                progress = stageShare / targetPct
-              } else if (targetAmount && targetAmount > 0) {
-                progress = stage.orderCount / targetAmount
+                progress = stageShare / asPct
+              } else if (rawNumber > 0) {
+                progress = stage.orderCount / rawNumber
               } else {
                 progress = stage.orderCount > 0 ? 1 : 0
               }
@@ -993,17 +1190,17 @@ export default function MetasWorkspace() {
           return { ruleId: rule.id, progress: Math.max(0, Math.min(progress, 1.4)) }
         })
 
-        const pointsAchieved = rules.reduce((sum, rule) => {
+        const pointsAchieved = blockRules.reduce((sum, rule) => {
           const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
           return sum + rule.points * Math.min(progress, 1)
         }, 0)
 
-        const rewardAchieved = rules.reduce((sum, rule) => {
+        const rewardAchieved = blockRules.reduce((sum, rule) => {
           const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
           return sum + (progress >= 1 ? rule.rewardValue : 0)
         }, 0)
 
-        const ratio = pointsTarget > 0 ? pointsAchieved / pointsTarget : 0
+        const ratio = blockPointsTarget > 0 ? pointsAchieved / blockPointsTarget : 0
         const status: SellerSnapshot['status'] = ratio >= 1.05 ? 'SUPEROU' : ratio >= 0.85 ? 'NO_ALVO' : ratio >= 0.65 ? 'ATENCAO' : 'CRITICO'
 
         return {
@@ -1013,16 +1210,17 @@ export default function MetasWorkspace() {
           totalGrossWeight: seller.totalGrossWeight,
           averageTicket,
           pointsAchieved,
-          pointsTarget,
+          pointsTarget: blockPointsTarget,
           rewardAchieved,
-          rewardTarget,
+          rewardTarget: blockRewardTarget,
           status,
-          gapToTarget: Math.max(pointsTarget - pointsAchieved, 0),
+          gapToTarget: Math.max(blockPointsTarget - pointsAchieved, 0),
           ruleProgress,
+          blockId: block.id,
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [cycle.weeks, pointsTarget, rewardTarget, rules, sellers])
+  }, [cycle.weeks, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) return
@@ -1109,7 +1307,7 @@ export default function MetasWorkspace() {
 
   const stageSeries = useMemo(
     () =>
-      STAGES.map((stage) => {
+      STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
         const stageRules = rules.filter((rule) => rule.stage === stage.key)
         const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
         if (stageTarget <= 0 || snapshots.length === 0) {
@@ -1145,7 +1343,7 @@ export default function MetasWorkspace() {
   const stageRuleMap = useMemo(
     () =>
       Object.fromEntries(
-        STAGES.map((stage) => [stage.key, rules.filter((rule) => rule.stage === stage.key)])
+        STAGES.filter((s) => s.key !== 'FULL').map((stage) => [stage.key, rules.filter((rule) => rule.stage === stage.key)])
       ) as Record<StageKey, GoalRule[]>,
     [rules]
   )
@@ -1243,8 +1441,8 @@ export default function MetasWorkspace() {
   const sellerHeatmap = useMemo(
     () =>
       snapshots.slice(0, 5).map((snapshot) => {
-        const cells = STAGES.map((stage) => {
-          const stageRules = stageRuleMap[stage.key]
+        const cells = STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
+          const stageRules = stageRuleMap[stage.key] ?? []
           const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
           const stageAchieved = stageRules.reduce((sum, rule) => {
             const progress =
@@ -1273,6 +1471,7 @@ export default function MetasWorkspace() {
     W2: 'bg-blue-500',
     W3: 'bg-indigo-500',
     CLOSING: 'bg-emerald-500',
+    FULL: 'bg-primary-500',
   }
 
   return (
@@ -1355,7 +1554,7 @@ export default function MetasWorkspace() {
                 {(activeMonth?.customOffDates?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-2">{activeMonth?.customOffDates.map((date) => <button key={date} type="button" className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100" onClick={() => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date) } }))}>{formatDateBr(date)} ×</button>)}</div> : null}
               </div>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-4">{cycle.weeks.map((week) => <div key={week.key} className="rounded-lg border border-surface-200 bg-white p-2.5 text-xs"><p className="font-semibold text-surface-700">{week.label}</p><p className="mt-1 text-surface-600">{formatDateBr(week.start)} - {formatDateBr(week.end)}</p><p className="text-surface-500">Dias úteis: {week.businessDays.length}</p></div>)}</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-4">{cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => <div key={week.key} className="rounded-lg border border-surface-200 bg-white p-2.5 text-xs"><p className="font-semibold text-surface-700">{week.label}</p><p className="mt-1 text-surface-600">{formatDateBr(week.start)} - {formatDateBr(week.end)}</p><p className="text-surface-500">Dias úteis: {week.businessDays.length}</p></div>)}</div>
 
               {standby ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{!activeMonth?.week1StartDate ? 'Mês em standby: defina a data de início da 1ª semana para ativar o ciclo.' : `Mês selecionado encerrou em ${formatDateBr(cycle.lastBusinessDate)}. O sistema permanece em standby até configurar o início do mês seguinte.`}</div> : null}
             </Card>
@@ -1373,38 +1572,158 @@ export default function MetasWorkspace() {
             </Card>
           </div>
 
-          <Card className="border-surface-200">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2"><Target size={16} className="text-primary-600" /><h2 className="text-base font-semibold text-surface-900">Matriz de KPIs e metas</h2></div>
-              <button type="button" onClick={() => setRules((prev) => [...prev, { id: `rule-${Date.now()}`, stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES' as KpiType, kpi: 'Base de clientes', description: 'Cobertura da base de clientes no período.', targetText: '0%', rewardValue: 0, points: 0 }])} className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"><Plus size={12} /> Novo KPI</button>
+          {/* ── Multi-block KPI system ─────────────────────── */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target size={16} className="text-primary-600" />
+              <h2 className="text-base font-semibold text-surface-900">Blocos de regras de KPIs e metas</h2>
             </div>
+            <button
+              type="button"
+              onClick={() => setRuleBlocks((prev) => [...prev, { id: `block-${Date.now()}`, title: `Bloco ${prev.length + 1}`, monthlyTarget: 0, sellerIds: [], rules: [] }])}
+              className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+            >
+              <Plus size={12} /> Novo bloco de KPIs
+            </button>
+          </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-surface-200 text-sm">
-                <thead><tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500"><th className="px-3 py-2">Período</th><th className="px-3 py-2">Freq.</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th></tr></thead>
-                <tbody className="divide-y divide-surface-100">
-                  {rules.map((rule) => (
-                    <tr key={rule.id} className="hover:bg-surface-50/50">
-                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, stage: event.target.value as StageKey } : item))}>{STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}</select></td>
-                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.frequency} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, frequency: event.target.value as RuleFrequency } : item))}><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></td>
-                      <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(event) => { const selected = KPI_CATALOG.find((k) => k.type === event.target.value); setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, kpiType: event.target.value as KpiType, kpi: selected?.label ?? item.kpi, description: selected?.defaultDescription || item.description } : item)) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
-                      <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, description: event.target.value } : item))} /></td>
-                      <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, targetText: event.target.value } : item))} /></td>
-                      <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></td>
-                      <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(event) => setRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, points: parseDecimal(event.target.value, 0) } : item))} /></td>
-                      <td className="px-3 py-2"><button type="button" onClick={() => setRules((prev) => prev.filter((item) => item.id !== rule.id))} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
-                    </tr>
-                  ))}
-                  <tr className="bg-surface-50 font-semibold">
-                    <td className="px-3 py-2 text-xs text-surface-500" colSpan={5}>Totais — {rules.length} KPIs configurados</td>
-                    <td className="px-3 py-2 text-xs text-surface-700">{currency(rules.reduce((s, r) => s + r.rewardValue, 0))}</td>
-                    <td className="px-3 py-2 text-xs text-surface-700">{num(rules.reduce((s, r) => s + r.points, 0), 3)}</td>
-                    <td className="px-3 py-2"></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {ruleBlocks.map((block) => {
+            const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
+            const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
+            const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
+            const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
+
+            return (
+              <Card key={block.id} className="border-surface-200">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                      value={block.title}
+                      onChange={(e) => updateBlock({ title: e.target.value })}
+                    />
+                    {block.sellerIds.length === 0 && (
+                      <Badge variant="secondary">Bloco padrão — aplica a vendedores não atribuídos</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateBlock({ rules: [...block.rules, { id: `rule-${Date.now()}`, stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES' as KpiType, kpi: 'Base de clientes', description: 'Cobertura da base de clientes no período.', targetText: '0%', rewardValue: 0, points: 0 }] })}
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+                    >
+                      <Plus size={12} /> Novo KPI
+                    </button>
+                    {ruleBlocks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setRuleBlocks((prev) => prev.filter((b) => b.id !== block.id))}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      >
+                        Excluir bloco
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Meta em dinheiro + seller assignment */}
+                <div className="mb-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className={label}>
+                      Meta financeira do mês (R$)
+                      <input
+                        className={input}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={block.monthlyTarget}
+                        onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
+                      />
+                    </label>
+                    <p className="mt-1 text-[10px] text-surface-400">
+                      {block.monthlyTarget > 0
+                        ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
+                        : 'Sem meta financeira definida — usa a média da equipe como referência.'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={label}>Vendedores neste bloco</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {assignedSellers.map((s) => (
+                        <span key={s.id} className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200">
+                          {s.name.split(' ').slice(0, 2).join(' ')}
+                          <button type="button" onClick={() => updateBlock({ sellerIds: block.sellerIds.filter((id) => id !== s.id) })} className="ml-0.5 text-primary-400 hover:text-primary-700">✕</button>
+                        </span>
+                      ))}
+                      <select
+                        className="rounded-lg border border-dashed border-surface-300 bg-white px-2 py-1 text-xs text-surface-500"
+                        value=""
+                        onChange={(e) => {
+                          if (!e.target.value) return
+                          updateBlock({ sellerIds: [...block.sellerIds, e.target.value] })
+                        }}
+                      >
+                        <option value="">+ Adicionar vendedor</option>
+                        {unassignedSellers.filter((s) => !block.sellerIds.includes(s.id)).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* KPI rules table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-surface-200 text-sm">
+                    <thead>
+                      <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                        <th className="px-3 py-2">Período</th><th className="px-3 py-2">Freq.</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-100">
+                      {block.rules.map((rule) => (
+                        <tr key={rule.id} className="hover:bg-surface-50/50">
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.frequency} onChange={(e) => updateBlockRule(rule.id, { frequency: e.target.value as RuleFrequency })}><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></td>
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
+                          <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
+                          <td className="px-3 py-2">{rule.kpiType === 'DISTRIBUICAO' ? (() => {
+                            const parts = rule.targetText.split('|')
+                            const itemsPart = parts[0] ?? ''
+                            const isPercent = itemsPart.includes('%')
+                            const itemsVal = itemsPart.replace('%', '')
+                            const clientsVal = parts[1] ?? ''
+                            return (
+                              <div className="flex items-center gap-1">
+                                <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title={isPercent ? '% dos itens totais' : 'Qtd. itens alvo'} value={itemsVal} onChange={(e) => { const v = e.target.value + (isPercent ? '%' : ''); updateBlockRule(rule.id, { targetText: `${v}|${clientsVal}` }) }} />
+                                <button type="button" className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${isPercent ? 'bg-primary-100 text-primary-700' : 'bg-surface-100 text-surface-500'}`} title="Alternar entre % e absoluto" onClick={() => { const v = itemsVal; updateBlockRule(rule.id, { targetText: `${v}${isPercent ? '' : '%'}|${clientsVal}` }) }}>{isPercent ? '%' : 'Nº'}</button>
+                                <span className="text-[10px] text-surface-400">itens</span>
+                                <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title="% da base de clientes" value={clientsVal} onChange={(e) => { updateBlockRule(rule.id, { targetText: `${itemsPart}|${e.target.value}` }) }} />
+                                <span className="text-[10px] text-surface-400">% base</span>
+                              </div>
+                            )
+                          })() : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
+                          <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
+                          <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
+                          <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
+                        </tr>
+                      ))}
+                      <tr className="bg-surface-50 font-semibold">
+                        <td className="px-3 py-2 text-xs text-surface-500" colSpan={5}>
+                          Totais — {block.rules.length} KPIs
+                          {block.monthlyTarget > 0 && <span className="ml-2 text-emerald-600">| Meta: {currency(block.monthlyTarget)}</span>}
+                          {block.sellerIds.length > 0 && <span className="ml-2 text-primary-600">| {block.sellerIds.length} vendedor(es)</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-surface-700">{currency(block.rules.reduce((s, r) => s + r.rewardValue, 0))}</td>
+                        <td className="px-3 py-2 text-xs text-surface-700">{num(block.rules.reduce((s, r) => s + r.points, 0), 3)}</td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )
+          })}
 
           <Card className="border-surface-200">
             <h2 className="mb-3 text-base font-semibold text-surface-900">Campanhas de premiação (mensal e trimestral)</h2>
@@ -1741,7 +2060,7 @@ export default function MetasWorkspace() {
             {/* Cycle weeks mini-bar */}
             {!standby && cycle.weeks.length > 0 && (
               <div className="mt-3 flex gap-2">
-                {cycle.weeks.map((week) => {
+                {cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => {
                   const today = toIsoDate(new Date())
                   const isActive = week.start && week.end && today >= week.start && today <= week.end
                   return (
@@ -2146,6 +2465,7 @@ export default function MetasWorkspace() {
               {selectedSeller ? (
                 <>
                   <div className="mb-4 flex items-center gap-2"><UserRound size={16} className="text-surface-600" /><h2 className="text-[1.65rem] font-semibold leading-none text-surface-900">{selectedSeller.seller.name}</h2></div>
+                  <div className="mb-2"><Badge variant="secondary">{findBlockForSeller(selectedSeller.seller.id, ruleBlocks).title}</Badge></div>
                   <div className="grid gap-2">
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(selectedSeller.totalOrders, 0)}</div>
@@ -2155,7 +2475,7 @@ export default function MetasWorkspace() {
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
                     <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>
                   </div>
-                  <div className="mt-3 space-y-2">{rules.map((rule) => { const progress = selectedSeller.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0; const done = progress >= 1; return <div key={rule.id} className="rounded-lg border border-surface-200 bg-white px-3 py-2 shadow-sm transition-colors hover:border-surface-300"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>{done ? <TrendingUp size={14} className="text-surface-600" /> : <TrendingDown size={14} className="text-surface-500" />}</div><p className="text-[11px] text-surface-500">{rule.description}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200"><div className={`h-full transition-[width] duration-700 ${done ? 'bg-surface-600' : 'bg-surface-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} /></div></div>})}</div>
+                  <div className="mt-3 space-y-2">{(() => { const sellerBlock = findBlockForSeller(selectedSeller.seller.id, ruleBlocks); return sellerBlock.rules.map((rule) => { const progress = selectedSeller.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0; const done = progress >= 1; return <div key={rule.id} className="rounded-lg border border-surface-200 bg-white px-3 py-2 shadow-sm transition-colors hover:border-surface-300"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>{done ? <TrendingUp size={14} className="text-surface-600" /> : <TrendingDown size={14} className="text-surface-500" />}</div><p className="text-[11px] text-surface-500">{rule.description}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200"><div className={`h-full transition-[width] duration-700 ${done ? 'bg-surface-600' : 'bg-surface-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} /></div></div>}) })()}</div>
                 </>
               ) : (
                 <p className="text-sm text-surface-500">Selecione um vendedor para ver detalhes.</p>

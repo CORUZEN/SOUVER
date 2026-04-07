@@ -409,7 +409,7 @@ export async function GET(req: NextRequest) {
       id: string
       name: string
       login: string
-      orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number }>
+      orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
       totalValue: number
       totalGrossWeight: number
     }>()
@@ -438,6 +438,7 @@ export async function GET(req: NextRequest) {
         negotiatedAt: order.negotiatedAt,
         totalValue: order.totalValue,
         grossWeight: order.grossWeight,
+        clientCode: order.partnerCode,
       })
       seller.totalValue += order.totalValue
       seller.totalGrossWeight += order.grossWeight
