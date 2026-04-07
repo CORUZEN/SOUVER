@@ -1159,6 +1159,24 @@ export default function MetasWorkspace() {
 
         const totalDistinctClients = stageMetrics.FULL.clientCodes.size
 
+        // ── Financial accumulation by stage closing date ────────────────────────
+        // For META_FINANCEIRA we need "all orders placed up to the END DATE of the
+        // stage", regardless of whether the order day falls on a weekday, weekend,
+        // or even before the cycle start.  This ensures the 30% / 60% / 80% / 120%
+        // thresholds are evaluated against the true cumulative revenue.
+        const stageEndDateMap: Partial<Record<StageKey, string>> = {}
+        for (const w of cycle.weeks) {
+          if (w.end) stageEndDateMap[w.key] = w.end
+        }
+
+        const financialByStageEnd: Partial<Record<StageKey, number>> = {}
+        for (const sk of ['W1', 'W2', 'W3', 'CLOSING', 'FULL'] as StageKey[]) {
+          const endDate = stageEndDateMap[sk]
+          financialByStageEnd[sk] = endDate
+            ? seller.orders.reduce((sum, o) => (o.negotiatedAt <= endDate ? sum + o.totalValue : sum), 0)
+            : 0
+        }
+
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
@@ -1189,13 +1207,19 @@ export default function MetasWorkspace() {
           let progress = 0
 
           switch (kpiType) {
-            case 'META_FINANCEIRA':
+            case 'META_FINANCEIRA': {
+              // Use orders accumulated up to the stage's CLOSING DATE (not just orders
+              // that fall within the stage date window).  This means weekends, holidays
+              // between stages, and orders placed before the cycle start are all counted
+              // toward the cumulative threshold (30% by end of W1, 60% by end of W2 …).
+              const financialAccumulated = financialByStageEnd[rule.stage] ?? cumStage.totalValue
               if (asPct) {
-                progress = cumStage.totalValue / (monthlyTargetSafe * asPct)
+                progress = financialAccumulated / (monthlyTargetSafe * asPct)
               } else {
-                progress = cumStage.totalValue / monthlyTargetSafe
+                progress = financialAccumulated / monthlyTargetSafe
               }
               break
+            }
             case 'RENTABILIDADE':
               // Use stage-locked average ticket so past stages don't shift
               progress = (lockedTicket / teamAverageTicketSafe) / (asPct ?? 1)
