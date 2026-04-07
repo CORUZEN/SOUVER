@@ -2243,7 +2243,7 @@ export default function MetasWorkspace() {
                           {(block.weightTargets ?? []).map((wt) => {
                             const sellerCodes = block.sellerIds.map((sid) => {
                               const s = sellers.find((x) => x.id === sid)
-                              return s ? s.login.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
+                              return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
                             })
                             const actualKg = brandWeightRows
                               .filter((r) => {
@@ -2336,7 +2336,7 @@ export default function MetasWorkspace() {
                               {num((block.weightTargets ?? []).reduce((sum, wt) => {
                                 const sellerCodes = block.sellerIds.map((sid) => {
                                   const s = sellers.find((x) => x.id === sid)
-                                  return s ? s.login.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
+                                  return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
                                 })
                                 return sum + brandWeightRows
                                   .filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sellerCodes.length === 0 || sellerCodes.some((sc) => r.sellerCode === sc)))
