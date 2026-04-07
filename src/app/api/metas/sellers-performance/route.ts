@@ -303,7 +303,8 @@ function parseYearMonth(req: NextRequest) {
 }
 
 /**
- * Build SQL that filters directly by seller codes AND date range.
+ * Build SQL that filters directly by seller codes, date range, and
+ * operation type (CODTIPOPER = 1001 — "Pedido de Venda").
  * Keeps the result well under the 5000-row API limit and avoids
  * transferring thousands of irrelevant orders over the network.
  */
@@ -311,10 +312,16 @@ function buildOrdersSql(
   startDate: string,
   endDateExclusive: string,
   sellerCodes: string[],
-  mode: 'STRICT_SALES' | 'ANY_MOVEMENT' = 'STRICT_SALES'
+  mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT' = 'STRICT'
 ) {
-  const tipmovFilter = mode === 'STRICT_SALES'
-    ? "AND CAB.TIPMOV IN ('V', 'P', 'O')\n  " : ''
+  // Primary: filter by CODTIPOPER = 1001 (pedido de venda real)
+  // Fallback 1: TIPMOV IN ('V','P') caso CODTIPOPER não exista na instalação
+  // Fallback 2: sem filtro de tipo (último recurso)
+  const typeFilter = mode === 'STRICT'
+    ? "AND CAB.CODTIPOPER = 1001\n  "
+    : mode === 'FALLBACK_TIPMOV'
+      ? "AND CAB.TIPMOV IN ('V', 'P')\n  "
+      : ''
 
   let sellerFilter = ''
   if (sellerCodes.length > 0) {
@@ -337,7 +344,7 @@ WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
   AND CAB.CODVEND > 0
-  ${tipmovFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
+  ${typeFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
 }
 
 /* ---------- GET handler ---------- */
@@ -385,21 +392,32 @@ export async function GET(req: NextRequest) {
       .filter((c) => c.length > 0)
 
     // --- Query orders filtered by seller codes in SQL ---
+    // Cascade: CODTIPOPER=1001 → TIPMOV fallback → any movement
     let orders: SankhyaOrder[] = []
-    const sql = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT_SALES')
 
+    // 1) Primary: CODTIPOPER = 1001 (pedido de venda)
+    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT')
     try {
-      const records = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+      const records = await queryRows(baseUrl, headers, sqlStrict, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
     } catch {
-      // primary query failed, try without TIPMOV filter
+      // CODTIPOPER may not exist — try TIPMOV fallback
     }
 
-    // Fallback: without TIPMOV filter
+    // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed or returned nothing
     if (orders.length === 0) {
-      const fallbackSql = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT')
+      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV')
       try {
-        const records = await queryRows(baseUrl, headers, fallbackSql, appKey, { allowEmpty: true })
+        const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
+        orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
+      } catch { /* next fallback */ }
+    }
+
+    // 3) Last resort: no type filter
+    if (orders.length === 0) {
+      const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT')
+      try {
+        const records = await queryRows(baseUrl, headers, sqlAny, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
       } catch { /* keep empty */ }
     }

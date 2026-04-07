@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Plus,
+  RotateCcw,
   Settings2,
   Target,
   TrendingDown,
@@ -202,11 +203,11 @@ const DEFAULT_RULES: GoalRule[] = [
   // ── Fechamento ──
   { id: 'closing-base', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento do mês.', targetText: '85%', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias entregues até o fechamento do mês.', targetText: '6 categorias', rewardValue: 483.73, points: 0.1 },
-  { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume e positivação.', targetText: '100% V + 40% D', rewardValue: 483.73, points: 0.1 },
-  { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado).', targetText: '120%', rewardValue: 96.75, points: 0.02 },
+  { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado) — bônus de superação.', targetText: '120%', rewardValue: 96.75, points: 0 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
 
@@ -543,8 +544,8 @@ export default function MetasWorkspace() {
         setExtraBonus(cfg.extraBonus)
         setExtraMinPoints(cfg.extraMinPoints)
       }
-    } catch {
-      // ignore bad payload
+    } catch (err) {
+      console.error('[Metas] Falha ao carregar configuração do localStorage:', err)
     }
   }, [])
 
@@ -605,14 +606,18 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const merged: Record<string, MetaConfig> = {
-      ...metaConfigs,
-      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+    try {
+      const merged: Record<string, MetaConfig> = {
+        ...metaConfigs,
+        [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+      }
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ year, month, monthConfigs, metaConfigs: merged })
+      )
+    } catch (err) {
+      console.error('[Metas] Falha ao salvar configuração no localStorage:', err)
     }
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ year, month, monthConfigs, metaConfigs: merged })
-    )
   }, [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
 
   useEffect(() => {
@@ -1434,7 +1439,7 @@ export default function MetasWorkspace() {
 
   const sellerBars = useMemo(() => snapshots.slice(0, 6), [snapshots])
   const maxSellerPoints = useMemo(
-    () => Math.max(0.001, ...sellerBars.map((seller) => seller.pointsAchieved)),
+    () => Math.max(0.001, ...sellerBars.map((s) => Math.max(s.pointsAchieved, s.pointsTarget))),
     [sellerBars]
   )
 
@@ -1669,6 +1674,17 @@ export default function MetasWorkspace() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Restaurar todos os KPIs deste bloco para os valores padrão da planilha? As regras atuais serão substituídas.')) {
+                          updateBlock({ rules: DEFAULT_RULES.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })) })
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+                    >
+                      <RotateCcw size={12} /> Restaurar padrões
+                    </button>
                     <button
                       type="button"
                       onClick={() => updateBlock({ rules: [...block.rules, { id: `rule-${Date.now()}`, stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES' as KpiType, kpi: 'Base de clientes', description: 'Cobertura da base de clientes no período.', targetText: '0%', rewardValue: 0, points: 0 }] })}
@@ -2332,41 +2348,75 @@ export default function MetasWorkspace() {
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                Ranking de pontuação
+                Pontuação vs Meta por vendedor
               </p>
-              <div className="mt-4 space-y-1.5">
-                {sellerBars.map((seller, idx) => {
-                  const ratio = maxSellerPoints > 0 ? seller.pointsAchieved / maxSellerPoints : 0
-                  const statusColor =
-                    seller.status === 'SUPEROU' ? 'bg-emerald-500' :
-                    seller.status === 'NO_ALVO' ? 'bg-cyan-500' :
-                    seller.status === 'ATENCAO' ? 'bg-amber-500' : 'bg-rose-500'
-                  const statusBorder =
-                    seller.status === 'SUPEROU' ? 'border-emerald-200' :
-                    seller.status === 'NO_ALVO' ? 'border-cyan-200' :
-                    seller.status === 'ATENCAO' ? 'border-amber-200' : 'border-rose-200'
-                  return (
-                    <div key={seller.seller.id} className={`group flex items-center gap-3 rounded-lg border ${statusBorder} bg-white px-3 py-2 transition-colors hover:bg-surface-50`}>
-                      <span className="w-5 shrink-0 text-center text-xs font-bold text-surface-400">{idx + 1}º</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-surface-800">{seller.seller.name}</span>
-                          <span className="shrink-0 text-xs font-bold tabular-nums text-surface-700">{num(seller.pointsAchieved, 2)} pts</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-200">
-                            <div className={`h-full rounded-full ${statusColor} transition-[width] duration-700`} style={{ width: `${Math.max(2, ratio * 100)}%` }} />
-                          </div>
-                          <span className="shrink-0 text-[10px] font-medium tabular-nums text-surface-500">{num(ratio * 100, 0)}%</span>
-                        </div>
-                      </div>
+              {sellerBars.length === 0 ? (
+                <p className="py-8 text-center text-xs text-surface-400">Nenhum vendedor encontrado</p>
+              ) : (() => {
+                const barH = 22
+                const gap = 14
+                const labelW = 90
+                const rightPad = 48
+                const topPad = 24
+                const chartH = sellerBars.length * (barH + gap) - gap + topPad + 4
+                const gridSteps = 5
+                return (
+                  <div className="mt-3 overflow-x-auto">
+                    <svg width="100%" viewBox={`0 0 520 ${chartH}`} className="w-full" preserveAspectRatio="xMinYMin meet">
+                      {/* Grid lines + axis labels */}
+                      {Array.from({ length: gridSteps + 1 }, (_, i) => {
+                        const val = (maxSellerPoints / gridSteps) * i
+                        const x = labelW + ((520 - labelW - rightPad) / gridSteps) * i
+                        return (
+                          <g key={i}>
+                            <line x1={x} y1={topPad - 6} x2={x} y2={chartH} stroke="#e2e8f0" strokeWidth="1" strokeDasharray={i === 0 ? '' : '3,3'} />
+                            <text x={x} y={topPad - 10} textAnchor="middle" className="fill-surface-400" style={{ fontSize: 9 }}>{num(val, 2)}</text>
+                          </g>
+                        )
+                      })}
+                      {/* Bars */}
+                      {sellerBars.map((seller, idx) => {
+                        const y = topPad + idx * (barH + gap)
+                        const barW = 520 - labelW - rightPad
+                        const achievedW = Math.max(2, (seller.pointsAchieved / maxSellerPoints) * barW)
+                        const targetX = labelW + (seller.pointsTarget / maxSellerPoints) * barW
+                        const statusFill =
+                          seller.status === 'SUPEROU' ? '#10b981' :
+                          seller.status === 'NO_ALVO' ? '#06b6d4' :
+                          seller.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
+                        const firstName = seller.seller.name.split(' ')[0]
+                        const lastName = seller.seller.name.split(' ').slice(-1)[0]
+                        const shortName = firstName === lastName ? firstName : `${firstName} ${lastName.charAt(0)}.`
+                        return (
+                          <g key={seller.seller.id}>
+                            {/* Seller name */}
+                            <text x={labelW - 6} y={y + barH / 2 + 1} textAnchor="end" dominantBaseline="middle" className="fill-surface-700" style={{ fontSize: 10, fontWeight: 600 }}>
+                              {shortName}
+                            </text>
+                            {/* Background bar */}
+                            <rect x={labelW} y={y} width={barW} height={barH} rx={4} fill="#f1f5f9" />
+                            {/* Achieved bar */}
+                            <rect x={labelW} y={y + 2} width={achievedW} height={barH - 4} rx={3} fill={statusFill} opacity={0.85}>
+                              <animate attributeName="width" from="0" to={achievedW} dur="0.8s" fill="freeze" />
+                            </rect>
+                            {/* Target marker line */}
+                            <line x1={targetX} y1={y - 2} x2={targetX} y2={y + barH + 2} stroke="#334155" strokeWidth="2" strokeLinecap="round" />
+                            <polygon points={`${targetX - 3},${y - 2} ${targetX + 3},${y - 2} ${targetX},${y + 2}`} fill="#334155" />
+                            {/* Value label */}
+                            <text x={labelW + barW + 4} y={y + barH / 2 + 1} dominantBaseline="middle" className="fill-surface-600" style={{ fontSize: 10, fontWeight: 700 }}>
+                              {num(seller.pointsAchieved, 2)}
+                            </text>
+                          </g>
+                        )
+                      })}
+                    </svg>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] text-surface-500">
+                      <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-6 rounded bg-cyan-500 opacity-85" />Atingido</span>
+                      <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-0.5 rounded bg-surface-800" />Meta alvo</span>
                     </div>
-                  )
-                })}
-                {sellerBars.length === 0 && (
-                  <p className="py-4 text-center text-xs text-surface-400">Nenhum vendedor encontrado</p>
-                )}
-              </div>
+                  </div>
+                )
+              })()}
             </Card>
 
             <Card className={executivePanelCardClass}>
