@@ -2354,7 +2354,7 @@ export default function MetasWorkspace() {
                                 if (totalTarget <= 0) return <span className="text-surface-400">—</span>
                                 const pct = totalActual / totalTarget * 100
                                 if (pct >= 100) {
-                                  return <span className="font-semibold text-emerald-600">Meta superada — +{num(pct - 100, 1)}% acima do planejado ↑</span>
+                                  return <span className="font-semibold text-emerald-600">+{num(pct - 100, 1)}% acima do planejado ↑</span>
                                 }
                                 const color = pct >= 80 ? 'text-cyan-700' : pct >= 60 ? 'text-amber-600' : 'text-rose-600'
                                 return <span className={`font-semibold ${color}`}>{num(pct, 1)}% da meta total atingida</span>
