@@ -1041,6 +1041,11 @@ export default function MetasWorkspace() {
   const standby = !activeMonth?.week1StartDate || (hasMonthEnded(year, month) && !nextConfigured)
 
   const snapshots = useMemo<SellerSnapshot[]>(() => {
+    const todayIso = toIsoDate(new Date())
+    const stageStarted = new Set<StageKey>(
+      cycle.weeks.filter((w) => w.start && w.start <= todayIso).map((w) => w.key)
+    )
+
     const teamAverageValue =
       sellers.length > 0 ? sellers.reduce((sum, seller) => sum + seller.totalValue, 0) / sellers.length : 0
 
@@ -1060,6 +1065,7 @@ export default function MetasWorkspace() {
         const blockRules = block.rules
         const blockPointsTarget = blockRules.reduce((sum, rule) => sum + rule.points, 0)
         const blockRewardTarget = blockRules.reduce((sum, rule) => sum + rule.rewardValue, 0)
+        const activePointsTarget = blockRules.filter((r) => stageStarted.has(r.stage)).reduce((sum, rule) => sum + rule.points, 0)
 
         const stageMetrics = STAGES.reduce(
           (acc, stage) => {
@@ -1108,6 +1114,9 @@ export default function MetasWorkspace() {
         const monthlyTargetSafe = block.monthlyTarget > 0 ? block.monthlyTarget : teamAverageValueSafe
 
         const ruleProgress = blockRules.map((rule) => {
+          // Skip rules for stages that haven't started yet
+          if (!stageStarted.has(rule.stage)) return { ruleId: rule.id, progress: 0 }
+
           const rawNumber = parseTargetNumber(rule.targetText) ?? 0
           const cumStage = cumulativeMetrics[rule.stage]
           const stage = stageMetrics[rule.stage]
@@ -1212,7 +1221,7 @@ export default function MetasWorkspace() {
           return sum + (progress >= 1 ? rule.rewardValue : 0)
         }, 0)
 
-        const ratio = blockPointsTarget > 0 ? pointsAchieved / blockPointsTarget : 0
+        const ratio = activePointsTarget > 0 ? pointsAchieved / activePointsTarget : 0
 
         const hasSuperTarget = blockRules.some((rule) => {
           if (rule.kpiType !== 'META_FINANCEIRA') return false
