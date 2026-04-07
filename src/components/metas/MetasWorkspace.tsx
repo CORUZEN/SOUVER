@@ -5,6 +5,7 @@ import {
   Boxes,
   Building2,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
@@ -477,12 +478,25 @@ export default function MetasWorkspace() {
   const [productDescriptionFilter, setProductDescriptionFilter] = useState('')
   const [productBrandFilter, setProductBrandFilter] = useState('')
   const [companyScopeFilter, setCompanyScopeFilter] = useState<CompanyScopeFilter>('1')
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false)
+  const [showCompanyModal, setShowCompanyModal] = useState(false)
+  const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (periodPickerRef.current && !periodPickerRef.current.contains(e.target as Node)) {
+        setShowPeriodPicker(false)
+      }
+    }
+    if (showPeriodPicker) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showPeriodPicker])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1527,39 +1541,180 @@ export default function MetasWorkspace() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
-      <Card className="relative overflow-hidden border-surface-200">
-        <div className="absolute inset-x-0 top-0 h-1 bg-surface-400" />
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <Card className="relative border-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary-500 via-cyan-400 to-emerald-400" />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Branding */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-surface-500">Metas comerciais</p>
-            <h1 className="mt-1 text-2xl font-semibold text-surface-900">PAINEL DE METAS - OURO VERDE</h1>
-            <p className="mt-1 text-sm text-surface-600">Visão executiva de desempenho, progresso de metas e previsão de premiação.</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Gestão Comercial · Metas</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Painel de Metas — Ouro Verde</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCompanyModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-white/20 hover:text-white"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                {companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'}
+              </button>
+              {!standby && !sellersLoading && (
+                <span className="text-xs text-slate-500">{MONTHS[month]} {year}</span>
+              )}
+              {sellersLoading && (
+                <span className="text-xs text-slate-500 animate-pulse">Carregando dados…</span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              onClick={() => setView((current) => (current === 'config' ? 'dashboard' : 'config'))}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
-            >
-              <Settings2 size={14} />
-              {view === 'config' ? 'Voltar para dashboard' : 'Configuração geral de metas'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView((current) => (current === 'sellers' ? 'dashboard' : 'sellers'))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
-            >
-              <Users size={14} />
-              {view === 'sellers' ? 'Voltar para dashboard' : 'Vendedores da meta'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView((current) => (current === 'products' ? 'dashboard' : 'products'))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
-            >
-              <Boxes size={14} />
-              {view === 'products' ? 'Voltar para dashboard' : 'Produtos da meta'}
-            </button>
+
+          {/* Action area */}
+          <div className="flex flex-wrap items-center gap-2">
+            {view !== 'dashboard' ? (
+              <button
+                type="button"
+                onClick={() => setView('dashboard')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+              >
+                <ChevronLeft size={14} />
+                Voltar ao painel
+              </button>
+            ) : (
+              <>
+                {/* Period picker */}
+                <div className="relative" ref={periodPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPeriodPicker((v) => !v)}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold backdrop-blur-sm transition-all ${
+                      showPeriodPicker
+                        ? 'border-primary-400/60 bg-primary-500/20 text-primary-200 ring-1 ring-primary-400/30'
+                        : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    <CalendarDays size={14} />
+                    <span>{MONTHS[month]} {year}</span>
+                    {standby && <span className="rounded bg-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">Standby</span>}
+                    <ChevronDown size={12} className={`transition-transform ${showPeriodPicker ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showPeriodPicker && (
+                    <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-surface-200 bg-white p-5 shadow-2xl ring-1 ring-black/5">
+                      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-surface-400">Período de referência</p>
+
+                      {/* Month/year navigation */}
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          aria-label="Mês anterior"
+                          onClick={() => { if (month === 0) { setMonth(11); setYear((y) => y - 1) } else { setMonth((m) => m - 1) } }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-surface-50 text-surface-600 hover:bg-surface-100 hover:text-surface-900"
+                        >
+                          <ChevronLeft size={15} />
+                        </button>
+
+                        <div className="flex flex-1 items-center gap-2">
+                          <select
+                            value={month}
+                            onChange={(e) => setMonth(Number(e.target.value))}
+                            className="flex-1 rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                          >
+                            {MONTHS.map((name, idx) => (
+                              <option key={name} value={idx}>{name}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={year}
+                            onChange={(e) => setYear(Number(e.target.value))}
+                            className="w-24 rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                          >
+                            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          aria-label="Próximo mês"
+                          onClick={() => { if (month === 11) { setMonth(0); setYear((y) => y + 1) } else { setMonth((m) => m + 1) } }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-surface-50 text-surface-600 hover:bg-surface-100 hover:text-surface-900"
+                        >
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => { const now = new Date(); setMonth(now.getMonth()); setYear(now.getFullYear()) }}
+                        className="mt-2 w-full rounded-lg border border-surface-200 bg-surface-50 py-1.5 text-xs font-semibold text-surface-600 hover:bg-surface-100 hover:text-surface-900"
+                      >
+                        Ir para mês atual
+                      </button>
+
+                      {standby ? (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          {!activeMonth?.week1StartDate
+                            ? 'Mês em standby — defina o início da 1ª semana em Configurações.'
+                            : `Mês encerrado em ${formatDateBr(cycle.lastBusinessDate)}.`}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-3 flex items-center justify-between">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-surface-400">Ciclo operacional</p>
+                            <span className="rounded-md bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700">{cycle.totalBusinessDays} dias úteis</span>
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-1.5">
+                            {cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => {
+                              const today = toIsoDate(new Date())
+                              const isActive = week.start && week.end && today >= week.start && today <= week.end
+                              return (
+                                <div
+                                  key={week.key}
+                                  className={`rounded-lg border px-2.5 py-2 text-xs ${isActive ? 'border-primary-200 bg-primary-50' : 'border-surface-200 bg-surface-50'}`}
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`h-1.5 w-1.5 rounded-full ${stageColorMap[week.key]}`} />
+                                    <span className={`font-semibold ${isActive ? 'text-primary-700' : 'text-surface-700'}`}>{week.label}</span>
+                                  </div>
+                                  <p className="mt-0.5 text-surface-500">{week.start ? `${formatDateBr(week.start)} – ${formatDateBr(week.end)}` : '—'}</p>
+                                  <p className="text-surface-400">{week.businessDays.length} dias úteis</p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-5 w-px bg-white/20" />
+
+                <button
+                  type="button"
+                  onClick={() => setView('config')}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500"
+                >
+                  <Settings2 size={14} />
+                  Configurações
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('sellers')}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                >
+                  <Users size={14} />
+                  Vendedores
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('products')}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                >
+                  <Boxes size={14} />
+                  Produtos
+                </button>
+              </>
+            )}
           </div>
         </div>
       </Card>
@@ -2133,149 +2288,46 @@ export default function MetasWorkspace() {
       ) : (
         <>
           {/* ── Period selector ────────────────────────────────────── */}
-          <Card className="relative overflow-hidden border-surface-200">
-            <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Left: month / year navigation */}
-              <div className="flex items-center gap-3">
-                <CalendarDays size={18} className="text-primary-600" />
-                <button
-                  type="button"
-                  aria-label="Mês anterior"
-                  onClick={() => {
-                    if (month === 0) { setMonth(11); setYear((y) => y - 1) } else { setMonth((m) => m - 1) }
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-white text-surface-600 hover:bg-surface-50 hover:text-surface-900"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-
-                <div className="flex items-baseline gap-2">
-                  <select
-                    value={month}
-                    onChange={(e) => setMonth(Number(e.target.value))}
-                    className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-                  >
-                    {MONTHS.map((name, idx) => (
-                      <option key={name} value={idx}>{name}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={year}
-                    onChange={(e) => setYear(Number(e.target.value))}
-                    className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-                  >
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  aria-label="Próximo mês"
-                  onClick={() => {
-                    if (month === 11) { setMonth(0); setYear((y) => y + 1) } else { setMonth((m) => m + 1) }
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-white text-surface-600 hover:bg-surface-50 hover:text-surface-900"
-                >
-                  <ChevronRight size={16} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { const now = new Date(); setMonth(now.getMonth()); setYear(now.getFullYear()) }}
-                  className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-semibold text-surface-600 hover:bg-surface-50 hover:text-surface-900"
-                >
-                  Hoje
-                </button>
-              </div>
-
-              {/* Right: status badge + business days */}
-              <div className="flex items-center gap-3">
-                {standby ? (
-                  <Badge variant="secondary">
-                    Período em standby — configure o calendário operacional
-                  </Badge>
-                ) : (
-                  <>
-                    <Badge variant="secondary">
-                      {cycle.totalBusinessDays} dias úteis
-                    </Badge>
-                    {sellersLoading && (
-                      <span className="text-xs text-surface-400">Carregando dados…</span>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Cycle weeks mini-bar */}
-            {!standby && cycle.weeks.length > 0 && (
-              <div className="mt-3 flex gap-2">
-                {cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => {
-                  const today = toIsoDate(new Date())
-                  const isActive = week.start && week.end && today >= week.start && today <= week.end
-                  return (
-                    <div
-                      key={week.key}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-center transition-all ${
-                        isActive
-                          ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
-                          : 'border-surface-200 bg-surface-50'
-                      }`}
-                    >
-                      <div className={`mx-auto mb-1 h-1 w-8 rounded-full ${stageColorMap[week.key]}`} />
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-500">{week.label}</p>
-                      <p className="text-xs font-medium text-surface-700">
-                        {week.start ? `${formatDateBr(week.start)} – ${formatDateBr(week.end)}` : '—'}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-surface-400">{week.businessDays.length} dias úteis</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-            <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Vendedores monitorados</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900 transition-transform duration-300 group-hover:scale-[1.02]">{snapshots.length}</p>
-              <p className="mt-2 text-xs text-surface-500">Base ativa para gestão comercial</p>
-            </Card>
-
-            <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 to-cyan-400" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{num(factoryGoalRatio * 100, 1)}%</p>
-              <p className="mt-2 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores meta batida</p>
+              <p className="mt-2 text-3xl font-bold text-surface-900">{num(factoryGoalRatio * 100, 1)}%</p>
+              <p className="mt-2 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores com meta batida</p>
             </Card>
 
-            <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta Batida ou acima</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{onTargetCount}</p>
-              <p className="mt-2 text-xs text-surface-500">Colaboradores com aderência positiva</p>
+            {/* Merged: Meta Batida + Risco Operacional */}
+            <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-rose-400" />
+              <div className="grid grid-cols-2 divide-x divide-surface-100">
+                <div className="pr-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Meta Batida</p>
+                  </div>
+                  <p className="mt-2 text-3xl font-semibold text-surface-900">{onTargetCount}</p>
+                  <p className="mt-1.5 text-xs text-surface-500">Aderência positiva</p>
+                </div>
+                <div className="pl-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700">Risco Operacional</p>
+                  </div>
+                  <p className="mt-2 text-3xl font-semibold text-surface-900">{byStatus.critico + byStatus.atencao}</p>
+                  <p className="mt-1.5 text-xs text-surface-500">Requerem atenção</p>
+                </div>
+              </div>
             </Card>
 
-            <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Risco operacional</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{byStatus.critico + byStatus.atencao}</p>
-              <p className="mt-2 text-xs text-surface-500">Vendedores que exigem acompanhamento</p>
-            </Card>
-          </div>
-
-          <div className="mt-1 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Pedidos no mês</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalOrders, 0)}</p>
               <p className="mt-2 text-xs text-surface-500">Consolidado empresarial dos vendedores monitorados</p>
             </Card>
+          </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Peso bruto total</p>
@@ -2288,13 +2340,6 @@ export default function MetasWorkspace() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Faturamento total</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(corporateTotalRevenue)}</p>
               <p className="mt-2 text-xs text-surface-500">Valor total dos pedidos no mês selecionado</p>
-            </Card>
-
-            <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-violet-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Ticket médio</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(corporateAverageTicket)}</p>
-              <p className="mt-2 text-xs text-surface-500">Faturamento médio por pedido consolidado</p>
             </Card>
           </div>
 
@@ -2690,6 +2735,92 @@ export default function MetasWorkspace() {
             <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
           </Card>
         </>
+      )}
+
+      {/* ── Company scope modal ─────────────────────────────────── */}
+      {showCompanyModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCompanyModal(false) }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/8">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-surface-100 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50">
+                  <Building2 size={18} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-surface-900">Escopo de empresas</h2>
+                  <p className="text-xs text-surface-500">Selecione a base de dados a considerar</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompanyModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-2 p-6">
+              {([
+                {
+                  value: '1' as CompanyScopeFilter,
+                  label: 'Empresa 1 — Ouro Verde',
+                  desc: 'Moagem Ouro Verde (CODEMP = 1). Dados da matriz.',
+                  color: 'emerald',
+                },
+                {
+                  value: '2' as CompanyScopeFilter,
+                  label: 'Empresa 2 — Maceió',
+                  desc: 'Moagem Ouro Verde Maceió (CODEMP = 2). Dados da filial.',
+                  color: 'blue',
+                },
+                {
+                  value: 'all' as CompanyScopeFilter,
+                  label: 'Empresas selecionadas: 1 e 2',
+                  desc: 'Consolidado de todas as filiais. Totais podem divergir de relatórios individuais.',
+                  color: 'violet',
+                },
+              ]).map(({ value, label, desc, color }) => {
+                const active = companyScopeFilter === value
+                const colorMap: Record<string, string> = {
+                  emerald: active ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200' : 'border-surface-200 hover:border-emerald-200 hover:bg-emerald-50/40',
+                  blue: active ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200' : 'border-surface-200 hover:border-blue-200 hover:bg-blue-50/40',
+                  violet: active ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-200' : 'border-surface-200 hover:border-violet-200 hover:bg-violet-50/40',
+                }
+                const dotMap: Record<string, string> = { emerald: 'bg-emerald-500', blue: 'bg-blue-500', violet: 'bg-violet-500' }
+                const textMap: Record<string, string> = {
+                  emerald: active ? 'text-emerald-800' : 'text-surface-800',
+                  blue: active ? 'text-blue-800' : 'text-surface-800',
+                  violet: active ? 'text-violet-800' : 'text-surface-800',
+                }
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => { setCompanyScopeFilter(value); setShowCompanyModal(false) }}
+                    className={`flex w-full items-start gap-3.5 rounded-xl border p-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-400/50 ${colorMap[color]}`}
+                  >
+                    <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotMap[color]}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-semibold ${textMap[color]}`}>{label}</span>
+                        {active && (
+                          <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-surface-600 ring-1 ring-surface-200">Ativo</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-surface-500">{desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
