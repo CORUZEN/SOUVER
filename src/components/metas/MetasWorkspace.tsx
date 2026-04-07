@@ -41,6 +41,7 @@ interface CampaignPrize {
   frequency: 'MONTHLY' | 'QUARTERLY'
   type: PrizeType
   rewardValue: number
+  benefitDescription: string
   minPoints: number
   active: boolean
 }
@@ -220,8 +221,8 @@ function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
 }
 
 const DEFAULT_PRIZES: CampaignPrize[] = [
-  { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', rewardValue: 1000, minPoints: 0.6, active: true },
-  { id: 'quarter', title: 'Campanha VDD do trimestre', frequency: 'QUARTERLY', type: 'BENEFIT', rewardValue: 0, minPoints: 18, active: true },
+  { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', rewardValue: 1000, benefitDescription: '', minPoints: 0.6, active: true },
+  { id: 'quarter', title: 'Campanha VDD do trimestre', frequency: 'QUARTERLY', type: 'BENEFIT', rewardValue: 0, benefitDescription: '', minPoints: 18, active: true },
 ]
 
 function monthKey(year: number, month: number) {
@@ -439,6 +440,7 @@ export default function MetasWorkspace() {
   const [monthConfigs, setMonthConfigs] = useState<Record<string, MonthConfig>>({})
   const [metaConfigs, setMetaConfigs] = useState<Record<string, MetaConfig>>({})
   const [ruleBlocks, setRuleBlocks] = useState<RuleBlock[]>(DEFAULT_RULE_BLOCKS)
+  const [selectedBlockId, setSelectedBlockId] = useState<string>(DEFAULT_RULE_BLOCKS[0].id)
   const rules = useMemo(() => ruleBlocks.flatMap((b) => b.rules), [ruleBlocks])
   const [prizes, setPrizes] = useState<CampaignPrize[]>(DEFAULT_PRIZES)
   const [salaryBase, setSalaryBase] = useState(1612.44)
@@ -521,7 +523,7 @@ export default function MetasWorkspace() {
         } else if (Array.isArray(data.rules)) {
           blocks = [{ id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: (data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })) }]
         }
-        const legacyPrizes = Array.isArray(data.prizes) ? (data.prizes as CampaignPrize[]) : DEFAULT_PRIZES
+        const legacyPrizes = Array.isArray(data.prizes) ? (data.prizes as CampaignPrize[]).map((p) => ({ ...p, benefitDescription: p.benefitDescription ?? '' })) : DEFAULT_PRIZES
         const cfg: MetaConfig = {
           ruleBlocks: blocks,
           prizes: legacyPrizes,
@@ -1590,14 +1592,48 @@ export default function MetasWorkspace() {
             </div>
             <button
               type="button"
-              onClick={() => setRuleBlocks((prev) => [...prev, { id: `block-${Date.now()}`, title: `Bloco ${prev.length + 1}`, monthlyTarget: 0, sellerIds: [], rules: [] }])}
+              onClick={() => {
+                const source = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
+                const newId = `block-${Date.now()}`
+                const cloned: RuleBlock = {
+                  ...source,
+                  id: newId,
+                  title: `${source.title} (cópia)`,
+                  sellerIds: [],
+                  rules: source.rules.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })),
+                }
+                setRuleBlocks((prev) => [...prev, cloned])
+                setSelectedBlockId(newId)
+              }}
               className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
             >
               <Plus size={12} /> Novo bloco de KPIs
             </button>
           </div>
 
-          {ruleBlocks.map((block) => {
+          {/* Block selector tabs */}
+          {ruleBlocks.length > 1 && (
+            <div className="flex flex-wrap gap-1 rounded-lg border border-surface-200 bg-surface-50 p-1">
+              {ruleBlocks.map((block) => (
+                <button
+                  key={block.id}
+                  type="button"
+                  onClick={() => setSelectedBlockId(block.id)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    selectedBlockId === block.id
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-surface-600 hover:bg-surface-200'
+                  }`}
+                >
+                  {block.title}
+                  {block.sellerIds.length > 0 && <span className="ml-1 text-[10px] opacity-75">({block.sellerIds.length})</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(() => {
+            const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
             const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
             const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
@@ -1627,7 +1663,10 @@ export default function MetasWorkspace() {
                     {ruleBlocks.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => setRuleBlocks((prev) => prev.filter((b) => b.id !== block.id))}
+                        onClick={() => {
+                          setRuleBlocks((prev) => prev.filter((b) => b.id !== block.id))
+                          setSelectedBlockId((prev) => prev === block.id ? ruleBlocks.find((b) => b.id !== block.id)?.id ?? '' : prev)
+                        }}
                         className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                       >
                         Excluir bloco
@@ -1732,12 +1771,25 @@ export default function MetasWorkspace() {
                 </div>
               </Card>
             )
-          })}
+          })()}
 
           <Card className="border-surface-200">
             <h2 className="mb-3 text-base font-semibold text-surface-900">Campanhas de premiação (mensal e trimestral)</h2>
             <div className="space-y-2">
-              {prizes.map((prize) => <div key={prize.id} className="grid gap-2 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-6 md:items-end"><label className={label}>Campanha<input className={input} value={prize.title} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, title: event.target.value } : item))} /></label><label className={label}>Frequência<select className={input} value={prize.frequency} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, frequency: event.target.value as CampaignPrize['frequency'] } : item))}><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></label><label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, type: event.target.value as PrizeType } : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label><label className={label}>Valor<input className={input} type="number" step="0.01" value={prize.rewardValue} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></label><label className={label}>Pontos mínimos<input className={input} type="number" step="0.01" value={prize.minPoints} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, minPoints: parseDecimal(event.target.value, 0) } : item))} /></label><label className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-700"><input type="checkbox" className="h-4 w-4 accent-primary-600" checked={prize.active} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label></div>)}
+              {prizes.map((prize) => (
+                <div key={prize.id} className="grid gap-2 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-6 md:items-end">
+                  <label className={label}>Campanha<input className={input} value={prize.title} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, title: event.target.value } : item))} /></label>
+                  <label className={label}>Frequência<select className={input} value={prize.frequency} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, frequency: event.target.value as CampaignPrize['frequency'] } : item))}><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></label>
+                  <label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, type: event.target.value as PrizeType } : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label>
+                  {prize.type === 'CASH' ? (
+                    <label className={label}>Valor (R$)<input className={input} type="number" step="0.01" value={prize.rewardValue} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></label>
+                  ) : (
+                    <label className={label}>Premiação<input className={input} placeholder="Ex: Viagem, produto, voucher…" value={prize.benefitDescription} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, benefitDescription: event.target.value } : item))} /></label>
+                  )}
+                  <label className={label}>Pontos mínimos<input className={input} type="number" step="0.01" value={prize.minPoints} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, minPoints: parseDecimal(event.target.value, 0) } : item))} /></label>
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-700"><input type="checkbox" className="h-4 w-4 accent-primary-600" checked={prize.active} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label>
+                </div>
+              ))}
             </div>
           </Card>
         </>
