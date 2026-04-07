@@ -1213,7 +1213,14 @@ export default function MetasWorkspace() {
         }, 0)
 
         const ratio = blockPointsTarget > 0 ? pointsAchieved / blockPointsTarget : 0
-        const status: SellerSnapshot['status'] = ratio >= 1.05 ? 'SUPEROU' : ratio >= 0.85 ? 'NO_ALVO' : ratio >= 0.65 ? 'ATENCAO' : 'CRITICO'
+
+        const hasSuperTarget = blockRules.some((rule) => {
+          if (rule.kpiType !== 'META_FINANCEIRA') return false
+          const pct = parseFloat(rule.targetText.replace('%', ''))
+          return pct > 100 && (ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0) >= 1
+        })
+
+        const status: SellerSnapshot['status'] = hasSuperTarget ? 'SUPEROU' : ratio >= 0.85 ? 'NO_ALVO' : ratio >= 0.65 ? 'ATENCAO' : 'CRITICO'
 
         return {
           seller,
