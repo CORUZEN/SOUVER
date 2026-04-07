@@ -2466,9 +2466,18 @@ export default function MetasWorkspace() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Peso bruto total</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalGrossWeight, 2)} kg</p>
-              <p className="mt-2 text-xs text-surface-500">Soma do peso bruto dos pedidos no período</p>
+              <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta de peso consolidada</p>
+                  <p className="mt-1 text-2xl font-semibold text-surface-400 italic">—</p>
+                  <p className="mt-1 text-[10px] text-surface-400">Metas de peso por vendedor e grupo de produtos (em breve)</p>
+                </div>
+                <div className="pl-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Peso total dos pedidos</p>
+                  <p className="mt-1 text-2xl font-semibold text-surface-900">{num(corporateTotalGrossWeight, 2)} kg</p>
+                  <p className="mt-1 text-[10px] text-surface-400">Soma do peso bruto dos pedidos no período</p>
+                </div>
+              </div>
             </Card>
 
             <Card className={executiveMetricCardClass}>
