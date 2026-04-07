@@ -303,7 +303,10 @@ function parseYearMonth(req: NextRequest) {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const next = new Date(year, month, 1)
   const endDateExclusive = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`
-  return { year, month, startDate, endDateExclusive }
+  const scopeRaw = req.nextUrl.searchParams.get('companyScope')
+  const companyScope: '1' | '2' | 'all' =
+    scopeRaw === '2' ? '2' : scopeRaw === 'all' ? 'all' : '1'
+  return { year, month, startDate, endDateExclusive, companyScope }
 }
 
 /**
@@ -317,7 +320,7 @@ function buildOrdersSql(
   endDateExclusive: string,
   sellerCodes: string[],
   mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT' = 'STRICT',
-  companyCode?: string | null
+  companyScope: '1' | '2' | 'all' = '1'
 ) {
   // Primary: filter by CODTIPOPER = 1001 (pedido de venda real)
   // Fallback 1: TIPMOV IN ('V','P') caso CODTIPOPER não exista na instalação
@@ -334,11 +337,12 @@ function buildOrdersSql(
     sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
   }
 
-  // Filter by company code (CODEMP) when configured — Sankhya native screens
-  // always scope to a single company, so without this filter we get orders from
-  // all branches and inflate the order count.
-  const companyFilter = companyCode
-    ? `AND CAB.CODEMP = ${Number(companyCode)}\n  `
+  // companyScope controls which Sankhya company (CODEMP) to include:
+  //   '1'   → Moagem Ouro Verde (empresa 1 apenas)
+  //   '2'   → Moagem Ouro Verde Maceió (empresa 2 apenas)
+  //   'all' → todas as empresas (sem filtro de CODEMP)
+  const companyFilter = companyScope !== 'all'
+    ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''
 
   return `
@@ -367,7 +371,7 @@ export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
 
-  const { year, month, startDate, endDateExclusive } = parseYearMonth(req)
+  const { year, month, startDate, endDateExclusive, companyScope } = parseYearMonth(req)
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -409,12 +413,9 @@ export async function GET(req: NextRequest) {
     // Cascade: CODTIPOPER=1001 → TIPMOV fallback → any movement
     let orders: SankhyaOrder[] = []
     let queryMode: 'CODTIPOPER_1001' | 'TIPMOV_VP' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
-    // Default to company 1 (MOAGEM OURO VERDE) — empresa 2 is a separate branch
-    // that must not be mixed into the performance data.
-    const companyCode = config.companyCode?.trim() || '1'
 
     // 1) Primary: CODTIPOPER = 1001 (pedido de venda)
-    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT', companyCode)
+    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT', companyScope)
     try {
       const records = await queryRows(baseUrl, headers, sqlStrict, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -425,7 +426,7 @@ export async function GET(req: NextRequest) {
 
     // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed
     if (queryMode === 'NONE') {
-      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV', companyCode)
+      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV', companyScope)
       try {
         const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -435,7 +436,7 @@ export async function GET(req: NextRequest) {
 
     // 3) Last resort: no type filter
     if (queryMode === 'NONE') {
-      const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT', companyCode)
+      const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT', companyScope)
       try {
         const records = await queryRows(baseUrl, headers, sqlAny, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -518,7 +519,7 @@ export async function GET(req: NextRequest) {
       diagnostics: {
         selectedMonthOrders: orders.length,
         queryMode,
-        companyCode: companyCode ?? null,
+        companyScope,
         byStatus: orders.reduce<Record<string, number>>((acc, o) => {
           acc[o.statusNota] = (acc[o.statusNota] ?? 0) + 1
           return acc

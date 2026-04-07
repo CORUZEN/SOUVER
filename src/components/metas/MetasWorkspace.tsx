@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Boxes,
+  Building2,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -96,10 +97,12 @@ interface ProductAllowlistEntry {
   active: boolean
 }
 
+type CompanyScopeFilter = '1' | '2' | 'all'
+
 interface PerformanceDiagnostics {
   selectedMonthOrders: number
   queryMode?: string
-  companyCode?: string | null
+  companyScope?: string | null
   byStatus?: Record<string, number>
   byCompany?: Record<string, number>
 }
@@ -473,6 +476,7 @@ export default function MetasWorkspace() {
   const [productCodeFilter, setProductCodeFilter] = useState('')
   const [productDescriptionFilter, setProductDescriptionFilter] = useState('')
   const [productBrandFilter, setProductBrandFilter] = useState('')
+  const [companyScopeFilter, setCompanyScopeFilter] = useState<CompanyScopeFilter>('1')
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -491,6 +495,9 @@ export default function MetasWorkspace() {
       if (typeof data.year === 'number') setYear(data.year)
       if (typeof data.month === 'number') setMonth(data.month)
       if (data.monthConfigs && typeof data.monthConfigs === 'object') setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
+      if (data.companyScopeFilter === '1' || data.companyScopeFilter === '2' || data.companyScopeFilter === 'all') {
+        setCompanyScopeFilter(data.companyScopeFilter)
+      }
 
       const migrateBlocks = (raw: unknown): RuleBlock[] => {
         if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
@@ -617,19 +624,19 @@ export default function MetasWorkspace() {
       }
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ year, month, monthConfigs, metaConfigs: merged })
+        JSON.stringify({ year, month, monthConfigs, metaConfigs: merged, companyScopeFilter })
       )
     } catch (err) {
       console.error('[Metas] Falha ao salvar configuração no localStorage:', err)
     }
-  }, [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
+  }, [activeKey, basePremiation, companyScopeFilter, extraBonus, extraMinPoints, includeNational, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
 
   useEffect(() => {
     const controller = new AbortController()
     setSellersLoading(true)
     setSellersError('')
 
-    fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}`, { signal: controller.signal })
+    fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`, { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}))
         if (!response.ok) {
@@ -678,7 +685,7 @@ export default function MetasWorkspace() {
           pedidos: diag.selectedMonthOrders,
           queryMode: diag.queryMode ?? 'N/A',
           vendedores: mapped.length,
-          empresa: diag.companyCode ?? 'todas',
+          escopo: diag.companyScope ?? 'N/A',
           porStatus: diag.byStatus ?? {},
           porEmpresa: diag.byCompany ?? {},
         })
@@ -695,7 +702,7 @@ export default function MetasWorkspace() {
       })
 
     return () => controller.abort()
-  }, [month, year])
+  }, [companyScopeFilter, month, year])
 
   async function loadAllowlist() {
     setAllowlistLoading(true)
@@ -1615,6 +1622,48 @@ export default function MetasWorkspace() {
               </div>
             </Card>
           </div>
+
+          {/* ── Escopo de empresas Sankhya ─────────────────── */}
+          <Card className="border-surface-200">
+            <div className="mb-4 flex items-center gap-2">
+              <Building2 size={16} className="text-indigo-600" />
+              <div>
+                <h2 className="text-base font-semibold text-surface-900">Escopo de empresas (Sankhya)</h2>
+                <p className="mt-0.5 text-xs text-surface-500">Define quais empresas do Sankhya são consideradas no cálculo de pedidos e faturamento.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {([
+                { value: '1', label: 'Empresa 1', desc: 'Moagem Ouro Verde' },
+                { value: '2', label: 'Empresa 2', desc: 'Moagem Ouro Verde Maceió' },
+                { value: 'all', label: 'Ambas', desc: 'Consolidado geral' },
+              ] as { value: CompanyScopeFilter; label: string; desc: string }[]).map(({ value, label, desc }) => {
+                const active = companyScopeFilter === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setCompanyScopeFilter(value)}
+                    className={`flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400/50 ${
+                      active
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-300'
+                        : 'border-surface-200 bg-white text-surface-700 hover:border-surface-300 hover:bg-surface-50'
+                    }`}
+                  >
+                    <span className={`text-sm font-semibold ${active ? 'text-indigo-700' : 'text-surface-800'}`}>{label}</span>
+                    <span className={`text-xs ${active ? 'text-indigo-500' : 'text-surface-500'}`}>{desc}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {companyScopeFilter === 'all' && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Atenção: com ambas as empresas ativas, os totais de pedidos e faturamento incluem todas as filiais e podem divergir dos relatórios individuais do Sankhya.
+              </div>
+            )}
+          </Card>
 
           {/* ── Multi-block KPI system ─────────────────────── */}
           <div className="flex items-center justify-between">
