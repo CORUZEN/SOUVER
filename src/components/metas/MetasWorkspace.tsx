@@ -98,6 +98,7 @@ interface ProductAllowlistEntry {
 
 interface PerformanceDiagnostics {
   selectedMonthOrders: number
+  queryMode?: string
 }
 
 interface RuleProgress {
@@ -667,11 +668,15 @@ export default function MetasWorkspace() {
         })
 
         setSellers(mapped)
-        setPerformanceDiagnostics(
-          (data?.diagnostics as PerformanceDiagnostics | undefined) ?? {
-            selectedMonthOrders: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
-          }
-        )
+        const diag = (data?.diagnostics as PerformanceDiagnostics | undefined) ?? {
+          selectedMonthOrders: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
+        }
+        console.info('[Metas] Performance carregada:', {
+          pedidos: diag.selectedMonthOrders,
+          queryMode: diag.queryMode ?? 'N/A',
+          vendedores: mapped.length,
+        })
+        setPerformanceDiagnostics(diag)
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return

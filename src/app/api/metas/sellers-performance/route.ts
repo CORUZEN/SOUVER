@@ -394,31 +394,35 @@ export async function GET(req: NextRequest) {
     // --- Query orders filtered by seller codes in SQL ---
     // Cascade: CODTIPOPER=1001 → TIPMOV fallback → any movement
     let orders: SankhyaOrder[] = []
+    let queryMode: 'CODTIPOPER_1001' | 'TIPMOV_VP' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
 
     // 1) Primary: CODTIPOPER = 1001 (pedido de venda)
     const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT')
     try {
       const records = await queryRows(baseUrl, headers, sqlStrict, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
+      queryMode = 'CODTIPOPER_1001'
     } catch {
       // CODTIPOPER may not exist — try TIPMOV fallback
     }
 
-    // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed or returned nothing
-    if (orders.length === 0) {
+    // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed
+    if (queryMode === 'NONE') {
       const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV')
       try {
         const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
+        queryMode = 'TIPMOV_VP'
       } catch { /* next fallback */ }
     }
 
     // 3) Last resort: no type filter
-    if (orders.length === 0) {
+    if (queryMode === 'NONE') {
       const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT')
       try {
         const records = await queryRows(baseUrl, headers, sqlAny, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
+        queryMode = 'ANY_MOVEMENT'
       } catch { /* keep empty */ }
     }
 
@@ -496,6 +500,7 @@ export async function GET(req: NextRequest) {
       },
       diagnostics: {
         selectedMonthOrders: orders.length,
+        queryMode,
       },
       sellers,
     })
