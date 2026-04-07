@@ -2332,24 +2332,40 @@ export default function MetasWorkspace() {
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                Pontuação por vendedor (barras)
+                Ranking de pontuação
               </p>
-              <div className="mt-4 rounded-xl border border-surface-200 bg-surface-50 p-3">
-                <div className="flex h-36 items-end gap-2">
-                  {sellerBars.map((seller) => {
-                    const ratio = seller.pointsAchieved / maxSellerPoints
-                    return (
-                      <div key={seller.seller.id} className="flex flex-1 flex-col items-center gap-2">
-                        <div className="relative w-full rounded-t-md bg-gradient-to-t from-blue-700 to-cyan-500 transition-all duration-700" style={{ height: `${Math.max(8, ratio * 100)}%` }}>
-                          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-surface-600">
-                            {num(seller.pointsAchieved, 2)}
-                          </span>
+              <div className="mt-4 space-y-1.5">
+                {sellerBars.map((seller, idx) => {
+                  const ratio = maxSellerPoints > 0 ? seller.pointsAchieved / maxSellerPoints : 0
+                  const statusColor =
+                    seller.status === 'SUPEROU' ? 'bg-emerald-500' :
+                    seller.status === 'NO_ALVO' ? 'bg-cyan-500' :
+                    seller.status === 'ATENCAO' ? 'bg-amber-500' : 'bg-rose-500'
+                  const statusBorder =
+                    seller.status === 'SUPEROU' ? 'border-emerald-200' :
+                    seller.status === 'NO_ALVO' ? 'border-cyan-200' :
+                    seller.status === 'ATENCAO' ? 'border-amber-200' : 'border-rose-200'
+                  return (
+                    <div key={seller.seller.id} className={`group flex items-center gap-3 rounded-lg border ${statusBorder} bg-white px-3 py-2 transition-colors hover:bg-surface-50`}>
+                      <span className="w-5 shrink-0 text-center text-xs font-bold text-surface-400">{idx + 1}º</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-semibold text-surface-800">{seller.seller.name}</span>
+                          <span className="shrink-0 text-xs font-bold tabular-nums text-surface-700">{num(seller.pointsAchieved, 2)} pts</span>
                         </div>
-                        <span className="line-clamp-1 max-w-full text-[10px] text-surface-500">{seller.seller.name.split(' ')[0]}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-200">
+                            <div className={`h-full rounded-full ${statusColor} transition-[width] duration-700`} style={{ width: `${Math.max(2, ratio * 100)}%` }} />
+                          </div>
+                          <span className="shrink-0 text-[10px] font-medium tabular-nums text-surface-500">{num(ratio * 100, 0)}%</span>
+                        </div>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })}
+                {sellerBars.length === 0 && (
+                  <p className="py-4 text-center text-xs text-surface-400">Nenhum vendedor encontrado</p>
+                )}
               </div>
             </Card>
 
