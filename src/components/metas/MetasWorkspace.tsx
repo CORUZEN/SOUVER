@@ -2252,9 +2252,11 @@ export default function MetasWorkspace() {
                                 return r.brand === wt.brand.toUpperCase() && sellerCodes.some((sc) => r.sellerCode === sc)
                               })
                               .reduce((sum, r) => sum + r.totalKg, 0)
-                            const progress = wt.targetKg > 0 ? Math.min(actualKg / wt.targetKg, 1.5) : 0
-                            const progressPct = wt.targetKg > 0 ? Math.min(actualKg / wt.targetKg * 100, 100) : 0
-                            const progressColor = progress >= 1 ? 'bg-emerald-500' : progress >= 0.8 ? 'bg-cyan-500' : progress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
+                            const rawProgress = wt.targetKg > 0 ? actualKg / wt.targetKg : 0
+                            const progressPct = rawProgress * 100
+                            const barPct = Math.min(progressPct, 100)
+                            const progressColor = rawProgress >= 1 ? 'bg-emerald-500' : rawProgress >= 0.8 ? 'bg-cyan-500' : rawProgress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
+                            const progressTextColor = rawProgress >= 1 ? 'text-emerald-600' : rawProgress >= 0.8 ? 'text-cyan-600' : rawProgress >= 0.6 ? 'text-amber-500' : 'text-rose-500'
                             return (
                               <tr key={wt.id} className="hover:bg-surface-50/50">
                                 <td className="px-3 py-2">
@@ -2305,9 +2307,11 @@ export default function MetasWorkspace() {
                                   {wt.targetKg > 0 ? (
                                     <div className="flex items-center gap-2">
                                       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-200">
-                                        <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${progressPct}%` }} />
+                                        <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${barPct}%` }} />
                                       </div>
-                                      <span className={`text-[11px] font-semibold ${progressColor.replace('bg-', 'text-')}`}>{num(progressPct, 1)}%</span>
+                                      <span className={`text-[11px] font-semibold ${progressTextColor}`}>
+                                        {num(progressPct, 1)}%{rawProgress > 1 && <span className="ml-0.5 text-[9px] text-emerald-500">↑</span>}
+                                      </span>
                                     </div>
                                   ) : (
                                     <span className="text-[11px] text-surface-400">—</span>
@@ -2328,25 +2332,34 @@ export default function MetasWorkspace() {
                               </tr>
                             )
                           })}
-                          <tr className="bg-surface-50 font-semibold">
-                            <td className="px-3 py-2 text-xs text-surface-500" colSpan={2}>
+                          <tr className="bg-surface-50 font-semibold border-t border-surface-200">
+                            <td className="px-3 py-2 text-xs text-surface-500">
                               Total — {(block.weightTargets ?? []).filter((w) => w.targetKg > 0).length} metas de peso configuradas
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
-                              {num((block.weightTargets ?? []).reduce((sum, wt) => {
-                                const sellerCodes = block.sellerIds.map((sid) => {
-                                  const s = sellers.find((x) => x.id === sid)
-                                  return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
-                                })
-                                return sum + brandWeightRows
-                                  .filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sellerCodes.length === 0 || sellerCodes.some((sc) => r.sellerCode === sc)))
-                                  .reduce((s2, r) => s2 + r.totalKg, 0)
-                              }, 0), 2)} kg realizado
+                              {num((block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0), 2)} kg
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
-                              Meta: {num((block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0), 2)} kg
+                              {(() => {
+                                const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                const total = (block.weightTargets ?? []).reduce((sum, wt) => sum + brandWeightRows.filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sc.length === 0 || sc.some((c) => r.sellerCode === c))).reduce((s2, r) => s2 + r.totalKg, 0), 0)
+                                return <>{num(total, 2)} kg</>
+                              })()}
                             </td>
-                            <td className="px-3 py-2"></td>
+                            <td className="px-3 py-2 text-xs" colSpan={2}>
+                              {(() => {
+                                const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                const totalTarget = (block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0)
+                                const totalActual = (block.weightTargets ?? []).reduce((sum, wt) => sum + brandWeightRows.filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sc.length === 0 || sc.some((c) => r.sellerCode === c))).reduce((s2, r) => s2 + r.totalKg, 0), 0)
+                                if (totalTarget <= 0) return <span className="text-surface-400">—</span>
+                                const pct = totalActual / totalTarget * 100
+                                if (pct >= 100) {
+                                  return <span className="font-semibold text-emerald-600">Meta superada — +{num(pct - 100, 1)}% acima do planejado ↑</span>
+                                }
+                                const color = pct >= 80 ? 'text-cyan-700' : pct >= 60 ? 'text-amber-600' : 'text-rose-600'
+                                return <span className={`font-semibold ${color}`}>{num(pct, 1)}% da meta total atingida</span>
+                              })()}
+                            </td>
                           </tr>
                         </tbody>
                       </table>
