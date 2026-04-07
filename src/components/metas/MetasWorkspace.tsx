@@ -42,6 +42,12 @@ interface GoalRule {
   points: number
 }
 
+interface WeightTarget {
+  id: string
+  brand: string        // product brand (MARCA from Sankhya / product allowlist)
+  targetKg: number    // monthly weight target in kg
+}
+
 interface CampaignPrize {
   id: string
   title: string
@@ -139,6 +145,7 @@ interface RuleBlock {
   monthlyTarget: number
   sellerIds: string[]
   rules: GoalRule[]
+  weightTargets: WeightTarget[]
 }
 
 interface CycleWeek {
@@ -224,7 +231,7 @@ const DEFAULT_RULES: GoalRule[] = [
 ]
 
 const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
-  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES },
+  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES, weightTargets: [] },
 ]
 
 function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
@@ -495,6 +502,11 @@ export default function MetasWorkspace() {
   const [sellerPickerBlockId, setSellerPickerBlockId] = useState<string | null>(null)
   const [sellerPickerSearch, setSellerPickerSearch] = useState('')
   const [addGroupModal, setAddGroupModal] = useState<{ open: boolean; search: string; selectedSellerId: string }>({ open: false, search: '', selectedSellerId: '' })
+  // Brand weight data fetched from Sankhya (seller × brand → total kg for the selected month)
+  const [brandWeightRows, setBrandWeightRows] = useState<Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>>([])
+  const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
+  const [brandWeightLoading, setBrandWeightLoading] = useState(false)
+  const [brandWeightError, setBrandWeightError] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -533,6 +545,7 @@ export default function MetasWorkspace() {
           ...b,
           monthlyTarget: b.monthlyTarget ?? 0,
           sellerIds: b.sellerIds ?? [],
+          weightTargets: b.weightTargets ?? [],
           rules: b.rules.map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
         }))
         return DEFAULT_RULE_BLOCKS
@@ -730,6 +743,31 @@ export default function MetasWorkspace() {
         if (!controller.signal.aborted) setSellersLoading(false)
       })
 
+    return () => controller.abort()
+  }, [companyScopeFilter, month, year])
+
+  // ── Brand weight effect ────────────────────────────────────────────────
+  useEffect(() => {
+    const controller = new AbortController()
+    setBrandWeightLoading(true)
+    setBrandWeightError('')
+    fetch(
+      `/api/metas/sellers-performance/brand-weight?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`,
+      { signal: controller.signal }
+    )
+      .then(async (res) => {
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar peso por marca.')
+        const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>
+        const brands = (payload.brands ?? []) as string[]
+        setBrandWeightRows(rows)
+        setBrandWeightBrands(brands)
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        setBrandWeightError(err instanceof Error ? err.message : 'Falha ao carregar peso por marca.')
+      })
+      .finally(() => { if (!controller.signal.aborted) setBrandWeightLoading(false) })
     return () => controller.abort()
   }, [companyScopeFilter, month, year])
 
@@ -1384,6 +1422,16 @@ export default function MetasWorkspace() {
         return sum + (block.monthlyTarget > 0 ? block.monthlyTarget : 0)
       }, 0),
     [ruleBlocks, snapshots]
+  )
+  // Sum of all weight targets across all blocks (all brands, all sellers)
+  const corporateTotalWeightTarget = useMemo(
+    () => ruleBlocks.reduce((sum, block) => sum + (block.weightTargets ?? []).reduce((s, wt) => s + (wt.targetKg > 0 ? wt.targetKg : 0), 0), 0),
+    [ruleBlocks]
+  )
+  // Total actual weight by brand (sum across all fetched rows)
+  const corporateTotalWeightActual = useMemo(
+    () => brandWeightRows.reduce((sum, r) => sum + r.totalKg, 0),
+    [brandWeightRows]
   )
   const corporateAverageTicket = useMemo(
     () => (corporateTotalOrders > 0 ? corporateTotalRevenue / corporateTotalOrders : 0),
@@ -2152,6 +2200,159 @@ export default function MetasWorkspace() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* ── Metas de peso por grupo de produto ───────── */}
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Boxes size={14} className="text-cyan-600" />
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Metas de peso por grupo de produto</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTarget: WeightTarget = {
+                          id: `wt-${Date.now()}`,
+                          brand: '',
+                          targetKg: 0,
+                        }
+                        updateBlock({ weightTargets: [...(block.weightTargets ?? []), newTarget] })
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-cyan-300 bg-cyan-50/50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-50 transition-colors"
+                    >
+                      <Plus size={11} /> Adicionar grupo
+                    </button>
+                  </div>
+                  {(!block.weightTargets || block.weightTargets.length === 0) ? (
+                    <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-3 py-4 text-center text-xs text-surface-400">
+                      Nenhuma meta de peso definida. Clique em "Adicionar grupo" para configurar.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-surface-200 text-sm">
+                        <thead>
+                          <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                            <th className="px-3 py-2">Grupo de produto (marca)</th>
+                            <th className="px-3 py-2">Meta (kg)</th>
+                            <th className="px-3 py-2">Realizado (kg)</th>
+                            <th className="px-3 py-2">Progresso</th>
+                            <th className="px-3 py-2 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-surface-100">
+                          {(block.weightTargets ?? []).map((wt) => {
+                            const sellerCodes = block.sellerIds.map((sid) => {
+                              const s = sellers.find((x) => x.id === sid)
+                              return s ? s.login.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
+                            })
+                            const actualKg = brandWeightRows
+                              .filter((r) => {
+                                if (!wt.brand) return false
+                                if (sellerCodes.length === 0) return r.brand === wt.brand.toUpperCase()
+                                return r.brand === wt.brand.toUpperCase() && sellerCodes.some((sc) => r.sellerCode === sc)
+                              })
+                              .reduce((sum, r) => sum + r.totalKg, 0)
+                            const progress = wt.targetKg > 0 ? Math.min(actualKg / wt.targetKg, 1.5) : 0
+                            const progressPct = wt.targetKg > 0 ? Math.min(actualKg / wt.targetKg * 100, 100) : 0
+                            const progressColor = progress >= 1 ? 'bg-emerald-500' : progress >= 0.8 ? 'bg-cyan-500' : progress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
+                            return (
+                              <tr key={wt.id} className="hover:bg-surface-50/50">
+                                <td className="px-3 py-2">
+                                  <select
+                                    className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs bg-white"
+                                    value={wt.brand}
+                                    onChange={(e) => {
+                                      const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, brand: e.target.value } : x)
+                                      updateBlock({ weightTargets: updated })
+                                    }}
+                                  >
+                                    <option value="">Selecionar grupo...</option>
+                                    {/* Known brands from allowlist and from fetched data */}
+                                    {[...new Set([
+                                      ...productAllowlist.map((p) => p.brand.toUpperCase()).filter(Boolean),
+                                      ...brandWeightBrands,
+                                    ])].sort().map((brand) => (
+                                      <option key={brand} value={brand}>{brand}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0"
+                                    value={wt.targetKg || ''}
+                                    onChange={(e) => {
+                                      const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
+                                      updateBlock({ weightTargets: updated })
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-xs text-surface-700">
+                                  {brandWeightLoading ? (
+                                    <span className="text-surface-400">Carregando...</span>
+                                  ) : brandWeightError ? (
+                                    <span className="text-amber-600" title={brandWeightError}>—</span>
+                                  ) : (
+                                    <span className={actualKg >= wt.targetKg && wt.targetKg > 0 ? 'font-semibold text-emerald-600' : ''}>
+                                      {num(actualKg, 2)} kg
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {wt.targetKg > 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-200">
+                                        <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${progressPct}%` }} />
+                                      </div>
+                                      <span className={`text-[11px] font-semibold ${progressColor.replace('bg-', 'text-')}`}>{num(progressPct, 1)}%</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-surface-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = (block.weightTargets ?? []).filter((x) => x.id !== wt.id)
+                                      updateBlock({ weightTargets: updated })
+                                    }}
+                                    className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                          <tr className="bg-surface-50 font-semibold">
+                            <td className="px-3 py-2 text-xs text-surface-500" colSpan={2}>
+                              Total — {(block.weightTargets ?? []).filter((w) => w.targetKg > 0).length} metas de peso configuradas
+                            </td>
+                            <td className="px-3 py-2 text-xs text-surface-700">
+                              {num((block.weightTargets ?? []).reduce((sum, wt) => {
+                                const sellerCodes = block.sellerIds.map((sid) => {
+                                  const s = sellers.find((x) => x.id === sid)
+                                  return s ? s.login.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '')
+                                })
+                                return sum + brandWeightRows
+                                  .filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sellerCodes.length === 0 || sellerCodes.some((sc) => r.sellerCode === sc)))
+                                  .reduce((s2, r) => s2 + r.totalKg, 0)
+                              }, 0), 2)} kg realizado
+                            </td>
+                            <td className="px-3 py-2 text-xs text-surface-700">
+                              Meta: {num((block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0), 2)} kg
+                            </td>
+                            <td className="px-3 py-2"></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </Card>
             )
           })()}
@@ -2469,13 +2670,32 @@ export default function MetasWorkspace() {
               <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta de peso consolidada</p>
-                  <p className="mt-1 text-2xl font-semibold text-surface-400 italic">—</p>
-                  <p className="mt-1 text-[10px] text-surface-400">Metas de peso por vendedor e grupo de produtos (em breve)</p>
+                  {corporateTotalWeightTarget > 0 ? (
+                    <>
+                      <p className="mt-1 text-2xl font-semibold text-surface-700">{num(corporateTotalWeightTarget, 2)} kg</p>
+                      <p className="mt-1 text-[10px] text-surface-400">Soma das metas de peso por grupo de produto</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-2xl font-semibold text-surface-400 italic">—</p>
+                      <p className="mt-1 text-[10px] text-surface-400">Configure em Configurações → metas de peso</p>
+                    </>
+                  )}
                 </div>
                 <div className="pl-4">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Peso total dos pedidos</p>
-                  <p className="mt-1 text-2xl font-semibold text-surface-900">{num(corporateTotalGrossWeight, 2)} kg</p>
-                  <p className="mt-1 text-[10px] text-surface-400">Soma do peso bruto dos pedidos no período</p>
+                  <p className={`mt-1 text-2xl font-semibold ${
+                    corporateTotalWeightTarget > 0 && corporateTotalGrossWeight >= corporateTotalWeightTarget
+                      ? 'text-emerald-600'
+                      : 'text-surface-900'
+                  }`}>{num(corporateTotalGrossWeight, 2)} kg</p>
+                  {corporateTotalWeightTarget > 0 ? (
+                    <p className="mt-1 text-[10px] text-surface-400">
+                      {num(Math.min(corporateTotalGrossWeight / corporateTotalWeightTarget * 100, 999), 1)}% da meta de peso
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[10px] text-surface-400">Soma do peso bruto dos pedidos no período</p>
+                  )}
                 </div>
               </div>
             </Card>
