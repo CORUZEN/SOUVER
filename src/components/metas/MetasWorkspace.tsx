@@ -11,15 +11,19 @@ import {
   CircleDollarSign,
   Plus,
   RotateCcw,
+  Search,
   Settings2,
   Target,
   TrendingDown,
   TrendingUp,
+  UserPlus,
   UserRound,
   Users,
+  X,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
+import Modal from '@/components/ui/Modal'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
@@ -480,6 +484,17 @@ export default function MetasWorkspace() {
   const [companyScopeFilter, setCompanyScopeFilter] = useState<CompanyScopeFilter>('1')
   const [showPeriodPicker, setShowPeriodPicker] = useState(false)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean
+    title: string
+    message: string
+    confirmLabel: string
+    variant: 'danger' | 'primary'
+    onConfirm: () => void
+  }>({ open: false, title: '', message: '', confirmLabel: 'Confirmar', variant: 'primary', onConfirm: () => {} })
+  const [sellerPickerBlockId, setSellerPickerBlockId] = useState<string | null>(null)
+  const [sellerPickerSearch, setSellerPickerSearch] = useState('')
+  const [addGroupModal, setAddGroupModal] = useState<{ open: boolean; search: string; selectedSellerId: string }>({ open: false, search: '', selectedSellerId: '' })
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -1373,30 +1388,40 @@ export default function MetasWorkspace() {
   const stageSeries = useMemo(
     () =>
       STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
-        const stageRules = rules.filter((rule) => rule.stage === stage.key)
-        const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
-        if (stageTarget <= 0 || snapshots.length === 0) {
-          return { key: stage.key, label: stage.label, target: stageTarget, achieved: 0, ratio: 0 }
+        if (snapshots.length === 0) {
+          return { key: stage.key, label: stage.label, target: 0, achieved: 0, ratio: 0, hitCount: 0 }
         }
 
-        const achievedAverage =
-          snapshots.reduce((sumSellers, snapshot) => {
-            const sellerStagePoints = stageRules.reduce((sumRules, rule) => {
-              const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-              return sumRules + rule.points * Math.min(progress, 1)
-            }, 0)
-            return sumSellers + sellerStagePoints
-          }, 0) / snapshots.length
+        let totalTarget = 0
+        let totalAchieved = 0
+        let hitCount = 0
+
+        for (const snapshot of snapshots) {
+          const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
+          const blockStageRules = block.rules.filter((r) => r.stage === stage.key)
+          const stageTarget = blockStageRules.reduce((sum, r) => sum + r.points, 0)
+          const stageAchieved = blockStageRules.reduce((sum, r) => {
+            const progress = snapshot.ruleProgress.find((item) => item.ruleId === r.id)?.progress ?? 0
+            return sum + r.points * Math.min(progress, 1)
+          }, 0)
+          totalTarget += stageTarget
+          totalAchieved += stageAchieved
+          if (stageTarget > 0 && stageAchieved >= stageTarget) hitCount++
+        }
+
+        const avgTarget = totalTarget / snapshots.length
+        const avgAchieved = totalAchieved / snapshots.length
 
         return {
           key: stage.key,
           label: stage.label,
-          target: stageTarget,
-          achieved: achievedAverage,
-          ratio: stageTarget > 0 ? achievedAverage / stageTarget : 0,
+          target: avgTarget,
+          achieved: avgAchieved,
+          ratio: avgTarget > 0 ? avgAchieved / avgTarget : 0,
+          hitCount,
         }
       }),
-    [rules, snapshots]
+    [ruleBlocks, snapshots]
   )
 
   const executiveMetricCardClass =
@@ -1404,14 +1429,6 @@ export default function MetasWorkspace() {
 
   const executivePanelCardClass =
     'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
-
-  const stageRuleMap = useMemo(
-    () =>
-      Object.fromEntries(
-        STAGES.filter((s) => s.key !== 'FULL').map((stage) => [stage.key, rules.filter((rule) => rule.stage === stage.key)])
-      ) as Record<StageKey, GoalRule[]>,
-    [rules]
-  )
 
   const lineChartData = useMemo(() => {
     const width = 560
@@ -1506,10 +1523,11 @@ export default function MetasWorkspace() {
   const sellerHeatmap = useMemo(
     () =>
       snapshots.slice(0, 5).map((snapshot) => {
+        const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
         const cells = STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
-          const stageRules = stageRuleMap[stage.key] ?? []
-          const stageTarget = stageRules.reduce((sum, rule) => sum + rule.points, 0)
-          const stageAchieved = stageRules.reduce((sum, rule) => {
+          const blockStageRules = block.rules.filter((r) => r.stage === stage.key)
+          const stageTarget = blockStageRules.reduce((sum, rule) => sum + rule.points, 0)
+          const stageAchieved = blockStageRules.reduce((sum, rule) => {
             const progress =
               snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
             return sum + rule.points * Math.min(progress, 1)
@@ -1519,7 +1537,7 @@ export default function MetasWorkspace() {
         })
         return { seller: snapshot.seller, cells }
       }),
-    [snapshots, stageRuleMap]
+    [ruleBlocks, snapshots]
   )
 
   const heatCellClass = (ratio: number) => {
@@ -1824,26 +1842,14 @@ export default function MetasWorkspace() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Target size={16} className="text-primary-600" />
-              <h2 className="text-base font-semibold text-surface-900">Blocos de regras de KPIs e metas</h2>
+              <h2 className="text-base font-semibold text-surface-900">Grupos de parâmetros por vendedor</h2>
             </div>
             <button
               type="button"
-              onClick={() => {
-                const source = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
-                const newId = `block-${Date.now()}`
-                const cloned: RuleBlock = {
-                  ...source,
-                  id: newId,
-                  title: `${source.title} (cópia)`,
-                  sellerIds: [],
-                  rules: source.rules.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })),
-                }
-                setRuleBlocks((prev) => [...prev, cloned])
-                setSelectedBlockId(newId)
-              }}
-              className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+              onClick={() => setAddGroupModal({ open: true, search: '', selectedSellerId: '' })}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
             >
-              <Plus size={12} /> Novo bloco de KPIs
+              <UserPlus size={12} /> Adicionar vendedor
             </button>
           </div>
 
@@ -1885,17 +1891,20 @@ export default function MetasWorkspace() {
                       onChange={(e) => updateBlock({ title: e.target.value })}
                     />
                     {block.sellerIds.length === 0 && (
-                      <Badge variant="secondary">Bloco padrão — aplica a vendedores não atribuídos</Badge>
+                      <Badge variant="secondary">Grupo padrão — aplica a vendedores não atribuídos</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm('Restaurar todos os KPIs deste bloco para os valores padrão da planilha? As regras atuais serão substituídas.')) {
-                          updateBlock({ rules: DEFAULT_RULES.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })) })
-                        }
-                      }}
+                      onClick={() => setConfirmModal({
+                        open: true,
+                        title: 'Restaurar padrões',
+                        message: `Restaurar todos os KPIs do grupo "${block.title}" para os valores padrão? As regras atuais serão substituídas e essa ação não pode ser desfeita.`,
+                        confirmLabel: 'Restaurar',
+                        variant: 'danger',
+                        onConfirm: () => updateBlock({ rules: DEFAULT_RULES.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })) }),
+                      })}
                       className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
                     >
                       <RotateCcw size={12} /> Restaurar padrões
@@ -1910,13 +1919,20 @@ export default function MetasWorkspace() {
                     {ruleBlocks.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setRuleBlocks((prev) => prev.filter((b) => b.id !== block.id))
-                          setSelectedBlockId((prev) => prev === block.id ? ruleBlocks.find((b) => b.id !== block.id)?.id ?? '' : prev)
-                        }}
+                        onClick={() => setConfirmModal({
+                          open: true,
+                          title: 'Excluir grupo',
+                          message: `Deseja excluir o grupo "${block.title}"? Os vendedores atribuídos voltarão ao grupo padrão.`,
+                          confirmLabel: 'Excluir',
+                          variant: 'danger',
+                          onConfirm: () => {
+                            setRuleBlocks((prev) => prev.filter((b) => b.id !== block.id))
+                            setSelectedBlockId((prev) => prev === block.id ? (ruleBlocks.find((b) => b.id !== block.id)?.id ?? '') : prev)
+                          },
+                        })}
                         className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                       >
-                        Excluir bloco
+                        Excluir grupo
                       </button>
                     )}
                   </div>
@@ -1948,22 +1964,109 @@ export default function MetasWorkspace() {
                       {assignedSellers.map((s) => (
                         <span key={s.id} className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200">
                           {s.name.split(' ').slice(0, 2).join(' ')}
-                          <button type="button" onClick={() => updateBlock({ sellerIds: block.sellerIds.filter((id) => id !== s.id) })} className="ml-0.5 text-primary-400 hover:text-primary-700">✕</button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmModal({
+                              open: true,
+                              title: 'Remover vendedor do grupo',
+                              message: `Deseja remover "${s.name}" do grupo "${block.title}"? O vendedor voltará a usar o grupo padrão.`,
+                              confirmLabel: 'Remover',
+                              variant: 'danger',
+                              onConfirm: () => updateBlock({ sellerIds: block.sellerIds.filter((id) => id !== s.id) }),
+                            })}
+                            className="ml-0.5 flex items-center justify-center rounded-full p-0.5 text-primary-400 hover:bg-primary-100 hover:text-rose-600 transition-colors"
+                          >
+                            <X size={10} />
+                          </button>
                         </span>
                       ))}
-                      <select
-                        className="rounded-lg border border-dashed border-surface-300 bg-white px-2 py-1 text-xs text-surface-500"
-                        value=""
-                        onChange={(e) => {
-                          if (!e.target.value) return
-                          updateBlock({ sellerIds: [...block.sellerIds, e.target.value] })
-                        }}
-                      >
-                        <option value="">+ Adicionar vendedor</option>
-                        {unassignedSellers.filter((s) => !block.sellerIds.includes(s.id)).map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (sellerPickerBlockId === block.id) {
+                              setSellerPickerBlockId(null)
+                              setSellerPickerSearch('')
+                            } else {
+                              setSellerPickerBlockId(block.id)
+                              setSellerPickerSearch('')
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary-300 bg-primary-50/40 px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 hover:border-primary-400 transition-colors"
+                        >
+                          <UserPlus size={11} /> Adicionar vendedor
+                        </button>
+                        {sellerPickerBlockId === block.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-20"
+                              onClick={() => { setSellerPickerBlockId(null); setSellerPickerSearch('') }}
+                              aria-hidden="true"
+                            />
+                            <div className="absolute left-0 top-full z-30 mt-1.5 w-72 rounded-xl border border-surface-200 bg-white shadow-xl ring-1 ring-black/5">
+                              <div className="p-2 border-b border-surface-100">
+                                <div className="flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-2.5 py-1.5">
+                                  <Search size={12} className="text-surface-400 shrink-0" />
+                                  <input
+                                    autoFocus
+                                    placeholder="Buscar vendedor..."
+                                    className="flex-1 bg-transparent text-xs text-surface-800 placeholder-surface-400 outline-none"
+                                    value={sellerPickerSearch}
+                                    onChange={(e) => setSellerPickerSearch(e.target.value)}
+                                  />
+                                  {sellerPickerSearch && (
+                                    <button type="button" onClick={() => setSellerPickerSearch('')} className="text-surface-400 hover:text-surface-600">
+                                      <X size={10} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <ul className="max-h-56 overflow-y-auto py-1 divide-y divide-surface-50">
+                                {unassignedSellers
+                                  .filter((s) => !block.sellerIds.includes(s.id))
+                                  .filter((s) => !sellerPickerSearch || s.name.toLowerCase().includes(sellerPickerSearch.toLowerCase()))
+                                  .map((s) => {
+                                    const initials = s.name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
+                                    return (
+                                      <li key={s.id}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-primary-50 transition-colors"
+                                          onClick={() => setConfirmModal({
+                                            open: true,
+                                            title: 'Adicionar vendedor ao grupo',
+                                            message: `Deseja adicionar "${s.name}" ao grupo "${block.title}"?`,
+                                            confirmLabel: 'Adicionar',
+                                            variant: 'primary',
+                                            onConfirm: () => {
+                                              updateBlock({ sellerIds: [...block.sellerIds, s.id] })
+                                              setSellerPickerBlockId(null)
+                                              setSellerPickerSearch('')
+                                            },
+                                          })}
+                                        >
+                                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[10px] font-bold text-primary-700">{initials}</span>
+                                          <span className="truncate text-xs font-medium text-surface-800">{s.name}</span>
+                                        </button>
+                                      </li>
+                                    )
+                                  })}
+                                {unassignedSellers
+                                  .filter((s) => !block.sellerIds.includes(s.id))
+                                  .filter((s) => !sellerPickerSearch || s.name.toLowerCase().includes(sellerPickerSearch.toLowerCase()))
+                                  .length === 0 && (
+                                  <li className="px-3 py-4 text-center text-xs text-surface-400">
+                                    {sellerPickerSearch ? 'Nenhum resultado para essa busca' : 'Todos os vendedores já estão atribuídos'}
+                                  </li>
+                                )}
+                              </ul>
+                              <div className="border-t border-surface-100 px-3 py-2 text-[10px] text-surface-400">
+                                {unassignedSellers.filter((s) => !block.sellerIds.includes(s.id)).length} vendedor(es) disponível(is)
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2628,18 +2731,28 @@ export default function MetasWorkspace() {
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por etapa</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
               <div className="mt-4 space-y-2.5">
-                {stageSeries.map((stage) => (
-                  <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
-                    <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{stage.label}</span><span className="font-semibold">{num(stage.achieved, 3)} / {num(stage.target, 3)} pts</span></div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                      <div
-                        className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
-                        style={{ width: `${Math.min(stage.ratio * 100, 100)}%` }}
-                      />
+                {stageSeries.map((stage) => {
+                  const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
+                  return (
+                    <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
+                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600">
+                        <span>{stage.label}</span>
+                        <span className="font-semibold">
+                          {stage.hitCount} / {snapshots.length}
+                          <span className="ml-1 font-normal text-surface-400">vendedores</span>
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
+                        <div
+                          className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
+                          style={{ width: `${Math.min(hitRatio * 100, 100)}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </Card>
           </div>
@@ -2736,6 +2849,152 @@ export default function MetasWorkspace() {
           </Card>
         </>
       )}
+
+      {/* ── Confirm modal ──────────────────────────────────────── */}
+      <Modal
+        open={confirmModal.open}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+        title={confirmModal.title}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2 px-6 py-4 border-t border-surface-100">
+            <button
+              type="button"
+              onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+              className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                confirmModal.onConfirm()
+                setConfirmModal((prev) => ({ ...prev, open: false }))
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
+                confirmModal.variant === 'danger'
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : 'bg-primary-600 hover:bg-primary-700'
+              }`}
+            >
+              {confirmModal.confirmLabel}
+            </button>
+          </div>
+        }
+      >
+        <div className="px-6 py-4">
+          <p className="text-sm text-surface-700 leading-relaxed">{confirmModal.message}</p>
+        </div>
+      </Modal>
+
+      {/* ── Add seller group modal ──────────────────────────────── */}
+      <Modal
+        open={addGroupModal.open}
+        onClose={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '' })}
+        title="Adicionar grupo de parâmetros"
+        description="Selecione um vendedor para criar um novo grupo de regras e meta financeira individual."
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2 px-6 py-4 border-t border-surface-100">
+            <button
+              type="button"
+              onClick={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '' })}
+              className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!addGroupModal.selectedSellerId}
+              onClick={() => {
+                const seller = sellers.find((s) => s.id === addGroupModal.selectedSellerId)
+                if (!seller) return
+                const newId = `block-${Date.now()}`
+                const source = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
+                const cloned: RuleBlock = {
+                  ...source,
+                  id: newId,
+                  title: seller.name.split(' ').slice(0, 2).join(' '),
+                  sellerIds: [seller.id],
+                  rules: source.rules.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })),
+                }
+                setRuleBlocks((prev) => [...prev, cloned])
+                setSelectedBlockId(newId)
+                setAddGroupModal({ open: false, search: '', selectedSellerId: '' })
+              }}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Criar grupo
+            </button>
+          </div>
+        }
+      >
+        <div className="px-6 py-4 space-y-3">
+          <div className="flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all">
+            <Search size={14} className="text-surface-400 shrink-0" />
+            <input
+              autoFocus
+              placeholder="Buscar vendedor..."
+              className="flex-1 bg-transparent text-sm text-surface-800 placeholder-surface-400 outline-none"
+              value={addGroupModal.search}
+              onChange={(e) => setAddGroupModal((prev) => ({ ...prev, search: e.target.value }))}
+            />
+            {addGroupModal.search && (
+              <button type="button" onClick={() => setAddGroupModal((prev) => ({ ...prev, search: '' }))} className="text-surface-400 hover:text-surface-600">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          {sellers.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
+              Nenhum vendedor carregado. Os dados são carregados automaticamente ao acessar o painel de metas com um período selecionado.
+            </p>
+          ) : (
+            <ul className="max-h-64 overflow-y-auto rounded-xl border border-surface-200 divide-y divide-surface-100">
+              {sellers
+                .filter((s) => !addGroupModal.search || s.name.toLowerCase().includes(addGroupModal.search.toLowerCase()))
+                .map((s) => {
+                  const initials = s.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+                  const alreadyInBlock = ruleBlocks.some((b) => b.sellerIds.includes(s.id))
+                  const isSelected = addGroupModal.selectedSellerId === s.id
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        disabled={alreadyInBlock}
+                        onClick={() => setAddGroupModal((prev) => ({ ...prev, selectedSellerId: s.id }))}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                          isSelected
+                            ? 'bg-primary-50'
+                            : alreadyInBlock
+                            ? 'cursor-not-allowed opacity-40 bg-surface-50'
+                            : 'hover:bg-surface-50'
+                        }`}
+                      >
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${isSelected ? 'bg-primary-600 text-white' : 'bg-surface-200 text-surface-600'}`}>
+                          {initials}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className={`truncate text-xs font-semibold ${isSelected ? 'text-primary-700' : 'text-surface-800'}`}>{s.name}</div>
+                          {alreadyInBlock && <div className="text-[10px] text-surface-400">Já possui grupo definido</div>}
+                        </div>
+                        {isSelected && <span className="text-primary-500 font-bold text-sm">✓</span>}
+                      </button>
+                    </li>
+                  )
+                })}
+              {sellers.filter((s) => !addGroupModal.search || s.name.toLowerCase().includes(addGroupModal.search.toLowerCase())).length === 0 && (
+                <li className="px-4 py-5 text-center text-xs text-surface-400">Nenhum vendedor encontrado para essa busca</li>
+              )}
+            </ul>
+          )}
+          {sellers.length > 0 && (
+            <p className="text-[10px] text-surface-400">
+              {sellers.filter((s) => !ruleBlocks.some((b) => b.sellerIds.includes(s.id))).length} de {sellers.length} vendedores sem grupo definido
+            </p>
+          )}
+        </div>
+      </Modal>
 
       {/* ── Company scope modal ─────────────────────────────────── */}
       {showCompanyModal && (
