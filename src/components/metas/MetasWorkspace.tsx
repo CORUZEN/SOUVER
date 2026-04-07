@@ -2234,7 +2234,7 @@ export default function MetasWorkspace() {
                           <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                             <th className="px-3 py-2">Grupo de produto (marca)</th>
                             <th className="px-3 py-2">Meta (kg)</th>
-                            <th className="px-3 py-2">Realizado (kg)</th>
+                            <th className="px-3 py-2">Vendido (kg)</th>
                             <th className="px-3 py-2">Progresso</th>
                             <th className="px-3 py-2 w-10"></th>
                           </tr>
@@ -2354,7 +2354,7 @@ export default function MetasWorkspace() {
                                 if (totalTarget <= 0) return <span className="text-surface-400">—</span>
                                 const pct = totalActual / totalTarget * 100
                                 if (pct >= 100) {
-                                  return <span className="font-semibold text-emerald-600">+{num(pct - 100, 1)}% acima do planejado ↑</span>
+                                  return <span className="font-semibold text-emerald-600">+{num(pct - 100, 1)}% acima da meta ↑</span>
                                 }
                                 const color = pct >= 80 ? 'text-cyan-700' : pct >= 60 ? 'text-amber-600' : 'text-rose-600'
                                 return <span className={`font-semibold ${color}`}>{num(pct, 1)}% da meta total atingida</span>
