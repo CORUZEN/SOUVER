@@ -512,6 +512,7 @@ export default function MetasWorkspace() {
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
 
@@ -575,7 +576,7 @@ export default function MetasWorkspace() {
         if (Array.isArray(data.ruleBlocks)) {
           blocks = migrateBlocks(data.ruleBlocks)
         } else if (Array.isArray(data.rules)) {
-          blocks = [{ id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: (data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })) }]
+          blocks = [{ id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], weightTargets: [], rules: (data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })) }]
         }
         const legacyPrizes = Array.isArray(data.prizes) ? (data.prizes as CampaignPrize[]).map((p) => ({ ...p, benefitDescription: p.benefitDescription ?? '' })) : DEFAULT_PRIZES
         const cfg: MetaConfig = {
@@ -599,6 +600,8 @@ export default function MetasWorkspace() {
       }
     } catch (err) {
       console.error('[Metas] Falha ao carregar configuração do localStorage:', err)
+    } finally {
+      setIsConfigLoaded(true)
     }
   }, [])
 
@@ -659,6 +662,7 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!isConfigLoaded) return
     try {
       const merged: Record<string, MetaConfig> = {
         ...metaConfigs,
@@ -671,7 +675,7 @@ export default function MetasWorkspace() {
     } catch (err) {
       console.error('[Metas] Falha ao salvar configuração no localStorage:', err)
     }
-  }, [activeKey, basePremiation, companyScopeFilter, extraBonus, extraMinPoints, includeNational, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
+  }, [activeKey, basePremiation, companyScopeFilter, extraBonus, extraMinPoints, includeNational, isConfigLoaded, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
 
   useEffect(() => {
     const controller = new AbortController()
