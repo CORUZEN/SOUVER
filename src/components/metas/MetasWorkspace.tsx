@@ -99,6 +99,9 @@ interface ProductAllowlistEntry {
 interface PerformanceDiagnostics {
   selectedMonthOrders: number
   queryMode?: string
+  companyCode?: string | null
+  byStatus?: Record<string, number>
+  byCompany?: Record<string, number>
 }
 
 interface RuleProgress {
@@ -675,6 +678,9 @@ export default function MetasWorkspace() {
           pedidos: diag.selectedMonthOrders,
           queryMode: diag.queryMode ?? 'N/A',
           vendedores: mapped.length,
+          empresa: diag.companyCode ?? 'todas',
+          porStatus: diag.byStatus ?? {},
+          porEmpresa: diag.byCompany ?? {},
         })
         setPerformanceDiagnostics(diag)
       })

@@ -15,6 +15,8 @@ type SankhyaOrder = {
   negotiatedAt: string
   totalValue: number
   grossWeight: number
+  statusNota: string
+  companyCode: string
 }
 
 /* ---------- helpers ---------- */
@@ -285,6 +287,8 @@ function toOrder(record: RawRecord): SankhyaOrder | null {
     negotiatedAt,
     totalValue: parseNumber(record.VLRNOTA),
     grossWeight: parseNumber(record.PESOBRUTO),
+    statusNota: String(record.STATUSNOTA ?? 'L').trim(),
+    companyCode: String(record.CODEMP ?? '').trim(),
   }
 }
 
@@ -312,7 +316,8 @@ function buildOrdersSql(
   startDate: string,
   endDateExclusive: string,
   sellerCodes: string[],
-  mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT' = 'STRICT'
+  mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT' = 'STRICT',
+  companyCode?: string | null
 ) {
   // Primary: filter by CODTIPOPER = 1001 (pedido de venda real)
   // Fallback 1: TIPMOV IN ('V','P') caso CODTIPOPER não exista na instalação
@@ -329,6 +334,13 @@ function buildOrdersSql(
     sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
   }
 
+  // Filter by company code (CODEMP) when configured — Sankhya native screens
+  // always scope to a single company, so without this filter we get orders from
+  // all branches and inflate the order count.
+  const companyFilter = companyCode
+    ? `AND CAB.CODEMP = ${Number(companyCode)}\n  `
+    : ''
+
   return `
 SELECT
   TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD') AS DTNEG,
@@ -337,14 +349,16 @@ SELECT
   TO_CHAR(NVL(CAB.CODPARC, 0)) AS CODPARC,
   TO_CHAR(CAB.NUNOTA) AS NUNOTA,
   NVL(CAB.VLRNOTA, 0) AS VLRNOTA,
-  NVL(CAB.PESOBRUTO, 0) AS PESOBRUTO
+  NVL(CAB.PESOBRUTO, 0) AS PESOBRUTO,
+  NVL(CAB.STATUSNOTA, 'L') AS STATUSNOTA,
+  TO_CHAR(CAB.CODEMP) AS CODEMP
 FROM TGFCAB CAB
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
   AND CAB.CODVEND > 0
-  ${typeFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
+  ${typeFilter}${companyFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
 }
 
 /* ---------- GET handler ---------- */
@@ -395,9 +409,12 @@ export async function GET(req: NextRequest) {
     // Cascade: CODTIPOPER=1001 → TIPMOV fallback → any movement
     let orders: SankhyaOrder[] = []
     let queryMode: 'CODTIPOPER_1001' | 'TIPMOV_VP' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
+    // Default to company 1 (MOAGEM OURO VERDE) — empresa 2 is a separate branch
+    // that must not be mixed into the performance data.
+    const companyCode = config.companyCode?.trim() || '1'
 
     // 1) Primary: CODTIPOPER = 1001 (pedido de venda)
-    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT')
+    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT', companyCode)
     try {
       const records = await queryRows(baseUrl, headers, sqlStrict, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -408,7 +425,7 @@ export async function GET(req: NextRequest) {
 
     // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed
     if (queryMode === 'NONE') {
-      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV')
+      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV', companyCode)
       try {
         const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -418,7 +435,7 @@ export async function GET(req: NextRequest) {
 
     // 3) Last resort: no type filter
     if (queryMode === 'NONE') {
-      const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT')
+      const sqlAny = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'ANY_MOVEMENT', companyCode)
       try {
         const records = await queryRows(baseUrl, headers, sqlAny, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
@@ -501,6 +518,16 @@ export async function GET(req: NextRequest) {
       diagnostics: {
         selectedMonthOrders: orders.length,
         queryMode,
+        companyCode: companyCode ?? null,
+        byStatus: orders.reduce<Record<string, number>>((acc, o) => {
+          acc[o.statusNota] = (acc[o.statusNota] ?? 0) + 1
+          return acc
+        }, {}),
+        byCompany: orders.reduce<Record<string, number>>((acc, o) => {
+          const key = o.companyCode || 'desconhecida'
+          acc[key] = (acc[key] ?? 0) + 1
+          return acc
+        }, {}),
       },
       sellers,
     })
