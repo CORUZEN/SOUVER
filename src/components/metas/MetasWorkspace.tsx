@@ -1111,6 +1111,12 @@ export default function MetasWorkspace() {
           const stage = stageMetrics[rule.stage]
           const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
 
+          // Stage-locked metrics: only data up to this rule's stage end, so past KPIs never change retroactively
+          const lockedValue = Math.max(cumStage.totalValue, 0.00001)
+          const lockedOrders = Math.max(cumStage.orderCount, 1)
+          const lockedClients = Math.max(cumStage.distinctClients, 1)
+          const lockedTicket = cumStage.orderCount > 0 ? cumStage.totalValue / cumStage.orderCount : 0
+
           // KPIs that always interpret parameter as percentage
           const pctKpis: KpiType[] = ['BASE_CLIENTES', 'META_FINANCEIRA', 'RENTABILIDADE', 'DEVOLUCAO', 'INADIMPLENCIA']
           const asPct = pctKpis.includes(kpiType) && rawNumber > 0
@@ -1128,28 +1134,30 @@ export default function MetasWorkspace() {
               }
               break
             case 'RENTABILIDADE':
-              progress = (averageTicket / teamAverageTicketSafe) / (asPct ?? 1)
+              // Use stage-locked average ticket so past stages don't shift
+              progress = (lockedTicket / teamAverageTicketSafe) / (asPct ?? 1)
               break
             case 'BASE_CLIENTES':
+              // Distinct clients reached in this stage vs total client base (% coverage)
+              // totalDistinctClients can only grow → past KPIs can only stay same or decrease, never improve
               if (asPct) {
-                const cumShare = cumStage.orderCount / Math.max(seller.totalOrders, 1)
-                progress = cumShare / asPct
+                const clientCoverage = cumStage.distinctClients / Math.max(totalDistinctClients, 1)
+                progress = clientCoverage / asPct
               } else {
-                progress = cumStage.orderCount > 0 ? 1 : 0
+                progress = cumStage.distinctClients > 0 ? 1 : 0
               }
               break
             case 'VOLUME':
               if (rawNumber > 0 && !rule.targetText.includes('%')) {
                 progress = cumStage.orderCount / rawNumber
               } else if (asPct) {
-                progress = (cumStage.totalValue / totalValueSafe) / asPct
+                progress = (cumStage.totalValue / lockedValue) / asPct
               } else {
                 progress = cumStage.orderCount > 0 ? 1 : 0
               }
               break
             case 'DISTRIBUICAO': {
               // targetText format: "X|Y" where X = items target (number or "N%" of total products), Y = clients% of seller base
-              // e.g. "27|30" = 27 items in 30% of clients, "50%|30" = 50% of products in 30% of clients
               const parts = rule.targetText.split('|').map((s) => s.trim())
               const itemsPart = parts[0] ?? '0'
               const itemsIsPercent = itemsPart.includes('%')
@@ -1158,8 +1166,9 @@ export default function MetasWorkspace() {
                 ? Math.ceil(totalActiveProducts * itemsNum / 100)
                 : itemsNum
               const clientsPct = parseDecimal(parts[1] ?? '0', 0) / 100
-              if (resolvedItems > 0 && clientsPct > 0 && totalDistinctClients > 0) {
-                const requiredClients = Math.ceil(totalDistinctClients * clientsPct)
+              // Use stage-locked distinct clients so past KPIs don't shift
+              if (resolvedItems > 0 && clientsPct > 0 && lockedClients > 0) {
+                const requiredClients = Math.ceil(lockedClients * clientsPct)
                 const clientsAchieved = cumStage.distinctClients
                 progress = clientsAchieved / Math.max(requiredClients, 1)
               } else if (resolvedItems > 0) {
@@ -1174,11 +1183,12 @@ export default function MetasWorkspace() {
               progress = 0
               break
             case 'ITEM_FOCO':
-              progress = stage.orderCount > 0 ? Math.min(stage.totalValue / totalValueSafe, 1) : 0
+              // Stage-locked: compare stage value against cumulative value up to this stage
+              progress = stage.orderCount > 0 ? Math.min(stage.totalValue / lockedValue, 1) : 0
               break
             default:
               if (asPct !== null) {
-                const stageShare = stage.totalValue / totalValueSafe
+                const stageShare = stage.totalValue / lockedValue
                 progress = stageShare / asPct
               } else if (rawNumber > 0) {
                 progress = stage.orderCount / rawNumber
@@ -1677,14 +1687,13 @@ export default function MetasWorkspace() {
                   <table className="min-w-full divide-y divide-surface-200 text-sm">
                     <thead>
                       <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                        <th className="px-3 py-2">Período</th><th className="px-3 py-2">Freq.</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th>
+                        <th className="px-3 py-2">Período</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
                       {block.rules.map((rule) => (
                         <tr key={rule.id} className="hover:bg-surface-50/50">
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
-                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.frequency} onChange={(e) => updateBlockRule(rule.id, { frequency: e.target.value as RuleFrequency })}><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></td>
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
                           <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
                           <td className="px-3 py-2">{rule.kpiType === 'DISTRIBUICAO' ? (() => {
@@ -1709,7 +1718,7 @@ export default function MetasWorkspace() {
                         </tr>
                       ))}
                       <tr className="bg-surface-50 font-semibold">
-                        <td className="px-3 py-2 text-xs text-surface-500" colSpan={5}>
+                        <td className="px-3 py-2 text-xs text-surface-500" colSpan={4}>
                           Totais — {block.rules.length} KPIs
                           {block.monthlyTarget > 0 && <span className="ml-2 text-emerald-600">| Meta: {currency(block.monthlyTarget)}</span>}
                           {block.sellerIds.length > 0 && <span className="ml-2 text-primary-600">| {block.sellerIds.length} vendedor(es)</span>}
