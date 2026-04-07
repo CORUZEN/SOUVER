@@ -1376,6 +1376,15 @@ export default function MetasWorkspace() {
     () => snapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0),
     [snapshots]
   )
+  // Sum of each seller's individual monthly target (from their assigned block)
+  const corporateTotalTarget = useMemo(
+    () =>
+      snapshots.reduce((sum, snapshot) => {
+        const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
+        return sum + (block.monthlyTarget > 0 ? block.monthlyTarget : 0)
+      }, 0),
+    [ruleBlocks, snapshots]
+  )
   const corporateAverageTicket = useMemo(
     () => (corporateTotalOrders > 0 ? corporateTotalRevenue / corporateTotalOrders : 0),
     [corporateTotalOrders, corporateTotalRevenue]
@@ -2464,9 +2473,29 @@ export default function MetasWorkspace() {
 
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Faturamento total</p>
-              <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(corporateTotalRevenue)}</p>
-              <p className="mt-2 text-xs text-surface-500">Valor total dos pedidos no mês selecionado</p>
+              <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-400">Meta consolidada</p>
+                  <p className="mt-1 text-2xl font-semibold text-surface-700">{currency(corporateTotalTarget)}</p>
+                  <p className="mt-1 text-[10px] text-surface-400">Soma das metas individuais dos vendedores</p>
+                </div>
+                <div className="pl-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-400">Valor total de Pedidos</p>
+                  <p className={`mt-1 text-2xl font-semibold ${
+                    corporateTotalTarget > 0 && corporateTotalRevenue >= corporateTotalTarget
+                      ? 'text-emerald-600'
+                      : 'text-surface-900'
+                  }`}>{currency(corporateTotalRevenue)}</p>
+                  {corporateTotalTarget > 0 && (
+                    <p className="mt-1 text-[10px] text-surface-400">
+                      {num(Math.min(corporateTotalRevenue / corporateTotalTarget * 100, 999), 1)}% da meta consolidada
+                    </p>
+                  )}
+                  {corporateTotalTarget === 0 && (
+                    <p className="mt-1 text-[10px] text-surface-400">Valor total dos pedidos no mês</p>
+                  )}
+                </div>
+              </div>
             </Card>
           </div>
 
