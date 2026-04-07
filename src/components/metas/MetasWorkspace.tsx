@@ -527,82 +527,63 @@ export default function MetasWorkspace() {
   }, [showPeriodPicker])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return
-    try {
-      const data = JSON.parse(raw) as Record<string, unknown>
-      const loadedYear = typeof data.year === 'number' ? data.year : now.getFullYear()
-      const loadedMonth = typeof data.month === 'number' ? data.month : now.getMonth()
-      if (typeof data.year === 'number') setYear(data.year)
-      if (typeof data.month === 'number') setMonth(data.month)
-      if (data.monthConfigs && typeof data.monthConfigs === 'object') setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
-      if (data.companyScopeFilter === '1' || data.companyScopeFilter === '2' || data.companyScopeFilter === 'all') {
-        setCompanyScopeFilter(data.companyScopeFilter)
-      }
-
-      const migrateBlocks = (raw: unknown): RuleBlock[] => {
-        if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
-          ...b,
-          monthlyTarget: b.monthlyTarget ?? 0,
-          sellerIds: b.sellerIds ?? [],
-          weightTargets: b.weightTargets ?? [],
-          rules: b.rules.map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
-        }))
-        return DEFAULT_RULE_BLOCKS
-      }
-
-      if (data.metaConfigs && typeof data.metaConfigs === 'object') {
-        const mc = data.metaConfigs as Record<string, MetaConfig>
-        // Normalize blocks inside each meta config
-        const normalized = Object.fromEntries(
-          Object.entries(mc).map(([k, v]) => [k, { ...v, ruleBlocks: migrateBlocks(v.ruleBlocks) }])
-        )
-        setMetaConfigs(normalized)
-        const key = monthKey(loadedYear, loadedMonth)
-        const cfg = normalized[key]
-        if (cfg) {
-          setRuleBlocks(cfg.ruleBlocks)
-          setPrizes(cfg.prizes)
-          setIncludeNational(cfg.includeNational)
-          setSalaryBase(cfg.salaryBase)
-          setBasePremiation(cfg.basePremiation)
-          setExtraBonus(cfg.extraBonus)
-          setExtraMinPoints(cfg.extraMinPoints)
-        }
-      } else {
-        // Legacy migration: flat ruleBlocks/rules at root level → create single metaConfig entry
-        let blocks = DEFAULT_RULE_BLOCKS
-        if (Array.isArray(data.ruleBlocks)) {
-          blocks = migrateBlocks(data.ruleBlocks)
-        } else if (Array.isArray(data.rules)) {
-          blocks = [{ id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], weightTargets: [], rules: (data.rules as GoalRule[]).map((r) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })) }]
-        }
-        const legacyPrizes = Array.isArray(data.prizes) ? (data.prizes as CampaignPrize[]).map((p) => ({ ...p, benefitDescription: p.benefitDescription ?? '' })) : DEFAULT_PRIZES
-        const cfg: MetaConfig = {
-          ruleBlocks: blocks,
-          prizes: legacyPrizes,
-          includeNational: typeof data.includeNational === 'boolean' ? data.includeNational : true,
-          salaryBase: typeof data.salaryBase === 'number' ? data.salaryBase : 1612.44,
-          basePremiation: typeof data.basePremiation === 'number' ? data.basePremiation : 4837.32,
-          extraBonus: typeof data.extraBonus === 'number' ? data.extraBonus : 400,
-          extraMinPoints: typeof data.extraMinPoints === 'number' ? data.extraMinPoints : 0.6,
-        }
-        const key = monthKey(loadedYear, loadedMonth)
-        setMetaConfigs({ [key]: cfg })
-        setRuleBlocks(cfg.ruleBlocks)
-        setPrizes(cfg.prizes)
-        setIncludeNational(cfg.includeNational)
-        setSalaryBase(cfg.salaryBase)
-        setBasePremiation(cfg.basePremiation)
-        setExtraBonus(cfg.extraBonus)
-        setExtraMinPoints(cfg.extraMinPoints)
-      }
-    } catch (err) {
-      console.error('[Metas] Falha ao carregar configuração do localStorage:', err)
-    } finally {
-      setIsConfigLoaded(true)
+    // ── Load config from API (database) ──────────────────────────────────
+    const migrateBlocks = (raw: unknown): RuleBlock[] => {
+      if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
+        ...b,
+        monthlyTarget: b.monthlyTarget ?? 0,
+        sellerIds: b.sellerIds ?? [],
+        weightTargets: b.weightTargets ?? [],
+        rules: (b.rules ?? []).map((r: GoalRule) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
+      }))
+      return DEFAULT_RULE_BLOCKS
     }
+
+    fetch('/api/metas/config?scope=1')
+      .then((r) => r.json())
+      .then((data: { metaConfigs?: unknown; monthConfigs?: unknown }) => {
+        if (data.monthConfigs && typeof data.monthConfigs === 'object' && !Array.isArray(data.monthConfigs)) {
+          setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
+        }
+        if (data.metaConfigs && typeof data.metaConfigs === 'object' && !Array.isArray(data.metaConfigs)) {
+          const mc = data.metaConfigs as Record<string, MetaConfig>
+          const normalized = Object.fromEntries(
+            Object.entries(mc).map(([k, v]) => [k, { ...v, ruleBlocks: migrateBlocks(v.ruleBlocks) }])
+          )
+          setMetaConfigs(normalized)
+          const key = monthKey(year, month)
+          const cfg = normalized[key]
+          if (cfg) {
+            setRuleBlocks(cfg.ruleBlocks)
+            setPrizes(cfg.prizes ?? DEFAULT_PRIZES)
+            setIncludeNational(cfg.includeNational ?? true)
+            setSalaryBase(cfg.salaryBase ?? 1612.44)
+            setBasePremiation(cfg.basePremiation ?? 4837.32)
+            setExtraBonus(cfg.extraBonus ?? 400)
+            setExtraMinPoints(cfg.extraMinPoints ?? 0.6)
+          } else {
+            // Inherit from closest previous month that has config
+            const source = Object.keys(normalized).sort().reverse().find((k) => k < monthKey(year, month))
+            if (source) {
+              const src = normalized[source]
+              setRuleBlocks(src.ruleBlocks)
+              setPrizes(src.prizes ?? DEFAULT_PRIZES)
+              setIncludeNational(src.includeNational ?? true)
+              setSalaryBase(src.salaryBase ?? 1612.44)
+              setBasePremiation(src.basePremiation ?? 4837.32)
+              setExtraBonus(src.extraBonus ?? 400)
+              setExtraMinPoints(src.extraMinPoints ?? 0.6)
+            }
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        console.error('[Metas] Falha ao carregar configuração da API:', err)
+      })
+      .finally(() => {
+        setIsConfigLoaded(true)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -660,22 +641,24 @@ export default function MetasWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
 
+  // ── Debounced save to API (database) ────────────────────────────────────
   useEffect(() => {
-    if (typeof window === 'undefined') return
     if (!isConfigLoaded) return
-    try {
-      const merged: Record<string, MetaConfig> = {
-        ...metaConfigs,
-        [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
-      }
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ year, month, monthConfigs, metaConfigs: merged, companyScopeFilter })
-      )
-    } catch (err) {
-      console.error('[Metas] Falha ao salvar configuração no localStorage:', err)
+    const merged: Record<string, MetaConfig> = {
+      ...metaConfigs,
+      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
     }
-  }, [activeKey, basePremiation, companyScopeFilter, extraBonus, extraMinPoints, includeNational, isConfigLoaded, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase, year])
+    const timer = setTimeout(() => {
+      fetch('/api/metas/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: '1', metaConfigs: merged, monthConfigs }),
+      }).catch((err: unknown) => {
+        console.error('[Metas] Falha ao salvar configuração na API:', err)
+      })
+    }, 1200)
+    return () => clearTimeout(timer)
+  }, [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, isConfigLoaded, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase])
 
   useEffect(() => {
     const controller = new AbortController()

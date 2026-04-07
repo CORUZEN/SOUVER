@@ -586,6 +586,23 @@ enum IntegrationStatus {
 }
 
 // ──────────────────────────────────────────────
+// CONFIGURAÇÃO DO PAINEL DE METAS
+// ──────────────────────────────────────────────
+// Stores the full metas workspace config per company scope.
+// `scopeKey` = "all" | "1" | "2" (company scope).
+// Each month's config lives inside `metaConfigs` JSON.
+model MetasConfig {
+  id             String   @id @default(cuid())
+  scopeKey       String   @unique @map("scope_key") // "all" | "1" | "2"
+  metaConfigs    Json     @map("meta_configs")      // Record<monthKey, MetaConfig>
+  monthConfigs   Json     @map("month_configs")     // Record<monthKey, MonthConfig>
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedByLogin String?  @map("updated_by_login")
+
+  @@map("metas_config")
+}
+
+// ──────────────────────────────────────────────
 // LOGS DE INTEGRAÇÃO
 // ──────────────────────────────────────────────
 model IntegrationLog {
