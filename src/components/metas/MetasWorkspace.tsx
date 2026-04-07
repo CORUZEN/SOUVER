@@ -1542,7 +1542,7 @@ export default function MetasWorkspace() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
       <Card className="relative border-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary-500 via-cyan-400 to-emerald-400" />
+        <div className="absolute inset-x-3 top-0 h-[3px] bg-gradient-to-r from-primary-500 via-cyan-400 to-emerald-400" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
