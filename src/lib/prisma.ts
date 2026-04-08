@@ -1,28 +1,48 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
+const isDev = process.env.APP_ENV === 'development'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const globalForPrisma = globalThis as unknown as { prisma?: any }
+
+function sanitizeConnectionString(raw: string): string {
+  try {
+    const url = new URL(raw)
+    // channel_binding is not supported by the pg adapter and causes failures
+    // with Neon's pooler when combined with the adapter-pg SSL handshake.
+    url.searchParams.delete('channel_binding')
+    // Keep sslmode=require — upgrading to verify-full requires the Neon CA cert
+    // to be in the system trust store, which is not guaranteed on Windows dev machines.
+    return url.toString()
+  } catch {
+    return raw
+  }
+}
 
 function createPrismaClient() {
-  // Replace sslmode=require with sslmode=verify-full to suppress pg deprecation warning.
-  // pg-connection-string triggers a warning when it encounters sslmode=require; using
-  // verify-full makes the intent explicit and keeps identical security behaviour.
-  const connectionString = (process.env.DATABASE_URL ?? '').replace(
-    /sslmode=require/gi,
-    'sslmode=verify-full'
-  )
+  const connectionString = sanitizeConnectionString(process.env.DATABASE_URL ?? '')
+
   const adapter = new PrismaPg({
     connectionString,
-    ssl: { rejectUnauthorized: true },
+    // rejectUnauthorized=false in development avoids Windows CA-store failures;
+    // in production the Neon certificate is signed by a trusted CA.
+    ssl: { rejectUnauthorized: !isDev },
+    // Give Neon's compute endpoint time to wake from auto-suspend (can take up to 5 s).
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
   })
+
   return new PrismaClient({
     adapter,
-    log: process.env.APP_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    log: isDev ? ['error', 'warn'] : ['error'],
   })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
-if (process.env.APP_ENV !== 'production') {
+if (!isDev) {
+  // In production the module is loaded once per worker; no global caching needed.
+} else {
   globalForPrisma.prisma = prisma
 }

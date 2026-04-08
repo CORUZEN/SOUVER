@@ -1330,7 +1330,15 @@ export default function MetasWorkspace() {
           return pct > 100 && (ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0) >= 1
         })
 
-        const status: SellerSnapshot['status'] = hasSuperTarget ? 'SUPEROU' : ratio >= 0.85 ? 'NO_ALVO' : ratio >= 0.65 ? 'ATENCAO' : 'CRITICO'
+        const activeRulesForStatus = blockRules.filter((r) => stageStarted.has(r.stage))
+        const allActiveKpisHit =
+          activeRulesForStatus.length > 0 &&
+          activeRulesForStatus.every((rule) => {
+            const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+            return progress >= 1
+          })
+
+        const status: SellerSnapshot['status'] = hasSuperTarget ? 'SUPEROU' : allActiveKpisHit ? 'NO_ALVO' : ratio >= 0.65 ? 'ATENCAO' : 'CRITICO'
 
         return {
           seller,
@@ -1453,6 +1461,54 @@ export default function MetasWorkspace() {
     [byStatus]
   )
 
+  const rewardDonut = useMemo(() => {
+    const palette: Record<SellerSnapshot['status'], string> = {
+      SUPEROU:  '#10b981',
+      NO_ALVO:  '#06b6d4',
+      ATENCAO:  '#f59e0b',
+      CRITICO:  '#f43f5e',
+    }
+    const labels: Record<SellerSnapshot['status'], string> = {
+      SUPEROU: 'Superou',
+      NO_ALVO: 'Meta Batida',
+      ATENCAO: 'Atenção',
+      CRITICO: 'Crítico',
+    }
+    const groups: Record<SellerSnapshot['status'], number> = {
+      SUPEROU: 0, NO_ALVO: 0, ATENCAO: 0, CRITICO: 0,
+    }
+    let totalEarned = 0
+    let totalTarget = 0
+    for (const s of snapshots) {
+      groups[s.status] += s.rewardAchieved
+      totalEarned += s.rewardAchieved
+      totalTarget += s.rewardTarget
+    }
+    const radius = 52
+    const circumference = 2 * Math.PI * radius
+    const totalSafe = Math.max(totalEarned, 0.0001)
+    const statuses: SellerSnapshot['status'][] = ['SUPEROU', 'NO_ALVO', 'ATENCAO', 'CRITICO']
+    let offset = 0
+    const segments = statuses
+      .filter((st) => groups[st] > 0)
+      .map((st) => {
+        const ratio = groups[st] / totalSafe
+        const length = ratio * circumference
+        const seg = {
+          status: st,
+          label: labels[st],
+          color: palette[st],
+          value: groups[st],
+          dash: `${length} ${circumference - length}`,
+          offset: -offset,
+        }
+        offset += length
+        return seg
+      })
+    const pctCommitted = totalTarget > 0 ? Math.min(totalEarned / totalTarget * 100, 100) : 0
+    return { radius, circumference, segments, totalEarned, totalTarget, pctCommitted }
+  }, [snapshots])
+
   const stageSeries = useMemo(
     () =>
       STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
@@ -1474,7 +1530,13 @@ export default function MetasWorkspace() {
           }, 0)
           totalTarget += stageTarget
           totalAchieved += stageAchieved
-          if (stageTarget > 0 && stageAchieved >= stageTarget) hitCount++
+          const allStageKpisHit =
+            blockStageRules.length > 0 &&
+            blockStageRules.every((r) => {
+              const progress = snapshot.ruleProgress.find((item) => item.ruleId === r.id)?.progress ?? 0
+              return progress >= 1
+            })
+          if (allStageKpisHit) hitCount++
         }
 
         const avgTarget = totalTarget / snapshots.length
@@ -1600,8 +1662,16 @@ export default function MetasWorkspace() {
               snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
             return sum + rule.points * Math.min(progress, 1)
           }, 0)
+          const allHit =
+            blockStageRules.length > 0 &&
+            blockStageRules.every((rule) => {
+              const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+              return progress >= 1
+            })
           const ratio = stageTarget > 0 ? stageAchieved / stageTarget : 0
-          return { stage: stage.label, ratio }
+          // Only show 100%/emerald when EVERY individual KPI in the stage is completed.
+          // Cap at 0.994 to prevent Intl rounding from displaying "100" when not all KPIs are done.
+          return { stage: stage.label, ratio: !allHit && ratio >= 0.995 ? 0.994 : ratio }
         })
         return { seller: snapshot.seller, cells }
       }),
@@ -1627,8 +1697,8 @@ export default function MetasWorkspace() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
-      <Card className="relative border-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
-        <div className="absolute inset-x-3 top-0 h-[3px] bg-gradient-to-r from-primary-500 via-cyan-400 to-emerald-400" />
+      <Card className="relative border-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
+        <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-primary-500 via-cyan-400 to-emerald-400" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
@@ -2627,7 +2697,7 @@ export default function MetasWorkspace() {
           {/* ── Period selector ────────────────────────────────────── */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 to-cyan-400" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary-500 to-cyan-400" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta de faturamento</p>
               {corporateTotalTarget > 0 ? (() => {
                 const pct = Math.min(corporateTotalRevenue / corporateTotalTarget * 100, 100)
@@ -2664,7 +2734,7 @@ export default function MetasWorkspace() {
 
             {/* Merged: Meta Batida + Risco Operacional */}
             <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-rose-400" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 to-rose-400" />
               <div className="grid grid-cols-2 divide-x divide-surface-100">
                 <div className="pr-4">
                   <div className="flex items-center gap-1.5">
@@ -2733,12 +2803,12 @@ export default function MetasWorkspace() {
               <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
               <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-400">Meta consolidada</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta consolidada</p>
                   <p className="mt-1 text-2xl font-semibold text-surface-700">{currency(corporateTotalTarget)}</p>
                   <p className="mt-1 text-[10px] text-surface-400">Soma das metas individuais dos vendedores</p>
                 </div>
                 <div className="pl-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-400">Valor total de Pedidos</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Valor total de Pedidos</p>
                   <p className={`mt-1 text-2xl font-semibold ${
                     corporateTotalTarget > 0 && corporateTotalRevenue >= corporateTotalTarget
                       ? 'text-emerald-600'
@@ -2773,7 +2843,7 @@ export default function MetasWorkspace() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Tendência de evolução (linha)
               </p>
-              <div className="mt-4 rounded-xl border border-surface-200 bg-gradient-to-b from-slate-50 to-white p-4">
+              <div className="mt-4 rounded-xl border border-surface-200 bg-linear-to-b from-slate-50 to-white p-4">
                 <svg
                   viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`}
                   className="h-52 w-full"
@@ -2988,7 +3058,7 @@ export default function MetasWorkspace() {
                 Mapa de calor por etapa
               </p>
               <div className="mt-4 overflow-x-auto rounded-xl border border-surface-200 bg-surface-50 p-3">
-                <div className="min-w-[420px] space-y-2">
+                <div className="min-w-105 space-y-2">
                   <div className="grid grid-cols-[1.3fr_repeat(4,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                     <span>Vendedor</span>
                     {STAGES.map((stage) => (
@@ -3013,17 +3083,84 @@ export default function MetasWorkspace() {
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta corporativa da fábrica</p>
-              <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-surface-200/90">
-                <div className="h-full bg-surface-600 transition-[width] duration-700" style={{ width: `${Math.min(factoryGoalRatio * 100, 100)}%` }} />
-              </div>
-              <p className="mt-3 text-sm font-medium text-surface-700">Critério: todos os vendedores precisam bater a meta.</p>
-              <p className="mt-1 text-xs text-surface-600">{factoryGoalMet ? 'Meta geral atingida.' : `Faltam ${factoryGap} vendedor(es) para atingir a meta geral.`}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Exposição ao Custo de Premiação</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">Prêmios por KPIs provisionados com base no desempenho atual da equipe</p>
+              {snapshots.length === 0 ? (
+                <p className="mt-6 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
+              ) : (
+                <div className="mt-4 flex flex-col items-center gap-4">
+                  {/* Donut */}
+                  <div className="relative flex items-center justify-center">
+                    <svg width="140" height="140" viewBox="0 0 140 140">
+                      <circle
+                        cx="70" cy="70" r={rewardDonut.radius}
+                        fill="none" stroke="#e5e7eb" strokeWidth="16"
+                      />
+                      {rewardDonut.segments.length === 0 ? (
+                        <circle
+                          cx="70" cy="70" r={rewardDonut.radius}
+                          fill="none" stroke="#e5e7eb" strokeWidth="16"
+                        />
+                      ) : (
+                        rewardDonut.segments.map((seg) => (
+                          <circle
+                            key={seg.status}
+                            cx="70" cy="70" r={rewardDonut.radius}
+                            fill="none"
+                            stroke={seg.color}
+                            strokeWidth="16"
+                            strokeDasharray={seg.dash}
+                            strokeDashoffset={seg.offset}
+                            strokeLinecap="butt"
+                            style={{ transform: 'rotate(-90deg)', transformOrigin: '70px 70px' }}
+                          />
+                        ))
+                      )}
+                      <text x="70" y="64" textAnchor="middle" className="fill-surface-400 text-[8px] font-semibold uppercase tracking-widest">Total</text>
+                      <text x="70" y="80" textAnchor="middle" className="fill-surface-900 text-[11px] font-bold">{currency(rewardDonut.totalEarned)}</text>
+                    </svg>
+                  </div>
+                  {/* Legend */}
+                  <div className="w-full space-y-1.5">
+                    {rewardDonut.segments.map((seg) => (
+                      <div key={seg.status} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1.5 text-surface-600 truncate">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: seg.color }} />
+                          {seg.label}
+                        </span>
+                        <span className="shrink-0 font-semibold text-surface-800">{currency(seg.value)}</span>
+                      </div>
+                    ))}
+                    {rewardDonut.segments.length === 0 && (
+                      <p className="text-center text-xs text-surface-400">Nenhuma premiação acumulada ainda.</p>
+                    )}
+                  </div>
+                  {/* Footer */}
+                  {rewardDonut.totalTarget > 0 && (
+                    <div className="w-full border-t border-surface-200 pt-2.5">
+                      <div className="flex items-center justify-between text-xs text-surface-500">
+                        <span>Orçamento total de KPIs</span>
+                        <span className="font-semibold">{currency(rewardDonut.totalTarget)}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
+                        <div
+                          className="h-full bg-emerald-500 transition-[width] duration-700"
+                          style={{ width: `${rewardDonut.pctCommitted}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-right text-[10px] text-surface-400">
+                        {num(rewardDonut.pctCommitted, 1)}% do orçamento comprometido
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Distribuição por status</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Perfil de Performance da Equipe</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">Classificação dos vendedores por nível de atingimento de KPIs no período</p>
               <div className="mt-4 space-y-2.5">
                 {statusSeries.map((item) => {
                   const ratio = snapshots.length > 0 ? item.value / snapshots.length : 0
@@ -3041,7 +3178,7 @@ export default function MetasWorkspace() {
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por etapa</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
               <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
               <div className="mt-4 space-y-2.5">
                 {stageSeries.map((stage) => {
@@ -3310,7 +3447,7 @@ export default function MetasWorkspace() {
       {/* ── Company scope modal ─────────────────────────────────── */}
       {showCompanyModal && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCompanyModal(false) }}
         >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/8">
