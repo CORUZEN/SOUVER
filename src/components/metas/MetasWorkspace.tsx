@@ -1471,8 +1471,8 @@ export default function MetasWorkspace() {
     const labels: Record<SellerSnapshot['status'], string> = {
       SUPEROU: 'Superou',
       NO_ALVO: 'Meta Batida',
-      ATENCAO: 'Atenção',
-      CRITICO: 'Crítico',
+      ATENCAO: 'Em progresso',
+      CRITICO: 'Requer atenção',
     }
     const groups: Record<SellerSnapshot['status'], number> = {
       SUPEROU: 0, NO_ALVO: 0, ATENCAO: 0, CRITICO: 0,
@@ -1506,7 +1506,29 @@ export default function MetasWorkspace() {
         return seg
       })
     const pctCommitted = totalTarget > 0 ? Math.min(totalEarned / totalTarget * 100, 100) : 0
-    return { radius, circumference, segments, totalEarned, totalTarget, pctCommitted }
+    const legendItems = [
+      { key: 'hit',        label: 'Meta Batida',  color: '#10b981', value: groups.SUPEROU + groups.NO_ALVO },
+      { key: 'progress',  label: 'Em progresso', color: '#f59e0b', value: groups.ATENCAO + groups.CRITICO },
+    ]
+    return { radius, circumference, segments, legendItems, totalEarned, totalTarget, pctCommitted }
+  }, [snapshots])
+
+  const sellerRewardRows = useMemo(() => {
+    return snapshots
+      .filter((s) => s.rewardAchieved > 0 || s.rewardTarget > 0)
+      .map((s) => ({
+        name: (() => {
+          const PREPS = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
+          const parts = s.seller.name.trim().split(/\s+/)
+          const toTitle = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+          const meaningful = parts.filter((w) => !PREPS.has(w.toLowerCase()))
+          return meaningful.slice(0, 2).map(toTitle).join(' ')
+        })(),
+        earned: s.rewardAchieved,
+        target: s.rewardTarget,
+        status: s.status,
+      }))
+      .sort((a, b) => b.earned - a.earned)
   }, [snapshots])
 
   const stageSeries = useMemo(
@@ -2837,8 +2859,8 @@ export default function MetasWorkspace() {
             </Card>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card className={executivePanelCardClass}>
+          <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+          <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Tendência de evolução (linha)
@@ -2936,78 +2958,155 @@ export default function MetasWorkspace() {
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
+              <div className="mt-4 space-y-2.5">
+                {stageSeries.map((stage) => {
+                  const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
+                  return (
+                    <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
+                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600">
+                        <span>{stage.label}</span>
+                        <span className="font-semibold">
+                          {stage.hitCount} / {snapshots.length}
+                          <span className="ml-1 font-normal text-surface-400">vendedores</span>
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
+                        <div
+                          className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
+                          style={{ width: `${Math.min(hitRatio * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          </div>
+
+            <Card className={executivePanelCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                Pontuação vs Meta por vendedor
+                Premiação por Desempenho
               </p>
-              {sellerBars.length === 0 ? (
-                <p className="py-8 text-center text-xs text-surface-400">Nenhum vendedor encontrado</p>
-              ) : (() => {
-                const barH = 22
-                const gap = 14
-                const labelW = 90
-                const rightPad = 48
-                const topPad = 24
-                const chartH = sellerBars.length * (barH + gap) - gap + topPad + 4
-                const gridSteps = 5
-                return (
-                  <div className="mt-3 overflow-x-auto">
-                    <svg width="100%" viewBox={`0 0 520 ${chartH}`} className="w-full" preserveAspectRatio="xMinYMin meet">
-                      {/* Grid lines + axis labels */}
-                      {Array.from({ length: gridSteps + 1 }, (_, i) => {
-                        const val = (maxSellerPoints / gridSteps) * i
-                        const x = labelW + ((520 - labelW - rightPad) / gridSteps) * i
-                        return (
-                          <g key={i}>
-                            <line x1={x} y1={topPad - 6} x2={x} y2={chartH} stroke="#e2e8f0" strokeWidth="1" strokeDasharray={i === 0 ? '' : '3,3'} />
-                            <text x={x} y={topPad - 10} textAnchor="middle" className="fill-surface-400" style={{ fontSize: 9 }}>{num(val, 2)}</text>
-                          </g>
-                        )
-                      })}
-                      {/* Bars */}
-                      {sellerBars.map((seller, idx) => {
-                        const y = topPad + idx * (barH + gap)
-                        const barW = 520 - labelW - rightPad
-                        const achievedW = Math.max(2, (seller.pointsAchieved / maxSellerPoints) * barW)
-                        const targetX = labelW + (seller.pointsTarget / maxSellerPoints) * barW
-                        const statusFill =
-                          seller.status === 'SUPEROU' ? '#10b981' :
-                          seller.status === 'NO_ALVO' ? '#06b6d4' :
-                          seller.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
-                        const firstName = seller.seller.name.split(' ')[0]
-                        const lastName = seller.seller.name.split(' ').slice(-1)[0]
-                        const shortName = firstName === lastName ? firstName : `${firstName} ${lastName.charAt(0)}.`
-                        return (
-                          <g key={seller.seller.id}>
-                            {/* Seller name */}
-                            <text x={labelW - 6} y={y + barH / 2 + 1} textAnchor="end" dominantBaseline="middle" className="fill-surface-700" style={{ fontSize: 10, fontWeight: 600 }}>
-                              {shortName}
-                            </text>
-                            {/* Background bar */}
-                            <rect x={labelW} y={y} width={barW} height={barH} rx={4} fill="#f1f5f9" />
-                            {/* Achieved bar */}
-                            <rect x={labelW} y={y + 2} width={achievedW} height={barH - 4} rx={3} fill={statusFill} opacity={0.85}>
-                              <animate attributeName="width" from="0" to={achievedW} dur="0.8s" fill="freeze" />
-                            </rect>
-                            {/* Target marker line */}
-                            <line x1={targetX} y1={y - 2} x2={targetX} y2={y + barH + 2} stroke="#334155" strokeWidth="2" strokeLinecap="round" />
-                            <polygon points={`${targetX - 3},${y - 2} ${targetX + 3},${y - 2} ${targetX},${y + 2}`} fill="#334155" />
-                            {/* Value label */}
-                            <text x={labelW + barW + 4} y={y + barH / 2 + 1} dominantBaseline="middle" className="fill-surface-600" style={{ fontSize: 10, fontWeight: 700 }}>
-                              {num(seller.pointsAchieved, 2)}
-                            </text>
-                          </g>
-                        )
-                      })}
+              <p className="mt-0.5 text-[10px] text-surface-400">Prêmios provisionados por nível de atingimento — {MONTHS[month]} {year}</p>
+              {snapshots.length === 0 ? (
+                <p className="py-8 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
+              ) : (
+                <div className="mt-4 grid gap-6 xl:grid-cols-5">
+                  {/* ── Donut grande ──────────────────────────── */}
+                  <div className="xl:col-span-2 flex flex-col items-center justify-center gap-2">
+                    <svg className="w-full max-w-70 h-auto" viewBox="0 0 200 200">
+                      {/* Track */}
+                      <circle cx="100" cy="100" r="76" fill="none" stroke="#e5e7eb" strokeWidth="22" />
+                      {/* Segments */}
+                      {rewardDonut.segments.length === 0 ? null : (() => {
+                        const r = 76
+                        const circ = 2 * Math.PI * r
+                        let off = 0
+                        return rewardDonut.segments.map((seg) => {
+                          const ratio = rewardDonut.totalEarned > 0 ? seg.value / rewardDonut.totalEarned : 0
+                          const len = ratio * circ
+                          const el = (
+                            <circle
+                              key={seg.status}
+                              cx="100" cy="100" r={r}
+                              fill="none"
+                              stroke={seg.color}
+                              strokeWidth="22"
+                              strokeDasharray={`${len} ${circ - len}`}
+                              strokeDashoffset={-off}
+                              strokeLinecap="butt"
+                              style={{ transform: 'rotate(-90deg)', transformOrigin: '100px 100px' }}
+                            />
+                          )
+                          off += len
+                          return el
+                        })
+                      })()}
+                      {/* Center text */}
+                      <text x="100" y="93" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Custo Atual</text>
+                      <text x="100" y="113" textAnchor="middle" className="fill-surface-900" style={{ fontSize: 14, fontWeight: 700 }}>{currency(rewardDonut.totalEarned)}</text>
                     </svg>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] text-surface-500">
-                      <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-6 rounded bg-cyan-500 opacity-85" />Atingido</span>
-                      <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-0.5 rounded bg-surface-800" />Meta alvo</span>
+                    {/* Status legend: 2 combined rows */}
+                    <div className="mt-2 w-full max-w-70 divide-y divide-surface-100 rounded-xl border border-surface-100 bg-surface-50/60">
+                      {rewardDonut.legendItems.map((item) => (
+                        <div key={item.key} className={`flex items-center justify-between gap-3 px-3 py-2 ${item.value === 0 ? 'opacity-40' : ''}`}>
+                          <span className="inline-flex items-center gap-2 text-xs font-medium text-surface-700">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                            {item.label}
+                          </span>
+                          <span className={`text-xs font-semibold tabular-nums ${item.value === 0 ? 'text-surface-400' : 'text-surface-900'}`}>
+                            {item.value === 0 ? '—' : currency(item.value)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )
-              })()}
+
+                  {/* ── Painel direito ────────────────────────── */}
+                  <div className="xl:col-span-3 flex min-w-0 flex-col justify-between gap-4">
+                    {/* Grid 3 colunas — todos os vendedores */}
+                    <div className="flex-1">
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-surface-400">Premiação por vendedor</p>
+                      {sellerRewardRows.length === 0 ? (
+                        <p className="text-[10px] text-surface-400">Nenhuma premiação acumulada ainda.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                          {sellerRewardRows.map((row, i) => {
+                            const statusColor =
+                              row.status === 'SUPEROU' ? '#10b981' :
+                              row.status === 'NO_ALVO' ? '#06b6d4' :
+                              row.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
+                            const pct = row.target > 0 ? Math.min(row.earned / row.target * 100, 100) : 0
+                            return (
+                              <div key={i} className="flex flex-col gap-1 rounded-lg border border-surface-100 bg-surface-50/80 px-2 py-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
+                                  <span className="truncate text-[10px] font-semibold text-surface-700">{row.name}</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-surface-900 tabular-nums">{currency(row.earned)}</span>
+                                <div className="h-1 w-full overflow-hidden rounded-full bg-surface-200">
+                                  <div
+                                    className="h-full transition-[width] duration-700"
+                                    style={{ width: `${pct}%`, backgroundColor: statusColor }}
+                                  />
+                                </div>
+                                {row.target > 0 && (
+                                  <span className="text-[9px] tabular-nums text-surface-400">máx. {currency(row.target)}</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rodapé: orçamento */}
+                    {rewardDonut.totalTarget > 0 && (
+                      <div className="border-t border-surface-200 pt-3">
+                        <div className="flex items-center justify-between text-[10px] text-surface-500">
+                          <span className="font-semibold uppercase tracking-[0.08em]">Previsão máxima de custos com premiação</span>
+                          <span className="font-bold text-surface-700">{currency(rewardDonut.totalTarget)}</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
+                          <div
+                            className="h-full bg-emerald-500 transition-[width] duration-700"
+                            style={{ width: `${rewardDonut.pctCommitted}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-right text-[10px] text-surface-400">
+                          {num(rewardDonut.pctCommitted, 1)}% da previsão máxima comprometida
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </Card>
 
+          <div className="grid gap-4 xl:grid-cols-2">
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
@@ -3080,7 +3179,7 @@ export default function MetasWorkspace() {
             </Card>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-2">
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Exposição ao Custo de Premiação</p>
@@ -3139,7 +3238,7 @@ export default function MetasWorkspace() {
                   {rewardDonut.totalTarget > 0 && (
                     <div className="w-full border-t border-surface-200 pt-2.5">
                       <div className="flex items-center justify-between text-xs text-surface-500">
-                        <span>Orçamento total de KPIs</span>
+                        <span>Previsão máxima de custos com premiação</span>
                         <span className="font-semibold">{currency(rewardDonut.totalTarget)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
@@ -3169,34 +3268,6 @@ export default function MetasWorkspace() {
                       <div className="mb-1 flex items-center justify-between text-xs text-surface-600"><span>{item.label}</span><span className="font-semibold">{item.value}</span></div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
                         <div className={`h-full transition-[width] duration-700 ${item.color}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
-
-            <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
-              <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
-              <div className="mt-4 space-y-2.5">
-                {stageSeries.map((stage) => {
-                  const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
-                  return (
-                    <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
-                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600">
-                        <span>{stage.label}</span>
-                        <span className="font-semibold">
-                          {stage.hitCount} / {snapshots.length}
-                          <span className="ml-1 font-normal text-surface-400">vendedores</span>
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                        <div
-                          className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
-                          style={{ width: `${Math.min(hitRatio * 100, 100)}%` }}
-                        />
                       </div>
                     </div>
                   )
