@@ -3069,50 +3069,41 @@ export default function MetasWorkspace() {
                       {sellerRewardRows.length === 0 ? (
                         <p className="text-[10px] text-surface-400">Nenhuma premiação acumulada ainda.</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
                           {sellerRewardRows.map((row, i) => {
                             const statusColor =
-                              row.status === 'SUPEROU' ? '#10b981' :
+                              row.status === 'SUPEROU' ? '#0ea5e9' :
                               row.status === 'NO_ALVO' ? '#06b6d4' :
                               row.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
-                            const statusBg =
-                              row.status === 'SUPEROU' ? 'rgba(16,185,129,0.08)' :
-                              row.status === 'NO_ALVO' ? 'rgba(6,182,212,0.08)' :
-                              row.status === 'ATENCAO' ? 'rgba(245,158,11,0.08)' : 'rgba(244,63,94,0.08)'
                             const pct = row.target > 0 ? Math.min(row.earned / row.target * 100, 100) : 0
                             const isZero = row.earned === 0
                             return (
                               <div
                                 key={i}
-                                className="group relative flex flex-col gap-2 overflow-hidden rounded-xl border border-surface-200/80 bg-white px-3 py-2.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                                style={{ borderLeftWidth: 3, borderLeftColor: statusColor }}
+                                className="flex flex-col overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 transition-shadow duration-200 hover:shadow-md"
                               >
-                                {/* tinted bg accent */}
-                                <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `radial-gradient(ellipse at top left, ${statusBg} 0%, transparent 70%)` }} />
-                                {/* rank badge */}
-                                <span className="absolute right-2 top-2 text-[9px] font-bold tabular-nums text-surface-300">#{i + 1}</span>
-                                {/* name row */}
-                                <div className="flex items-center gap-1.5 min-w-0 pr-5">
-                                  <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: statusColor }} />
-                                  <span className="truncate text-[11px] font-semibold tracking-wide text-surface-700">{row.name}</span>
+                                {/* header band */}
+                                <div className="flex items-center justify-between px-2.5 py-1.5" style={{ backgroundColor: statusColor }}>
+                                  <span className="truncate text-[9px] font-bold uppercase tracking-widest text-white/90 leading-none">{row.name}</span>
+                                  <span className="shrink-0 ml-1 text-[8px] font-semibold text-white/50 tabular-nums">#{i + 1}</span>
                                 </div>
-                                {/* earned value */}
-                                <span className={`text-sm font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-400' : 'text-surface-900'}`}>
-                                  {currency(row.earned)}
-                                </span>
-                                {/* progress bar */}
-                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
-                                  <div
-                                    className="h-full rounded-full transition-[width] duration-700"
-                                    style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${statusColor}cc, ${statusColor})` }}
-                                  />
-                                </div>
-                                {/* max label */}
-                                {row.target > 0 && (
-                                  <span className="text-[9px] tabular-nums text-surface-400 leading-none">
-                                    máx. {currency(row.target)}
+                                {/* body */}
+                                <div className="flex flex-1 flex-col gap-1.5 bg-white px-2.5 py-2">
+                                  <span className={`text-[13px] font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-300' : 'text-surface-900'}`}>
+                                    {currency(row.earned)}
                                   </span>
-                                )}
+                                  <div className="h-1 w-full overflow-hidden rounded-full bg-surface-100">
+                                    <div
+                                      className="h-full rounded-full transition-[width] duration-700"
+                                      style={{ width: `${pct}%`, backgroundColor: statusColor }}
+                                    />
+                                  </div>
+                                  {row.target > 0 && (
+                                    <span className="text-[9px] tabular-nums text-surface-400 leading-none">
+                                      máx. {currency(row.target)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             )
                           })}
