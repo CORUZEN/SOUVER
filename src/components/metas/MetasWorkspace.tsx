@@ -2628,9 +2628,38 @@ export default function MetasWorkspace() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 to-cyan-400" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta geral da fábrica</p>
-              <p className="mt-2 text-3xl font-bold text-surface-900">{num(factoryGoalRatio * 100, 1)}%</p>
-              <p className="mt-2 text-xs text-surface-600">{onTargetCount}/{snapshots.length || 0} vendedores com meta batida</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta de faturamento</p>
+              {corporateTotalTarget > 0 ? (() => {
+                const pct = Math.min(corporateTotalRevenue / corporateTotalTarget * 100, 100)
+                const exceeded = corporateTotalRevenue > corporateTotalTarget
+                return (
+                  <>
+                    <p className={`mt-2 text-3xl font-bold ${exceeded ? 'text-emerald-600' : 'text-surface-900'}`}>
+                      {num(pct, 1)}%
+                    </p>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-700 ${exceeded ? 'bg-emerald-500' : pct >= 80 ? 'bg-cyan-500' : pct >= 50 ? 'bg-amber-400' : 'bg-rose-400'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {exceeded ? (
+                      <p className="mt-1.5 text-xs font-semibold text-emerald-600">
+                        +{num((corporateTotalRevenue / corporateTotalTarget - 1) * 100, 1)}% acima da meta ↑
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-surface-500">
+                        {currency(corporateTotalTarget - corporateTotalRevenue)} restam para atingir a meta
+                      </p>
+                    )}
+                  </>
+                )
+              })() : (
+                <>
+                  <p className="mt-2 text-3xl font-bold text-surface-900">{num(factoryGoalRatio * 100, 1)}%</p>
+                  <p className="mt-2 text-xs text-surface-500">{onTargetCount}/{snapshots.length || 0} vendedores com meta batida</p>
+                </>
+              )}
             </Card>
 
             {/* Merged: Meta Batida + Risco Operacional */}
@@ -2648,10 +2677,10 @@ export default function MetasWorkspace() {
                 <div className="pl-4">
                   <div className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700">Risco Operacional</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700">Requer atenção</p>
                   </div>
                   <p className="mt-2 text-3xl font-semibold text-surface-900">{byStatus.critico + byStatus.atencao}</p>
-                  <p className="mt-1.5 text-xs text-surface-500">Requerem atenção</p>
+                  <p className="mt-1.5 text-xs text-surface-500">Em progresso</p>
                 </div>
               </div>
             </Card>
