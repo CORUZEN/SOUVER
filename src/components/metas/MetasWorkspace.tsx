@@ -2994,9 +2994,9 @@ export default function MetasWorkspace() {
               {snapshots.length === 0 ? (
                 <p className="py-8 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
               ) : (
-                <div className="mt-4 grid gap-6 xl:grid-cols-5">
+                <div className="mt-4 grid gap-6 xl:grid-cols-[1.5fr_3.5fr]">
                   {/* ── Donut grande ──────────────────────────── */}
-                  <div className="xl:col-span-2 flex flex-col items-center justify-center gap-2">
+                  <div className="flex flex-col items-center justify-center gap-2">
                     <svg className="w-full max-w-70 h-auto" viewBox="0 0 200 200">
                       {/* Track */}
                       <circle cx="100" cy="100" r="76" fill="none" stroke="#e5e7eb" strokeWidth="22" />
@@ -3046,35 +3046,56 @@ export default function MetasWorkspace() {
                   </div>
 
                   {/* ── Painel direito ────────────────────────── */}
-                  <div className="xl:col-span-3 flex min-w-0 flex-col justify-between gap-4">
+                  <div className="flex min-w-0 flex-col justify-between gap-4">
                     {/* Grid 3 colunas — todos os vendedores */}
                     <div className="flex-1">
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-surface-400">Premiação por vendedor</p>
                       {sellerRewardRows.length === 0 ? (
                         <p className="text-[10px] text-surface-400">Nenhuma premiação acumulada ainda.</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
                           {sellerRewardRows.map((row, i) => {
                             const statusColor =
                               row.status === 'SUPEROU' ? '#10b981' :
                               row.status === 'NO_ALVO' ? '#06b6d4' :
                               row.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
+                            const statusBg =
+                              row.status === 'SUPEROU' ? 'rgba(16,185,129,0.08)' :
+                              row.status === 'NO_ALVO' ? 'rgba(6,182,212,0.08)' :
+                              row.status === 'ATENCAO' ? 'rgba(245,158,11,0.08)' : 'rgba(244,63,94,0.08)'
                             const pct = row.target > 0 ? Math.min(row.earned / row.target * 100, 100) : 0
+                            const isZero = row.earned === 0
                             return (
-                              <div key={i} className="flex flex-col gap-1 rounded-lg border border-surface-100 bg-surface-50/80 px-2 py-1.5">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
-                                  <span className="truncate text-[10px] font-semibold text-surface-700">{row.name}</span>
+                              <div
+                                key={i}
+                                className="group relative flex flex-col gap-2 overflow-hidden rounded-xl border border-surface-200/80 bg-white px-3 py-2.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                                style={{ borderLeftWidth: 3, borderLeftColor: statusColor }}
+                              >
+                                {/* tinted bg accent */}
+                                <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `radial-gradient(ellipse at top left, ${statusBg} 0%, transparent 70%)` }} />
+                                {/* rank badge */}
+                                <span className="absolute right-2 top-2 text-[9px] font-bold tabular-nums text-surface-300">#{i + 1}</span>
+                                {/* name row */}
+                                <div className="flex items-center gap-1.5 min-w-0 pr-5">
+                                  <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: statusColor }} />
+                                  <span className="truncate text-[11px] font-semibold tracking-wide text-surface-700">{row.name}</span>
                                 </div>
-                                <span className="text-[11px] font-bold text-surface-900 tabular-nums">{currency(row.earned)}</span>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-surface-200">
+                                {/* earned value */}
+                                <span className={`text-sm font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-400' : 'text-surface-900'}`}>
+                                  {currency(row.earned)}
+                                </span>
+                                {/* progress bar */}
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                                   <div
-                                    className="h-full transition-[width] duration-700"
-                                    style={{ width: `${pct}%`, backgroundColor: statusColor }}
+                                    className="h-full rounded-full transition-[width] duration-700"
+                                    style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${statusColor}cc, ${statusColor})` }}
                                   />
                                 </div>
+                                {/* max label */}
                                 {row.target > 0 && (
-                                  <span className="text-[9px] tabular-nums text-surface-400">máx. {currency(row.target)}</span>
+                                  <span className="text-[9px] tabular-nums text-surface-400 leading-none">
+                                    máx. {currency(row.target)}
+                                  </span>
                                 )}
                               </div>
                             )
