@@ -3080,28 +3080,28 @@ export default function MetasWorkspace() {
                             return (
                               <div
                                 key={i}
-                                className="flex flex-col overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 transition-shadow duration-200 hover:shadow-md"
+                                className="relative flex flex-col justify-between overflow-hidden rounded-lg bg-white px-3 pt-2.5 pb-2 shadow-sm ring-1 ring-surface-200 transition-all duration-150 hover:ring-surface-300 hover:shadow-md"
                               >
-                                {/* header band */}
-                                <div className="flex items-center justify-between px-2.5 py-1.5" style={{ backgroundColor: statusColor }}>
-                                  <span className="truncate text-[9px] font-bold uppercase tracking-widest text-white/90 leading-none">{row.name}</span>
-                                  <span className="shrink-0 ml-1 text-[8px] font-semibold text-white/50 tabular-nums">#{i + 1}</span>
-                                </div>
-                                {/* body */}
-                                <div className="flex flex-1 flex-col gap-1.5 bg-white px-2.5 py-2">
-                                  <span className={`text-[13px] font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-300' : 'text-surface-900'}`}>
-                                    {currency(row.earned)}
-                                  </span>
-                                  <div className="h-1 w-full overflow-hidden rounded-full bg-surface-100">
+                                {/* rank badge */}
+                                <span className="absolute right-2 top-1.5 text-[9px] font-semibold tabular-nums text-surface-300">#{i + 1}</span>
+                                {/* colored left rule */}
+                                <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-lg" style={{ backgroundColor: statusColor }} />
+                                {/* name */}
+                                <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-surface-500 leading-none mb-1.5">{row.name}</p>
+                                {/* value */}
+                                <p className={`text-[13px] font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-300' : 'text-surface-900'}`}>
+                                  {currency(row.earned)}
+                                </p>
+                                {/* progress + max */}
+                                <div className="mt-2 space-y-1">
+                                  <div className="h-0.75 w-full overflow-hidden rounded-full bg-surface-100">
                                     <div
                                       className="h-full rounded-full transition-[width] duration-700"
                                       style={{ width: `${pct}%`, backgroundColor: statusColor }}
                                     />
                                   </div>
                                   {row.target > 0 && (
-                                    <span className="text-[9px] tabular-nums text-surface-400 leading-none">
-                                      máx. {currency(row.target)}
-                                    </span>
+                                    <p className="text-[9px] tabular-nums text-surface-400 leading-none">máx. {currency(row.target)}</p>
                                   )}
                                 </div>
                               </div>
