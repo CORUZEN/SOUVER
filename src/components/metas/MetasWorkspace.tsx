@@ -1463,7 +1463,7 @@ export default function MetasWorkspace() {
 
   const rewardDonut = useMemo(() => {
     const palette: Record<SellerSnapshot['status'], string> = {
-      SUPEROU:  '#10b981',
+      SUPEROU:  '#0ea5e9',
       NO_ALVO:  '#06b6d4',
       ATENCAO:  '#f59e0b',
       CRITICO:  '#f43f5e',
@@ -1507,7 +1507,7 @@ export default function MetasWorkspace() {
       })
     const pctCommitted = totalTarget > 0 ? Math.min(totalEarned / totalTarget * 100, 100) : 0
     const legendItems = [
-      { key: 'hit',        label: 'Meta Batida',  color: '#10b981', value: groups.SUPEROU + groups.NO_ALVO },
+      { key: 'hit',        label: 'Meta Batida',  color: '#06b6d4', value: groups.SUPEROU + groups.NO_ALVO },
       { key: 'progress',  label: 'Em progresso', color: '#f59e0b', value: groups.ATENCAO + groups.CRITICO },
     ]
     return { radius, circumference, segments, legendItems, totalEarned, totalTarget, pctCommitted }
@@ -2861,7 +2861,7 @@ export default function MetasWorkspace() {
 
           <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
           <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-500 via-indigo-500 to-violet-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Tendência de evolução (linha)
               </p>
@@ -2957,7 +2957,7 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
               <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
               <div className="mt-4 space-y-2.5">
@@ -2986,7 +2986,7 @@ export default function MetasWorkspace() {
           </div>
 
             <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 via-teal-500 to-cyan-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Premiação por Desempenho
               </p>
@@ -2997,9 +2997,9 @@ export default function MetasWorkspace() {
                 <div className="mt-4 grid gap-6 xl:grid-cols-[1.5fr_3.5fr]">
                   {/* ── Donut grande ──────────────────────────── */}
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <svg className="w-full max-w-70 h-auto" viewBox="0 0 200 200">
+                    <svg className="w-full max-w-56 h-auto" viewBox="0 0 200 200">
                       {/* Track */}
-                      <circle cx="100" cy="100" r="76" fill="none" stroke="#e5e7eb" strokeWidth="22" />
+                      <circle cx="100" cy="100" r="76" fill="none" stroke="#f1f5f9" strokeWidth="22" />
                       {/* Segments */}
                       {rewardDonut.segments.length === 0 ? null : (() => {
                         const r = 76
@@ -3026,11 +3026,11 @@ export default function MetasWorkspace() {
                         })
                       })()}
                       {/* Center text */}
-                      <text x="100" y="93" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Custo Atual</text>
-                      <text x="100" y="113" textAnchor="middle" className="fill-surface-900" style={{ fontSize: 14, fontWeight: 700 }}>{currency(rewardDonut.totalEarned)}</text>
+                      <text x="100" y="95" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Custo Atual</text>
+                      <text x="100" y="113" textAnchor="middle" className="fill-surface-900" style={{ fontSize: 13, fontWeight: 700 }}>{currency(rewardDonut.totalEarned)}</text>
                     </svg>
                     {/* Status legend: 2 combined rows */}
-                    <div className="mt-2 w-full max-w-70 divide-y divide-surface-100 rounded-xl border border-surface-100 bg-surface-50/60">
+                    <div className="mt-2 w-full max-w-56 divide-y divide-surface-100 rounded-xl border border-surface-100 bg-surface-50/60">
                       {rewardDonut.legendItems.map((item) => (
                         <div key={item.key} className={`flex items-center justify-between gap-3 px-3 py-2 ${item.value === 0 ? 'opacity-40' : ''}`}>
                           <span className="inline-flex items-center gap-2 text-xs font-medium text-surface-700">
@@ -3043,11 +3043,27 @@ export default function MetasWorkspace() {
                         </div>
                       ))}
                     </div>
+                    {/* Previsão máxima — ao final da coluna do donut */}
+                    {rewardDonut.totalTarget > 0 && (
+                      <div className="mt-3 w-full max-w-56 rounded-xl border border-surface-200 bg-surface-50/80 px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2 text-[10px] text-surface-500">
+                          <span className="font-semibold uppercase tracking-[0.08em] leading-tight">Previsão máxima</span>
+                          <span className="font-bold text-surface-800 tabular-nums">{currency(rewardDonut.totalTarget)}</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
+                          <div
+                            className="h-full rounded-full bg-linear-to-r from-emerald-400 to-teal-500 transition-[width] duration-700"
+                            style={{ width: `${rewardDonut.pctCommitted}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-right text-[9px] text-surface-400">
+                          {num(rewardDonut.pctCommitted, 1)}% comprometida
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* ── Painel direito ────────────────────────── */}
                   <div className="flex min-w-0 flex-col justify-between gap-4">
-                    {/* Grid 3 colunas — todos os vendedores */}
+                    {/* Grid vendedores — sem rodapé de orçamento aqui */}
                     <div className="flex-1">
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-surface-400">Premiação por vendedor</p>
                       {sellerRewardRows.length === 0 ? (
@@ -3103,25 +3119,6 @@ export default function MetasWorkspace() {
                         </div>
                       )}
                     </div>
-
-                    {/* Rodapé: orçamento */}
-                    {rewardDonut.totalTarget > 0 && (
-                      <div className="border-t border-surface-200 pt-3">
-                        <div className="flex items-center justify-between text-[10px] text-surface-500">
-                          <span className="font-semibold uppercase tracking-[0.08em]">Previsão máxima de custos com premiação</span>
-                          <span className="font-bold text-surface-700">{currency(rewardDonut.totalTarget)}</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
-                          <div
-                            className="h-full bg-emerald-500 transition-[width] duration-700"
-                            style={{ width: `${rewardDonut.pctCommitted}%` }}
-                          />
-                        </div>
-                        <p className="mt-1 text-right text-[10px] text-surface-400">
-                          {num(rewardDonut.pctCommitted, 1)}% da previsão máxima comprometida
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
