@@ -1583,60 +1583,35 @@ export default function MetasWorkspace() {
     'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
 
   const lineChartData = useMemo(() => {
-    const width = 560
-    const height = 240
-    const padLeft = 54
-    const padRight = 18
-    const padTop = 18
-    const padBottom = 40
-    const plotWidth = width - padLeft - padRight
-    const plotHeight = height - padTop - padBottom
+    const W = 500
+    const H = 200
+    const PAD = { top: 24, right: 16, bottom: 36, left: 44 }
+    const plotW = W - PAD.left - PAD.right
+    const plotH = H - PAD.top - PAD.bottom
+    const totalSellers = Math.max(snapshots.length, 1)
 
-    const maxStagePoint = Math.max(
-      0.001,
-      ...stageSeries.flatMap((stage) => [stage.target, stage.achieved])
-    )
-
-    const yFor = (value: number) =>
-      height - padBottom - (Math.min(value, maxStagePoint) / maxStagePoint) * plotHeight
-
-    const buildPoints = (pick: (item: (typeof stageSeries)[number]) => number) =>
-      stageSeries.map((stage, index) => {
-        const x = padLeft + (index * plotWidth) / Math.max(stageSeries.length - 1, 1)
-        const y = yFor(pick(stage))
-        return { x, y }
-      })
-
-    const actualPoints = buildPoints((stage) => stage.achieved)
-    const targetPoints = buildPoints((stage) => stage.target)
-    const actualPath = smoothLinePath(actualPoints)
-    const targetPath = smoothLinePath(targetPoints)
-    const areaPath = `${actualPath} L ${actualPoints.at(-1)?.x ?? 0} ${height - padBottom} L ${actualPoints[0]?.x ?? 0} ${height - padBottom} Z`
-
-    const guideSteps = [1, 0.75, 0.5, 0.25, 0]
-    const guides = guideSteps.map((step) => {
-      const value = maxStagePoint * step
-      return {
-        y: yFor(value),
-        label: num(value, 2),
-      }
+    // Show % of sellers who hit each stage goal
+    const stagesFiltered = stageSeries.filter((s) => s.key !== 'FULL')
+    const points = stagesFiltered.map((stage, i) => {
+      const pct = (stage.hitCount / totalSellers) * 100
+      const x = PAD.left + (stagesFiltered.length > 1 ? (i / (stagesFiltered.length - 1)) * plotW : plotW / 2)
+      const y = PAD.top + plotH - (pct / 100) * plotH
+      return { x, y, pct, count: stage.hitCount, label: stage.label, key: stage.key }
     })
 
-    return {
-      width,
-      height,
-      padLeft,
-      padRight,
-      padTop,
-      padBottom,
-      guides,
-      actualPoints,
-      targetPoints,
-      actualPath,
-      targetPath,
-      areaPath,
-    }
-  }, [stageSeries])
+    const linePath = smoothLinePath(points)
+    const areaPath =
+      points.length > 0
+        ? `${linePath} L ${points[points.length - 1].x} ${PAD.top + plotH} L ${points[0].x} ${PAD.top + plotH} Z`
+        : ''
+
+    const guides = [0, 25, 50, 75, 100].map((pct) => ({
+      pct,
+      y: PAD.top + plotH - (pct / 100) * plotH,
+    }))
+
+    return { W, H, PAD, plotW, plotH, points, linePath, areaPath, guides, totalSellers }
+  }, [stageSeries, snapshots])
 
   const sellerBars = useMemo(() => snapshots.slice(0, 6), [snapshots])
   const maxSellerPoints = useMemo(
@@ -2862,125 +2837,129 @@ export default function MetasWorkspace() {
           <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
           <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-500 via-indigo-500 to-violet-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                Tendência de evolução (linha)
-              </p>
-              <div className="mt-4 rounded-xl border border-surface-200 bg-linear-to-b from-slate-50 to-white p-4">
-                <svg
-                  viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`}
-                  className="h-52 w-full"
-                >
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                  Tendência de evolução (linha)
+                </p>
+                <p className="text-[9px] text-surface-400">% de vendedores com meta batida por etapa</p>
+              </div>
+              <div className="mt-3">
+                <svg viewBox={`0 0 ${lineChartData.W} ${lineChartData.H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
                   <defs>
-                    <linearGradient id="line-area-gradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.28" />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
+                    <linearGradient id="trend-area-grad" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
                     </linearGradient>
-                    <filter id="line-soft-shadow" x="-15%" y="-20%" width="130%" height="150%">
-                      <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#1e3a8a" floodOpacity="0.18" />
+                    <linearGradient id="trend-line-grad" x1="0" x2="1" y1="0" y2="0">
+                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                    <filter id="trend-dot-glow">
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#3b82f6" floodOpacity="0.5" />
                     </filter>
                   </defs>
 
-                  {lineChartData.guides.map((guide) => (
-                    <g key={`guide-${guide.y}`}>
+                  {/* Grid lines + Y labels */}
+                  {lineChartData.guides.map((g) => (
+                    <g key={g.pct}>
                       <line
-                        x1={lineChartData.padLeft}
-                        x2={lineChartData.width - lineChartData.padRight}
-                        y1={guide.y}
-                        y2={guide.y}
-                        stroke="#dbe4ef"
-                        strokeWidth="1"
-                        strokeDasharray="4 4"
+                        x1={lineChartData.PAD.left} x2={lineChartData.W - lineChartData.PAD.right}
+                        y1={g.y} y2={g.y}
+                        stroke={g.pct === 100 ? '#c7d2fe' : '#e2e8f0'}
+                        strokeWidth={g.pct === 100 ? 1.5 : 1}
+                        strokeDasharray={g.pct === 0 ? 'none' : '4 4'}
                       />
-                      <text
-                        x={lineChartData.padLeft - 8}
-                        y={guide.y + 4}
-                        textAnchor="end"
-                        className="fill-surface-400 text-[9px] font-medium"
-                      >
-                        {guide.label}
+                      <text x={lineChartData.PAD.left - 6} y={g.y + 4} textAnchor="end"
+                        fill="#94a3b8" style={{ fontSize: 9, fontWeight: 500 }}>
+                        {g.pct}%
                       </text>
                     </g>
                   ))}
 
-                  <path d={lineChartData.areaPath} fill="url(#line-area-gradient)" />
-                  <path
-                    d={lineChartData.targetPath}
-                    fill="none"
-                    stroke="#0f766e"
-                    strokeDasharray="6 5"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d={lineChartData.actualPath}
-                    fill="none"
-                    stroke="#1d4ed8"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    filter="url(#line-soft-shadow)"
-                  />
-                  {lineChartData.targetPoints.map((point, index) => (
-                    <circle
-                      key={`target-${STAGES[index].key}`}
-                      cx={point.x}
-                      cy={point.y}
-                      r="3.5"
-                      fill="#ffffff"
-                      stroke="#0f766e"
-                      strokeWidth="1.5"
-                    />
-                  ))}
-                  {lineChartData.actualPoints.map((point, index) => (
-                    <g key={`actual-${STAGES[index].key}`}>
-                      <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#bfdbfe" strokeWidth="1.4" />
-                      <circle cx={point.x} cy={point.y} r="2.8" fill="#1d4ed8" />
-                    </g>
-                  ))}
+                  {/* Area fill */}
+                  {lineChartData.areaPath && (
+                    <path d={lineChartData.areaPath} fill="url(#trend-area-grad)" />
+                  )}
 
-                  {lineChartData.actualPoints.map((point, index) => (
-                    <text
-                      key={`label-${STAGES[index].key}`}
-                      x={point.x}
-                      y={lineChartData.height - 14}
-                      textAnchor="middle"
-                      className="fill-surface-500 text-[9px] font-semibold uppercase tracking-[0.06em]"
-                    >
-                      {STAGES[index].label}
-                    </text>
+                  {/* Line */}
+                  {lineChartData.linePath && (
+                    <path
+                      d={lineChartData.linePath}
+                      fill="none"
+                      stroke="url(#trend-line-grad)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )}
+
+                  {/* Dots + value labels */}
+                  {lineChartData.points.map((pt) => (
+                    <g key={pt.key}>
+                      <circle cx={pt.x} cy={pt.y} r="5" fill="white" stroke="#6366f1" strokeWidth="2" filter="url(#trend-dot-glow)" />
+                      <circle cx={pt.x} cy={pt.y} r="2.5" fill="#6366f1" />
+                      {/* value above dot */}
+                      <text x={pt.x} y={pt.y - 10} textAnchor="middle" fill="#1e293b"
+                        style={{ fontSize: 10, fontWeight: 700 }}>
+                        {Math.round(pt.pct)}%
+                      </text>
+                      {/* X label */}
+                      <text x={pt.x} y={lineChartData.H - 8} textAnchor="middle" fill="#64748b"
+                        style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {pt.label}
+                      </text>
+                    </g>
                   ))}
                 </svg>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-surface-600">
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Atingido médio</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-700" />Meta planejada</span>
-              </div>
+              <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalSellers} vendedores monitorados · {MONTHS[month]} {year}</p>
             </Card>
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
               <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
-              <div className="mt-4 space-y-2.5">
-                {stageSeries.map((stage) => {
-                  const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
-                  return (
-                    <div key={stage.key} className="rounded-lg border border-surface-200/70 bg-white/80 px-2.5 py-2">
-                      <div className="mb-1 flex items-center justify-between text-xs text-surface-600">
-                        <span>{stage.label}</span>
-                        <span className="font-semibold">
-                          {stage.hitCount} / {snapshots.length}
-                          <span className="ml-1 font-normal text-surface-400">vendedores</span>
-                        </span>
+              <div className="mt-4 space-y-2">
+                {(() => {
+                  const stageHex: Record<string, string> = {
+                    W1: '#06b6d4', W2: '#3b82f6', W3: '#6366f1', CLOSING: '#10b981', FULL: '#10b981',
+                  }
+                  return stageSeries.map((stage) => {
+                    const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
+                    const pct = Math.round(hitRatio * 100)
+                    const color = stageHex[stage.key] ?? '#64748b'
+                    const isGood = pct >= 50
+                    return (
+                      <div key={stage.key} className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-white px-3 py-2.5 ring-1 ring-surface-200 shadow-sm">
+                        {/* left accent */}
+                        <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl" style={{ backgroundColor: color }} />
+                        <div className="flex-1 min-w-0 pl-1">
+                          <div className="flex items-center justify-between mb-1.5 gap-2">
+                            <span className="text-[11px] font-semibold text-surface-700 truncate">{stage.label}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums"
+                                style={{ backgroundColor: `${color}18`, color }}
+                              >{pct}%</span>
+                              <span className="text-[10px] text-surface-400 tabular-nums">{stage.hitCount}/{snapshots.length}</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                            <div
+                              className="h-full rounded-full transition-[width] duration-700"
+                              style={{ width: `${Math.min(hitRatio * 100, 100)}%`, backgroundColor: color }}
+                            />
+                          </div>
+                          {!isGood && stage.hitCount > 0 && (
+                            <p className="mt-1 text-[9px] text-surface-400">
+                              {snapshots.length - stage.hitCount} vendedor{snapshots.length - stage.hitCount !== 1 ? 'es' : ''} ainda não atingiu
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-200">
-                        <div
-                          className={`h-full transition-[width] duration-700 ${stageColorMap[stage.key as StageKey]}`}
-                          style={{ width: `${Math.min(hitRatio * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                })()}
               </div>
             </Card>
           </div>
