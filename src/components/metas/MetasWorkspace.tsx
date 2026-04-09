@@ -3192,15 +3192,13 @@ export default function MetasWorkspace() {
                               {isOpen && (
                                 <div className="border-t border-slate-300 bg-linear-to-b from-slate-100 via-blue-50/45 to-cyan-50/35 px-3 py-3">
                                   <div className="rounded-xl border border-slate-300/80 bg-linear-to-br from-white via-slate-50 to-blue-50/40 shadow-[0_10px_24px_rgba(15,23,42,0.12)] ring-1 ring-white/60">
-                                    <div className="border-b border-slate-100 px-3 py-2.5">
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="relative overflow-hidden border-b border-slate-200/80">
+                                      <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+                                      <div className="px-3 py-3">
                                         <div>
                                           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Painel do vendedor</p>
-                                          <p className="text-sm font-semibold text-slate-900">{row.fullName}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <span className={`rounded-md px-2 py-1 text-[10px] font-semibold ring-1 ${statusVisual.tone}`}>{statusVisual.label}</span>
-                                          <Badge variant="secondary">{sellerBlock.title}</Badge>
+                                          <p className="text-base font-semibold text-slate-900">{row.fullName}</p>
+                                          <p className="text-[11px] text-slate-500">Resumo executivo de performance e KPIs no período selecionado.</p>
                                         </div>
                                       </div>
                                     </div>
