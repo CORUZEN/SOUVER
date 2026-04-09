@@ -125,6 +125,7 @@ interface RuleProgress {
 interface SellerSnapshot {
   seller: Salesperson
   totalOrders: number
+  uniqueClients: number
   totalValue: number
   totalGrossWeight: number
   averageTicket: number
@@ -1350,6 +1351,7 @@ export default function MetasWorkspace() {
         return {
           seller,
           totalOrders: seller.totalOrders,
+          uniqueClients: totalDistinctClients,
           totalValue: seller.totalValue,
           totalGrossWeight: seller.totalGrossWeight,
           averageTicket,
@@ -3050,13 +3052,6 @@ export default function MetasWorkspace() {
             ) : (
               <div className="space-y-3">
                 {(() => {
-                  const statusMeta: Record<SellerSnapshot['status'], { label: string; tone: string }> = {
-                    SUPEROU: { label: 'Superou', tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
-                    NO_ALVO: { label: 'Meta batida', tone: 'bg-cyan-100 text-cyan-700 ring-cyan-200' },
-                    ATENCAO: { label: 'Atenção', tone: 'bg-amber-100 text-amber-700 ring-amber-200' },
-                    CRITICO: { label: 'Crítico', tone: 'bg-rose-100 text-rose-700 ring-rose-200' },
-                  }
-
                   const rows = sellerWeeklyHeatmap
                     .map((row) => {
                       const snapshot = snapshots.find((s) => s.seller.id === row.seller.id)
@@ -3065,10 +3060,6 @@ export default function MetasWorkspace() {
                         ? row.cells.reduce((sum, cell) => sum + cell.ratio, 0) / row.cells.length
                         : 0
                       const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
-                      const campaignProjection = prizes.reduce((sum, prize) => {
-                        if (!prize.active) return sum
-                        return snapshot.pointsAchieved >= prize.minPoints ? sum + prize.rewardValue : sum
-                      }, 0)
                       return {
                         id: row.seller.id,
                         nameShort: getSellerShortName(row.seller.name),
@@ -3080,7 +3071,6 @@ export default function MetasWorkspace() {
                         pointsTarget: snapshot.pointsTarget,
                         pointsRatio,
                         avgRatio,
-                        campaignProjection,
                         snapshot,
                         cells: row.cells,
                       }
@@ -3133,14 +3123,13 @@ export default function MetasWorkspace() {
                         </div>
 
                       <div className="space-y-1.5">
-                        <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                        <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
                           <span>Vendedor</span>
                           <span className="text-center">Pontuação</span>
                           {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
                             <span key={`head-compact-${stage.key}`} className="text-center">{stage.label}</span>
                           ))}
-                          <span className="text-center">Status geral</span>
                           <span />
                         </div>
                         {rows.map((row) => {
@@ -3151,10 +3140,6 @@ export default function MetasWorkspace() {
                             const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                             return progress >= 1
                           }).length
-                          const cycleStatus = periodClosed
-                            ? { label: `Alcançou ${kpisHit} de ${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
-                            : { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
-                          const statusVisual = statusMeta[row.status]
                           return (
                             <div
                               key={`seller-accordion-${row.id}`}
@@ -3169,7 +3154,7 @@ export default function MetasWorkspace() {
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
                                 className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
                               >
-                                <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5">
+                                <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)} pts</span>
@@ -3181,7 +3166,6 @@ export default function MetasWorkspace() {
                                       {num(cell.ratio * 100, 0)}%
                                     </span>
                                   ))}
-                                  <span className={`rounded-md px-2 py-1 text-center text-[10px] font-semibold ring-1 ${cycleStatus.tone}`}>{cycleStatus.label}</span>
                                   <ChevronDown
                                     size={14}
                                     className={`justify-self-center text-surface-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -3193,7 +3177,6 @@ export default function MetasWorkspace() {
                                 <div className="border-t border-slate-300 bg-linear-to-b from-slate-100 via-blue-50/45 to-cyan-50/35 px-3 py-3">
                                   <div className="rounded-xl border border-slate-300/80 bg-linear-to-br from-white via-slate-50 to-blue-50/40 shadow-[0_10px_24px_rgba(15,23,42,0.12)] ring-1 ring-white/60">
                                     <div className="relative overflow-hidden border-b border-slate-200/80">
-                                      <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 via-blue-500 to-indigo-500" />
                                       <div className="px-3 py-3">
                                         <div>
                                           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Painel do vendedor</p>
@@ -3225,8 +3208,8 @@ export default function MetasWorkspace() {
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.rewardAchieved)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Campanhas elegíveis</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.campaignProjection)}</p>
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Clientes atendidos</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.uniqueClients, 0)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Gap para meta</p>
