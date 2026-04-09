@@ -3111,11 +3111,11 @@ export default function MetasWorkspace() {
                     return (
                       <>
                         <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-3 py-2.5 shadow-sm">
-                            <div className="absolute inset-x-0 top-0 h-0.75 bg-slate-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Vendedores monitorados</p>
-                            <p className="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{rows.length}</p>
-                            <p className="text-[10px] text-slate-500">Base ativa no período selecionado</p>
+                          <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
+                            <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-700">Vendedores monitorados</p>
+                            <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{rows.length}</p>
+                            <p className="text-[10px] text-sky-700">Base ativa no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
