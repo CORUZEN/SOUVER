@@ -33,7 +33,7 @@
     "code": "15",
     "partnerCode": "231",
     "name": "EGLINAURIA VIEIRA CAVALCANTE",
-    "active": true
+    "active": false
   },
   {
     "code": "8",
@@ -57,13 +57,13 @@
     "code": "29",
     "partnerCode": "16643",
     "name": "JOSE CARLOS DIAS",
-    "active": true
+    "active": false
   },
   {
     "code": "16",
     "partnerCode": "16909",
     "name": "JOSE CLAUDIO FEITOSA",
-    "active": true
+    "active": false
   },
   {
     "code": "31",
@@ -75,7 +75,7 @@
     "code": "17",
     "partnerCode": "233",
     "name": "JOSELIA LOPES DE SIQUEIRA",
-    "active": true
+    "active": false
   },
   {
     "code": "19",
@@ -105,7 +105,7 @@
     "code": "18",
     "partnerCode": "15567",
     "name": "ROGERIO CORREIA DA SILVA",
-    "active": true
+    "active": false
   },
   {
     "code": "22",
