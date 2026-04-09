@@ -2892,7 +2892,6 @@ export default function MetasWorkspace() {
                   return stageSeries.map((stage) => {
                     const hitRatio = stage.ratio
                     const color = stageHex[stage.key] ?? '#64748b'
-                    const isGood = hitRatio >= 0.5
                     const missingKpis = Math.max(stage.kpiTotal - stage.kpiHit, 0)
                     return (
                       <div key={stage.key} className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-white px-3 py-2.5 ring-1 ring-surface-200 shadow-sm">
@@ -2909,7 +2908,7 @@ export default function MetasWorkspace() {
                               style={{ width: `${Math.min(hitRatio * 100, 100)}%`, backgroundColor: color }}
                             />
                           </div>
-                          {!isGood && stage.kpiTotal > 0 && (
+                          {stage.kpiTotal > 0 && (
                             <p className="mt-1 text-[9px] text-surface-400">
                               {missingKpis} KPI{missingKpis !== 1 ? 's' : ''} ainda não conquistado{missingKpis !== 1 ? 's' : ''}
                             </p>
