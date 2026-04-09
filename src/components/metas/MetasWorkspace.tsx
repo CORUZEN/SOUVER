@@ -3159,6 +3159,12 @@ export default function MetasWorkspace() {
                             const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                             return progress >= 1
                           }).length
+                          const rowAccent =
+                            row.pointsAchieved >= 0.8
+                              ? 'from-emerald-500 to-cyan-500'
+                              : row.pointsAchieved >= 0.6
+                                ? 'from-blue-500 to-indigo-500'
+                                : 'from-amber-500 to-rose-500'
                           const cycleStatus = periodClosed
                             ? { label: `Alcançou ${kpisHit} de ${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
                             : { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
@@ -3166,16 +3172,17 @@ export default function MetasWorkspace() {
                           return (
                             <div
                               key={`seller-accordion-${row.id}`}
-                              className={`overflow-hidden rounded-xl border transition-all duration-200 ${
+                              className={`relative overflow-hidden rounded-xl border transition-all duration-250 ${
                                 isOpen
-                                  ? 'border-slate-300 bg-white shadow-md ring-1 ring-slate-200'
-                                  : 'border-surface-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                                  ? 'border-slate-300 bg-linear-to-r from-white to-slate-50 shadow-lg ring-1 ring-slate-200'
+                                  : 'border-surface-200 bg-linear-to-r from-white to-slate-50/70 shadow-sm hover:border-slate-300 hover:shadow-md'
                               }`}
                             >
+                              <span className={`absolute inset-y-0 left-0 w-1 bg-linear-to-b ${rowAccent}`} />
                               <button
                                 type="button"
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
-                                className="w-full cursor-pointer px-2 py-1.5 text-left transition-colors duration-200 hover:bg-slate-50/60"
+                                className="w-full cursor-pointer px-2 py-1.5 pl-3 text-left transition-colors duration-200 hover:bg-slate-100/60"
                               >
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
