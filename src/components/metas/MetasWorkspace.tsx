@@ -3190,8 +3190,8 @@ export default function MetasWorkspace() {
                               </button>
 
                               {isOpen && (
-                                <div className="border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3">
-                                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-t border-slate-300 bg-linear-to-b from-slate-100 via-blue-50/45 to-cyan-50/35 px-3 py-3">
+                                  <div className="rounded-xl border border-slate-300/80 bg-linear-to-br from-white via-slate-50 to-blue-50/40 shadow-[0_10px_24px_rgba(15,23,42,0.12)] ring-1 ring-white/60">
                                     <div className="border-b border-slate-100 px-3 py-2.5">
                                       <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
@@ -3206,35 +3206,35 @@ export default function MetasWorkspace() {
                                     </div>
 
                                     <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pontuação</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.pointsAchieved, 3)} / {num(row.snapshot.pointsTarget, 3)} pts</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pedidos no mês</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalOrders, 0)}</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Faturamento</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.totalValue)}</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Peso bruto</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Premiação por KPIs</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.rewardAchieved)}</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Campanhas elegíveis</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.campaignProjection)}</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Gap para meta</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.gapToTarget, 3)} pts</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">KPIs alcançados</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{kpisHit}/{kpisTotal}</p>
                                       </div>
