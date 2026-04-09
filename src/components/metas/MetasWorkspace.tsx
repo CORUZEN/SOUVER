@@ -3245,60 +3245,78 @@ export default function MetasWorkspace() {
                                       {sellerBlock.rules.map((rule) => {
                                         const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                                         const done = progress >= 1
+                                        const progressPct = Math.min(progress * 100, 100)
+                                        const kpiState = done
+                                          ? 'HIT'
+                                          : progress >= 0.85
+                                            ? 'NEAR'
+                                            : progress >= 0.5
+                                              ? 'MID'
+                                              : 'FAR'
                                         const stageLabel = STAGES.find((s) => s.key === rule.stage)?.label ?? rule.stage
-                                        const stageTheme: Record<string, { chip: string; accent: string; track: string; icon: string }> = {
-                                          W1: {
-                                            chip: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
-                                            accent: 'from-cyan-500 to-sky-500',
-                                            track: 'bg-cyan-100/60',
-                                            icon: 'text-cyan-600',
-                                          },
-                                          W2: {
-                                            chip: 'bg-blue-50 text-blue-700 ring-blue-200',
-                                            accent: 'from-blue-500 to-indigo-500',
-                                            track: 'bg-blue-100/60',
-                                            icon: 'text-blue-600',
-                                          },
-                                          W3: {
-                                            chip: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
-                                            accent: 'from-indigo-500 to-violet-500',
-                                            track: 'bg-indigo-100/60',
-                                            icon: 'text-indigo-600',
-                                          },
-                                          CLOSING: {
-                                            chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                                            accent: 'from-emerald-500 to-teal-500',
-                                            track: 'bg-emerald-100/60',
+                                        const stageChipClass = 'bg-slate-100 text-slate-600 ring-slate-200'
+                                        const progressTrackClass = 'bg-slate-200/80'
+                                        const stateTheme: Record<'HIT' | 'NEAR' | 'MID' | 'FAR', { card: string; bar: string; text: string; icon: string; subtext: string; badgeBg: string; top: string }> = {
+                                          HIT: {
+                                            card: 'border-emerald-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-emerald-100/70',
+                                            bar: 'bg-emerald-500',
+                                            text: 'text-emerald-700',
                                             icon: 'text-emerald-600',
+                                            subtext: 'text-slate-600',
+                                            badgeBg: 'bg-emerald-50',
+                                            top: 'bg-emerald-400/70',
+                                          },
+                                          NEAR: {
+                                            card: 'border-amber-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-amber-100/70',
+                                            bar: 'bg-amber-500',
+                                            text: 'text-amber-700',
+                                            icon: 'text-amber-600',
+                                            subtext: 'text-slate-600',
+                                            badgeBg: 'bg-amber-50',
+                                            top: 'bg-amber-400/70',
+                                          },
+                                          MID: {
+                                            card: 'border-orange-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-orange-100/70',
+                                            bar: 'bg-orange-500',
+                                            text: 'text-orange-700',
+                                            icon: 'text-orange-600',
+                                            subtext: 'text-slate-600',
+                                            badgeBg: 'bg-orange-50',
+                                            top: 'bg-orange-400/70',
+                                          },
+                                          FAR: {
+                                            card: 'border-red-300 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-red-100/80',
+                                            bar: 'bg-red-500',
+                                            text: 'text-red-700',
+                                            icon: 'text-red-600',
+                                            subtext: 'text-slate-600',
+                                            badgeBg: 'bg-red-50',
+                                            top: 'bg-red-400/70',
                                           },
                                         }
-                                        const theme = stageTheme[rule.stage] ?? {
-                                          chip: 'bg-slate-100 text-slate-700 ring-slate-200',
-                                          accent: 'from-slate-500 to-slate-600',
-                                          track: 'bg-slate-200',
-                                          icon: 'text-slate-600',
-                                        }
+                                        const visual = stateTheme[kpiState]
+                                        const topAccentClass = visual.top
                                         return (
                                           <div
                                             key={`seller-rule-${row.id}-${rule.id}`}
-                                            className="group relative overflow-hidden rounded-xl border border-slate-200/90 bg-linear-to-br from-white to-slate-50 px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+                                            className={`group relative overflow-hidden rounded-xl border px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.12)] ${visual.card}`}
                                           >
-                                            <div className={`absolute inset-x-0 top-0 h-0.75 bg-linear-to-r ${theme.accent}`} />
+                                            <div className={`absolute inset-x-0 top-0 h-0.75 ${topAccentClass}`} />
                                             <div className="mb-1 flex items-start justify-between gap-2">
-                                              <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] ring-1 ${theme.chip}`}>{stageLabel}</span>
-                                              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${done ? 'bg-emerald-50' : 'bg-amber-50'}`}>
-                                                {done ? <TrendingUp size={12} className={theme.icon} /> : <TrendingDown size={12} className="text-amber-500" />}
+                                              <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] ring-1 ${stageChipClass}`}>{stageLabel}</span>
+                                              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${visual.badgeBg}`}>
+                                                {done ? <TrendingUp size={12} className={visual.icon} /> : <TrendingDown size={12} className={visual.icon} />}
                                               </span>
                                             </div>
                                             <p className="line-clamp-1 text-xs font-semibold text-slate-900">{rule.kpi} ({rule.targetText})</p>
-                                            <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-slate-500">{rule.description}</p>
-                                            <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${theme.track}`}>
+                                            <p className={`mt-0.5 line-clamp-2 text-[10px] leading-relaxed ${visual.subtext}`}>{rule.description}</p>
+                                            <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${progressTrackClass}`}>
                                               <div
-                                                className={`h-full rounded-full transition-[width] duration-700 ${done ? `bg-linear-to-r ${theme.accent}` : 'bg-slate-400'}`}
-                                                style={{ width: `${Math.min(progress * 100, 100)}%` }}
+                                                className={`h-full rounded-full transition-[width] duration-700 ${visual.bar}`}
+                                                style={{ width: `${progressPct}%` }}
                                               />
                                             </div>
-                                            <p className={`mt-1 text-right text-[10px] font-semibold tabular-nums ${done ? 'text-emerald-700' : 'text-slate-600'}`}>{num(Math.min(progress * 100, 100), 0)}%</p>
+                                            <p className={`mt-1 text-right text-[10px] font-semibold tabular-nums ${visual.text}`}>{num(progressPct, 0)}%</p>
                                           </div>
                                         )
                                       })}
