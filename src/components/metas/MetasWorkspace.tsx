@@ -3036,16 +3036,13 @@ export default function MetasWorkspace() {
             </Card>
 
           <Card className={executivePanelCardClass}>
-            <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-slate-500 via-slate-600 to-slate-700" />
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Users size={16} className="text-surface-600" />
-                <div>
-                  <h2 className="text-lg font-semibold text-surface-900">Desempenho individual de vendedores</h2>
-                  <p className="text-xs text-surface-500">Clique no card do vendedor para expandir os detalhes completos no próprio bloco.</p>
-                </div>
-              </div>
-            </div>
+            <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+              Desempenho individual de vendedores
+            </p>
+            <p className="mt-0.5 text-[10px] text-surface-400">
+              Clique no card do vendedor para expandir os detalhes completos no próprio bloco.
+            </p>
             {sellersLoading ? (
               <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                 Carregando vendedores...
@@ -3099,8 +3096,11 @@ export default function MetasWorkspace() {
                     .filter((row): row is NonNullable<typeof row> => row !== null)
 
                     const periodClosed = hasMonthEnded(year, month) && Boolean(cycle.lastBusinessDate)
-                    const avgTeamWeekly = rows.length > 0
-                      ? rows.reduce((sum, row) => sum + row.avgRatio, 0) / rows.length
+                    const avgPoints = rows.length > 0
+                      ? rows.reduce((sum, row) => sum + row.pointsAchieved, 0) / rows.length
+                      : 0
+                    const avgGapToFull = rows.length > 0
+                      ? rows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / rows.length
                       : 0
                     const kpiSummary = rows.reduce(
                       (acc, row) => {
@@ -3117,7 +3117,7 @@ export default function MetasWorkspace() {
 
                     return (
                       <>
-                        <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
                           <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-slate-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Vendedores monitorados</p>
@@ -3126,15 +3126,17 @@ export default function MetasWorkspace() {
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-700">Aderência média semanal</p>
-                            <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgTeamWeekly * 100, 1)}%</p>
-                            <p className="text-[10px] text-cyan-700">Consolidado das 4 etapas do ciclo</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-700">Pontuação média da equipe</p>
+                            <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgPoints, 2)} pts</p>
+                            <p className="text-[10px] text-cyan-700">Média geral de pontos alcançados no ciclo</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">KPIs conquistados no ciclo</p>
                             <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">{kpiSummary.hit}/{kpiSummary.total}</p>
-                            <p className="text-[10px] text-emerald-700">{periodClosed ? 'Ciclo encerrado' : 'Parcial até a data atual'}</p>
+                            <p className="text-[10px] text-emerald-700">
+                              {periodClosed ? `Gap médio para 1,00 pt: ${num(avgGapToFull, 2)} pts` : 'Parcial até a data atual'}
+                            </p>
                           </div>
                         </div>
 
@@ -3158,7 +3160,7 @@ export default function MetasWorkspace() {
                             return progress >= 1
                           }).length
                           const cycleStatus = periodClosed
-                            ? { label: `Bateu ${kpisHit}/${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
+                            ? { label: `Alcançou ${kpisHit} de ${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
                             : { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
                           const statusVisual = statusMeta[row.status]
                           return (
@@ -3178,7 +3180,7 @@ export default function MetasWorkspace() {
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)}/{num(row.pointsTarget > 0 ? row.pointsTarget : 1, 2)} pts</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)} pts</span>
                                   {row.cells.map((cell) => (
                                     <span
                                       key={`seller-stage-pill-${row.id}-${cell.stageKey}`}

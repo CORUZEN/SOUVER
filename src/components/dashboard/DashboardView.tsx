@@ -115,7 +115,7 @@ export default function DashboardView() {
   const [trendData, setTrendData]   = useState<{ date: string; batches: number; movements: number; ncs: number }[]>([])
   const [loadingTrend, setLoadingTrend] = useState(true)
   const abortRef = useRef<AbortController | null>(null)
-
+                                                     
   const loadKpis = useCallback(async (p?: string) => {
     const prd = p ?? period
     setLoadingKpis(true)
