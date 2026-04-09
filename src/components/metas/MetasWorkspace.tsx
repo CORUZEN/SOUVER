@@ -2870,7 +2870,7 @@ export default function MetasWorkspace() {
                         strokeDasharray={g.pct === 0 ? 'none' : '4 4'}
                       />
                       <text x={lineChartData.PAD.left - 6} y={g.y + 4} textAnchor="end"
-                        fill="#94a3b8" style={{ fontSize: 9, fontWeight: 500 }}>
+                        fill="#94a3b8" style={{ fontSize: 7, fontWeight: 500 }}>
                         {g.pct}%
                       </text>
                     </g>
@@ -2904,12 +2904,12 @@ export default function MetasWorkspace() {
                       <circle cx={pt.x} cy={pt.y} r="2.5" fill="#6366f1" />
                       {/* value above dot */}
                       <text x={pt.x} y={pt.y - 10} textAnchor="middle" fill="#1e293b"
-                        style={{ fontSize: 10, fontWeight: 700 }}>
+                        style={{ fontSize: 8, fontWeight: 700 }}>
                         {Math.round(pt.pct)}%
                       </text>
                       {/* X label */}
                       <text x={pt.x} y={lineChartData.H - 8} textAnchor={xLabelAnchor} fill="#64748b"
-                        style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        style={{ fontSize: 7, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {pt.label}
                       </text>
                     </g>
