@@ -3098,26 +3098,45 @@ export default function MetasWorkspace() {
                     })
                     .filter((row): row is NonNullable<typeof row> => row !== null)
 
-                  const avgTeamWeekly = rows.length > 0
-                    ? rows.reduce((sum, row) => sum + row.avgRatio, 0) / rows.length
-                    : 0
+                    const periodClosed = hasMonthEnded(year, month) && Boolean(cycle.lastBusinessDate)
+                    const avgTeamWeekly = rows.length > 0
+                      ? rows.reduce((sum, row) => sum + row.avgRatio, 0) / rows.length
+                      : 0
+                    const kpiSummary = rows.reduce(
+                      (acc, row) => {
+                        const block = findBlockForSeller(row.id, ruleBlocks)
+                        const total = block.rules.length
+                        const hit = block.rules.filter((rule) => {
+                          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+                          return progress >= 1
+                        }).length
+                        return { hit: acc.hit + hit, total: acc.total + total }
+                      },
+                      { hit: 0, total: 0 }
+                    )
 
-                  return (
-                    <>
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Vendedores monitorados</p>
-                          <p className="mt-1 text-lg font-semibold text-surface-900">{rows.length}</p>
+                    return (
+                      <>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-3 py-2.5 shadow-sm">
+                            <div className="absolute inset-x-0 top-0 h-0.75 bg-slate-500" />
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Vendedores monitorados</p>
+                            <p className="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{rows.length}</p>
+                            <p className="text-[10px] text-slate-500">Base ativa no período selecionado</p>
+                          </div>
+                          <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
+                            <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-700">Aderência média semanal</p>
+                            <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgTeamWeekly * 100, 1)}%</p>
+                            <p className="text-[10px] text-cyan-700">Consolidado das 4 etapas do ciclo</p>
+                          </div>
+                          <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
+                            <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">KPIs conquistados no ciclo</p>
+                            <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">{kpiSummary.hit}/{kpiSummary.total}</p>
+                            <p className="text-[10px] text-emerald-700">{periodClosed ? 'Ciclo encerrado' : 'Parcial até a data atual'}</p>
+                          </div>
                         </div>
-                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Aderência média semanal</p>
-                          <p className="mt-1 text-lg font-semibold text-surface-900">{num(avgTeamWeekly * 100, 1)}%</p>
-                        </div>
-                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Meta batida no ciclo</p>
-                          <p className="mt-1 text-lg font-semibold text-surface-900">{onTargetCount}/{rows.length}</p>
-                        </div>
-                      </div>
 
                       <div className="space-y-1.5">
                         <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
@@ -3132,17 +3151,16 @@ export default function MetasWorkspace() {
                         </div>
                         {rows.map((row) => {
                           const isOpen = selectedSellerId === row.id
-                          const completedStages = row.cells.filter((cell) => cell.ratio >= 1).length
-                          const cycleFinished = completedStages === row.cells.length
-                          const cycleStatus = !cycleFinished
-                            ? { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
-                            : row.pointsRatio > 1
-                              ? { label: 'Superou', tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
-                              : row.pointsRatio >= 1
-                                ? { label: 'Meta batida', tone: 'bg-cyan-100 text-cyan-700 ring-cyan-200' }
-                                : { label: 'Não bateu', tone: 'bg-rose-100 text-rose-700 ring-rose-200' }
-                          const statusVisual = statusMeta[row.status]
                           const sellerBlock = findBlockForSeller(row.id, ruleBlocks)
+                          const kpisTotal = sellerBlock.rules.length
+                          const kpisHit = sellerBlock.rules.filter((rule) => {
+                            const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+                            return progress >= 1
+                          }).length
+                          const cycleStatus = periodClosed
+                            ? { label: `Bateu ${kpisHit}/${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
+                            : { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
+                          const statusVisual = statusMeta[row.status]
                           return (
                             <div
                               key={`seller-accordion-${row.id}`}
