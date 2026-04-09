@@ -3120,11 +3120,10 @@ export default function MetasWorkspace() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="grid grid-cols-[44px_2.2fr_0.85fr_0.85fr_repeat(4,0.8fr)_1fr_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                        <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
                           <span>Vendedor</span>
                           <span className="text-center">Pontuação</span>
-                          <span className="text-center">Média</span>
                           {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
                             <span key={`head-compact-${stage.key}`} className="text-center">{stage.label}</span>
                           ))}
@@ -3147,22 +3146,21 @@ export default function MetasWorkspace() {
                           return (
                             <div
                               key={`seller-accordion-${row.id}`}
-                              className={`overflow-hidden rounded-xl border transition-all ${
+                              className={`overflow-hidden rounded-xl border transition-all duration-200 ${
                                 isOpen
-                                  ? 'border-slate-300 bg-slate-50/70 shadow-sm'
-                                  : 'border-surface-200 bg-white hover:border-surface-300'
+                                  ? 'border-slate-300 bg-white shadow-md ring-1 ring-slate-200'
+                                  : 'border-surface-200 bg-white hover:border-slate-300 hover:shadow-sm'
                               }`}
                             >
                               <button
                                 type="button"
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
-                                className="w-full px-2 py-1.5 text-left"
+                                className="w-full cursor-pointer px-2 py-1.5 text-left transition-colors duration-200 hover:bg-slate-50/60"
                               >
-                                <div className="grid grid-cols-[44px_2.2fr_0.85fr_0.85fr_repeat(4,0.8fr)_1fr_24px] items-center gap-1.5">
+                                <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
-                                  <span className="block min-w-0 truncate text-sm text-surface-900"><span className="font-semibold">{row.nameShort}</span> <span className="text-surface-500">· {row.login}</span></span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsRatio * 100, 0)}%</span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-700">{num(row.avgRatio * 100, 0)}%</span>
+                                  <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)}/{num(row.pointsTarget > 0 ? row.pointsTarget : 1, 2)} pts</span>
                                   {row.cells.map((cell) => (
                                     <span
                                       key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
