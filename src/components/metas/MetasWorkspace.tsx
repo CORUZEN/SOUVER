@@ -2674,7 +2674,7 @@ export default function MetasWorkspace() {
 
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-emerald-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Gastos com premiação</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">CUSTO DE PREMIAÇÕES</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(rewardDonut.totalEarned)}</p>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                 <div
@@ -2691,7 +2691,7 @@ export default function MetasWorkspace() {
               <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Pedidos no mês</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalOrders, 0)}</p>
-              <p className="mt-2 text-xs text-surface-500">Consolidado empresarial dos vendedores monitorados</p>
+              <p className="mt-2 text-xs text-surface-500">Consolidado dos vendedores monitorados</p>
             </Card>
           </div>
 
