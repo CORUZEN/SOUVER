@@ -1482,10 +1482,18 @@ export default function MetasWorkspace() {
     }
     let totalEarned = 0
     let totalTarget = 0
+    let totalKpiHit = 0
+    let totalKpiTarget = 0
     for (const s of snapshots) {
       groups[s.status] += s.rewardAchieved
       totalEarned += s.rewardAchieved
       totalTarget += s.rewardTarget
+      const block = ruleBlocks.find((b) => b.id === s.blockId) ?? ruleBlocks[0]
+      totalKpiTarget += block.rules.length
+      totalKpiHit += block.rules.reduce((sum, rule) => {
+        const progress = s.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        return sum + (progress >= 1 ? 1 : 0)
+      }, 0)
     }
     const radius = 52
     const circumference = 2 * Math.PI * radius
@@ -1513,8 +1521,9 @@ export default function MetasWorkspace() {
       { key: 'hit',        label: 'Meta Batida',  color: '#06b6d4', value: groups.SUPEROU + groups.NO_ALVO },
       { key: 'progress',  label: 'Em progresso', color: '#f59e0b', value: groups.ATENCAO + groups.CRITICO },
     ]
-    return { radius, circumference, segments, legendItems, totalEarned, totalTarget, pctCommitted }
-  }, [snapshots])
+    const kpiCommittedPct = totalKpiTarget > 0 ? Math.min(totalKpiHit / totalKpiTarget * 100, 100) : 0
+    return { radius, circumference, segments, legendItems, totalEarned, totalTarget, pctCommitted, totalKpiHit, totalKpiTarget, kpiCommittedPct }
+  }, [ruleBlocks, snapshots])
 
   const sellerRewardRows = useMemo(() => {
     return snapshots
@@ -2919,7 +2928,7 @@ export default function MetasWorkspace() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                 Premiação por Desempenho
               </p>
-              <p className="mt-0.5 text-[10px] text-surface-400">Prêmios provisionados por nível de atingimento — {MONTHS[month]} {year}</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">KPIs conquistados no período selecionado — {MONTHS[month]} {year}</p>
               {snapshots.length === 0 ? (
                 <p className="py-8 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
               ) : (
@@ -2929,48 +2938,34 @@ export default function MetasWorkspace() {
                     <svg className="w-full max-w-56 h-auto" viewBox="0 0 200 200">
                       {/* Track */}
                       <circle cx="100" cy="100" r="76" fill="none" stroke="#f1f5f9" strokeWidth="22" />
-                      {/* Segments */}
-                      {rewardDonut.segments.length === 0 ? null : (() => {
-                        const r = 76
-                        const circ = 2 * Math.PI * r
-                        let off = 0
-                        return rewardDonut.segments.map((seg) => {
-                          const ratio = rewardDonut.totalEarned > 0 ? seg.value / rewardDonut.totalEarned : 0
-                          const len = ratio * circ
-                          const el = (
-                            <circle
-                              key={seg.status}
-                              cx="100" cy="100" r={r}
-                              fill="none"
-                              stroke={seg.color}
-                              strokeWidth="22"
-                              strokeDasharray={`${len} ${circ - len}`}
-                              strokeDashoffset={-off}
-                              strokeLinecap="butt"
-                              style={{ transform: 'rotate(-90deg)', transformOrigin: '100px 100px' }}
-                            />
-                          )
-                          off += len
-                          return el
-                        })
-                      })()}
+                      {/* Single KPI progress segment */}
+                      {rewardDonut.totalKpiTarget > 0 && (
+                        <circle
+                          cx="100" cy="100" r="76"
+                          fill="none"
+                          stroke="#06b6d4"
+                          strokeWidth="22"
+                          strokeDasharray={`${(rewardDonut.kpiCommittedPct / 100) * (2 * Math.PI * 76)} ${2 * Math.PI * 76}`}
+                          strokeDashoffset={0}
+                          strokeLinecap="round"
+                          style={{ transform: 'rotate(-90deg)', transformOrigin: '100px 100px' }}
+                        />
+                      )}
                       {/* Center text */}
-                      <text x="100" y="95" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Custo Atual</text>
+                      <text x="100" y="95" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Premiação atual</text>
                       <text x="100" y="113" textAnchor="middle" className="fill-surface-900" style={{ fontSize: 13, fontWeight: 700 }}>{currency(rewardDonut.totalEarned)}</text>
                     </svg>
-                    {/* Status legend: 2 combined rows */}
-                    <div className="mt-2 w-full max-w-56 divide-y divide-surface-100 rounded-xl border border-surface-100 bg-surface-50/60">
-                      {rewardDonut.legendItems.map((item) => (
-                        <div key={item.key} className={`flex items-center justify-between gap-3 px-3 py-2 ${item.value === 0 ? 'opacity-40' : ''}`}>
-                          <span className="inline-flex items-center gap-2 text-xs font-medium text-surface-700">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                            {item.label}
-                          </span>
-                          <span className={`text-xs font-semibold tabular-nums ${item.value === 0 ? 'text-surface-400' : 'text-surface-900'}`}>
-                            {item.value === 0 ? '—' : currency(item.value)}
-                          </span>
-                        </div>
-                      ))}
+                    {/* KPI summary */}
+                    <div className="mt-2 w-full max-w-56 rounded-xl border border-surface-100 bg-surface-50/60 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-surface-700">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-500" />
+                          KPIs alcançados
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums text-surface-900">
+                          {rewardDonut.totalKpiHit}/{rewardDonut.totalKpiTarget}
+                        </span>
+                      </div>
                     </div>
                     {/* Previsão máxima — ao final da coluna do donut */}
                     {rewardDonut.totalTarget > 0 && (
