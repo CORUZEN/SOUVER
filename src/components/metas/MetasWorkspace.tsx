@@ -2994,10 +2994,13 @@ export default function MetasWorkspace() {
                       ) : (
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
                           {sellerRewardRows.map((row, i) => {
-                            const statusColor =
-                              row.status === 'SUPEROU' ? '#0ea5e9' :
-                              row.status === 'NO_ALVO' ? '#06b6d4' :
-                              row.status === 'ATENCAO' ? '#f59e0b' : '#f43f5e'
+                            const rankRatio = sellerRewardRows.length > 1
+                              ? 1 - i / (sellerRewardRows.length - 1)
+                              : 1
+                            const rankColor =
+                              rankRatio >= 0.8 ? '#0ea5e9' :
+                              rankRatio >= 0.55 ? '#3b82f6' :
+                              rankRatio >= 0.3 ? '#f59e0b' : '#f43f5e'
                             const pct = row.target > 0 ? Math.min(row.earned / row.target * 100, 100) : 0
                             const isZero = row.earned === 0
                             return (
@@ -3008,7 +3011,7 @@ export default function MetasWorkspace() {
                                 {/* rank badge */}
                                 <span className="absolute right-2 top-1.5 text-[9px] font-semibold tabular-nums text-surface-300">#{i + 1}</span>
                                 {/* colored left rule */}
-                                <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-lg" style={{ backgroundColor: statusColor }} />
+                                <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-lg" style={{ backgroundColor: rankColor }} />
                                 {/* name */}
                                 <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-surface-500 leading-none mb-1.5">{row.name}</p>
                                 {/* value */}
@@ -3020,7 +3023,7 @@ export default function MetasWorkspace() {
                                   <div className="h-0.75 w-full overflow-hidden rounded-full bg-surface-100">
                                     <div
                                       className="h-full rounded-full transition-[width] duration-700"
-                                      style={{ width: `${pct}%`, backgroundColor: statusColor }}
+                                      style={{ width: `${pct}%`, backgroundColor: rankColor }}
                                     />
                                   </div>
                                   {row.target > 0 && (
