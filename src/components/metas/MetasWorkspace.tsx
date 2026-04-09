@@ -2992,7 +2992,7 @@ export default function MetasWorkspace() {
                       {sellerRewardRows.length === 0 ? (
                         <p className="text-[10px] text-surface-400">Nenhuma premiação acumulada ainda.</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                           {sellerRewardRows.map((row, i) => {
                             const rankRatio = sellerRewardRows.length > 1
                               ? 1 - i / (sellerRewardRows.length - 1)
