@@ -1404,6 +1404,16 @@ export default function MetasWorkspace() {
     () => snapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0),
     [snapshots]
   )
+  const corporateUniqueClients = useMemo(() => {
+    const uniqueClients = new Set<string>()
+    for (const seller of sellers) {
+      for (const order of seller.orders) {
+        const code = (order.clientCode ?? '').trim()
+        if (code) uniqueClients.add(code)
+      }
+    }
+    return uniqueClients.size
+  }, [sellers])
   // Sum of each seller's individual monthly target (from their assigned block)
   const corporateTotalTarget = useMemo(
     () =>
@@ -3069,6 +3079,7 @@ export default function MetasWorkspace() {
                         status: snapshot.status,
                         pointsAchieved: snapshot.pointsAchieved,
                         pointsTarget: snapshot.pointsTarget,
+                        uniqueClients: snapshot.uniqueClients,
                         pointsRatio,
                         avgRatio,
                         snapshot,
@@ -3099,12 +3110,18 @@ export default function MetasWorkspace() {
 
                     return (
                       <>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="mt-3 grid gap-2 sm:grid-cols-4">
                           <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-slate-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Vendedores monitorados</p>
                             <p className="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{rows.length}</p>
                             <p className="text-[10px] text-slate-500">Base ativa no período selecionado</p>
+                          </div>
+                          <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
+                            <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-indigo-700">Clientes únicos atendidos</p>
+                            <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">{num(corporateUniqueClients, 0)}</p>
+                            <p className="text-[10px] text-indigo-700">Total no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
@@ -3123,10 +3140,11 @@ export default function MetasWorkspace() {
                         </div>
 
                       <div className="space-y-1.5">
-                        <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                        <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
                           <span>Vendedor</span>
                           <span className="text-center">Pontuação</span>
+                          <span className="text-center">Clientes atendidos</span>
                           {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
                             <span key={`head-compact-${stage.key}`} className="text-center">{stage.label}</span>
                           ))}
@@ -3154,10 +3172,11 @@ export default function MetasWorkspace() {
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
                                 className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
                               >
-                                <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
+                                <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)} pts</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.uniqueClients, 0)}</span>
                                   {row.cells.map((cell) => (
                                     <span
                                       key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
