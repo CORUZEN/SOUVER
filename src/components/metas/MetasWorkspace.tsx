@@ -2674,7 +2674,7 @@ export default function MetasWorkspace() {
 
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-emerald-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Premiação atual</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Gastos com premiação</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(rewardDonut.totalEarned)}</p>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                 <div
@@ -2683,7 +2683,7 @@ export default function MetasWorkspace() {
                 />
               </div>
               <p className="mt-1.5 text-xs text-surface-500">
-                {num(rewardDonut.pctCommitted, 1)}% comprometido da previsão de {currency(rewardDonut.totalTarget)}.
+                {num(rewardDonut.pctCommitted, 1)}% comprometido da previsão de {currency(rewardDonut.totalTarget)}
               </p>
             </Card>
 
@@ -3190,36 +3190,80 @@ export default function MetasWorkspace() {
                               </button>
 
                               {isOpen && (
-                                <div className="border-t border-slate-200 bg-white/90 px-3 py-3">
-                                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Vendedor:</span> {row.fullName}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(row.snapshot.pointsAchieved, 3)} / {num(row.snapshot.pointsTarget, 3)} pts</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Status:</span> {statusVisual.label}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(row.snapshot.totalOrders, 0)}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Faturamento no mês:</span> {currency(row.snapshot.totalValue)}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Peso bruto no mês:</span> {num(row.snapshot.totalGrossWeight, 2)} kg</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(row.snapshot.rewardAchieved)}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(row.campaignProjection)}</div>
-                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(row.snapshot.gapToTarget, 3)} pts</div>
+                                <div className="border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3">
+                                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                                    <div className="border-b border-slate-100 px-3 py-2.5">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Painel do vendedor</p>
+                                          <p className="text-sm font-semibold text-slate-900">{row.fullName}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`rounded-md px-2 py-1 text-[10px] font-semibold ring-1 ${statusVisual.tone}`}>{statusVisual.label}</span>
+                                          <Badge variant="secondary">{sellerBlock.title}</Badge>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pontuação</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.pointsAchieved, 3)} / {num(row.snapshot.pointsTarget, 3)} pts</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pedidos no mês</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalOrders, 0)}</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Faturamento</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.totalValue)}</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Peso bruto</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Premiação por KPIs</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.rewardAchieved)}</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Campanhas elegíveis</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.campaignProjection)}</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Gap para meta</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.gapToTarget, 3)} pts</p>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">KPIs alcançados</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{kpisHit}/{kpisTotal}</p>
+                                      </div>
+                                    </div>
                                   </div>
 
-                                  <div className="mt-2.5 space-y-2">
-                                    {sellerBlock.rules.map((rule) => {
-                                      const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-                                      const done = progress >= 1
-                                      return (
-                                        <div key={`seller-rule-${row.id}-${rule.id}`} className="rounded-lg border border-surface-200 bg-white px-3 py-2">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>
-                                            {done ? <TrendingUp size={14} className="text-emerald-600" /> : <TrendingDown size={14} className="text-amber-500" />}
+                                  <div className="mt-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">KPIs e parâmetros do ciclo</p>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                      {sellerBlock.rules.map((rule) => {
+                                        const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+                                        const done = progress >= 1
+                                        const stageLabel = STAGES.find((s) => s.key === rule.stage)?.label ?? rule.stage
+                                        return (
+                                          <div key={`seller-rule-${row.id}-${rule.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                                            <div className="mb-1 flex items-start justify-between gap-2">
+                                              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-600">{stageLabel}</span>
+                                              {done ? <TrendingUp size={14} className="text-emerald-600" /> : <TrendingDown size={14} className="text-amber-500" />}
+                                            </div>
+                                            <p className="line-clamp-1 text-xs font-semibold text-slate-900">{rule.kpi} ({rule.targetText})</p>
+                                            <p className="mt-0.5 line-clamp-2 text-[10px] text-slate-500">{rule.description}</p>
+                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                              <div className={`h-full transition-[width] duration-700 ${done ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} />
+                                            </div>
+                                            <p className="mt-1 text-right text-[10px] font-semibold tabular-nums text-slate-600">{num(Math.min(progress * 100, 100), 0)}%</p>
                                           </div>
-                                          <p className="text-[11px] text-surface-500">{rule.description}</p>
-                                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-200">
-                                            <div className={`h-full transition-[width] duration-700 ${done ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} />
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
+                                        )
+                                      })}
+                                    </div>
                                   </div>
                                 </div>
                               )}
