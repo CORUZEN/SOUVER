@@ -1532,42 +1532,28 @@ export default function MetasWorkspace() {
     () =>
       STAGES.filter((s) => s.key !== 'FULL').map((stage) => {
         if (snapshots.length === 0) {
-          return { key: stage.key, label: stage.label, target: 0, achieved: 0, ratio: 0, hitCount: 0 }
+          return { key: stage.key, label: stage.label, kpiTotal: 0, kpiHit: 0, ratio: 0 }
         }
 
-        let totalTarget = 0
-        let totalAchieved = 0
-        let hitCount = 0
+        let kpiTotal = 0
+        let kpiHit = 0
 
         for (const snapshot of snapshots) {
           const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
           const blockStageRules = block.rules.filter((r) => r.stage === stage.key)
-          const stageTarget = blockStageRules.reduce((sum, r) => sum + r.points, 0)
-          const stageAchieved = blockStageRules.reduce((sum, r) => {
+          kpiTotal += blockStageRules.length
+          kpiHit += blockStageRules.reduce((sum, r) => {
             const progress = snapshot.ruleProgress.find((item) => item.ruleId === r.id)?.progress ?? 0
-            return sum + r.points * Math.min(progress, 1)
+            return sum + (progress >= 1 ? 1 : 0)
           }, 0)
-          totalTarget += stageTarget
-          totalAchieved += stageAchieved
-          const allStageKpisHit =
-            blockStageRules.length > 0 &&
-            blockStageRules.every((r) => {
-              const progress = snapshot.ruleProgress.find((item) => item.ruleId === r.id)?.progress ?? 0
-              return progress >= 1
-            })
-          if (allStageKpisHit) hitCount++
         }
-
-        const avgTarget = totalTarget / snapshots.length
-        const avgAchieved = totalAchieved / snapshots.length
 
         return {
           key: stage.key,
           label: stage.label,
-          target: avgTarget,
-          achieved: avgAchieved,
-          ratio: avgTarget > 0 ? avgAchieved / avgTarget : 0,
-          hitCount,
+          kpiTotal,
+          kpiHit,
+          ratio: kpiTotal > 0 ? kpiHit / kpiTotal : 0,
         }
       }),
     [ruleBlocks, snapshots]
@@ -1585,15 +1571,14 @@ export default function MetasWorkspace() {
     const PAD = { top: 24, right: 16, bottom: 36, left: 44 }
     const plotW = W - PAD.left - PAD.right
     const plotH = H - PAD.top - PAD.bottom
-    const totalSellers = Math.max(snapshots.length, 1)
+    const totalStageKpis = stageSeries.reduce((sum, stage) => sum + stage.kpiTotal, 0)
 
-    // Show % of sellers who hit each stage goal
-    const stagesFiltered = stageSeries.filter((s) => s.key !== 'FULL')
-    const points = stagesFiltered.map((stage, i) => {
-      const pct = (stage.hitCount / totalSellers) * 100
-      const x = PAD.left + (stagesFiltered.length > 1 ? (i / (stagesFiltered.length - 1)) * plotW : plotW / 2)
+    // Show % of KPIs conquered in each stage
+    const points = stageSeries.map((stage, i) => {
+      const pct = stage.ratio * 100
+      const x = PAD.left + (stageSeries.length > 1 ? (i / (stageSeries.length - 1)) * plotW : plotW / 2)
       const y = PAD.top + plotH - (pct / 100) * plotH
-      return { x, y, pct, count: stage.hitCount, label: stage.label, key: stage.key }
+      return { x, y, pct, hit: stage.kpiHit, total: stage.kpiTotal, label: stage.label, key: stage.key }
     })
 
     const linePath = smoothLinePath(points)
@@ -1607,8 +1592,8 @@ export default function MetasWorkspace() {
       y: PAD.top + plotH - (pct / 100) * plotH,
     }))
 
-    return { W, H, PAD, plotW, plotH, points, linePath, areaPath, guides, totalSellers }
-  }, [stageSeries, snapshots])
+    return { W, H, PAD, plotW, plotH, points, linePath, areaPath, guides, totalStageKpis }
+  }, [stageSeries])
 
   const sellerWeeklyHeatmap = useMemo(
     () =>
@@ -2807,7 +2792,7 @@ export default function MetasWorkspace() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                   Tendência de evolução
                 </p>
-                <p className="text-[9px] text-surface-400">% de vendedores com meta batida por etapa</p>
+                <p className="text-[9px] text-surface-400">% de KPIs conquistados por etapa</p>
               </div>
               <div className="mt-3">
                 <svg viewBox={`0 0 ${lineChartData.W} ${lineChartData.H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
@@ -2883,22 +2868,23 @@ export default function MetasWorkspace() {
                   })}
                 </svg>
               </div>
-              <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalSellers} vendedores monitorados · {MONTHS[month]} {year}</p>
+              <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalStageKpis} KPIs monitorados nas etapas · {MONTHS[month]} {year}</p>
             </Card>
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
-              <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
+              <p className="mt-0.5 text-[10px] text-surface-400">KPIs conquistados em cada etapa do ciclo</p>
               <div className="mt-4 space-y-2.5">
                 {(() => {
                   const stageHex: Record<string, string> = {
                     W1: '#06b6d4', W2: '#3b82f6', W3: '#6366f1', CLOSING: '#10b981', FULL: '#10b981',
                   }
                   return stageSeries.map((stage) => {
-                    const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
+                    const hitRatio = stage.ratio
                     const color = stageHex[stage.key] ?? '#64748b'
                     const isGood = hitRatio >= 0.5
+                    const missingKpis = Math.max(stage.kpiTotal - stage.kpiHit, 0)
                     return (
                       <div key={stage.key} className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-white px-3 py-2.5 ring-1 ring-surface-200 shadow-sm">
                         {/* left accent */}
@@ -2906,7 +2892,7 @@ export default function MetasWorkspace() {
                         <div className="flex-1 min-w-0 pl-1">
                           <div className="mb-1.5 flex items-center justify-between gap-2">
                             <span className="text-[11px] font-semibold text-surface-700 truncate">{stage.label}</span>
-                            <span className="text-[10px] text-surface-400 tabular-nums shrink-0">{stage.hitCount}/{snapshots.length}</span>
+                            <span className="text-[10px] text-surface-400 tabular-nums shrink-0">{stage.kpiHit}/{stage.kpiTotal}</span>
                           </div>
                           <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                             <div
@@ -2914,9 +2900,9 @@ export default function MetasWorkspace() {
                               style={{ width: `${Math.min(hitRatio * 100, 100)}%`, backgroundColor: color }}
                             />
                           </div>
-                          {!isGood && stage.hitCount > 0 && (
+                          {!isGood && stage.kpiTotal > 0 && (
                             <p className="mt-1 text-[9px] text-surface-400">
-                              {snapshots.length - stage.hitCount} vendedor{snapshots.length - stage.hitCount !== 1 ? 'es' : ''} ainda não atingiu
+                              {missingKpis} KPI{missingKpis !== 1 ? 's' : ''} ainda não conquistado{missingKpis !== 1 ? 's' : ''}
                             </p>
                           )}
                         </div>
