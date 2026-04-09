@@ -183,7 +183,7 @@ const STAGES: Array<{ key: StageKey; label: string }> = [
 
 const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: string }> = [
   { type: 'BASE_CLIENTES', label: 'Base de clientes', defaultDescription: 'Cobertura da base de clientes no período.' },
-  { type: 'VOLUME', label: 'Volume', defaultDescription: 'Categorias trafegando no período.' },
+  { type: 'VOLUME', label: 'Volume', defaultDescription: 'Quantidade mínima de grupos de produto com meta de peso (kg) atingida no período.' },
   { type: 'META_FINANCEIRA', label: 'Meta financeira', defaultDescription: 'Atingir a meta financeira no fechamento do período.' },
   { type: 'DISTRIBUICAO', label: 'Distribuição de itens', defaultDescription: 'Positivação de itens na base de clientes.' },
   { type: 'DEVOLUCAO', label: 'Devolução', defaultDescription: 'Racional sobre os valores devolvidos x valores faturados.' },
@@ -217,19 +217,19 @@ function getSellerShortName(fullName: string) {
 const DEFAULT_RULES: GoalRule[] = [
   // ── 1ª Semana ──
   { id: 'w1-base', stage: 'W1', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento da 1ª semana.', targetText: '40%', rewardValue: 193.49, points: 0.04 },
-  { id: 'w1-volume', stage: 'W1', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 1ª semana.', targetText: '2 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w1-volume', stage: 'W1', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Grupos de produto com meta de peso atingida até o fechamento da 1ª semana.', targetText: '2', rewardValue: 145.12, points: 0.03 },
   { id: 'w1-fin', stage: 'W1', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 1ª semana.', targetText: '30%', rewardValue: 96.75, points: 0.02 },
   // ── 2ª Semana ──
   { id: 'w2-base', stage: 'W2', frequency: 'WEEKLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento da 2ª semana.', targetText: '80%', rewardValue: 193.49, points: 0.04 },
-  { id: 'w2-volume', stage: 'W2', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 2ª semana.', targetText: '3 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w2-volume', stage: 'W2', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Grupos de produto com meta de peso atingida até o fechamento da 2ª semana.', targetText: '3', rewardValue: 145.12, points: 0.03 },
   { id: 'w2-fin', stage: 'W2', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 2ª semana.', targetText: '60%', rewardValue: 96.75, points: 0.02 },
   // ── 3ª Semana ──
-  { id: 'w3-volume', stage: 'W3', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias trafegando dentro do tempo decorrido até o fechamento da 3ª semana.', targetText: '4 categorias', rewardValue: 145.12, points: 0.03 },
+  { id: 'w3-volume', stage: 'W3', frequency: 'WEEKLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Grupos de produto com meta de peso atingida até o fechamento da 3ª semana.', targetText: '4', rewardValue: 145.12, points: 0.03 },
   { id: 'w3-dist', stage: 'W3', frequency: 'WEEKLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 50% dos itens positivados em 30% da base de clientes.', targetText: '50%|30', rewardValue: 483.73, points: 0.1 },
   { id: 'w3-fin', stage: 'W3', frequency: 'WEEKLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento da 3ª semana.', targetText: '80%', rewardValue: 241.87, points: 0.05 },
   // ── Fechamento ──
   { id: 'closing-base', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'BASE_CLIENTES', kpi: 'Base de clientes', description: 'Cobertura da base de clientes até o fechamento do mês.', targetText: '85%', rewardValue: 483.73, points: 0.1 },
-  { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Categorias entregues até o fechamento do mês.', targetText: '6 categorias', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Grupos de produto com meta de peso atingida até o fechamento do mês.', targetText: '6', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
@@ -1210,6 +1210,15 @@ export default function MetasWorkspace() {
             : 0
         }
 
+        const sellerCode = seller.id.replace(/^sankhya-/, '')
+        const achievedWeightGroups = (block.weightTargets ?? []).filter((target) => {
+          if (!target.brand || target.targetKg <= 0) return false
+          const soldKg = brandWeightRows
+            .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
+            .reduce((sum, row) => sum + row.totalKg, 0)
+          return soldKg >= target.targetKg
+        }).length
+
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
@@ -1268,12 +1277,11 @@ export default function MetasWorkspace() {
               }
               break
             case 'VOLUME':
-              if (rawNumber > 0 && !rule.targetText.includes('%')) {
-                progress = cumStage.orderCount / rawNumber
-              } else if (asPct) {
-                progress = (cumStage.totalValue / lockedValue) / asPct
+              if (rawNumber > 0) {
+                const requiredGroups = Math.max(Math.floor(rawNumber), 1)
+                progress = achievedWeightGroups / requiredGroups
               } else {
-                progress = cumStage.orderCount > 0 ? 1 : 0
+                progress = 0
               }
               break
             case 'DISTRIBUICAO': {
@@ -1366,7 +1374,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [cycle.weeks, productAllowlist, ruleBlocks, sellers])
+  }, [brandWeightRows, cycle.weeks, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -2173,7 +2181,7 @@ export default function MetasWorkspace() {
                       {block.rules.map((rule) => (
                         <tr key={rule.id} className="hover:bg-surface-50/50">
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
-                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
                           <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
                           <td className="px-3 py-2">{rule.kpiType === 'DISTRIBUICAO' ? (() => {
                             const parts = rule.targetText.split('|')
@@ -2190,7 +2198,18 @@ export default function MetasWorkspace() {
                                 <span className="text-[10px] text-surface-400">% base</span>
                               </div>
                             )
-                          })() : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
+                          })() : rule.kpiType === 'VOLUME' ? (
+                            <input
+                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              type="number"
+                              min={0}
+                              step={1}
+                              placeholder="0"
+                              title="Quantidade mínima de grupos de produto com meta de peso batida"
+                              value={String(Math.max(0, Math.floor(parseTargetNumber(rule.targetText) ?? 0)))}
+                              onChange={(e) => updateBlockRule(rule.id, { targetText: String(Math.max(0, Math.floor(parseDecimal(e.target.value, 0)))) })}
+                            />
+                          ) : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
