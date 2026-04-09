@@ -17,7 +17,6 @@ import {
   TrendingDown,
   TrendingUp,
   UserPlus,
-  UserRound,
   Users,
   X,
 } from 'lucide-react'
@@ -1368,13 +1367,14 @@ export default function MetasWorkspace() {
   }, [cycle.weeks, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
-    if (snapshots.length === 0) return
+    if (snapshots.length === 0) {
+      if (selectedSellerId !== '') setSelectedSellerId('')
+      return
+    }
     if (!snapshots.some((snapshot) => snapshot.seller.id === selectedSellerId)) {
-      setSelectedSellerId(snapshots[0].seller.id)
+      setSelectedSellerId('')
     }
   }, [selectedSellerId, snapshots])
-
-  const selectedSeller = snapshots.find((snapshot) => snapshot.seller.id === selectedSellerId) ?? snapshots[0]
 
   const byStatus = useMemo(
     () => ({
@@ -1385,14 +1385,6 @@ export default function MetasWorkspace() {
     }),
     [snapshots]
   )
-
-  const selectedCampaignProjection = useMemo(() => {
-    if (!selectedSeller) return 0
-    return prizes.reduce((sum, prize) => {
-      if (!prize.active) return sum
-      return selectedSeller.pointsAchieved >= prize.minPoints ? sum + prize.rewardValue : sum
-    }, 0)
-  }, [prizes, selectedSeller])
 
   const onTargetCount = byStatus.superou + byStatus.noAlvo
   const factoryGoalRatio = snapshots.length > 0 ? onTargetCount / snapshots.length : 0
@@ -3043,89 +3035,194 @@ export default function MetasWorkspace() {
               )}
             </Card>
 
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              <div className="mb-4 flex items-center gap-2"><Users size={16} className="text-surface-600" /><h2 className="text-lg font-semibold text-surface-900">Desempenho individual de vendedores</h2></div>
-              {sellersLoading ? (
-                <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                  Carregando vendedores...
+          <Card className={executivePanelCardClass}>
+            <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-slate-500 via-slate-600 to-slate-700" />
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-surface-600" />
+                <div>
+                  <h2 className="text-lg font-semibold text-surface-900">Desempenho individual de vendedores</h2>
+                  <p className="text-xs text-surface-500">Clique no card do vendedor para expandir os detalhes completos no próprio bloco.</p>
                 </div>
-              ) : sellersError ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-sm text-rose-700">
-                  {sellersError}
-                </div>
-              ) : snapshots.length === 0 ? (
-                <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                  Nenhum vendedor ativo encontrado.
-                </div>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-surface-200 bg-surface-50 p-3">
-                  <div className="min-w-120 space-y-2">
-                    <div className="grid grid-cols-[1.55fr_repeat(4,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
-                      <span>Vendedor</span>
-                      {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
-                        <span key={`seller-week-head-${stage.key}`} className="text-center">{stage.label}</span>
-                      ))}
-                    </div>
-                    {sellerWeeklyHeatmap.map((row) => {
-                      const isSelected = selectedSeller?.seller.id === row.seller.id
-                      return (
-                        <button
-                          type="button"
-                          key={`seller-week-row-${row.seller.id}`}
-                          onClick={() => setSelectedSellerId(row.seller.id)}
-                          className={`grid w-full grid-cols-[1.55fr_repeat(4,1fr)] gap-2 rounded-lg border p-1 text-left transition-colors ${
-                            isSelected
-                              ? 'border-surface-300 bg-white shadow-sm'
-                              : 'border-transparent bg-transparent hover:border-surface-200 hover:bg-white/60'
-                          }`}
-                        >
-                          <span className={`truncate rounded-md border px-2 py-1 text-xs ${
-                            isSelected
-                              ? 'border-surface-300 bg-surface-100 text-surface-900'
-                              : 'border-surface-200 bg-white text-surface-700'
-                          }`}>
-                            {getSellerShortName(row.seller.name)}
-                          </span>
-                          {row.cells.map((cell) => (
-                            <span
-                              key={`seller-week-cell-${row.seller.id}-${cell.stageKey}`}
-                              className={`rounded-md px-2 py-1 text-center text-[11px] font-semibold ${heatCellClass(cell.ratio)}`}
-                            >
-                              {num(cell.ratio * 100, 0)}%
-                            </span>
-                          ))}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </Card>
+              </div>
+            </div>
+            {sellersLoading ? (
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                Carregando vendedores...
+              </div>
+            ) : sellersError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-sm text-rose-700">
+                {sellersError}
+              </div>
+            ) : snapshots.length === 0 ? (
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                Nenhum vendedor ativo encontrado.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(() => {
+                  const statusMeta: Record<SellerSnapshot['status'], { label: string; tone: string }> = {
+                    SUPEROU: { label: 'Superou', tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
+                    NO_ALVO: { label: 'Meta batida', tone: 'bg-cyan-100 text-cyan-700 ring-cyan-200' },
+                    ATENCAO: { label: 'Atenção', tone: 'bg-amber-100 text-amber-700 ring-amber-200' },
+                    CRITICO: { label: 'Crítico', tone: 'bg-rose-100 text-rose-700 ring-rose-200' },
+                  }
 
-            <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-surface-300" />
-              {selectedSeller ? (
-                <>
-                  <div className="mb-4 flex items-center gap-2"><UserRound size={16} className="text-surface-600" /><h2 className="text-[1.65rem] font-semibold leading-none text-surface-900">{selectedSeller.seller.name}</h2></div>
-                  <div className="mb-2"><Badge variant="secondary">{findBlockForSeller(selectedSeller.seller.id, ruleBlocks).title}</Badge></div>
-                  <div className="grid gap-2">
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(selectedSeller.pointsAchieved, 3)} / {num(selectedSeller.pointsTarget, 3)} pts</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(selectedSeller.totalOrders, 0)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Faturamento no mês:</span> {currency(selectedSeller.totalValue)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Peso bruto no mês:</span> {num(selectedSeller.totalGrossWeight, 2)} kg</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(selectedSeller.rewardAchieved)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(selectedCampaignProjection)}</div>
-                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(selectedSeller.gapToTarget, 3)} pts</div>
-                  </div>
-                  <div className="mt-3 space-y-2">{(() => { const sellerBlock = findBlockForSeller(selectedSeller.seller.id, ruleBlocks); return sellerBlock.rules.map((rule) => { const progress = selectedSeller.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0; const done = progress >= 1; return <div key={rule.id} className="rounded-lg border border-surface-200 bg-white px-3 py-2 shadow-sm transition-colors hover:border-surface-300"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>{done ? <TrendingUp size={14} className="text-surface-600" /> : <TrendingDown size={14} className="text-surface-500" />}</div><p className="text-[11px] text-surface-500">{rule.description}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200"><div className={`h-full transition-[width] duration-700 ${done ? 'bg-surface-600' : 'bg-surface-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} /></div></div>}) })()}</div>
-                </>
-              ) : (
-                <p className="text-sm text-surface-500">Selecione um vendedor para ver detalhes.</p>
-              )}
-            </Card>
-          </div>
+                  const rows = sellerWeeklyHeatmap
+                    .map((row) => {
+                      const snapshot = snapshots.find((s) => s.seller.id === row.seller.id)
+                      if (!snapshot) return null
+                      const avgRatio = row.cells.length > 0
+                        ? row.cells.reduce((sum, cell) => sum + cell.ratio, 0) / row.cells.length
+                        : 0
+                      const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+                      const campaignProjection = prizes.reduce((sum, prize) => {
+                        if (!prize.active) return sum
+                        return snapshot.pointsAchieved >= prize.minPoints ? sum + prize.rewardValue : sum
+                      }, 0)
+                      return {
+                        id: row.seller.id,
+                        nameShort: getSellerShortName(row.seller.name),
+                        fullName: row.seller.name,
+                        login: row.seller.login,
+                        rank: snapshots.findIndex((s) => s.seller.id === row.seller.id) + 1,
+                        status: snapshot.status,
+                        pointsAchieved: snapshot.pointsAchieved,
+                        pointsTarget: snapshot.pointsTarget,
+                        pointsRatio,
+                        avgRatio,
+                        campaignProjection,
+                        snapshot,
+                        cells: row.cells,
+                      }
+                    })
+                    .filter((row): row is NonNullable<typeof row> => row !== null)
+
+                  const avgTeamWeekly = rows.length > 0
+                    ? rows.reduce((sum, row) => sum + row.avgRatio, 0) / rows.length
+                    : 0
+
+                  return (
+                    <>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Vendedores monitorados</p>
+                          <p className="mt-1 text-lg font-semibold text-surface-900">{rows.length}</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Aderência média semanal</p>
+                          <p className="mt-1 text-lg font-semibold text-surface-900">{num(avgTeamWeekly * 100, 1)}%</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Meta batida no ciclo</p>
+                          <p className="mt-1 text-lg font-semibold text-surface-900">{onTargetCount}/{rows.length}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-[44px_2.2fr_0.85fr_0.85fr_repeat(4,0.8fr)_1fr_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                          <span className="text-center">#</span>
+                          <span>Vendedor</span>
+                          <span className="text-center">Pontuação</span>
+                          <span className="text-center">Média</span>
+                          {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
+                            <span key={`head-compact-${stage.key}`} className="text-center">{stage.label}</span>
+                          ))}
+                          <span className="text-center">Status geral</span>
+                          <span />
+                        </div>
+                        {rows.map((row) => {
+                          const isOpen = selectedSellerId === row.id
+                          const completedStages = row.cells.filter((cell) => cell.ratio >= 1).length
+                          const cycleFinished = completedStages === row.cells.length
+                          const cycleStatus = !cycleFinished
+                            ? { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
+                            : row.pointsRatio > 1
+                              ? { label: 'Superou', tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
+                              : row.pointsRatio >= 1
+                                ? { label: 'Meta batida', tone: 'bg-cyan-100 text-cyan-700 ring-cyan-200' }
+                                : { label: 'Não bateu', tone: 'bg-rose-100 text-rose-700 ring-rose-200' }
+                          const statusVisual = statusMeta[row.status]
+                          const sellerBlock = findBlockForSeller(row.id, ruleBlocks)
+                          return (
+                            <div
+                              key={`seller-accordion-${row.id}`}
+                              className={`overflow-hidden rounded-xl border transition-all ${
+                                isOpen
+                                  ? 'border-slate-300 bg-slate-50/70 shadow-sm'
+                                  : 'border-surface-200 bg-white hover:border-surface-300'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
+                                className="w-full px-2 py-1.5 text-left"
+                              >
+                                <div className="grid grid-cols-[44px_2.2fr_0.85fr_0.85fr_repeat(4,0.8fr)_1fr_24px] items-center gap-1.5">
+                                  <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
+                                  <span className="block min-w-0 truncate text-sm text-surface-900"><span className="font-semibold">{row.nameShort}</span> <span className="text-surface-500">· {row.login}</span></span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsRatio * 100, 0)}%</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-700">{num(row.avgRatio * 100, 0)}%</span>
+                                  {row.cells.map((cell) => (
+                                    <span
+                                      key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
+                                      className={`rounded-md px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums ${heatCellClass(cell.ratio)}`}
+                                    >
+                                      {num(cell.ratio * 100, 0)}%
+                                    </span>
+                                  ))}
+                                  <span className={`rounded-md px-2 py-1 text-center text-[10px] font-semibold ring-1 ${cycleStatus.tone}`}>{cycleStatus.label}</span>
+                                  <ChevronDown
+                                    size={14}
+                                    className={`justify-self-center text-surface-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                                  />
+                                </div>
+                              </button>
+
+                              {isOpen && (
+                                <div className="border-t border-slate-200 bg-white/90 px-3 py-3">
+                                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Vendedor:</span> {row.fullName}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Pontuação:</span> {num(row.snapshot.pointsAchieved, 3)} / {num(row.snapshot.pointsTarget, 3)} pts</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Status:</span> {statusVisual.label}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Pedidos no mês:</span> {num(row.snapshot.totalOrders, 0)}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Faturamento no mês:</span> {currency(row.snapshot.totalValue)}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Peso bruto no mês:</span> {num(row.snapshot.totalGrossWeight, 2)} kg</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Premiação por KPIs:</span> {currency(row.snapshot.rewardAchieved)}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Campanhas elegíveis:</span> {currency(row.campaignProjection)}</div>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700"><span className="font-medium">Gap para meta:</span> {num(row.snapshot.gapToTarget, 3)} pts</div>
+                                  </div>
+
+                                  <div className="mt-2.5 space-y-2">
+                                    {sellerBlock.rules.map((rule) => {
+                                      const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+                                      const done = progress >= 1
+                                      return (
+                                        <div key={`seller-rule-${row.id}-${rule.id}`} className="rounded-lg border border-surface-200 bg-white px-3 py-2">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <p className="text-xs font-semibold text-surface-800">{rule.kpi} ({rule.targetText})</p>
+                                            {done ? <TrendingUp size={14} className="text-emerald-600" /> : <TrendingDown size={14} className="text-amber-500" />}
+                                          </div>
+                                          <p className="text-[11px] text-surface-500">{rule.description}</p>
+                                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-200">
+                                            <div className={`h-full transition-[width] duration-700 ${done ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${Math.min(progress * 100, 100)}%` }} />
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+          </Card>
 
           <Card className="border-surface-200">
             <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
