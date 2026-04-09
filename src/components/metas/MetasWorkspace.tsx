@@ -2839,7 +2839,7 @@ export default function MetasWorkspace() {
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-500 via-indigo-500 to-violet-500" />
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                  Tendência de evolução (linha)
+                  Tendência de evolução
                 </p>
                 <p className="text-[9px] text-surface-400">% de vendedores com meta batida por etapa</p>
               </div>
@@ -2894,7 +2894,11 @@ export default function MetasWorkspace() {
                   )}
 
                   {/* Dots + value labels */}
-                  {lineChartData.points.map((pt) => (
+                  {lineChartData.points.map((pt, idx) => {
+                    const isFirst = idx === 0
+                    const isLast = idx === lineChartData.points.length - 1
+                    const xLabelAnchor: 'start' | 'middle' | 'end' = isFirst ? 'start' : isLast ? 'end' : 'middle'
+                    return (
                     <g key={pt.key}>
                       <circle cx={pt.x} cy={pt.y} r="5" fill="white" stroke="#6366f1" strokeWidth="2" filter="url(#trend-dot-glow)" />
                       <circle cx={pt.x} cy={pt.y} r="2.5" fill="#6366f1" />
@@ -2904,12 +2908,13 @@ export default function MetasWorkspace() {
                         {Math.round(pt.pct)}%
                       </text>
                       {/* X label */}
-                      <text x={pt.x} y={lineChartData.H - 8} textAnchor="middle" fill="#64748b"
+                      <text x={pt.x} y={lineChartData.H - 8} textAnchor={xLabelAnchor} fill="#64748b"
                         style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {pt.label}
                       </text>
                     </g>
-                  ))}
+                    )
+                  })}
                 </svg>
               </div>
               <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalSellers} vendedores monitorados · {MONTHS[month]} {year}</p>
@@ -2919,30 +2924,23 @@ export default function MetasWorkspace() {
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
               <p className="mt-0.5 text-[10px] text-surface-400">Vendedores que bateram 100% da meta em cada semana</p>
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-2.5">
                 {(() => {
                   const stageHex: Record<string, string> = {
                     W1: '#06b6d4', W2: '#3b82f6', W3: '#6366f1', CLOSING: '#10b981', FULL: '#10b981',
                   }
                   return stageSeries.map((stage) => {
                     const hitRatio = snapshots.length > 0 ? stage.hitCount / snapshots.length : 0
-                    const pct = Math.round(hitRatio * 100)
                     const color = stageHex[stage.key] ?? '#64748b'
-                    const isGood = pct >= 50
+                    const isGood = hitRatio >= 0.5
                     return (
                       <div key={stage.key} className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-white px-3 py-2.5 ring-1 ring-surface-200 shadow-sm">
                         {/* left accent */}
                         <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl" style={{ backgroundColor: color }} />
                         <div className="flex-1 min-w-0 pl-1">
-                          <div className="flex items-center justify-between mb-1.5 gap-2">
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
                             <span className="text-[11px] font-semibold text-surface-700 truncate">{stage.label}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span
-                                className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums"
-                                style={{ backgroundColor: `${color}18`, color }}
-                              >{pct}%</span>
-                              <span className="text-[10px] text-surface-400 tabular-nums">{stage.hitCount}/{snapshots.length}</span>
-                            </div>
+                            <span className="text-[10px] text-surface-400 tabular-nums shrink-0">{stage.hitCount}/{snapshots.length}</span>
                           </div>
                           <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                             <div
