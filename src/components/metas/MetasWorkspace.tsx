@@ -2672,27 +2672,19 @@ export default function MetasWorkspace() {
               )}
             </Card>
 
-            {/* Merged: Meta Batida + Risco Operacional */}
-            <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 to-rose-400" />
-              <div className="grid grid-cols-2 divide-x divide-surface-100">
-                <div className="pr-4">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Meta Batida</p>
-                  </div>
-                  <p className="mt-2 text-3xl font-semibold text-surface-900">{onTargetCount}</p>
-                  <p className="mt-1.5 text-xs text-surface-500">Aderência positiva</p>
-                </div>
-                <div className="pl-4">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700">Requer atenção</p>
-                  </div>
-                  <p className="mt-2 text-3xl font-semibold text-surface-900">{byStatus.critico + byStatus.atencao}</p>
-                  <p className="mt-1.5 text-xs text-surface-500">Em progresso</p>
-                </div>
+            <Card className={executiveMetricCardClass}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-emerald-500" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Premiação atual</p>
+              <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(rewardDonut.totalEarned)}</p>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                <div
+                  className="h-full rounded-full bg-linear-to-r from-cyan-500 to-emerald-500 transition-[width] duration-700"
+                  style={{ width: `${Math.min(rewardDonut.pctCommitted, 100)}%` }}
+                />
               </div>
+              <p className="mt-1.5 text-xs text-surface-500">
+                {num(rewardDonut.pctCommitted, 1)}% comprometido da previsão de {currency(rewardDonut.totalTarget)}.
+              </p>
             </Card>
 
             <Card className={executiveMetricCardClass}>
@@ -3159,12 +3151,6 @@ export default function MetasWorkspace() {
                             const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                             return progress >= 1
                           }).length
-                          const rowAccent =
-                            row.pointsAchieved >= 0.8
-                              ? 'from-emerald-500 to-cyan-500'
-                              : row.pointsAchieved >= 0.6
-                                ? 'from-blue-500 to-indigo-500'
-                                : 'from-amber-500 to-rose-500'
                           const cycleStatus = periodClosed
                             ? { label: `Alcançou ${kpisHit} de ${kpisTotal} KPIs`, tone: 'bg-emerald-100 text-emerald-700 ring-emerald-200' }
                             : { label: 'Em progresso', tone: 'bg-amber-100 text-amber-700 ring-amber-200' }
@@ -3172,17 +3158,16 @@ export default function MetasWorkspace() {
                           return (
                             <div
                               key={`seller-accordion-${row.id}`}
-                              className={`relative overflow-hidden rounded-xl border transition-all duration-250 ${
+                              className={`overflow-hidden rounded-xl border transition-all duration-200 ${
                                 isOpen
-                                  ? 'border-slate-300 bg-linear-to-r from-white to-slate-50 shadow-lg ring-1 ring-slate-200'
-                                  : 'border-surface-200 bg-linear-to-r from-white to-slate-50/70 shadow-sm hover:border-slate-300 hover:shadow-md'
+                                  ? 'border-slate-300 bg-white shadow-md ring-1 ring-slate-200'
+                                  : 'border-surface-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50/50 hover:shadow-md'
                               }`}
                             >
-                              <span className={`absolute inset-y-0 left-0 w-1 bg-linear-to-b ${rowAccent}`} />
                               <button
                                 type="button"
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
-                                className="w-full cursor-pointer px-2 py-1.5 pl-3 text-left transition-colors duration-200 hover:bg-slate-100/60"
+                                className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
                               >
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_repeat(4,0.82fr)_1.05fr_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
