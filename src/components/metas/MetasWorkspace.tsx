@@ -149,6 +149,8 @@ interface RuleBlock {
   sellerIds: string[]
   rules: GoalRule[]
   weightTargets: WeightTarget[]
+  focusProductCode?: string
+  focusTargetKg?: number
 }
 
 interface CycleWeek {
@@ -191,7 +193,7 @@ const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: str
   { type: 'DISTRIBUICAO', label: 'Distribuição de itens', defaultDescription: 'Positivação de itens na base de clientes.' },
   { type: 'DEVOLUCAO', label: 'Devolução', defaultDescription: 'Racional sobre os valores devolvidos x valores faturados.' },
   { type: 'INADIMPLENCIA', label: 'Inadimplência acumulativa', defaultDescription: 'Racional sobre o percentual x valores faturados.' },
-  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume e positivação.' },
+  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume do item foco com limite de devolução.' },
   { type: 'RENTABILIDADE', label: 'Rentabilidade', defaultDescription: 'Margem de contribuição dentro do percentual parametrizado.' },
   { type: 'CUSTOM', label: 'Personalizado', defaultDescription: '' },
 ]
@@ -236,13 +238,13 @@ const DEFAULT_RULES: GoalRule[] = [
   { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
-  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume e positivação.', targetText: '100% V + 40% D', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume do item foco com limite de devolução.', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado) — bônus de superação.', targetText: '120%', rewardValue: 96.75, points: 0 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
 
 const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
-  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES, weightTargets: [] },
+  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES, weightTargets: [], focusProductCode: '', focusTargetKg: 0 },
 ]
 
 function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
@@ -341,6 +343,27 @@ function parseTargetNumber(targetText: string) {
   const match = targetText.match(/(\d+(?:[.,]\d+)?)/)
   if (!match) return null
   return parseDecimal(match[1], 0)
+}
+
+function parseItemFocoTarget(targetText: string) {
+  if (targetText.includes('|')) {
+    const [volRaw, devRaw] = targetText.split('|')
+    return {
+      volumePct: Math.max(parseDecimal((volRaw ?? '').replace('%', ''), 0), 0),
+      devolucaoPct: Math.max(parseDecimal((devRaw ?? '').replace('%', ''), 0), 0),
+    }
+  }
+  const numbers = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
+  return {
+    volumePct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
+    devolucaoPct: Math.max(parseDecimal(numbers[1] ?? '0', 0), 0),
+  }
+}
+
+function formatItemFocoTarget(volumePct: number, devolucaoPct: number) {
+  const v = Math.max(volumePct, 0)
+  const d = Math.max(devolucaoPct, 0)
+  return `${v}|${d}`
 }
 
 type ChartPoint = { x: number; y: number }
@@ -551,6 +574,9 @@ export default function MetasWorkspace() {
   const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
   const [brandWeightLoading, setBrandWeightLoading] = useState(false)
   const [brandWeightError, setBrandWeightError] = useState('')
+  const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>>>({})
+  const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
+  const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -578,6 +604,8 @@ export default function MetasWorkspace() {
         monthlyTarget: b.monthlyTarget ?? 0,
         sellerIds: b.sellerIds ?? [],
         weightTargets: b.weightTargets ?? [],
+        focusProductCode: b.focusProductCode ?? '',
+        focusTargetKg: b.focusTargetKg ?? 0,
         rules: (b.rules ?? []).map((r: GoalRule) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
       }))
       return DEFAULT_RULE_BLOCKS
@@ -805,6 +833,44 @@ export default function MetasWorkspace() {
       .finally(() => { if (!controller.signal.aborted) setBrandWeightLoading(false) })
     return () => controller.abort()
   }, [companyScopeFilter, month, year])
+
+  useEffect(() => {
+    setFocusProductRows({})
+    setFocusProductLoading({})
+    setFocusProductError({})
+  }, [companyScopeFilter, month, year])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const focusCodes = [...new Set(ruleBlocks.map((b) => (b.focusProductCode ?? '').trim()).filter(Boolean))]
+
+    focusCodes.forEach((code) => {
+      if (focusProductRows[code] || focusProductLoading[code]) return
+
+      setFocusProductLoading((prev) => ({ ...prev, [code]: true }))
+      setFocusProductError((prev) => ({ ...prev, [code]: '' }))
+
+      fetch(
+        `/api/metas/sellers-performance/product-focus?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}&productCode=${encodeURIComponent(code)}`,
+        { signal: controller.signal }
+      )
+        .then(async (res) => {
+          const payload = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar item foco do mês.')
+          const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>
+          setFocusProductRows((prev) => ({ ...prev, [code]: rows }))
+        })
+        .catch((err: unknown) => {
+          if (controller.signal.aborted) return
+          setFocusProductError((prev) => ({ ...prev, [code]: err instanceof Error ? err.message : 'Falha ao carregar item foco do mês.' }))
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setFocusProductLoading((prev) => ({ ...prev, [code]: false }))
+        })
+    })
+
+    return () => controller.abort()
+  }, [companyScopeFilter, focusProductLoading, focusProductRows, month, ruleBlocks, year])
 
   async function loadAllowlist() {
     setAllowlistLoading(true)
@@ -1259,6 +1325,12 @@ export default function MetasWorkspace() {
           return soldKg >= target.targetKg
         }).length
 
+        const focusCode = (block.focusProductCode ?? '').trim()
+        const focusRows = focusCode ? (focusProductRows[focusCode] ?? []) : []
+        const focusRow = focusRows.find((row) => row.sellerCode === sellerCode)
+        const focusSoldKg = focusRow?.soldKg ?? 0
+        const focusReturnKg = focusRow?.returnKg ?? 0
+
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
@@ -1351,8 +1423,19 @@ export default function MetasWorkspace() {
               progress = 0
               break
             case 'ITEM_FOCO':
-              // Stage-locked: compare stage value against cumulative value up to this stage
-              progress = stage.orderCount > 0 ? Math.min(stage.totalValue / lockedValue, 1) : 0
+              {
+                const { volumePct, devolucaoPct } = parseItemFocoTarget(rule.targetText)
+                const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                if (!focusCode || focusTargetKg <= 0 || volumePct <= 0) {
+                  progress = 0
+                  break
+                }
+                const requiredKg = focusTargetKg * (volumePct / 100)
+                const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
+                const returnPct = focusSoldKg > 0 ? (focusReturnKg / focusSoldKg) * 100 : 0
+                const returnOk = devolucaoPct > 0 ? returnPct <= devolucaoPct : true
+                progress = returnOk ? volumeProgress : 0
+              }
               break
             default:
               if (asPct !== null) {
@@ -1434,7 +1517,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, prizes, productAllowlist, ruleBlocks, sellers])
+  }, [brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -2249,7 +2332,7 @@ export default function MetasWorkspace() {
                       {block.rules.map((rule) => (
                         <tr key={rule.id} className="hover:bg-surface-50/50">
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
-                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : e.target.value === 'ITEM_FOCO' ? '0|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
                           <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
                           <td className="px-3 py-2">{rule.kpiType === 'DISTRIBUICAO' ? (() => {
                             const parts = rule.targetText.split('|')
@@ -2277,7 +2360,35 @@ export default function MetasWorkspace() {
                               value={String(Math.max(0, Math.floor(parseTargetNumber(rule.targetText) ?? 0)))}
                               onChange={(e) => updateBlockRule(rule.id, { targetText: String(Math.max(0, Math.floor(parseDecimal(e.target.value, 0)))) })}
                             />
-                          ) : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
+                          ) : rule.kpiType === 'ITEM_FOCO' ? (() => {
+                            const parsed = parseItemFocoTarget(rule.targetText)
+                            return (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  type="number"
+                                  min={0}
+                                  step="0.1"
+                                  placeholder="0"
+                                  title="% mínimo do volume para item foco"
+                                  value={parsed.volumePct || ''}
+                                  onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.devolucaoPct) })}
+                                />
+                                <span className="text-[10px] text-surface-400">% vol.</span>
+                                <input
+                                  className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  type="number"
+                                  min={0}
+                                  step="0.1"
+                                  placeholder="0"
+                                  title="% máximo de devolução para item foco"
+                                  value={parsed.devolucaoPct || ''}
+                                  onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parsed.volumePct, parseDecimal(e.target.value, 0)) })}
+                                />
+                                <span className="text-[10px] text-surface-400">% dev.</span>
+                              </div>
+                            )
+                          })() : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
@@ -2461,6 +2572,127 @@ export default function MetasWorkspace() {
                       </table>
                     </div>
                   )}
+                </div>
+
+                <div className="mt-6">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Target size={14} className="text-indigo-600" />
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Item foco do mês</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-[1.6fr_0.7fr] md:items-end">
+                    <label className={label}>
+                      Produto foco
+                      <select
+                        className={`${input} text-sm`}
+                        value={block.focusProductCode ?? ''}
+                        onChange={(e) => updateBlock({ focusProductCode: e.target.value })}
+                      >
+                        <option value="">Selecionar produto...</option>
+                        {productAllowlist
+                          .filter((p) => p.active)
+                          .sort((a, b) => a.description.localeCompare(b.description))
+                          .map((p) => (
+                            <option key={p.code} value={p.code}>
+                              {p.description} · {p.brand}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label className={label}>
+                      Meta do item (kg)
+                      <input
+                        className={input}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0"
+                        value={block.focusTargetKg ?? ''}
+                        onChange={(e) => updateBlock({ focusTargetKg: parseDecimal(e.target.value, 0) })}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3">
+                    {(!block.focusProductCode || !block.focusTargetKg) ? (
+                      <p className="rounded-lg border border-dashed border-surface-200 bg-white px-3 py-4 text-center text-xs text-surface-400">
+                        Selecione um produto da lista e defina a meta (kg) para acompanhar o item foco por vendedor.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-surface-200 text-sm">
+                          <thead>
+                            <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                              <th className="px-3 py-2">Vendedor</th>
+                              <th className="px-3 py-2">Vendido (kg)</th>
+                              <th className="px-3 py-2">Devolvido (kg)</th>
+                              <th className="px-3 py-2">Progresso</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-surface-100">
+                            {(() => {
+                              const focusCode = (block.focusProductCode ?? '').trim()
+                              const rows = focusCode ? (focusProductRows[focusCode] ?? []) : []
+                              const loading = focusCode ? focusProductLoading[focusCode] : false
+                              const error = focusCode ? focusProductError[focusCode] : ''
+                              const sellersInBlock = block.sellerIds.length > 0 ? sellers.filter((s) => block.sellerIds.includes(s.id)) : sellers
+
+                              if (loading) {
+                                return (
+                                  <tr>
+                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={4}>Carregando item foco...</td>
+                                  </tr>
+                                )
+                              }
+                              if (error) {
+                                return (
+                                  <tr>
+                                    <td className="px-3 py-3 text-xs text-rose-600" colSpan={4}>{error}</td>
+                                  </tr>
+                                )
+                              }
+                              if (sellersInBlock.length === 0) {
+                                return (
+                                  <tr>
+                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={4}>Nenhum vendedor neste bloco.</td>
+                                  </tr>
+                                )
+                              }
+
+                              return sellersInBlock.map((seller) => {
+                                const sellerCode = seller.id.replace(/^sankhya-/, '')
+                                const row = rows.find((r) => r.sellerCode === sellerCode)
+                                const soldKg = row?.soldKg ?? 0
+                                const returnKg = row?.returnKg ?? 0
+                                const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                                const rawProgress = targetKg > 0 ? soldKg / targetKg : 0
+                                const pct = rawProgress * 100
+                                const barPct = Math.min(pct, 100)
+                                const progressColor = rawProgress >= 1 ? 'bg-emerald-500' : rawProgress >= 0.8 ? 'bg-cyan-500' : rawProgress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
+                                return (
+                                  <tr key={`focus-${seller.id}`} className="hover:bg-surface-50/50">
+                                    <td className="px-3 py-2 text-xs font-semibold text-surface-800">{seller.name}</td>
+                                    <td className="px-3 py-2 text-xs text-surface-700">{num(soldKg, 2)} kg</td>
+                                    <td className="px-3 py-2 text-xs text-surface-700">{num(returnKg, 2)} kg</td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-200">
+                                          <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${barPct}%` }} />
+                                        </div>
+                                        <span className="text-[11px] font-semibold text-surface-700">{num(pct, 1)}%</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
             )
