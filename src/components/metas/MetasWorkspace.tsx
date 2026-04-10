@@ -844,33 +844,41 @@ export default function MetasWorkspace() {
     const controller = new AbortController()
     const focusCodes = [...new Set(ruleBlocks.map((b) => (b.focusProductCode ?? '').trim()).filter(Boolean))]
 
-    focusCodes.forEach((code) => {
-      if (focusProductRows[code] || focusProductLoading[code]) return
+    const codesToFetch = focusCodes.filter((code) => !focusProductRows[code] && !focusProductLoading[code])
+    if (codesToFetch.length === 0) {
+      return () => controller.abort()
+    }
 
+    codesToFetch.forEach((code) => {
       setFocusProductLoading((prev) => ({ ...prev, [code]: true }))
       setFocusProductError((prev) => ({ ...prev, [code]: '' }))
-
-      fetch(
-        `/api/metas/sellers-performance/product-focus?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}&productCode=${encodeURIComponent(code)}`,
-        { signal: controller.signal }
-      )
-        .then(async (res) => {
-          const payload = await res.json().catch(() => ({}))
-          if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar item foco do mês.')
-          const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>
-          setFocusProductRows((prev) => ({ ...prev, [code]: rows }))
-        })
-        .catch((err: unknown) => {
-          if (controller.signal.aborted) return
-          setFocusProductError((prev) => ({ ...prev, [code]: err instanceof Error ? err.message : 'Falha ao carregar item foco do mês.' }))
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setFocusProductLoading((prev) => ({ ...prev, [code]: false }))
-        })
     })
 
+    ;(async () => {
+      await Promise.all(
+        codesToFetch.map(async (code) => {
+          try {
+            const res = await fetch(
+              `/api/metas/sellers-performance/product-focus?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}&productCode=${encodeURIComponent(code)}`,
+              { signal: controller.signal }
+            )
+            const payload = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar item foco do mês.')
+            const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>
+            setFocusProductRows((prev) => ({ ...prev, [code]: rows }))
+          } catch (err: unknown) {
+            if (!controller.signal.aborted) {
+              setFocusProductError((prev) => ({ ...prev, [code]: err instanceof Error ? err.message : 'Falha ao carregar item foco do mês.' }))
+            }
+          } finally {
+            setFocusProductLoading((prev) => ({ ...prev, [code]: false }))
+          }
+        })
+      )
+    })()
+
     return () => controller.abort()
-  }, [companyScopeFilter, focusProductLoading, focusProductRows, month, ruleBlocks, year])
+  }, [companyScopeFilter, month, ruleBlocks, year])
 
   async function loadAllowlist() {
     setAllowlistLoading(true)
@@ -910,6 +918,13 @@ export default function MetasWorkspace() {
     if (view !== 'products') return
     void loadProductAllowlist()
   }, [view])
+
+  useEffect(() => {
+    if (view !== 'config') return
+    if (productAllowlistLoading) return
+    if (productAllowlist.length > 0) return
+    void loadProductAllowlist()
+  }, [productAllowlist.length, productAllowlistLoading, view])
 
   async function saveAllowlist() {
     setAllowlistSaving(true)
@@ -2625,10 +2640,12 @@ export default function MetasWorkspace() {
                         <table className="min-w-full divide-y divide-surface-200 text-sm">
                           <thead>
                             <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                              <th className="px-3 py-2">Vendedor</th>
+                              <th className="px-3 py-2">SKU</th>
+                              <th className="px-3 py-2">Item foco</th>
+                              <th className="px-3 py-2">Meta (kg)</th>
                               <th className="px-3 py-2">Vendido (kg)</th>
                               <th className="px-3 py-2">Devolvido (kg)</th>
-                              <th className="px-3 py-2">Progresso</th>
+                              <th className="px-3 py-2">Devolução (%)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-surface-100">
@@ -2638,55 +2655,62 @@ export default function MetasWorkspace() {
                               const loading = focusCode ? focusProductLoading[focusCode] : false
                               const error = focusCode ? focusProductError[focusCode] : ''
                               const sellersInBlock = block.sellerIds.length > 0 ? sellers.filter((s) => block.sellerIds.includes(s.id)) : sellers
+                              const focusProduct = productAllowlist.find((p) => p.code === focusCode)
 
                               if (loading) {
                                 return (
                                   <tr>
-                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={4}>Carregando item foco...</td>
+                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={6}>Carregando item foco...</td>
                                   </tr>
                                 )
                               }
                               if (error) {
                                 return (
                                   <tr>
-                                    <td className="px-3 py-3 text-xs text-rose-600" colSpan={4}>{error}</td>
+                                    <td className="px-3 py-3 text-xs text-rose-600" colSpan={6}>{error}</td>
                                   </tr>
                                 )
                               }
                               if (sellersInBlock.length === 0) {
                                 return (
                                   <tr>
-                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={4}>Nenhum vendedor neste bloco.</td>
+                                    <td className="px-3 py-3 text-xs text-surface-400" colSpan={6}>Nenhum vendedor neste bloco.</td>
                                   </tr>
                                 )
                               }
 
-                              return sellersInBlock.map((seller) => {
-                                const sellerCode = seller.id.replace(/^sankhya-/, '')
-                                const row = rows.find((r) => r.sellerCode === sellerCode)
-                                const soldKg = row?.soldKg ?? 0
-                                const returnKg = row?.returnKg ?? 0
-                                const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
-                                const rawProgress = targetKg > 0 ? soldKg / targetKg : 0
-                                const pct = rawProgress * 100
-                                const barPct = Math.min(pct, 100)
-                                const progressColor = rawProgress >= 1 ? 'bg-emerald-500' : rawProgress >= 0.8 ? 'bg-cyan-500' : rawProgress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
-                                return (
-                                  <tr key={`focus-${seller.id}`} className="hover:bg-surface-50/50">
-                                    <td className="px-3 py-2 text-xs font-semibold text-surface-800">{seller.name}</td>
-                                    <td className="px-3 py-2 text-xs text-surface-700">{num(soldKg, 2)} kg</td>
-                                    <td className="px-3 py-2 text-xs text-surface-700">{num(returnKg, 2)} kg</td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-200">
-                                          <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${barPct}%` }} />
-                                        </div>
-                                        <span className="text-[11px] font-semibold text-surface-700">{num(pct, 1)}%</span>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )
-                              })
+                              const sellerCodes = new Set(sellersInBlock.map((seller) => seller.id.replace(/^sankhya-/, '')))
+                              const blockRows = rows.filter((r) => sellerCodes.has(r.sellerCode))
+                              const soldKg = blockRows.reduce((sum, row) => sum + (row.soldKg ?? 0), 0)
+                              const returnKg = blockRows.reduce((sum, row) => sum + (row.returnKg ?? 0), 0)
+                              const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                              const returnPct = targetKg > 0 ? (returnKg / targetKg) * 100 : 0
+                              const itemFocoRule = block.rules.find((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'ITEM_FOCO')
+                              const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, devolucaoPct: 0 }
+                              const devolucaoLimite = Math.max(itemFocoParams.devolucaoPct, 0)
+                              const devolucaoLimiteKg = targetKg > 0 ? targetKg * (devolucaoLimite / 100) : 0
+                              const returnOk = devolucaoLimite > 0 ? returnPct <= devolucaoLimite : true
+                              const returnColor = returnOk ? 'text-emerald-700' : 'text-rose-700'
+                              const sku = focusProduct?.code ?? focusCode
+                              const itemNome = focusProduct?.description ?? 'Item não encontrado na lista'
+
+                              return (
+                                <tr key={`focus-item-${focusCode}`} className="hover:bg-surface-50/50">
+                                  <td className="px-3 py-2 text-xs font-semibold text-surface-800">{sku || '—'}</td>
+                                  <td className="px-3 py-2 text-xs text-surface-700">{itemNome}</td>
+                                  <td className="px-3 py-2 text-xs text-surface-700">{num(targetKg, 2)} kg</td>
+                                  <td className="px-3 py-2 text-xs text-surface-700">{num(soldKg, 2)} kg</td>
+                                  <td className="px-3 py-2 text-xs text-surface-700">{num(returnKg, 2)} kg</td>
+                                  <td className={`px-3 py-2 text-xs font-semibold ${returnColor}`}>
+                                    {num(returnPct, 1)}%
+                                    {devolucaoLimite > 0 ? (
+                                      <span className="ml-1 text-[10px] font-medium text-surface-500">
+                                        (limite {num(devolucaoLimite, 0)}% = {num(devolucaoLimiteKg, 2)} kg)
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              )
                             })()}
                           </tbody>
                         </table>
