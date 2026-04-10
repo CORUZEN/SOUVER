@@ -323,6 +323,20 @@ function parseBrlNumber(input: string) {
   return Number(digits) / 100
 }
 
+function parsePointsInput(input: string) {
+  const cleaned = input.replace(/[^\d.,]/g, '')
+  if (!cleaned) return 0
+  if (cleaned.includes(',') || cleaned.includes('.')) {
+    return parseDecimal(cleaned, 0)
+  }
+  if (cleaned.length === 1) {
+    return Number(cleaned) / 10
+  }
+  const whole = cleaned.slice(0, -1)
+  const frac = cleaned.slice(-1)
+  return parseDecimal(`${whole}.${frac}`, 0)
+}
+
 function parseTargetNumber(targetText: string) {
   const match = targetText.match(/(\d+(?:[.,]\d+)?)/)
   if (!match) return null
@@ -496,6 +510,7 @@ export default function MetasWorkspace() {
   const [basePremiation, setBasePremiation] = useState(4837.32)
   const [extraBonus, setExtraBonus] = useState(400)
   const [extraMinPoints, setExtraMinPoints] = useState(0.6)
+  const [extraMinPointsInput, setExtraMinPointsInput] = useState('0,60')
   const [customDate, setCustomDate] = useState('')
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
@@ -590,6 +605,7 @@ export default function MetasWorkspace() {
             setBasePremiation(cfg.basePremiation ?? 4837.32)
             setExtraBonus(cfg.extraBonus ?? 400)
             setExtraMinPoints(cfg.extraMinPoints ?? 0.6)
+            setExtraMinPointsInput(num(cfg.extraMinPoints ?? 0.6, 2))
           } else {
             // Inherit from closest previous month that has config
             const source = Object.keys(normalized).sort().reverse().find((k) => k < monthKey(year, month))
@@ -602,6 +618,7 @@ export default function MetasWorkspace() {
               setBasePremiation(src.basePremiation ?? 4837.32)
               setExtraBonus(src.extraBonus ?? 400)
               setExtraMinPoints(src.extraMinPoints ?? 0.6)
+              setExtraMinPointsInput(num(src.extraMinPoints ?? 0.6, 2))
             }
           }
         }
@@ -649,6 +666,7 @@ export default function MetasWorkspace() {
         setBasePremiation(cfg.basePremiation)
         setExtraBonus(cfg.extraBonus)
         setExtraMinPoints(cfg.extraMinPoints)
+        setExtraMinPointsInput(num(cfg.extraMinPoints, 2))
       } else {
         // Inherit from closest previous month that has config
         const source = Object.keys(updated).sort().reverse().find((k) => k < activeKey)
@@ -661,6 +679,7 @@ export default function MetasWorkspace() {
           setBasePremiation(src.basePremiation)
           setExtraBonus(src.extraBonus)
           setExtraMinPoints(src.extraMinPoints)
+          setExtraMinPointsInput(num(src.extraMinPoints, 2))
         }
         // If no previous month exists, keep current defaults
       }
@@ -1921,7 +1940,21 @@ export default function MetasWorkspace() {
               <label className={label}>Salário base<input className={input} type="number" step="0.01" value={salaryBase} onChange={(event) => setSalaryBase(parseDecimal(event.target.value, 0))} /></label>
               <label className={label}>Base de premiação<input className={input} type="number" step="0.01" value={basePremiation} onChange={(event) => setBasePremiation(parseDecimal(event.target.value, 0))} /></label>
               <label className={label}>Bônus extra de meta<input className={input} type="number" step="0.01" value={extraBonus} onChange={(event) => setExtraBonus(parseDecimal(event.target.value, 0))} /></label>
-              <label className={label}>Pontos mínimos do bônus<input className={input} type="number" step="0.01" value={extraMinPoints} onChange={(event) => setExtraMinPoints(parseDecimal(event.target.value, 0))} /></label>
+              <label className={label}>
+                Pontos mínimos do bônus
+                <input
+                  className={input}
+                  type="text"
+                  inputMode="decimal"
+                  value={extraMinPointsInput}
+                  onChange={(event) => setExtraMinPointsInput(event.target.value)}
+                  onBlur={() => {
+                    const parsed = parsePointsInput(extraMinPointsInput)
+                    setExtraMinPoints(parsed)
+                    setExtraMinPointsInput(num(parsed, 2))
+                  }}
+                />
+              </label>
               <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700">
                 <p>Potencial de KPIs: <strong>{currency(rewardTarget)}</strong> | {num(pointsTarget, 3)} pts</p>
                 <p>Base de premiação: <strong>{currency(basePremiation)}</strong></p>
