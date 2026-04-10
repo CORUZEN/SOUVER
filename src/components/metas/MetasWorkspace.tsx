@@ -1447,7 +1447,7 @@ export default function MetasWorkspace() {
                 }
                 const requiredKg = focusTargetKg * (volumePct / 100)
                 const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
-                const returnPct = focusSoldKg > 0 ? (focusReturnKg / focusSoldKg) * 100 : 0
+                const returnPct = focusTargetKg > 0 ? (focusReturnKg / focusTargetKg) * 100 : 0
                 const returnOk = devolucaoPct > 0 ? returnPct <= devolucaoPct : true
                 progress = returnOk ? volumeProgress : 0
               }
@@ -2684,9 +2684,11 @@ export default function MetasWorkspace() {
                               const soldKg = blockRows.reduce((sum, row) => sum + (row.soldKg ?? 0), 0)
                               const returnKg = blockRows.reduce((sum, row) => sum + (row.returnKg ?? 0), 0)
                               const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
-                              const returnPct = targetKg > 0 ? (returnKg / targetKg) * 100 : 0
                               const itemFocoRule = block.rules.find((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'ITEM_FOCO')
                               const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, devolucaoPct: 0 }
+                              const volumeRequiredKg = targetKg > 0 ? targetKg * (Math.max(itemFocoParams.volumePct, 0) / 100) : 0
+                              const volumeOk = volumeRequiredKg > 0 ? soldKg >= volumeRequiredKg : soldKg > 0
+                              const returnPct = targetKg > 0 ? (returnKg / targetKg) * 100 : 0
                               const devolucaoLimite = Math.max(itemFocoParams.devolucaoPct, 0)
                               const devolucaoLimiteKg = targetKg > 0 ? targetKg * (devolucaoLimite / 100) : 0
                               const returnOk = devolucaoLimite > 0 ? returnPct <= devolucaoLimite : true
@@ -2699,7 +2701,14 @@ export default function MetasWorkspace() {
                                   <td className="px-3 py-2 text-xs font-semibold text-surface-800">{sku || '—'}</td>
                                   <td className="px-3 py-2 text-xs text-surface-700">{itemNome}</td>
                                   <td className="px-3 py-2 text-xs text-surface-700">{num(targetKg, 2)} kg</td>
-                                  <td className="px-3 py-2 text-xs text-surface-700">{num(soldKg, 2)} kg</td>
+                                  <td className="px-3 py-2 text-xs text-surface-700">
+                                    <div className="font-medium">{num(soldKg, 2)} kg</div>
+                                    {itemFocoParams.volumePct > 0 ? (
+                                      <div className={`text-[10px] ${volumeOk ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                        mínimo {num(itemFocoParams.volumePct, 0)}% = {num(volumeRequiredKg, 2)} kg
+                                      </div>
+                                    ) : null}
+                                  </td>
                                   <td className="px-3 py-2 text-xs text-surface-700">{num(returnKg, 2)} kg</td>
                                   <td className={`px-3 py-2 text-xs font-semibold ${returnColor}`}>
                                     {num(returnPct, 1)}%
