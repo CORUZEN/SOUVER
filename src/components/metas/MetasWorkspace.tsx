@@ -27,6 +27,7 @@ import Modal from '@/components/ui/Modal'
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
 type PrizeType = 'CASH' | 'BENEFIT'
+type CashCalcMode = 'PERCENT' | 'FIXED'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
 
 interface GoalRule {
@@ -52,6 +53,7 @@ interface CampaignPrize {
   title: string
   frequency: 'MONTHLY' | 'QUARTERLY'
   type: PrizeType
+  cashMode?: CashCalcMode
   rewardValue: number
   benefitDescription: string
   minPoints: number
@@ -131,6 +133,7 @@ interface SellerSnapshot {
   averageTicket: number
   pointsAchieved: number
   pointsTarget: number
+  kpiRewardAchieved: number
   rewardAchieved: number
   rewardTarget: number
   status: 'SUPEROU' | 'NO_ALVO' | 'ATENCAO' | 'CRITICO'
@@ -249,9 +252,14 @@ function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
 }
 
 const DEFAULT_PRIZES: CampaignPrize[] = [
-  { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', rewardValue: 1000, benefitDescription: '', minPoints: 0.6, active: true },
+  { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', cashMode: 'PERCENT', rewardValue: 0, benefitDescription: '', minPoints: 0.6, active: true },
   { id: 'quarter', title: 'Campanha VDD do trimestre', frequency: 'QUARTERLY', type: 'BENEFIT', rewardValue: 0, benefitDescription: '', minPoints: 18, active: true },
 ]
+
+function normalizePrize(prize: CampaignPrize): CampaignPrize {
+  if (prize.type !== 'CASH') return { ...prize, cashMode: undefined }
+  return { ...prize, cashMode: prize.cashMode ?? 'PERCENT' }
+}
 
 function monthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}`
@@ -563,7 +571,7 @@ export default function MetasWorkspace() {
           const cfg = normalized[key]
           if (cfg) {
             setRuleBlocks(cfg.ruleBlocks)
-            setPrizes(cfg.prizes ?? DEFAULT_PRIZES)
+            setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
             setIncludeNational(cfg.includeNational ?? true)
             setSalaryBase(cfg.salaryBase ?? 1612.44)
             setBasePremiation(cfg.basePremiation ?? 4837.32)
@@ -575,7 +583,7 @@ export default function MetasWorkspace() {
             if (source) {
               const src = normalized[source]
               setRuleBlocks(src.ruleBlocks)
-              setPrizes(src.prizes ?? DEFAULT_PRIZES)
+              setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
               setIncludeNational(src.includeNational ?? true)
               setSalaryBase(src.salaryBase ?? 1612.44)
               setBasePremiation(src.basePremiation ?? 4837.32)
@@ -622,7 +630,7 @@ export default function MetasWorkspace() {
       const cfg = updated[activeKey]
       if (cfg) {
         setRuleBlocks(cfg.ruleBlocks)
-        setPrizes(cfg.prizes)
+        setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
         setIncludeNational(cfg.includeNational)
         setSalaryBase(cfg.salaryBase)
         setBasePremiation(cfg.basePremiation)
@@ -634,7 +642,7 @@ export default function MetasWorkspace() {
         if (source) {
           const src = updated[source]
           setRuleBlocks(src.ruleBlocks)
-          setPrizes(src.prizes)
+          setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
           setIncludeNational(src.includeNational)
           setSalaryBase(src.salaryBase)
           setBasePremiation(src.basePremiation)
@@ -1333,10 +1341,27 @@ export default function MetasWorkspace() {
           return sum + rule.points * Math.min(progress, 1)
         }, 0)
 
-        const rewardAchieved = blockRules.reduce((sum, rule) => {
+        const kpiRewardAchieved = blockRules.reduce((sum, rule) => {
           const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
           return sum + (progress >= 1 ? rule.rewardValue : 0)
         }, 0)
+
+        const campaignCashTarget = prizes.reduce((sum, prize) => {
+          if (!prize.active || prize.type !== 'CASH') return sum
+          const monthlyTargetBase = Math.max(block.monthlyTarget, 0)
+          const rewardValue = Math.max(prize.rewardValue, 0)
+          return sum + (prize.cashMode === 'FIXED' ? rewardValue : (monthlyTargetBase * rewardValue) / 100)
+        }, 0)
+
+        const campaignCashAchieved = prizes.reduce((sum, prize) => {
+          if (!prize.active || prize.type !== 'CASH') return sum
+          if (pointsAchieved < prize.minPoints) return sum
+          const monthlyTargetBase = Math.max(block.monthlyTarget, 0)
+          const rewardValue = Math.max(prize.rewardValue, 0)
+          return sum + (prize.cashMode === 'FIXED' ? rewardValue : (monthlyTargetBase * rewardValue) / 100)
+        }, 0)
+
+        const rewardAchieved = kpiRewardAchieved + campaignCashAchieved
 
         const ratio = activePointsTarget > 0 ? pointsAchieved / activePointsTarget : 0
 
@@ -1365,8 +1390,9 @@ export default function MetasWorkspace() {
           averageTicket,
           pointsAchieved,
           pointsTarget: blockPointsTarget,
+          kpiRewardAchieved,
           rewardAchieved,
-          rewardTarget: blockRewardTarget,
+          rewardTarget: blockRewardTarget + campaignCashTarget,
           status,
           gapToTarget: Math.max(blockPointsTarget - pointsAchieved, 0),
           ruleProgress,
@@ -1374,7 +1400,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [brandWeightRows, cycle.weeks, productAllowlist, ruleBlocks, sellers])
+  }, [brandWeightRows, cycle.weeks, prizes, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -2399,9 +2425,47 @@ export default function MetasWorkspace() {
                 <div key={prize.id} className="grid gap-2 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-6 md:items-end">
                   <label className={label}>Campanha<input className={input} value={prize.title} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, title: event.target.value } : item))} /></label>
                   <label className={label}>Frequência<select className={input} value={prize.frequency} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, frequency: event.target.value as CampaignPrize['frequency'] } : item))}><option value="MONTHLY">Mensal</option><option value="QUARTERLY">Trimestral</option></select></label>
-                  <label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, type: event.target.value as PrizeType } : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label>
+                  <label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? normalizePrize({ ...item, type: event.target.value as PrizeType }) : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label>
                   {prize.type === 'CASH' ? (
-                    <label className={label}>Valor (R$)<input className={input} type="number" step="0.01" value={prize.rewardValue} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, rewardValue: parseDecimal(event.target.value, 0) } : item))} /></label>
+                    <label className={label}>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span>{(prize.cashMode ?? 'PERCENT') === 'FIXED' ? 'Valor fixo (R$)' : 'Percentual sobre meta (%)'}</span>
+                        <select
+                          className="rounded border border-surface-200 bg-white px-1.5 py-1 text-[11px] text-surface-700"
+                          value={prize.cashMode ?? 'PERCENT'}
+                          onChange={(event) =>
+                            setPrizes((prev) =>
+                              prev.map((item) =>
+                                item.id === prize.id
+                                  ? { ...item, cashMode: event.target.value as CashCalcMode }
+                                  : item
+                              )
+                            )
+                          }
+                        >
+                          <option value="PERCENT">Percentual</option>
+                          <option value="FIXED">Valor em R$</option>
+                        </select>
+                      </div>
+                      <input
+                        className={input}
+                        type="number"
+                        step="0.01"
+                        value={prize.rewardValue}
+                        onChange={(event) =>
+                          setPrizes((prev) =>
+                            prev.map((item) =>
+                              item.id === prize.id
+                                ? { ...item, rewardValue: parseDecimal(event.target.value, 0) }
+                                : item
+                            )
+                          )
+                        }
+                      />
+                      {(prize.cashMode ?? 'PERCENT') === 'FIXED' && (
+                        <span className="mt-1 text-[10px] text-surface-400">Formato BRL: {currency(prize.rewardValue)}</span>
+                      )}
+                    </label>
                   ) : (
                     <label className={label}>Premiação<input className={input} placeholder="Ex: Viagem, produto, voucher…" value={prize.benefitDescription} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, benefitDescription: event.target.value } : item))} /></label>
                   )}
@@ -3226,7 +3290,7 @@ export default function MetasWorkspace() {
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Premiação por KPIs</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.rewardAchieved)}</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.kpiRewardAchieved)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Clientes atendidos</p>
