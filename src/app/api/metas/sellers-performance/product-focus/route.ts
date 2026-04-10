@@ -201,15 +201,15 @@ function buildSql(startDate: string, endDateExclusive: string, sellerCodes: stri
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
-    ? "AND (CAB.CODTIPOPER = 1001 OR CAB.TIPMOV IN ('D', 'E'))\n  "
-    : "AND CAB.TIPMOV IN ('V', 'P', 'D', 'E')\n  "
+    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+    : "AND CAB.TIPMOV = 'V'\n  "
 
   return `
 SELECT
   TO_CHAR(CAB.CODVEND) AS CODVEND,
   NVL(VEN.APELIDO, TO_CHAR(CAB.CODVEND)) AS VENDEDOR,
-  SUM(CASE WHEN CAB.TIPMOV IN ('V','P') THEN NVL(ITE.QTDNEG,0) * NVL(PRO.PESOBRUTO,0) ELSE 0 END) AS PESO_VENDIDO,
-  SUM(CASE WHEN CAB.TIPMOV IN ('D','E') THEN NVL(ITE.QTDNEG,0) * NVL(PRO.PESOBRUTO,0) ELSE 0 END) AS PESO_DEVOLVIDO
+  SUM(NVL(ITE.QTDNEG,0) * NVL(PRO.PESOBRUTO,0)) AS PESO_VENDIDO,
+  COUNT(DISTINCT CAB.CODPARC) AS CLIENTES_ITEM_FOCO
 FROM TGFCAB CAB
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 INNER JOIN TGFITE ITE ON ITE.NUNOTA = CAB.NUNOTA
@@ -277,7 +277,8 @@ export async function GET(req: NextRequest) {
       sellerCode: String(r.CODVEND ?? '').trim(),
       sellerName: String(r.VENDEDOR ?? '').trim(),
       soldKg: parseNumber(r.PESO_VENDIDO),
-      returnKg: parseNumber(r.PESO_DEVOLVIDO),
+      returnKg: 0,
+      soldClients: Math.max(Math.floor(parseNumber(r.CLIENTES_ITEM_FOCO)), 0),
     }))
 
     return NextResponse.json({ rows, year, month, productCode })

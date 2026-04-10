@@ -215,7 +215,7 @@ const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: str
   { type: 'DISTRIBUICAO', label: 'Distribuição de itens', defaultDescription: 'Positivação de itens na base de clientes.' },
   { type: 'DEVOLUCAO', label: 'Devolução', defaultDescription: 'Racional sobre os valores devolvidos x valores faturados.' },
   { type: 'INADIMPLENCIA', label: 'Inadimplência acumulativa', defaultDescription: 'Racional sobre o percentual x valores faturados.' },
-  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume do item foco com limite de devolução.' },
+  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume do item foco com positivação mínima da base de clientes.' },
   { type: 'RENTABILIDADE', label: 'Rentabilidade', defaultDescription: 'Margem de contribuição dentro do percentual parametrizado.' },
   { type: 'CUSTOM', label: 'Personalizado', defaultDescription: '' },
 ]
@@ -260,7 +260,7 @@ const DEFAULT_RULES: GoalRule[] = [
   { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: '3|45', rewardValue: 241.87, points: 0.05 },
-  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume do item foco com limite de devolução.', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume do item foco com positivação mínima da base de clientes.', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado) — bônus de superação.', targetText: '120%', rewardValue: 96.75, points: 0 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
@@ -396,23 +396,23 @@ function parseTargetNumber(targetText: string) {
 
 function parseItemFocoTarget(targetText: string) {
   if (targetText.includes('|')) {
-    const [volRaw, devRaw] = targetText.split('|')
+    const [volRaw, baseRaw] = targetText.split('|')
     return {
       volumePct: Math.max(parseDecimal((volRaw ?? '').replace('%', ''), 0), 0),
-      devolucaoPct: Math.max(parseDecimal((devRaw ?? '').replace('%', ''), 0), 0),
+      basePct: Math.max(parseDecimal((baseRaw ?? '').replace('%', ''), 0), 0),
     }
   }
   const numbers = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
   return {
     volumePct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
-    devolucaoPct: Math.max(parseDecimal(numbers[1] ?? '0', 0), 0),
+    basePct: Math.max(parseDecimal(numbers[1] ?? '0', 0), 0),
   }
 }
 
-function formatItemFocoTarget(volumePct: number, devolucaoPct: number) {
+function formatItemFocoTarget(volumePct: number, basePct: number) {
   const v = Math.max(volumePct, 0)
-  const d = Math.max(devolucaoPct, 0)
-  return `${v}|${d}`
+  const b = Math.max(basePct, 0)
+  return `${v}|${b}`
 }
 
 function parseInadimplenciaTarget(targetText: string) {
@@ -642,7 +642,7 @@ export default function MetasWorkspace() {
   const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
   const [brandWeightLoading, setBrandWeightLoading] = useState(false)
   const [brandWeightError, setBrandWeightError] = useState('')
-  const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>>>({})
+  const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
@@ -970,7 +970,7 @@ export default function MetasWorkspace() {
             )
             const payload = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar item foco do mês.')
-            const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>
+            const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients?: number }>
             setFocusProductRows((prev) => ({ ...prev, [code]: rows }))
           } catch (err: unknown) {
             if (!controller.signal.aborted) {
@@ -1474,7 +1474,7 @@ export default function MetasWorkspace() {
         const focusRows = focusCode ? (focusProductRows[focusCode] ?? []) : []
         const focusRow = focusRows.find((row) => row.sellerCode === sellerCode)
         const focusSoldKg = focusRow?.soldKg ?? 0
-        const focusReturnKg = focusRow?.returnKg ?? 0
+        const focusSoldClients = Number(focusRow?.soldClients ?? 0)
 
         const averageTicket = seller.totalOrders > 0 ? seller.totalValue / seller.totalOrders : 0
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
@@ -1596,7 +1596,7 @@ export default function MetasWorkspace() {
               break
             case 'ITEM_FOCO':
               {
-                const { volumePct, devolucaoPct } = parseItemFocoTarget(rule.targetText)
+                const { volumePct, basePct } = parseItemFocoTarget(rule.targetText)
                 const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
                 if (!focusCode || focusTargetKg <= 0 || volumePct <= 0) {
                   progress = 0
@@ -1604,11 +1604,14 @@ export default function MetasWorkspace() {
                 }
                 const requiredKg = focusTargetKg * (volumePct / 100)
                 const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
-                const returnPct = focusTargetKg > 0 ? (focusReturnKg / focusTargetKg) * 100 : 0
-                const returnProgress = devolucaoPct > 0
-                  ? (returnPct <= devolucaoPct ? 1 : devolucaoPct / Math.max(returnPct, 0.00001))
+                const baseTotalClients = Math.max(totalDistinctClients, 0)
+                const requiredBaseClients = basePct > 0
+                  ? Math.ceil(baseTotalClients * (basePct / 100))
+                  : 0
+                const baseProgress = requiredBaseClients > 0
+                  ? focusSoldClients / Math.max(requiredBaseClients, 1)
                   : 1
-                progress = volumeProgress * returnProgress
+                progress = volumeProgress * baseProgress
               }
               break
             default:
@@ -2528,28 +2531,33 @@ export default function MetasWorkspace() {
                                 resultValue = `${num(coveragePct, 2)}% base`
                                 ok = clientsPct > 0 && coveragePct >= clientsPct
                               } else if (kpiType === 'ITEM_FOCO') {
-                                const { volumePct, devolucaoPct } = parseItemFocoTarget(rule.targetText)
+                                const { volumePct, basePct } = parseItemFocoTarget(rule.targetText)
                                 const focusCode = (block.focusProductCode ?? '').trim()
                                 const focusRow = focusCode
                                   ? (focusProductRows[focusCode] ?? []).find((row) => row.sellerCode === sellerCode)
                                   : null
                                 const soldKg = focusRow?.soldKg ?? 0
-                                const returnKg = focusRow?.returnKg ?? 0
+                                const soldClients = Number(focusRow?.soldClients ?? 0)
+                                const baseTotalClients = distinctClientsMonth
                                 const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
                                 const requiredKg = focusTargetKg * (Math.max(volumePct, 0) / 100)
-                                const returnPct = focusTargetKg > 0 ? (returnKg / focusTargetKg) * 100 : 0
-                                const returnOk = devolucaoPct > 0 ? returnPct <= devolucaoPct : true
-                                title = 'Item foco (volume + devolução)'
+                                const requiredBaseClients = basePct > 0
+                                  ? Math.ceil(baseTotalClients * (basePct / 100))
+                                  : 0
+                                const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
+                                const baseGoalOk = requiredBaseClients > 0 ? soldClients >= requiredBaseClients : true
+                                title = 'Item foco (volume + base de clientes)'
                                 lines = [
                                   { label: 'Meta do item foco (kg)', value: `${num(focusTargetKg, 2)} kg` },
                                   { label: 'Volume mínimo exigido', value: `${num(requiredKg, 2)} kg` },
                                   { label: 'Vendido do item foco', value: `${num(soldKg, 2)} kg` },
-                                  { label: 'Devolvido do item foco', value: `${num(returnKg, 2)} kg` },
-                                  { label: 'Limite devolução', value: `${num(devolucaoPct, 2)}%` },
+                                  { label: 'Base total de clientes do vendedor', value: `${baseTotalClients}` },
+                                  { label: 'Clientes com item foco', value: `${soldClients}` },
+                                  { label: 'Meta de base (clientes)', value: requiredBaseClients > 0 ? `${requiredBaseClients} (${num(basePct, 2)}%)` : `${num(basePct, 2)}%` },
                                 ]
                                 resultLabel = 'Resultado apurado'
-                                resultValue = `${num(returnPct, 2)}% dev.`
-                                ok = requiredKg > 0 && soldKg >= requiredKg && returnOk
+                                resultValue = `${num(baseCoveragePct, 2)}% base`
+                                ok = requiredKg > 0 && soldKg >= requiredKg && baseGoalOk
                               } else if (kpiType === 'RENTABILIDADE') {
                                 const targetPct = Math.max(parameterNumber, 0)
                                 const threshold = targetPct > 0 ? teamAverageTicket * (targetPct / 100) : 0
@@ -2873,7 +2881,7 @@ export default function MetasWorkspace() {
                                     placeholder="0"
                                     title="% mínimo do volume para item foco"
                                     value={parsed.volumePct || ''}
-                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.devolucaoPct) })}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.basePct) })}
                                   />
                                   <span className="text-[10px] text-surface-400">% vol.</span>
                                   <input
@@ -2882,11 +2890,11 @@ export default function MetasWorkspace() {
                                     min={0}
                                     step="0.1"
                                     placeholder="0"
-                                    title="% máximo de devolução para item foco"
-                                    value={parsed.devolucaoPct || ''}
+                                    title="% da base total de clientes do vendedor para positivação do item foco"
+                                    value={parsed.basePct || ''}
                                     onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parsed.volumePct, parseDecimal(e.target.value, 0)) })}
                                   />
-                                  <span className="text-[10px] text-surface-400">% dev.</span>
+                                  <span className="text-[10px] text-surface-400">% base</span>
                                   {renderKpiInspector(rule, kpiType)}
                                 </div>
                               )
@@ -3189,8 +3197,8 @@ export default function MetasWorkspace() {
                               <th className="px-3 py-2">Item foco</th>
                               <th className="px-3 py-2">Meta (kg)</th>
                               <th className="px-3 py-2">Vendido (kg)</th>
-                              <th className="px-3 py-2">Devolvido (kg)</th>
-                              <th className="px-3 py-2">Devolução (%)</th>
+                              <th className="px-3 py-2">Base total (clientes)</th>
+                              <th className="px-3 py-2">Positivação da base</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-surface-100">
@@ -3227,17 +3235,25 @@ export default function MetasWorkspace() {
                               const sellerCodes = new Set(sellersInBlock.map((seller) => seller.id.replace(/^sankhya-/, '')))
                               const blockRows = rows.filter((r) => sellerCodes.has(r.sellerCode))
                               const soldKg = blockRows.reduce((sum, row) => sum + (row.soldKg ?? 0), 0)
-                              const returnKg = blockRows.reduce((sum, row) => sum + (row.returnKg ?? 0), 0)
+                              const soldClients = blockRows.reduce((sum, row) => sum + Number(row.soldClients ?? 0), 0)
                               const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
                               const itemFocoRule = block.rules.find((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'ITEM_FOCO')
-                              const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, devolucaoPct: 0 }
+                              const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, basePct: 0 }
                               const volumeRequiredKg = targetKg > 0 ? targetKg * (Math.max(itemFocoParams.volumePct, 0) / 100) : 0
                               const volumeOk = volumeRequiredKg > 0 ? soldKg >= volumeRequiredKg : soldKg > 0
-                              const returnPct = targetKg > 0 ? (returnKg / targetKg) * 100 : 0
-                              const devolucaoLimite = Math.max(itemFocoParams.devolucaoPct, 0)
-                              const devolucaoLimiteKg = targetKg > 0 ? targetKg * (devolucaoLimite / 100) : 0
-                              const returnOk = devolucaoLimite > 0 ? returnPct <= devolucaoLimite : true
-                              const returnColor = returnOk ? 'text-emerald-700' : 'text-rose-700'
+                              const baseTotalClients = sellersInBlock.reduce((sum, seller) => {
+                                const clientSet = new Set<string>()
+                                for (const order of seller.orders) {
+                                  const code = (order.clientCode ?? '').trim()
+                                  if (code) clientSet.add(code)
+                                }
+                                return sum + clientSet.size
+                              }, 0)
+                              const basePct = Math.max(itemFocoParams.basePct, 0)
+                              const requiredBaseClients = basePct > 0 ? Math.ceil(baseTotalClients * (basePct / 100)) : 0
+                              const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
+                              const baseOk = requiredBaseClients > 0 ? soldClients >= requiredBaseClients : true
+                              const baseColor = baseOk ? 'text-emerald-700' : 'text-rose-700'
                               const sku = focusProduct?.code ?? focusCode
                               const itemNome = focusProduct?.description ?? 'Item não encontrado na lista'
 
@@ -3254,12 +3270,12 @@ export default function MetasWorkspace() {
                                       </div>
                                     ) : null}
                                   </td>
-                                  <td className="px-3 py-2 text-xs text-surface-700">{num(returnKg, 2)} kg</td>
-                                  <td className={`px-3 py-2 text-xs font-semibold ${returnColor}`}>
-                                    {num(returnPct, 1)}%
-                                    {devolucaoLimite > 0 ? (
+                                  <td className="px-3 py-2 text-xs text-surface-700">{baseTotalClients}</td>
+                                  <td className={`px-3 py-2 text-xs font-semibold ${baseColor}`}>
+                                    {num(baseCoveragePct, 1)}%
+                                    {basePct > 0 ? (
                                       <span className="ml-1 text-[10px] font-medium text-surface-500">
-                                        (limite {num(devolucaoLimite, 0)}% = {num(devolucaoLimiteKg, 2)} kg)
+                                        (meta {num(basePct, 0)}% = {requiredBaseClients} clientes)
                                       </span>
                                     ) : null}
                                   </td>
