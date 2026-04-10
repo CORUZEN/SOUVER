@@ -587,6 +587,7 @@ export default function MetasWorkspace() {
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
+  const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -605,6 +606,19 @@ export default function MetasWorkspace() {
     if (showPeriodPicker) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showPeriodPicker])
+
+  useEffect(() => {
+    function handleViewportChange() {
+      setKpiInspectorOpenKey(null)
+      setKpiInspectorAnchor(null)
+    }
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('scroll', handleViewportChange, true)
+    return () => {
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('scroll', handleViewportChange, true)
+    }
+  }, [])
 
   useEffect(() => {
     // ── Load config from API (database) ──────────────────────────────────
@@ -2252,15 +2266,24 @@ export default function MetasWorkspace() {
                     type="button"
                     className="rounded p-0.5 text-surface-400 hover:bg-surface-100 hover:text-primary-600"
                     title="Abrir auditoria técnica do KPI"
-                    onClick={() => {
+                    onClick={(e) => {
                       if (isOpen) {
                         setKpiInspectorOpenKey(null)
+                        setKpiInspectorAnchor(null)
                         return
                       }
+                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                      const estimatedHeight = 340
+                      const openUp = window.innerHeight - rect.bottom < estimatedHeight
                       setKpiInspectorOpenKey(inspectorKey)
                       setKpiInspectorSellerId((prev) => {
                         if (sellersInBlock.some((s) => s.id === prev)) return prev
                         return sellersInBlock[0]?.id ?? ''
+                      })
+                      setKpiInspectorAnchor({
+                        top: openUp ? rect.top - 8 : rect.bottom + 8,
+                        left: rect.right,
+                        openUp,
                       })
                     }}
                   >
@@ -2270,10 +2293,20 @@ export default function MetasWorkspace() {
                     <>
                       <div
                         className="fixed inset-0 z-20"
-                        onClick={() => setKpiInspectorOpenKey(null)}
+                        onClick={() => {
+                          setKpiInspectorOpenKey(null)
+                          setKpiInspectorAnchor(null)
+                        }}
                         aria-hidden="true"
                       />
-                      <div className="absolute right-0 top-full z-30 mt-1.5 w-96 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5">
+                      <div
+                        className="fixed z-[70] w-96 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5"
+                        style={{
+                          top: kpiInspectorAnchor?.top ?? 0,
+                          left: kpiInspectorAnchor?.left ?? 0,
+                          transform: kpiInspectorAnchor?.openUp ? 'translate(-100%, -100%)' : 'translateX(-100%)',
+                        }}
+                      >
                         <div className="mb-2">
                           <p className="text-xs font-semibold text-surface-800">Auditoria do KPI (Sankhya)</p>
                           <p className="text-[10px] text-surface-500">{stageLabel} · Período {formatDateBr(monthStartIso)} a {stageEndIso ? formatDateBr(stageEndIso) : '--'}</p>
