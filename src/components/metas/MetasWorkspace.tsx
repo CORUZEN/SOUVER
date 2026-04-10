@@ -83,12 +83,19 @@ interface SellerOrder {
   clientCode: string
 }
 
+interface SellerReturnEntry {
+  negotiatedAt: string
+  totalValue: number
+}
+
 interface Salesperson {
   id: string
   name: string
   login: string
   orders: SellerOrder[]
+  returns: SellerReturnEntry[]
   totalValue: number
+  totalReturnedValue: number
   totalGrossWeight: number
   totalOrders: number
 }
@@ -755,9 +762,11 @@ export default function MetasWorkspace() {
           name: string
           login: string
           totalValue?: number
+          totalReturnedValue?: number
           totalGrossWeight?: number
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
         }>
 
         const mapped = remoteSellers.map((seller) => {
@@ -770,15 +779,23 @@ export default function MetasWorkspace() {
               grossWeight: Number(order.grossWeight ?? 0),
               clientCode: String(order.clientCode ?? ''),
             }))
+          const normalizedReturns = (seller.returns ?? [])
+            .filter((item) => typeof item.negotiatedAt === 'string' && item.negotiatedAt.length >= 10)
+            .map((item) => ({
+              negotiatedAt: String(item.negotiatedAt).slice(0, 10),
+              totalValue: Number(item.totalValue ?? 0),
+            }))
 
           return {
             id: seller.id,
             name: seller.name,
             login: seller.login,
             totalValue: Number(seller.totalValue ?? 0),
+            totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
             totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
             totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
             orders: normalizedOrders,
+            returns: normalizedReturns,
           }
         })
 
@@ -970,19 +987,15 @@ export default function MetasWorkspace() {
           name: string
           login: string
           totalValue?: number
+          totalReturnedValue?: number
           totalGrossWeight?: number
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
         }>
         setSellers(
-          remoteSellers.map((seller) => ({
-            id: seller.id,
-            name: seller.name,
-            login: seller.login,
-            totalValue: Number(seller.totalValue ?? 0),
-            totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
-            totalOrders: Number(seller.totalOrders ?? (seller.orders ?? []).length),
-            orders: (seller.orders ?? [])
+          remoteSellers.map((seller) => {
+            const normalizedOrders = (seller.orders ?? [])
               .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
               .map((order) => ({
                 orderNumber: String(order.orderNumber ?? ''),
@@ -990,8 +1003,25 @@ export default function MetasWorkspace() {
                 totalValue: Number(order.totalValue ?? 0),
                 grossWeight: Number(order.grossWeight ?? 0),
                 clientCode: String(order.clientCode ?? ''),
-              })),
-          }))
+              }))
+            const normalizedReturns = (seller.returns ?? [])
+              .filter((item) => typeof item.negotiatedAt === 'string' && item.negotiatedAt.length >= 10)
+              .map((item) => ({
+                negotiatedAt: String(item.negotiatedAt).slice(0, 10),
+                totalValue: Number(item.totalValue ?? 0),
+              }))
+            return {
+              id: seller.id,
+              name: seller.name,
+              login: seller.login,
+              totalValue: Number(seller.totalValue ?? 0),
+              totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
+              totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
+              totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+              orders: normalizedOrders,
+              returns: normalizedReturns,
+            }
+          })
         )
         setPerformanceDiagnostics(
           (perfData?.diagnostics as PerformanceDiagnostics | undefined) ?? {
@@ -1324,10 +1354,14 @@ export default function MetasWorkspace() {
         }
 
         const financialByStageEnd: Partial<Record<StageKey, number>> = {}
+        const returnsByStageEnd: Partial<Record<StageKey, number>> = {}
         for (const sk of ['W1', 'W2', 'W3', 'CLOSING', 'FULL'] as StageKey[]) {
           const endDate = stageEndDateMap[sk]
           financialByStageEnd[sk] = endDate
             ? seller.orders.reduce((sum, o) => (o.negotiatedAt <= endDate ? sum + o.totalValue : sum), 0)
+            : 0
+          returnsByStageEnd[sk] = endDate
+            ? seller.returns.reduce((sum, r) => (r.negotiatedAt <= endDate ? sum + r.totalValue : sum), 0)
             : 0
         }
 
@@ -1434,6 +1468,18 @@ export default function MetasWorkspace() {
               break
             }
             case 'DEVOLUCAO':
+              {
+                const financialAccumulated = Math.max(financialByStageEnd[rule.stage] ?? 0, 0)
+                const returnedAccumulated = Math.max(returnsByStageEnd[rule.stage] ?? 0, 0)
+                const targetPct = asPct ?? (rawNumber > 0 ? rawNumber / 100 : 0)
+                if (financialAccumulated <= 0 || targetPct <= 0) {
+                  progress = 0
+                  break
+                }
+                const actualPct = returnedAccumulated / financialAccumulated
+                progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+              }
+              break
             case 'INADIMPLENCIA':
               progress = 0
               break
@@ -2403,7 +2449,21 @@ export default function MetasWorkspace() {
                                 <span className="text-[10px] text-surface-400">% dev.</span>
                               </div>
                             )
-                          })() : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
+                          })() : rule.kpiType === 'DEVOLUCAO' ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                type="number"
+                                min={0}
+                                step="0.1"
+                                placeholder="0"
+                                title="% máximo de devolução sobre o faturado no período"
+                                value={parseTargetNumber(rule.targetText) ?? 0}
+                                onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
+                              />
+                              <span className="text-[10px] text-surface-400">%</span>
+                            </div>
+                          ) : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>

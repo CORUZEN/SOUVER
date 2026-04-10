@@ -19,6 +19,15 @@ type SankhyaOrder = {
   companyCode: string
 }
 
+type SankhyaReturn = {
+  sellerCode: string
+  sellerName: string
+  negotiatedAt: string
+  totalValue: number
+  statusNota: string
+  companyCode: string
+}
+
 /* ---------- helpers ---------- */
 
 function parseNumber(value: unknown): number {
@@ -292,6 +301,22 @@ function toOrder(record: RawRecord): SankhyaOrder | null {
   }
 }
 
+function toReturn(record: RawRecord): SankhyaReturn | null {
+  const sellerName = String(
+    record.VENDEDOR ?? record.APELIDO ?? record.NOMEVEND ?? ''
+  ).trim() || 'Sem vendedor'
+  const negotiatedAt = toIsoDate(record.DTNEG ?? record.DTMOV)
+  if (!negotiatedAt) return null
+  return {
+    sellerCode: String(record.CODVEND ?? '').trim(),
+    sellerName,
+    negotiatedAt,
+    totalValue: Math.abs(parseNumber(record.VLRNOTA)),
+    statusNota: String(record.STATUSNOTA ?? 'L').trim(),
+    companyCode: String(record.CODEMP ?? '').trim(),
+  }
+}
+
 /* ---------- SQL builders ---------- */
 
 function parseYearMonth(req: NextRequest) {
@@ -363,6 +388,40 @@ WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
   AND CAB.CODVEND > 0
   ${typeFilter}${companyFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
+}
+
+function buildReturnsSql(
+  startDate: string,
+  endDateExclusive: string,
+  sellerCodes: string[],
+  companyScope: '1' | '2' | 'all' = '1'
+) {
+  let sellerFilter = ''
+  if (sellerCodes.length > 0) {
+    const escaped = sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
+    sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
+  }
+
+  const companyFilter = companyScope !== 'all'
+    ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
+    : ''
+
+  return `
+SELECT
+  TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD') AS DTNEG,
+  NVL(VEN.APELIDO, 'SEM VENDEDOR') AS VENDEDOR,
+  TO_CHAR(CAB.CODVEND) AS CODVEND,
+  NVL(CAB.VLRNOTA, 0) AS VLRNOTA,
+  NVL(CAB.STATUSNOTA, 'L') AS STATUSNOTA,
+  TO_CHAR(CAB.CODEMP) AS CODEMP
+FROM TGFCAB CAB
+INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
+  AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
+  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
+  AND CAB.CODVEND > 0
+  AND CAB.TIPMOV = 'D'
+  ${companyFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
 }
 
 /* ---------- GET handler ---------- */
@@ -444,13 +503,25 @@ export async function GET(req: NextRequest) {
       } catch { /* keep empty */ }
     }
 
+    // --- Devoluções do mês por vendedor ---
+    let returns: SankhyaReturn[] = []
+    try {
+      const sqlReturns = buildReturnsSql(startDate, endDateExclusive, sellerCodes, companyScope)
+      const returnRecords = await queryRows(baseUrl, headers, sqlReturns, appKey, { allowEmpty: true })
+      returns = returnRecords.map(toReturn).filter((o): o is SankhyaReturn => o !== null)
+    } catch {
+      returns = []
+    }
+
     // --- Group by seller ---
     const sellersMap = new Map<string, {
       id: string
       name: string
       login: string
       orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
+      returns: Array<{ negotiatedAt: string; totalValue: number }>
       totalValue: number
+      totalReturnedValue: number
       totalGrossWeight: number
     }>()
 
@@ -467,7 +538,9 @@ export async function GET(req: NextRequest) {
           name: normalizedName,
           login: makeSellerLogin(normalizedName, sellerId),
           orders: [],
+          returns: [],
           totalValue: 0,
+          totalReturnedValue: 0,
           totalGrossWeight: 0,
         })
       }
@@ -484,6 +557,34 @@ export async function GET(req: NextRequest) {
       seller.totalGrossWeight += order.grossWeight
     }
 
+    for (const ret of returns) {
+      const normalizedName = ret.sellerName.trim() || 'Sem vendedor'
+      const sellerKey = `${ret.sellerCode || '0'}::${normalizedName.toUpperCase()}`
+      const sellerId = ret.sellerCode
+        ? `sankhya-${ret.sellerCode}`
+        : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+
+      if (!sellersMap.has(sellerKey)) {
+        sellersMap.set(sellerKey, {
+          id: sellerId,
+          name: normalizedName,
+          login: makeSellerLogin(normalizedName, sellerId),
+          orders: [],
+          returns: [],
+          totalValue: 0,
+          totalReturnedValue: 0,
+          totalGrossWeight: 0,
+        })
+      }
+
+      const seller = sellersMap.get(sellerKey)!
+      seller.returns.push({
+        negotiatedAt: ret.negotiatedAt,
+        totalValue: ret.totalValue,
+      })
+      seller.totalReturnedValue += ret.totalValue
+    }
+
     // Ensure all active sellers are present (even with 0 orders)
     for (const allowed of allowedSellers) {
       const normalizedName = allowed.name.trim() || 'Sem vendedor'
@@ -497,7 +598,9 @@ export async function GET(req: NextRequest) {
         name: normalizedName,
         login: makeSellerLogin(normalizedName, sellerId),
         orders: [],
+        returns: [],
         totalValue: 0,
+        totalReturnedValue: 0,
         totalGrossWeight: 0,
       })
     }
