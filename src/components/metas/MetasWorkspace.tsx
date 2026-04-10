@@ -310,6 +310,19 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function formatBrlNumber(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.max(value, 0))
+}
+
+function parseBrlNumber(input: string) {
+  const digits = input.replace(/\D/g, '')
+  if (!digits) return 0
+  return Number(digits) / 100
+}
+
 function parseTargetNumber(targetText: string) {
   const match = targetText.match(/(\d+(?:[.,]\d+)?)/)
   if (!match) return null
@@ -2428,10 +2441,43 @@ export default function MetasWorkspace() {
                   <label className={label}>Tipo<select className={input} value={prize.type} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? normalizePrize({ ...item, type: event.target.value as PrizeType }) : item))}><option value="CASH">Financeira</option><option value="BENEFIT">Benefício</option></select></label>
                   {prize.type === 'CASH' ? (
                     <label className={label}>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span>{(prize.cashMode ?? 'PERCENT') === 'FIXED' ? 'Valor fixo (R$)' : 'Percentual sobre meta (%)'}</span>
+                      <span>{(prize.cashMode ?? 'PERCENT') === 'FIXED' ? 'Valor fixo (R$)' : 'Percentual sobre a meta'}</span>
+                      <div className="relative mt-1">
+                        {(prize.cashMode ?? 'PERCENT') === 'FIXED' ? (
+                          <input
+                            className={`${input} pr-16`}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatBrlNumber(prize.rewardValue)}
+                            onChange={(event) =>
+                              setPrizes((prev) =>
+                                prev.map((item) =>
+                                  item.id === prize.id
+                                    ? { ...item, rewardValue: parseBrlNumber(event.target.value) }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                        ) : (
+                          <input
+                            className={`${input} pr-16 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                            type="number"
+                            step="0.01"
+                            value={prize.rewardValue}
+                            onChange={(event) =>
+                              setPrizes((prev) =>
+                                prev.map((item) =>
+                                  item.id === prize.id
+                                    ? { ...item, rewardValue: parseDecimal(event.target.value, 0) }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                        )}
                         <select
-                          className="rounded border border-surface-200 bg-white px-1.5 py-1 text-[11px] text-surface-700"
+                          className="absolute right-1.5 top-1/2 z-10 h-7 w-14 -translate-y-1/2 rounded-md border border-surface-200 bg-white px-1.5 py-1 text-[11px] font-semibold text-surface-700 shadow-sm"
                           value={prize.cashMode ?? 'PERCENT'}
                           onChange={(event) =>
                             setPrizes((prev) =>
@@ -2443,28 +2489,10 @@ export default function MetasWorkspace() {
                             )
                           }
                         >
-                          <option value="PERCENT">Percentual</option>
-                          <option value="FIXED">Valor em R$</option>
+                          <option value="PERCENT">%</option>
+                          <option value="FIXED">R$</option>
                         </select>
                       </div>
-                      <input
-                        className={input}
-                        type="number"
-                        step="0.01"
-                        value={prize.rewardValue}
-                        onChange={(event) =>
-                          setPrizes((prev) =>
-                            prev.map((item) =>
-                              item.id === prize.id
-                                ? { ...item, rewardValue: parseDecimal(event.target.value, 0) }
-                                : item
-                            )
-                          )
-                        }
-                      />
-                      {(prize.cashMode ?? 'PERCENT') === 'FIXED' && (
-                        <span className="mt-1 text-[10px] text-surface-400">Formato BRL: {currency(prize.rewardValue)}</span>
-                      )}
                     </label>
                   ) : (
                     <label className={label}>Premiação<input className={input} placeholder="Ex: Viagem, produto, voucher…" value={prize.benefitDescription} onChange={(event) => setPrizes((prev) => prev.map((item) => item.id === prize.id ? { ...item, benefitDescription: event.target.value } : item))} /></label>
