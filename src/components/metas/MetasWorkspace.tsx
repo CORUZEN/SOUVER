@@ -108,6 +108,7 @@ interface Salesperson {
   totalOpenTitlesValue: number
   totalGrossWeight: number
   totalOrders: number
+  baseClientCount: number
 }
 
 interface SellerAllowlistEntry {
@@ -139,6 +140,9 @@ interface PerformanceDiagnostics {
   openTitlePartners?: number
   openTitlesQueryMode?: string
   openTitlesErrors?: string[]
+  sellerBaseFetched?: number
+  sellerBaseQueryMode?: string
+  sellerBaseErrors?: string[]
 }
 
 interface RuleProgress {
@@ -838,6 +842,7 @@ export default function MetasWorkspace() {
           id: string
           name: string
           login: string
+          baseClientCount?: number
           totalValue?: number
           totalReturnedValue?: number
           totalOpenTitlesValue?: number
@@ -882,6 +887,7 @@ export default function MetasWorkspace() {
             totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
             totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
             totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+            baseClientCount: Number(seller.baseClientCount ?? 0),
             orders: normalizedOrders,
             returns: normalizedReturns,
             openTitles: normalizedOpenTitles,
@@ -1075,6 +1081,7 @@ export default function MetasWorkspace() {
           id: string
           name: string
           login: string
+          baseClientCount?: number
           totalValue?: number
           totalReturnedValue?: number
           totalOpenTitlesValue?: number
@@ -1118,6 +1125,7 @@ export default function MetasWorkspace() {
               totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
               totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
               totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+              baseClientCount: Number(seller.baseClientCount ?? 0),
               orders: normalizedOrders,
               returns: normalizedReturns,
               openTitles: normalizedOpenTitles,
@@ -1443,6 +1451,7 @@ export default function MetasWorkspace() {
         }
 
         const totalDistinctClients = stageMetrics.FULL.clientCodes.size
+        const officialBaseClients = Math.max(seller.baseClientCount ?? 0, 0)
 
         // ── Financial accumulation by stage closing date ────────────────────────
         // For META_FINANCEIRA we need "all orders placed up to the END DATE of the
@@ -1494,7 +1503,6 @@ export default function MetasWorkspace() {
           // Stage-locked metrics: only data up to this rule's stage end, so past KPIs never change retroactively
           const lockedValue = Math.max(cumStage.totalValue, 0.00001)
           const lockedOrders = Math.max(cumStage.orderCount, 1)
-          const lockedClients = Math.max(cumStage.distinctClients, 1)
           const lockedTicket = cumStage.orderCount > 0 ? cumStage.totalValue / cumStage.orderCount : 0
 
           // KPIs that always interpret parameter as percentage
@@ -1527,7 +1535,8 @@ export default function MetasWorkspace() {
               // Distinct clients reached in this stage vs total client base (% coverage)
               // totalDistinctClients can only grow → past KPIs can only stay same or decrease, never improve
               if (asPct) {
-                const clientCoverage = cumStage.distinctClients / Math.max(totalDistinctClients, 1)
+                const denominator = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 1)
+                const clientCoverage = cumStage.distinctClients / denominator
                 progress = clientCoverage / asPct
               } else {
                 progress = cumStage.distinctClients > 0 ? 1 : 0
@@ -1551,9 +1560,10 @@ export default function MetasWorkspace() {
                 ? Math.ceil(totalActiveProducts * itemsNum / 100)
                 : itemsNum
               const clientsPct = parseDecimal(parts[1] ?? '0', 0) / 100
-              // Use stage-locked distinct clients so past KPIs don't shift
-              if (resolvedItems > 0 && clientsPct > 0 && lockedClients > 0) {
-                const requiredClients = Math.ceil(lockedClients * clientsPct)
+              const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
+              // Use official client base (parceiros preferenciais) when available.
+              if (resolvedItems > 0 && clientsPct > 0 && baseTotalClients > 0) {
+                const requiredClients = Math.ceil(baseTotalClients * clientsPct)
                 const clientsAchieved = cumStage.distinctClients
                 progress = clientsAchieved / Math.max(requiredClients, 1)
               } else if (resolvedItems > 0) {
@@ -1604,7 +1614,7 @@ export default function MetasWorkspace() {
                 }
                 const requiredKg = focusTargetKg * (volumePct / 100)
                 const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
-                const baseTotalClients = Math.max(totalDistinctClients, 0)
+                const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
                 const requiredBaseClients = basePct > 0
                   ? Math.ceil(baseTotalClients * (basePct / 100))
                   : 0
@@ -2436,6 +2446,8 @@ export default function MetasWorkspace() {
                               const returned = getCumulativeReturns(selectedSeller, stageEndIso)
                               const distinctClientsCum = getDistinctClientsUntil(selectedSeller, stageEndIso)
                               const distinctClientsMonth = getTotalDistinctClientsInMonth(selectedSeller)
+                              const officialBaseClients = Math.max(selectedSeller.baseClientCount ?? 0, 0)
+                              const resolvedBaseClients = officialBaseClients > 0 ? officialBaseClients : distinctClientsMonth
                               const teamAverageTicket = (() => {
                                 const tickets = sellers
                                   .filter((s) => s.totalOrders > 0)
@@ -2466,11 +2478,11 @@ export default function MetasWorkspace() {
                                 resultValue = `${num(actualPct, 3)}%`
                                 ok = parameterNumber > 0 && actualPct <= parameterNumber
                               } else if (kpiType === 'BASE_CLIENTES') {
-                                const coveragePct = distinctClientsMonth > 0 ? (distinctClientsCum / distinctClientsMonth) * 100 : 0
+                                const coveragePct = resolvedBaseClients > 0 ? (distinctClientsCum / resolvedBaseClients) * 100 : 0
                                 title = 'Cobertura da base'
                                 lines = [
                                   { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
-                                  { label: 'Base de clientes do mês', value: `${distinctClientsMonth}` },
+                                  { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
                                   { label: 'Meta parametrizada', value: `${num(parameterNumber, 2)}%` },
                                 ]
                                 resultLabel = 'Cobertura apurada'
@@ -2519,10 +2531,11 @@ export default function MetasWorkspace() {
                                   ? Math.ceil(totalActiveProducts * itemsNum / 100)
                                   : itemsNum
                                 const clientsPct = Math.max(parseDecimal(parts[1] ?? '0', 0), 0)
-                                const coveragePct = distinctClientsMonth > 0 ? (distinctClientsCum / distinctClientsMonth) * 100 : 0
+                                const coveragePct = resolvedBaseClients > 0 ? (distinctClientsCum / resolvedBaseClients) * 100 : 0
                                 title = 'Distribuição por clientes e itens'
                                 lines = [
                                   { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
+                                  { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
                                   { label: 'Cobertura da base', value: `${num(coveragePct, 2)}%` },
                                   { label: 'Itens alvo resolvidos', value: `${num(resolvedItems, 0)} item(ns)` },
                                   { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
@@ -2538,7 +2551,7 @@ export default function MetasWorkspace() {
                                   : null
                                 const soldKg = focusRow?.soldKg ?? 0
                                 const soldClients = Number(focusRow?.soldClients ?? 0)
-                                const baseTotalClients = distinctClientsMonth
+                                const baseTotalClients = resolvedBaseClients
                                 const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
                                 const requiredKg = focusTargetKg * (Math.max(volumePct, 0) / 100)
                                 const requiredBaseClients = basePct > 0
@@ -3242,6 +3255,8 @@ export default function MetasWorkspace() {
                               const volumeRequiredKg = targetKg > 0 ? targetKg * (Math.max(itemFocoParams.volumePct, 0) / 100) : 0
                               const volumeOk = volumeRequiredKg > 0 ? soldKg >= volumeRequiredKg : soldKg > 0
                               const baseTotalClients = sellersInBlock.reduce((sum, seller) => {
+                                const official = Math.max(seller.baseClientCount ?? 0, 0)
+                                if (official > 0) return sum + official
                                 const clientSet = new Set<string>()
                                 for (const order of seller.orders) {
                                   const code = (order.clientCode ?? '').trim()

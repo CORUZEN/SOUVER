@@ -39,6 +39,11 @@ type SankhyaOpenTitle = {
   companyCode: string
 }
 
+type SankhyaSellerBase = {
+  sellerCode: string
+  totalClients: number
+}
+
 /* ---------- helpers ---------- */
 
 function parseNumber(value: unknown): number {
@@ -352,6 +357,15 @@ function toOpenTitle(record: RawRecord): SankhyaOpenTitle | null {
   }
 }
 
+function toSellerBase(record: RawRecord): SankhyaSellerBase | null {
+  const sellerCode = String(record.CODVEND ?? '').trim()
+  if (!sellerCode) return null
+  return {
+    sellerCode,
+    totalClients: Math.max(Math.floor(parseNumber(record.BASECLIENTES ?? record.TOTALCLIENTES ?? record.QTDCLIENTES)), 0),
+  }
+}
+
 /* ---------- SQL builders ---------- */
 
 function parseYearMonth(req: NextRequest) {
@@ -579,6 +593,65 @@ ${buildBaseFilters(pendingCond, withReceitasReal)}
   return candidates
 }
 
+function buildSellerBaseSqlCandidates(sellerCodes: string[]) {
+  const sellerFilter = sellerCodes.length > 0
+    ? `AND NVL(PAR.CODVEND, 0) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
+    : ''
+  const sellerPrefFilter = sellerCodes.length > 0
+    ? `AND NVL(PAR.CODVENDPREF, 0) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
+    : ''
+
+  const clienteCond = "UPPER(TO_CHAR(NVL(PAR.CLIENTE, 'N'))) IN ('S', '1', 'SIM')"
+  const ativoCond = "UPPER(TO_CHAR(NVL(PAR.ATIVO, 'S'))) IN ('S', '1', 'SIM')"
+  const notInactiveCond = "UPPER(TO_CHAR(NVL(PAR.INATIVO, 'N'))) IN ('N', '0', 'NAO', 'NÃO')"
+
+  const q1 = `
+SELECT
+  TO_CHAR(PAR.CODVEND) AS CODVEND,
+  COUNT(DISTINCT PAR.CODPARC) AS BASECLIENTES
+FROM TGFPAR PAR
+WHERE NVL(PAR.CODVEND, 0) > 0
+  AND ${clienteCond}
+  AND ${ativoCond}
+  ${sellerFilter}GROUP BY PAR.CODVEND
+ORDER BY PAR.CODVEND`.trim()
+
+  const q2 = `
+SELECT
+  TO_CHAR(PAR.CODVEND) AS CODVEND,
+  COUNT(DISTINCT PAR.CODPARC) AS BASECLIENTES
+FROM TGFPAR PAR
+WHERE NVL(PAR.CODVEND, 0) > 0
+  AND ${clienteCond}
+  AND ${notInactiveCond}
+  ${sellerFilter}GROUP BY PAR.CODVEND
+ORDER BY PAR.CODVEND`.trim()
+
+  const q3 = `
+SELECT
+  TO_CHAR(PAR.CODVENDPREF) AS CODVEND,
+  COUNT(DISTINCT PAR.CODPARC) AS BASECLIENTES
+FROM TGFPAR PAR
+WHERE NVL(PAR.CODVENDPREF, 0) > 0
+  AND ${clienteCond}
+  AND ${ativoCond}
+  ${sellerPrefFilter}GROUP BY PAR.CODVENDPREF
+ORDER BY PAR.CODVENDPREF`.trim()
+
+  const q4 = `
+SELECT
+  TO_CHAR(PAR.CODVENDPREF) AS CODVEND,
+  COUNT(DISTINCT PAR.CODPARC) AS BASECLIENTES
+FROM TGFPAR PAR
+WHERE NVL(PAR.CODVENDPREF, 0) > 0
+  AND ${clienteCond}
+  AND ${notInactiveCond}
+  ${sellerPrefFilter}GROUP BY PAR.CODVENDPREF
+ORDER BY PAR.CODVENDPREF`.trim()
+
+  return [q1, q2, q3, q4]
+}
+
 async function detectTgffinColumns(
   baseUrl: string,
   headers: Record<string, string>,
@@ -706,6 +779,30 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    let sellerBaseRows: SankhyaSellerBase[] = []
+    let sellerBaseQueryMode = 'NONE'
+    const sellerBaseErrors: string[] = []
+    const sellerCodesForBase = sellerCodes.length > 0
+      ? sellerCodes
+      : [...new Set(orders.map((o) => String(o.sellerCode ?? '').trim()).filter((c) => c.length > 0))]
+    const sellerBaseSqlCandidates = buildSellerBaseSqlCandidates(sellerCodesForBase)
+    for (let i = 0; i < sellerBaseSqlCandidates.length; i += 1) {
+      const sqlBase = sellerBaseSqlCandidates[i]
+      try {
+        const baseRecords = await queryRows(baseUrl, headers, sqlBase, appKey, { allowEmpty: true })
+        sellerBaseRows = baseRecords.map(toSellerBase).filter((r): r is SankhyaSellerBase => r !== null)
+        sellerBaseQueryMode = `VARIANT_${i + 1}`
+        break
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'erro desconhecido'
+        sellerBaseErrors.push(`VARIANT_${i + 1}: ${msg}`)
+      }
+    }
+    const sellerBaseMap = new Map<string, number>()
+    for (const row of sellerBaseRows) {
+      sellerBaseMap.set(String(row.sellerCode).trim(), row.totalClients)
+    }
+
     // --- Group by seller ---
     const sellersMap = new Map<string, {
       id: string
@@ -714,6 +811,7 @@ export async function GET(req: NextRequest) {
       orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
       returns: Array<{ negotiatedAt: string; totalValue: number }>
       openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
+      baseClientCount: number
       totalValue: number
       totalReturnedValue: number
       totalOpenTitlesValue: number
@@ -735,6 +833,7 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
           totalOpenTitlesValue: 0,
@@ -769,6 +868,7 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
           totalOpenTitlesValue: 0,
@@ -800,6 +900,7 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
           totalOpenTitlesValue: 0,
@@ -833,11 +934,17 @@ export async function GET(req: NextRequest) {
         orders: [],
         returns: [],
         openTitles: [],
+        baseClientCount: 0,
         totalValue: 0,
         totalReturnedValue: 0,
         totalOpenTitlesValue: 0,
         totalGrossWeight: 0,
       })
+    }
+
+    for (const seller of sellersMap.values()) {
+      const sellerCode = seller.id.replace(/^sankhya-/, '').trim()
+      seller.baseClientCount = sellerBaseMap.get(sellerCode) ?? 0
     }
 
     const sellers = [...sellersMap.values()]
@@ -869,6 +976,9 @@ export async function GET(req: NextRequest) {
         }, {}),
         openTitlesFetched: openTitles.length,
         openTitlesMappedToSeller: mappedOpenTitlesCount,
+        sellerBaseFetched: sellerBaseRows.length,
+        sellerBaseQueryMode,
+        sellerBaseErrors: sellerBaseErrors.slice(0, 3),
         openTitlePartners: openTitles.reduce((acc, item) => {
           if (item.partnerCode) acc.add(item.partnerCode)
           return acc
