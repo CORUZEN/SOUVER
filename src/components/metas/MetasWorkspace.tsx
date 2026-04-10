@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   CircleDollarSign,
   Plus,
   RotateCcw,
@@ -584,6 +585,8 @@ export default function MetasWorkspace() {
   const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
+  const [devolucaoInspectorOpenKey, setDevolucaoInspectorOpenKey] = useState<string | null>(null)
+  const [devolucaoInspectorSellerId, setDevolucaoInspectorSellerId] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -2190,6 +2193,7 @@ export default function MetasWorkspace() {
             const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
+            const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
 
             return (
               <Card key={block.id} className="border-surface-200">
@@ -2462,6 +2466,98 @@ export default function MetasWorkspace() {
                                 onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
                               />
                               <span className="text-[10px] text-surface-400">%</span>
+                              {(() => {
+                                const inspectorKey = `${block.id}:${rule.id}`
+                                const isOpen = devolucaoInspectorOpenKey === inspectorKey
+                                const stageLabel = STAGES.find((s) => s.key === rule.stage)?.label ?? rule.stage
+                                const stageEnd = cycle.weeks.find((w) => w.key === rule.stage)?.end ?? null
+                                const selectedSeller =
+                                  sellersInBlock.find((s) => s.id === devolucaoInspectorSellerId) ??
+                                  sellersInBlock[0] ??
+                                  null
+                                const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+                                const faturado = selectedSeller && stageEnd
+                                  ? selectedSeller.orders.reduce((sum, order) => (order.negotiatedAt <= stageEnd ? sum + order.totalValue : sum), 0)
+                                  : 0
+                                const devolvido = selectedSeller && stageEnd
+                                  ? selectedSeller.returns.reduce((sum, item) => (item.negotiatedAt <= stageEnd ? sum + item.totalValue : sum), 0)
+                                  : 0
+                                const apuradoPct = faturado > 0 ? (devolvido / faturado) * 100 : 0
+
+                                return (
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      className="rounded p-0.5 text-surface-400 hover:bg-surface-100 hover:text-primary-600"
+                                      title="Verificar valores apurados do Sankhya"
+                                      onClick={() => {
+                                        if (isOpen) {
+                                          setDevolucaoInspectorOpenKey(null)
+                                          return
+                                        }
+                                        setDevolucaoInspectorOpenKey(inspectorKey)
+                                        setDevolucaoInspectorSellerId((prev) => {
+                                          if (sellersInBlock.some((s) => s.id === prev)) return prev
+                                          return sellersInBlock[0]?.id ?? ''
+                                        })
+                                      }}
+                                    >
+                                      <CircleHelp size={14} />
+                                    </button>
+                                    {isOpen && (
+                                      <>
+                                        <div
+                                          className="fixed inset-0 z-20"
+                                          onClick={() => setDevolucaoInspectorOpenKey(null)}
+                                          aria-hidden="true"
+                                        />
+                                        <div className="absolute right-0 top-full z-30 mt-1.5 w-80 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5">
+                                          <div className="mb-2">
+                                            <p className="text-xs font-semibold text-surface-800">Auditoria da devolução (Sankhya)</p>
+                                            <p className="text-[10px] text-surface-500">{stageLabel} · Período {formatDateBr(periodStart)} a {stageEnd ? formatDateBr(stageEnd) : '--'}</p>
+                                          </div>
+                                          {sellersInBlock.length > 0 ? (
+                                            <div className="space-y-2">
+                                              <div>
+                                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Vendedor</p>
+                                                <select
+                                                  className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs text-surface-800"
+                                                  value={selectedSeller?.id ?? ''}
+                                                  onChange={(e) => setDevolucaoInspectorSellerId(e.target.value)}
+                                                >
+                                                  {sellersInBlock.map((sellerOption) => (
+                                                    <option key={sellerOption.id} value={sellerOption.id}>{sellerOption.name}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                              <div className="rounded-lg border border-surface-200 bg-surface-50 p-2.5 text-xs text-surface-700">
+                                                <div className="flex items-center justify-between">
+                                                  <span>Valor faturado no período</span>
+                                                  <strong className="text-surface-900">{currency(faturado)}</strong>
+                                                </div>
+                                                <div className="mt-1.5 flex items-center justify-between">
+                                                  <span>Valor devolvido no período</span>
+                                                  <strong className="text-surface-900">{currency(devolvido)}</strong>
+                                                </div>
+                                                <div className="mt-2 border-t border-surface-200 pt-2 flex items-center justify-between">
+                                                  <span>Resultado apurado</span>
+                                                  <strong className={apuradoPct <= Math.max(parseTargetNumber(rule.targetText) ?? 0, 0) ? 'text-emerald-700' : 'text-rose-700'}>
+                                                    {num(apuradoPct, 3)}%
+                                                  </strong>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-2.5 py-2 text-xs text-surface-500">
+                                              Nenhum vendedor neste grupo para auditar.
+                                            </p>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </div>
                           ) : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
