@@ -1374,7 +1374,9 @@ export default function MetasWorkspace() {
           return sum + (prize.cashMode === 'FIXED' ? rewardValue : (monthlyTargetBase * rewardValue) / 100)
         }, 0)
 
-        const rewardAchieved = kpiRewardAchieved + campaignCashAchieved
+        const extraBonusEligible = pointsAchieved >= extraMinPoints
+        const extraBonusAchieved = extraBonusEligible ? Math.max(extraBonus, 0) : 0
+        const rewardAchieved = kpiRewardAchieved + campaignCashAchieved + extraBonusAchieved
 
         const ratio = activePointsTarget > 0 ? pointsAchieved / activePointsTarget : 0
 
@@ -1405,7 +1407,7 @@ export default function MetasWorkspace() {
           pointsTarget: blockPointsTarget,
           kpiRewardAchieved,
           rewardAchieved,
-          rewardTarget: blockRewardTarget + campaignCashTarget,
+          rewardTarget: blockRewardTarget + campaignCashTarget + Math.max(extraBonus, 0),
           status,
           gapToTarget: Math.max(blockPointsTarget - pointsAchieved, 0),
           ruleProgress,
@@ -1413,7 +1415,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [brandWeightRows, cycle.weeks, prizes, productAllowlist, ruleBlocks, sellers])
+  }, [brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, prizes, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
