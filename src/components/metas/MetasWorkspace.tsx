@@ -334,6 +334,33 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function getSellerWeightTargetRatios(
+  weightTargets: WeightTarget[],
+  brandWeightRows: Array<{ sellerCode: string; brand: string; totalKg: number }>,
+  sellerCode: string
+) {
+  return weightTargets
+    .filter((target) => target.brand && target.targetKg > 0)
+    .map((target) => {
+      const soldKg = brandWeightRows
+        .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
+        .reduce((sum, row) => sum + row.totalKg, 0)
+      return soldKg / Math.max(target.targetKg, 0.00001)
+    })
+}
+
+function getVolumeProgressByClosestTargets(ratios: number[], requiredGroups: number) {
+  if (requiredGroups <= 0) return 0
+  const topRatios = [...ratios]
+    .sort((a, b) => b - a)
+    .slice(0, requiredGroups)
+  const normalized = Array.from({ length: requiredGroups }, (_, index) =>
+    Math.max(0, Math.min(topRatios[index] ?? 0, 1))
+  )
+  const sum = normalized.reduce((acc, value) => acc + value, 0)
+  return sum / requiredGroups
+}
+
 function formatBrlNumber(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 2,
@@ -1440,13 +1467,8 @@ export default function MetasWorkspace() {
         }
 
         const sellerCode = seller.id.replace(/^sankhya-/, '')
-        const achievedWeightGroups = (block.weightTargets ?? []).filter((target) => {
-          if (!target.brand || target.targetKg <= 0) return false
-          const soldKg = brandWeightRows
-            .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
-            .reduce((sum, row) => sum + row.totalKg, 0)
-          return soldKg >= target.targetKg
-        }).length
+        const weightTargetRatios = getSellerWeightTargetRatios(block.weightTargets ?? [], brandWeightRows, sellerCode)
+        const achievedWeightGroups = weightTargetRatios.filter((ratio) => ratio >= 1).length
 
         const focusCode = (block.focusProductCode ?? '').trim()
         const focusRows = focusCode ? (focusProductRows[focusCode] ?? []) : []
@@ -1514,7 +1536,7 @@ export default function MetasWorkspace() {
             case 'VOLUME':
               if (rawNumber > 0) {
                 const requiredGroups = Math.max(Math.floor(rawNumber), 1)
-                progress = achievedWeightGroups / requiredGroups
+                progress = getVolumeProgressByClosestTargets(weightTargetRatios, requiredGroups)
               } else {
                 progress = 0
               }
@@ -1583,8 +1605,10 @@ export default function MetasWorkspace() {
                 const requiredKg = focusTargetKg * (volumePct / 100)
                 const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
                 const returnPct = focusTargetKg > 0 ? (focusReturnKg / focusTargetKg) * 100 : 0
-                const returnOk = devolucaoPct > 0 ? returnPct <= devolucaoPct : true
-                progress = returnOk ? volumeProgress : 0
+                const returnProgress = devolucaoPct > 0
+                  ? (returnPct <= devolucaoPct ? 1 : devolucaoPct / Math.max(returnPct, 0.00001))
+                  : 1
+                progress = volumeProgress * returnProgress
               }
               break
             default:
@@ -2464,22 +2488,24 @@ export default function MetasWorkspace() {
                                 ok = required > 0 && revenue >= required
                               } else if (kpiType === 'VOLUME') {
                                 const requiredGroups = Math.max(Math.floor(parameterNumber), 0)
-                                const achievedGroups = (block.weightTargets ?? []).filter((target) => {
-                                  if (!target.brand || target.targetKg <= 0) return false
-                                  const soldKg = brandWeightRows
-                                    .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
-                                    .reduce((sum, row) => sum + row.totalKg, 0)
-                                  return soldKg >= target.targetKg
-                                }).length
+                                const ratios = getSellerWeightTargetRatios(block.weightTargets ?? [], brandWeightRows, sellerCode)
+                                const achievedGroups = ratios.filter((ratio) => ratio >= 1).length
+                                const volumeProgress = requiredGroups > 0
+                                  ? getVolumeProgressByClosestTargets(ratios, requiredGroups)
+                                  : 0
+                                const equivalentGroups = volumeProgress * Math.max(requiredGroups, 1)
                                 title = 'Grupos de peso atingidos'
                                 lines = [
                                   { label: 'Grupos com meta batida', value: `${achievedGroups}` },
                                   { label: 'Grupos exigidos no parâmetro', value: `${requiredGroups}` },
+                                  { label: 'Progresso aproximado', value: `${num(volumeProgress * 100, 1)}%` },
                                   { label: 'Metas de peso no bloco', value: `${(block.weightTargets ?? []).length}` },
                                 ]
                                 resultLabel = 'Resultado apurado'
-                                resultValue = `${achievedGroups}/${requiredGroups || 0}`
-                                ok = requiredGroups > 0 && achievedGroups >= requiredGroups
+                                resultValue = requiredGroups > 0
+                                  ? `${num(equivalentGroups, 2)}/${requiredGroups}`
+                                  : 'N/A'
+                                ok = requiredGroups > 0 && volumeProgress >= 1
                               } else if (kpiType === 'DISTRIBUICAO') {
                                 const parts = rule.targetText.split('|').map((s) => s.trim())
                                 const itemsPart = parts[0] ?? '0'
