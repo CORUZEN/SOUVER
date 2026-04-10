@@ -89,14 +89,22 @@ interface SellerReturnEntry {
   totalValue: number
 }
 
+interface SellerOpenTitleEntry {
+  titleId: string
+  dueDate: string
+  totalValue: number
+}
+
 interface Salesperson {
   id: string
   name: string
   login: string
   orders: SellerOrder[]
   returns: SellerReturnEntry[]
+  openTitles: SellerOpenTitleEntry[]
   totalValue: number
   totalReturnedValue: number
+  totalOpenTitlesValue: number
   totalGrossWeight: number
   totalOrders: number
 }
@@ -245,7 +253,7 @@ const DEFAULT_RULES: GoalRule[] = [
   { id: 'closing-volume', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'VOLUME', kpi: 'Volume', description: 'Grupos de produto com meta de peso atingida até o fechamento do mês.', targetText: '6', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
-  { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: 'Até 3%', rewardValue: 241.87, points: 0.05 },
+  { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: '3|45', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume do item foco com limite de devolução.', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado) — bônus de superação.', targetText: '120%', rewardValue: 96.75, points: 0 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
@@ -372,6 +380,33 @@ function formatItemFocoTarget(volumePct: number, devolucaoPct: number) {
   const v = Math.max(volumePct, 0)
   const d = Math.max(devolucaoPct, 0)
   return `${v}|${d}`
+}
+
+function parseInadimplenciaTarget(targetText: string) {
+  if (targetText.includes('|')) {
+    const [pctRaw, daysRaw] = targetText.split('|')
+    return {
+      pct: Math.max(parseDecimal((pctRaw ?? '').replace('%', ''), 0), 0),
+      days: Math.max(Math.floor(parseDecimal(daysRaw ?? '45', 45)), 1),
+    }
+  }
+  const numbers = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
+  return {
+    pct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
+    days: Math.max(Math.floor(parseDecimal(numbers[1] ?? '45', 45)), 1),
+  }
+}
+
+function formatInadimplenciaTarget(pct: number, days: number) {
+  return `${Math.max(pct, 0)}|${Math.max(Math.floor(days), 1)}`
+}
+
+function diffDays(startIso: string, endIso: string) {
+  const start = parseIsoDate(startIso)
+  const end = parseIsoDate(endIso)
+  if (!start || !end) return 0
+  const ms = end.getTime() - start.getTime()
+  return Math.floor(ms / 86_400_000)
 }
 
 type ChartPoint = { x: number; y: number }
@@ -780,10 +815,12 @@ export default function MetasWorkspace() {
           login: string
           totalValue?: number
           totalReturnedValue?: number
+          totalOpenTitlesValue?: number
           totalGrossWeight?: number
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
+          openTitles?: Array<{ titleId?: string; dueDate?: string; totalValue?: number }>
         }>
 
         const mapped = remoteSellers.map((seller) => {
@@ -802,6 +839,13 @@ export default function MetasWorkspace() {
               negotiatedAt: String(item.negotiatedAt).slice(0, 10),
               totalValue: Number(item.totalValue ?? 0),
             }))
+          const normalizedOpenTitles = (seller.openTitles ?? [])
+            .filter((item) => typeof item.dueDate === 'string' && item.dueDate.length >= 10)
+            .map((item) => ({
+              titleId: String(item.titleId ?? ''),
+              dueDate: String(item.dueDate).slice(0, 10),
+              totalValue: Number(item.totalValue ?? 0),
+            }))
 
           return {
             id: seller.id,
@@ -809,10 +853,12 @@ export default function MetasWorkspace() {
             login: seller.login,
             totalValue: Number(seller.totalValue ?? 0),
             totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
+            totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
             totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
             totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
             orders: normalizedOrders,
             returns: normalizedReturns,
+            openTitles: normalizedOpenTitles,
           }
         })
 
@@ -1005,10 +1051,12 @@ export default function MetasWorkspace() {
           login: string
           totalValue?: number
           totalReturnedValue?: number
+          totalOpenTitlesValue?: number
           totalGrossWeight?: number
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
+          openTitles?: Array<{ titleId?: string; dueDate?: string; totalValue?: number }>
         }>
         setSellers(
           remoteSellers.map((seller) => {
@@ -1027,16 +1075,25 @@ export default function MetasWorkspace() {
                 negotiatedAt: String(item.negotiatedAt).slice(0, 10),
                 totalValue: Number(item.totalValue ?? 0),
               }))
+            const normalizedOpenTitles = (seller.openTitles ?? [])
+              .filter((item) => typeof item.dueDate === 'string' && item.dueDate.length >= 10)
+              .map((item) => ({
+                titleId: String(item.titleId ?? ''),
+                dueDate: String(item.dueDate).slice(0, 10),
+                totalValue: Number(item.totalValue ?? 0),
+              }))
             return {
               id: seller.id,
               name: seller.name,
               login: seller.login,
               totalValue: Number(seller.totalValue ?? 0),
               totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
+              totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
               totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
               totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
               orders: normalizedOrders,
               returns: normalizedReturns,
+              openTitles: normalizedOpenTitles,
             }
           })
         )
@@ -1498,7 +1555,22 @@ export default function MetasWorkspace() {
               }
               break
             case 'INADIMPLENCIA':
-              progress = 0
+              {
+                const financialAccumulated = Math.max(financialByStageEnd[rule.stage] ?? 0, 0)
+                const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
+                const stageEnd = stageEndDateMap[rule.stage]
+                const overdueOpenTitles = stageEnd
+                  ? seller.openTitles.filter((title) => title.dueDate <= stageEnd && diffDays(title.dueDate, stageEnd) > atrasoDias)
+                  : []
+                const overdueValue = overdueOpenTitles.reduce((sum, title) => sum + title.totalValue, 0)
+                const targetPct = inadPct > 0 ? inadPct / 100 : 0
+                if (financialAccumulated <= 0 || targetPct <= 0) {
+                  progress = 0
+                  break
+                }
+                const actualPct = overdueValue / financialAccumulated
+                progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+              }
               break
             case 'ITEM_FOCO':
               {
@@ -2465,15 +2537,24 @@ export default function MetasWorkspace() {
                                 resultValue = threshold > 0 ? `${num((avgTicketCum / threshold) * 100, 2)}%` : 'N/A'
                                 ok = threshold > 0 && avgTicketCum >= threshold
                               } else if (kpiType === 'INADIMPLENCIA') {
+                                const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
+                                const overdueTitles = stageEndIso
+                                  ? selectedSeller.openTitles.filter((title) => title.dueDate <= stageEndIso && diffDays(title.dueDate, stageEndIso) > atrasoDias)
+                                  : []
+                                const overdueValue = overdueTitles.reduce((sum, title) => sum + title.totalValue, 0)
+                                const actualPct = revenue > 0 ? (overdueValue / revenue) * 100 : 0
                                 title = 'Inadimplência acumulativa'
                                 lines = [
-                                  { label: 'Status do cálculo', value: 'Ainda não implementado' },
-                                  { label: 'Parâmetro cadastrado', value: `${num(parameterNumber, 2)}%` },
-                                  { label: 'Fonte de dados', value: 'Pendente de definição' },
+                                  { label: 'Faturado acumulado', value: currency(revenue) },
+                                  { label: 'Títulos em aberto > prazo', value: currency(overdueValue) },
+                                  { label: 'Quantidade de títulos', value: `${overdueTitles.length}` },
+                                  { label: 'Parâmetro de inadimplência', value: `${num(inadPct, 2)}%` },
+                                  { label: 'Prazo mínimo em atraso', value: `${atrasoDias} dias` },
+                                  { label: 'Regra técnica', value: 'Clientes do vendedor no período + DHBAIXA nulo + DTVENC acima do prazo' },
                                 ]
                                 resultLabel = 'Resultado apurado'
-                                resultValue = 'N/A'
-                                ok = false
+                                resultValue = `${num(actualPct, 3)}%`
+                                ok = inadPct > 0 && actualPct <= inadPct
                               } else {
                                 title = 'KPI personalizado'
                                 lines = [
@@ -2714,7 +2795,7 @@ export default function MetasWorkspace() {
                       {block.rules.map((rule) => (
                         <tr key={rule.id} className="hover:bg-surface-50/50">
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
-                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : e.target.value === 'ITEM_FOCO' ? '0|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
+                          <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : e.target.value === 'ITEM_FOCO' ? '0|0' : e.target.value === 'INADIMPLENCIA' ? '0|45' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
                           <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
                           <td className="px-3 py-2">{(() => {
                             const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
@@ -2806,19 +2887,31 @@ export default function MetasWorkspace() {
                             }
 
                             if (kpiType === 'INADIMPLENCIA') {
+                              const parsed = parseInadimplenciaTarget(rule.targetText)
                               return (
                                 <div className="flex items-center gap-1">
                                   <input
-                                    className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    className="w-16 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                     type="number"
                                     min={0}
                                     step="0.1"
                                     placeholder="0"
-                                    title="% máximo de inadimplência acumulada no período"
-                                    value={parseTargetNumber(rule.targetText) ?? 0}
-                                    onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
+                                    title="% máximo de inadimplência sobre o faturado no período"
+                                    value={parsed.pct || ''}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatInadimplenciaTarget(parseDecimal(e.target.value, 0), parsed.days) })}
                                   />
                                   <span className="text-[10px] text-surface-400">%</span>
+                                  <input
+                                    className="w-16 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    placeholder="45"
+                                    title="Dias mínimos em atraso (títulos em aberto com DHBAIXA nulo)"
+                                    value={parsed.days || ''}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatInadimplenciaTarget(parsed.pct, Math.max(Math.floor(parseDecimal(e.target.value, 45)), 1)) })}
+                                  />
+                                  <span className="text-[10px] text-surface-400">dias</span>
                                   {renderKpiInspector(rule, kpiType)}
                                 </div>
                               )

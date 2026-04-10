@@ -28,6 +28,14 @@ type SankhyaReturn = {
   companyCode: string
 }
 
+type SankhyaOpenTitle = {
+  partnerCode: string
+  dueDate: string
+  totalValue: number
+  titleId: string
+  companyCode: string
+}
+
 /* ---------- helpers ---------- */
 
 function parseNumber(value: unknown): number {
@@ -317,6 +325,18 @@ function toReturn(record: RawRecord): SankhyaReturn | null {
   }
 }
 
+function toOpenTitle(record: RawRecord): SankhyaOpenTitle | null {
+  const dueDate = toIsoDate(record.DTVENC)
+  if (!dueDate) return null
+  return {
+    partnerCode: String(record.CODPARC ?? '').trim(),
+    dueDate,
+    totalValue: Math.abs(parseNumber(record.VLRTITULO ?? record.VLRDESDOB ?? record.VLRNOTA)),
+    titleId: String(record.NUFIN ?? '').trim(),
+    companyCode: String(record.CODEMP ?? '').trim(),
+  }
+}
+
 /* ---------- SQL builders ---------- */
 
 function parseYearMonth(req: NextRequest) {
@@ -424,6 +444,37 @@ WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   ${companyFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
 }
 
+function chunk<T>(items: T[], size: number) {
+  const groups: T[][] = []
+  for (let i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size))
+  return groups
+}
+
+function buildOpenTitlesSql(
+  endDateExclusive: string,
+  partnerCodes: string[],
+  companyScope: '1' | '2' | 'all' = '1'
+) {
+  const escapedPartners = partnerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
+  const companyFilter = companyScope !== 'all'
+    ? `AND FIN.CODEMP = ${Number(companyScope)}\n  `
+    : ''
+
+  return `
+SELECT
+  TO_CHAR(FIN.CODPARC) AS CODPARC,
+  TO_CHAR(FIN.DTVENC, 'YYYY-MM-DD') AS DTVENC,
+  NVL(FIN.VLRDESDOB, NVL(FIN.VLRLIQUIDO, 0)) AS VLRTITULO,
+  TO_CHAR(FIN.NUFIN) AS NUFIN,
+  TO_CHAR(FIN.CODEMP) AS CODEMP
+FROM TGFFIN FIN
+WHERE FIN.DHBAIXA IS NULL
+  AND FIN.DTVENC < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
+  AND NVL(FIN.CODPARC, 0) > 0
+  AND TO_CHAR(FIN.CODPARC) IN (${escapedPartners})
+  ${companyFilter}ORDER BY FIN.CODPARC, FIN.DTVENC`.trim()
+}
+
 /* ---------- GET handler ---------- */
 
 export async function GET(req: NextRequest) {
@@ -513,6 +564,34 @@ export async function GET(req: NextRequest) {
       returns = []
     }
 
+    const partnerOwner = new Map<string, { sellerCode: string; sellerName: string; lastOrderDate: string }>()
+    for (const order of orders) {
+      const partnerCode = order.partnerCode.trim()
+      if (!partnerCode) continue
+      const prev = partnerOwner.get(partnerCode)
+      if (!prev || order.negotiatedAt > prev.lastOrderDate) {
+        partnerOwner.set(partnerCode, {
+          sellerCode: order.sellerCode,
+          sellerName: order.sellerName,
+          lastOrderDate: order.negotiatedAt,
+        })
+      }
+    }
+
+    let openTitles: SankhyaOpenTitle[] = []
+    const partnerCodes = [...partnerOwner.keys()]
+    for (const partnerChunk of chunk(partnerCodes, 400)) {
+      if (partnerChunk.length === 0) continue
+      try {
+        const sqlTitles = buildOpenTitlesSql(endDateExclusive, partnerChunk, companyScope)
+        const titleRecords = await queryRows(baseUrl, headers, sqlTitles, appKey, { allowEmpty: true })
+        const parsed = titleRecords.map(toOpenTitle).filter((o): o is SankhyaOpenTitle => o !== null)
+        openTitles.push(...parsed)
+      } catch {
+        // keep next chunk
+      }
+    }
+
     // --- Group by seller ---
     const sellersMap = new Map<string, {
       id: string
@@ -520,8 +599,10 @@ export async function GET(req: NextRequest) {
       login: string
       orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
       returns: Array<{ negotiatedAt: string; totalValue: number }>
+      openTitles: Array<{ titleId: string; dueDate: string; totalValue: number }>
       totalValue: number
       totalReturnedValue: number
+      totalOpenTitlesValue: number
       totalGrossWeight: number
     }>()
 
@@ -539,8 +620,10 @@ export async function GET(req: NextRequest) {
           login: makeSellerLogin(normalizedName, sellerId),
           orders: [],
           returns: [],
+          openTitles: [],
           totalValue: 0,
           totalReturnedValue: 0,
+          totalOpenTitlesValue: 0,
           totalGrossWeight: 0,
         })
       }
@@ -571,8 +654,10 @@ export async function GET(req: NextRequest) {
           login: makeSellerLogin(normalizedName, sellerId),
           orders: [],
           returns: [],
+          openTitles: [],
           totalValue: 0,
           totalReturnedValue: 0,
+          totalOpenTitlesValue: 0,
           totalGrossWeight: 0,
         })
       }
@@ -583,6 +668,41 @@ export async function GET(req: NextRequest) {
         totalValue: ret.totalValue,
       })
       seller.totalReturnedValue += ret.totalValue
+    }
+
+    let mappedOpenTitlesCount = 0
+    for (const title of openTitles) {
+      const owner = partnerOwner.get(title.partnerCode)
+      if (!owner) continue
+      const normalizedName = owner.sellerName.trim() || 'Sem vendedor'
+      const sellerKey = `${owner.sellerCode || '0'}::${normalizedName.toUpperCase()}`
+      const sellerId = owner.sellerCode
+        ? `sankhya-${owner.sellerCode}`
+        : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+
+      if (!sellersMap.has(sellerKey)) {
+        sellersMap.set(sellerKey, {
+          id: sellerId,
+          name: normalizedName,
+          login: makeSellerLogin(normalizedName, sellerId),
+          orders: [],
+          returns: [],
+          openTitles: [],
+          totalValue: 0,
+          totalReturnedValue: 0,
+          totalOpenTitlesValue: 0,
+          totalGrossWeight: 0,
+        })
+      }
+
+      const seller = sellersMap.get(sellerKey)!
+      seller.openTitles.push({
+        titleId: title.titleId,
+        dueDate: title.dueDate,
+        totalValue: title.totalValue,
+      })
+      seller.totalOpenTitlesValue += title.totalValue
+      mappedOpenTitlesCount += 1
     }
 
     // Ensure all active sellers are present (even with 0 orders)
@@ -599,8 +719,10 @@ export async function GET(req: NextRequest) {
         login: makeSellerLogin(normalizedName, sellerId),
         orders: [],
         returns: [],
+        openTitles: [],
         totalValue: 0,
         totalReturnedValue: 0,
+        totalOpenTitlesValue: 0,
         totalGrossWeight: 0,
       })
     }
@@ -632,6 +754,9 @@ export async function GET(req: NextRequest) {
           acc[key] = (acc[key] ?? 0) + 1
           return acc
         }, {}),
+        openTitlesFetched: openTitles.length,
+        openTitlesMappedToSeller: mappedOpenTitlesCount,
+        openTitlePartnersInPeriod: partnerOwner.size,
       },
       sellers,
     })
