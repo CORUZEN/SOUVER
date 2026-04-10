@@ -29,8 +29,11 @@ type SankhyaReturn = {
 }
 
 type SankhyaOpenTitle = {
+  sellerCode: string
+  sellerName: string
   partnerCode: string
   dueDate: string
+  overdueDays: number
   totalValue: number
   titleId: string
   companyCode: string
@@ -69,6 +72,12 @@ function makeSellerLogin(name: string, fallbackId: string) {
     .replace(/[^a-z0-9]+/g, '.')
     .replace(/^\.+|\.+$/g, '')
   return normalized || fallbackId
+}
+
+function sellerMapKey(code: string, name: string) {
+  const normalizedCode = String(code ?? '').trim()
+  if (normalizedCode) return `COD:${normalizedCode}`
+  return `NAME:${name.trim().toUpperCase()}`
 }
 
 /* ---------- Sankhya auth ---------- */
@@ -326,11 +335,17 @@ function toReturn(record: RawRecord): SankhyaReturn | null {
 }
 
 function toOpenTitle(record: RawRecord): SankhyaOpenTitle | null {
+  const sellerName = String(
+    record.VENDEDOR ?? record.APELIDO ?? record.NOMEVEND ?? ''
+  ).trim() || 'Sem vendedor'
   const dueDate = toIsoDate(record.DTVENC)
   if (!dueDate) return null
   return {
+    sellerCode: String(record.CODVEND ?? '').trim(),
+    sellerName,
     partnerCode: String(record.CODPARC ?? '').trim(),
     dueDate,
+    overdueDays: Math.max(Math.floor(parseNumber(record.ATRASODIAS ?? record.ATRASO ?? record.DIASATRASO)), 0),
     totalValue: Math.abs(parseNumber(record.VLRTITULO ?? record.VLRDESDOB ?? record.VLRNOTA)),
     titleId: String(record.NUFIN ?? '').trim(),
     companyCode: String(record.CODEMP ?? '').trim(),
@@ -444,35 +459,143 @@ WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   ${companyFilter}${sellerFilter}ORDER BY CAB.CODVEND`.trim()
 }
 
-function chunk<T>(items: T[], size: number) {
-  const groups: T[][] = []
-  for (let i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size))
-  return groups
-}
-
-function buildOpenTitlesSql(
+function buildOpenTitlesSqlCandidates(
   endDateExclusive: string,
-  partnerCodes: string[],
-  companyScope: '1' | '2' | 'all' = '1'
+  sellerCodes: string[],
+  companyScope: '1' | '2' | 'all' = '1',
+  tgffinColumns?: Set<string>
 ) {
-  const escapedPartners = partnerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
+  const hasCol = (name: string) => Boolean(tgffinColumns?.has(name.toUpperCase()))
+  const sellerFilter = sellerCodes.length > 0
+    ? `AND FIN.CODVEND IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
+    : ''
   const companyFilter = companyScope !== 'all'
     ? `AND FIN.CODEMP = ${Number(companyScope)}\n  `
     : ''
 
-  return `
+  const pendingStrict = 'FIN.DHBAIXA IS NULL'
+  const receitasCond = "(TO_CHAR(NVL(FIN.RECDESP, 0)) = '1' OR UPPER(TO_CHAR(NVL(FIN.RECDESP, ''))) = 'R')"
+  const realCond = "(UPPER(TO_CHAR(NVL(FIN.PROVISAO, 'N'))) IN ('N', '0', 'NAO', 'NÃO'))"
+
+  const buildBaseFilters = (pendingCond: string, withReceitasReal: boolean) => `
+WHERE ${pendingCond}
+  ${withReceitasReal ? `AND ${realCond}\n  AND ${receitasCond}\n  ` : ''}AND FIN.DTVENC < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
+`
+
+  const makeSql = (openValueExpr: string, overdueExpr: string, pendingCond: string, withReceitasReal: boolean) => `
 SELECT
+  TO_CHAR(FIN.CODVEND) AS CODVEND,
+  NVL(VEN.APELIDO, 'SEM VENDEDOR') AS VENDEDOR,
   TO_CHAR(FIN.CODPARC) AS CODPARC,
   TO_CHAR(FIN.DTVENC, 'YYYY-MM-DD') AS DTVENC,
-  NVL(FIN.VLRDESDOB, NVL(FIN.VLRLIQUIDO, 0)) AS VLRTITULO,
+  ${overdueExpr} AS ATRASODIAS,
+  ${openValueExpr} AS VLRTITULO,
   TO_CHAR(FIN.NUFIN) AS NUFIN,
   TO_CHAR(FIN.CODEMP) AS CODEMP
 FROM TGFFIN FIN
-WHERE FIN.DHBAIXA IS NULL
-  AND FIN.DTVENC < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
-  AND NVL(FIN.CODPARC, 0) > 0
-  AND TO_CHAR(FIN.CODPARC) IN (${escapedPartners})
-  ${companyFilter}ORDER BY FIN.CODPARC, FIN.DTVENC`.trim()
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = FIN.CODVEND
+${buildBaseFilters(pendingCond, withReceitasReal)}
+  AND NVL(FIN.CODVEND, 0) > 0
+  ${companyFilter}${sellerFilter}ORDER BY FIN.CODVEND, FIN.DTVENC`.trim()
+
+  const sellerFilterFallback = sellerCodes.length > 0
+    ? `AND NVL(FIN.CODVEND, CAB.CODVEND) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
+    : ''
+
+  const makeFallbackSql = (openValueExpr: string, overdueExpr: string, pendingCond: string, withReceitasReal: boolean) => `
+SELECT
+  TO_CHAR(NVL(FIN.CODVEND, CAB.CODVEND)) AS CODVEND,
+  NVL(VEN.APELIDO, 'SEM VENDEDOR') AS VENDEDOR,
+  TO_CHAR(FIN.CODPARC) AS CODPARC,
+  TO_CHAR(FIN.DTVENC, 'YYYY-MM-DD') AS DTVENC,
+  ${overdueExpr} AS ATRASODIAS,
+  ${openValueExpr} AS VLRTITULO,
+  TO_CHAR(FIN.NUFIN) AS NUFIN,
+  TO_CHAR(FIN.CODEMP) AS CODEMP
+FROM TGFFIN FIN
+LEFT JOIN TGFCAB CAB ON CAB.NUNOTA = FIN.NUNOTA
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = NVL(FIN.CODVEND, CAB.CODVEND)
+${buildBaseFilters(pendingCond, withReceitasReal)}
+  AND NVL(NVL(FIN.CODVEND, CAB.CODVEND), 0) > 0
+  ${companyFilter}${sellerFilterFallback}ORDER BY NVL(FIN.CODVEND, CAB.CODVEND), FIN.DTVENC`.trim()
+
+  const openValueByDesdob = 'NVL(FIN.VLRDESDOB, 0)'
+  const overdueByAtraso = 'NVL(FIN.ATRASO, TRUNC(SYSDATE) - TRUNC(FIN.DTVENC))'
+  const overdueByAtrasoInicial = 'NVL(FIN.ATRASOINICIAL, TRUNC(SYSDATE) - TRUNC(FIN.DTVENC))'
+  const overdueByCalc = '(TRUNC(SYSDATE) - TRUNC(FIN.DTVENC))'
+  const overduePrimary = hasCol('ATRASO')
+    ? overdueByAtraso
+    : hasCol('ATRASOINICIAL')
+      ? overdueByAtrasoInicial
+      : overdueByCalc
+
+  // Try to mirror Sankhya "Valor Líquido" when physical columns are available.
+  // Base oficial do KPI: Valor Liquido (VLRLIQUIDO).
+  // VLRDESDOB permanece apenas como fallback tecnico quando a API nao expor VLRLIQUIDO.
+  const openValueFromColumns = (() => {
+    if (hasCol('VLRLIQUIDO')) return 'NVL(FIN.VLRLIQUIDO, NVL(FIN.VLRDESDOB, 0))'
+    let expr = hasCol('VLRDESDOB') ? 'NVL(FIN.VLRDESDOB, 0)' : '0'
+    if (hasCol('VLRJURO')) expr += ' + NVL(FIN.VLRJURO, 0)'
+    if (hasCol('VLRMULTA')) expr += ' + NVL(FIN.VLRMULTA, 0)'
+    if (hasCol('VLRDESC')) expr += ' - NVL(FIN.VLRDESC, 0)'
+    if (hasCol('VLRABATIMENTO')) expr += ' - NVL(FIN.VLRABATIMENTO, 0)'
+    return expr
+  })()
+
+  const openValueByLiquido = 'NVL(FIN.VLRLIQUIDO, NVL(FIN.VLRDESDOB, 0))'
+  const includeLiquidoVariants = hasCol('VLRLIQUIDO')
+
+  const candidates = [
+    ...(includeLiquidoVariants
+      ? [
+          makeSql(openValueByLiquido, overduePrimary, pendingStrict, true),
+          makeSql(openValueByLiquido, overduePrimary, pendingStrict, false),
+          makeSql(openValueByLiquido, overdueByCalc, pendingStrict, true),
+          makeSql(openValueByLiquido, overdueByCalc, pendingStrict, false),
+        ]
+      : []),
+    makeSql(openValueFromColumns, overduePrimary, pendingStrict, true),
+    makeSql(openValueFromColumns, overduePrimary, pendingStrict, false),
+    makeSql(openValueByDesdob, overduePrimary, pendingStrict, true),
+    makeSql(openValueByDesdob, overduePrimary, pendingStrict, false),
+    makeSql(openValueFromColumns, overdueByCalc, pendingStrict, true),
+    makeSql(openValueByDesdob, overdueByCalc, pendingStrict, true),
+    ...(includeLiquidoVariants
+      ? [
+          makeFallbackSql(openValueByLiquido, overduePrimary, pendingStrict, true),
+          makeFallbackSql(openValueByLiquido, overduePrimary, pendingStrict, false),
+          makeFallbackSql(openValueByLiquido, overdueByCalc, pendingStrict, true),
+          makeFallbackSql(openValueByLiquido, overdueByCalc, pendingStrict, false),
+        ]
+      : []),
+    makeFallbackSql(openValueFromColumns, overduePrimary, pendingStrict, true),
+    makeFallbackSql(openValueFromColumns, overduePrimary, pendingStrict, false),
+    makeFallbackSql(openValueByDesdob, overduePrimary, pendingStrict, true),
+    makeFallbackSql(openValueByDesdob, overduePrimary, pendingStrict, false),
+    makeFallbackSql(openValueFromColumns, overdueByCalc, pendingStrict, true),
+    makeFallbackSql(openValueByDesdob, overdueByCalc, pendingStrict, true),
+  ]
+  return candidates
+}
+
+async function detectTgffinColumns(
+  baseUrl: string,
+  headers: Record<string, string>,
+  appKey?: string | null
+) {
+  const sql = `
+SELECT UPPER(C.COLUMN_NAME) AS COLUMN_NAME
+FROM ALL_TAB_COLUMNS C
+WHERE UPPER(C.TABLE_NAME) = 'TGFFIN'
+  AND UPPER(C.OWNER) = UPPER((SELECT USER FROM DUAL))
+ORDER BY C.COLUMN_ID`
+  const rows = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+  const set = new Set<string>()
+  for (const row of rows) {
+    const col = String(row.COLUMN_NAME ?? '').trim().toUpperCase()
+    if (col) set.add(col)
+  }
+  return set
 }
 
 /* ---------- GET handler ---------- */
@@ -509,6 +632,7 @@ export async function GET(req: NextRequest) {
     }
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey ?? config.token ?? null
+    const tgffinColumns = await detectTgffinColumns(baseUrl, headers, appKey).catch(() => new Set<string>())
 
     // --- Allowlist ---
     const allowlist = await readSellerAllowlist()
@@ -564,31 +688,20 @@ export async function GET(req: NextRequest) {
       returns = []
     }
 
-    const partnerOwner = new Map<string, { sellerCode: string; sellerName: string; lastOrderDate: string }>()
-    for (const order of orders) {
-      const partnerCode = order.partnerCode.trim()
-      if (!partnerCode) continue
-      const prev = partnerOwner.get(partnerCode)
-      if (!prev || order.negotiatedAt > prev.lastOrderDate) {
-        partnerOwner.set(partnerCode, {
-          sellerCode: order.sellerCode,
-          sellerName: order.sellerName,
-          lastOrderDate: order.negotiatedAt,
-        })
-      }
-    }
-
     let openTitles: SankhyaOpenTitle[] = []
-    const partnerCodes = [...partnerOwner.keys()]
-    for (const partnerChunk of chunk(partnerCodes, 400)) {
-      if (partnerChunk.length === 0) continue
+    let openTitlesQueryMode = 'NONE'
+    const openTitlesErrors: string[] = []
+    const openTitlesSqlCandidates = buildOpenTitlesSqlCandidates(endDateExclusive, sellerCodes, companyScope, tgffinColumns)
+    for (let i = 0; i < openTitlesSqlCandidates.length; i += 1) {
+      const sqlTitles = openTitlesSqlCandidates[i]
       try {
-        const sqlTitles = buildOpenTitlesSql(endDateExclusive, partnerChunk, companyScope)
         const titleRecords = await queryRows(baseUrl, headers, sqlTitles, appKey, { allowEmpty: true })
-        const parsed = titleRecords.map(toOpenTitle).filter((o): o is SankhyaOpenTitle => o !== null)
-        openTitles.push(...parsed)
-      } catch {
-        // keep next chunk
+        openTitles = titleRecords.map(toOpenTitle).filter((o): o is SankhyaOpenTitle => o !== null)
+        openTitlesQueryMode = `VARIANT_${i + 1}`
+        break
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'erro desconhecido'
+        openTitlesErrors.push(`VARIANT_${i + 1}: ${msg}`)
       }
     }
 
@@ -599,7 +712,7 @@ export async function GET(req: NextRequest) {
       login: string
       orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
       returns: Array<{ negotiatedAt: string; totalValue: number }>
-      openTitles: Array<{ titleId: string; dueDate: string; totalValue: number }>
+      openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
       totalValue: number
       totalReturnedValue: number
       totalOpenTitlesValue: number
@@ -608,7 +721,7 @@ export async function GET(req: NextRequest) {
 
     for (const order of orders) {
       const normalizedName = order.sellerName.trim() || 'Sem vendedor'
-      const sellerKey = `${order.sellerCode || '0'}::${normalizedName.toUpperCase()}`
+      const sellerKey = sellerMapKey(order.sellerCode, normalizedName)
       const sellerId = order.sellerCode
         ? `sankhya-${order.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
@@ -642,7 +755,7 @@ export async function GET(req: NextRequest) {
 
     for (const ret of returns) {
       const normalizedName = ret.sellerName.trim() || 'Sem vendedor'
-      const sellerKey = `${ret.sellerCode || '0'}::${normalizedName.toUpperCase()}`
+      const sellerKey = sellerMapKey(ret.sellerCode, normalizedName)
       const sellerId = ret.sellerCode
         ? `sankhya-${ret.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
@@ -672,12 +785,10 @@ export async function GET(req: NextRequest) {
 
     let mappedOpenTitlesCount = 0
     for (const title of openTitles) {
-      const owner = partnerOwner.get(title.partnerCode)
-      if (!owner) continue
-      const normalizedName = owner.sellerName.trim() || 'Sem vendedor'
-      const sellerKey = `${owner.sellerCode || '0'}::${normalizedName.toUpperCase()}`
-      const sellerId = owner.sellerCode
-        ? `sankhya-${owner.sellerCode}`
+      const normalizedName = title.sellerName.trim() || 'Sem vendedor'
+      const sellerKey = sellerMapKey(title.sellerCode, normalizedName)
+      const sellerId = title.sellerCode
+        ? `sankhya-${title.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
 
       if (!sellersMap.has(sellerKey)) {
@@ -699,6 +810,7 @@ export async function GET(req: NextRequest) {
       seller.openTitles.push({
         titleId: title.titleId,
         dueDate: title.dueDate,
+        overdueDays: title.overdueDays,
         totalValue: title.totalValue,
       })
       seller.totalOpenTitlesValue += title.totalValue
@@ -708,7 +820,7 @@ export async function GET(req: NextRequest) {
     // Ensure all active sellers are present (even with 0 orders)
     for (const allowed of allowedSellers) {
       const normalizedName = allowed.name.trim() || 'Sem vendedor'
-      const sellerKey = `${allowed.code || '0'}::${normalizedName.toUpperCase()}`
+      const sellerKey = sellerMapKey(String(allowed.code ?? ''), normalizedName)
       if (sellersMap.has(sellerKey)) continue
       const sellerId = allowed.code
         ? `sankhya-${allowed.code}`
@@ -756,7 +868,22 @@ export async function GET(req: NextRequest) {
         }, {}),
         openTitlesFetched: openTitles.length,
         openTitlesMappedToSeller: mappedOpenTitlesCount,
-        openTitlePartnersInPeriod: partnerOwner.size,
+        openTitlePartners: openTitles.reduce((acc, item) => {
+          if (item.partnerCode) acc.add(item.partnerCode)
+          return acc
+        }, new Set<string>()).size,
+        openTitlesQueryMode,
+        openTitlesErrors: openTitlesErrors.slice(0, 3),
+        tgffinColumnHints: {
+          hasAtraso: tgffinColumns.has('ATRASO'),
+          hasAtrasoInicial: tgffinColumns.has('ATRASOINICIAL'),
+          hasVlrLiquido: tgffinColumns.has('VLRLIQUIDO'),
+          hasVlrDesdob: tgffinColumns.has('VLRDESDOB'),
+          hasVlrJuro: tgffinColumns.has('VLRJURO'),
+          hasVlrMulta: tgffinColumns.has('VLRMULTA'),
+          hasVlrDesc: tgffinColumns.has('VLRDESC'),
+          hasVlrAbatimento: tgffinColumns.has('VLRABATIMENTO'),
+        },
       },
       sellers,
     })

@@ -92,6 +92,7 @@ interface SellerReturnEntry {
 interface SellerOpenTitleEntry {
   titleId: string
   dueDate: string
+  overdueDays: number
   totalValue: number
 }
 
@@ -133,6 +134,11 @@ interface PerformanceDiagnostics {
   companyScope?: string | null
   byStatus?: Record<string, number>
   byCompany?: Record<string, number>
+  openTitlesFetched?: number
+  openTitlesMappedToSeller?: number
+  openTitlePartners?: number
+  openTitlesQueryMode?: string
+  openTitlesErrors?: string[]
 }
 
 interface RuleProgress {
@@ -399,14 +405,6 @@ function parseInadimplenciaTarget(targetText: string) {
 
 function formatInadimplenciaTarget(pct: number, days: number) {
   return `${Math.max(pct, 0)}|${Math.max(Math.floor(days), 1)}`
-}
-
-function diffDays(startIso: string, endIso: string) {
-  const start = parseIsoDate(startIso)
-  const end = parseIsoDate(endIso)
-  if (!start || !end) return 0
-  const ms = end.getTime() - start.getTime()
-  return Math.floor(ms / 86_400_000)
 }
 
 type ChartPoint = { x: number; y: number }
@@ -820,7 +818,7 @@ export default function MetasWorkspace() {
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
-          openTitles?: Array<{ titleId?: string; dueDate?: string; totalValue?: number }>
+          openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
 
         const mapped = remoteSellers.map((seller) => {
@@ -844,6 +842,7 @@ export default function MetasWorkspace() {
             .map((item) => ({
               titleId: String(item.titleId ?? ''),
               dueDate: String(item.dueDate).slice(0, 10),
+              overdueDays: Number(item.overdueDays ?? 0),
               totalValue: Number(item.totalValue ?? 0),
             }))
 
@@ -1056,7 +1055,7 @@ export default function MetasWorkspace() {
           totalOrders?: number
           orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
-          openTitles?: Array<{ titleId?: string; dueDate?: string; totalValue?: number }>
+          openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
         setSellers(
           remoteSellers.map((seller) => {
@@ -1080,6 +1079,7 @@ export default function MetasWorkspace() {
               .map((item) => ({
                 titleId: String(item.titleId ?? ''),
                 dueDate: String(item.dueDate).slice(0, 10),
+                overdueDays: Number(item.overdueDays ?? 0),
                 totalValue: Number(item.totalValue ?? 0),
               }))
             return {
@@ -1560,7 +1560,7 @@ export default function MetasWorkspace() {
                 const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
                 const stageEnd = stageEndDateMap[rule.stage]
                 const overdueOpenTitles = stageEnd
-                  ? seller.openTitles.filter((title) => title.dueDate <= stageEnd && diffDays(title.dueDate, stageEnd) > atrasoDias)
+                  ? seller.openTitles.filter((title) => title.dueDate <= stageEnd && title.overdueDays > atrasoDias)
                   : []
                 const overdueValue = overdueOpenTitles.reduce((sum, title) => sum + title.totalValue, 0)
                 const targetPct = inadPct > 0 ? inadPct / 100 : 0
@@ -2539,7 +2539,7 @@ export default function MetasWorkspace() {
                               } else if (kpiType === 'INADIMPLENCIA') {
                                 const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
                                 const overdueTitles = stageEndIso
-                                  ? selectedSeller.openTitles.filter((title) => title.dueDate <= stageEndIso && diffDays(title.dueDate, stageEndIso) > atrasoDias)
+                                  ? selectedSeller.openTitles.filter((title) => title.dueDate <= stageEndIso && title.overdueDays > atrasoDias)
                                   : []
                                 const overdueValue = overdueTitles.reduce((sum, title) => sum + title.totalValue, 0)
                                 const actualPct = revenue > 0 ? (overdueValue / revenue) * 100 : 0
@@ -2550,7 +2550,6 @@ export default function MetasWorkspace() {
                                   { label: 'Quantidade de títulos', value: `${overdueTitles.length}` },
                                   { label: 'Parâmetro de inadimplência', value: `${num(inadPct, 2)}%` },
                                   { label: 'Prazo mínimo em atraso', value: `${atrasoDias} dias` },
-                                  { label: 'Regra técnica', value: 'Clientes do vendedor no período + DHBAIXA nulo + DTVENC acima do prazo' },
                                 ]
                                 resultLabel = 'Resultado apurado'
                                 resultValue = `${num(actualPct, 3)}%`
