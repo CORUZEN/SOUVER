@@ -2805,6 +2805,25 @@ export default function MetasWorkspace() {
                               )
                             }
 
+                            if (kpiType === 'INADIMPLENCIA') {
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    placeholder="0"
+                                    title="% máximo de inadimplência acumulada no período"
+                                    value={parseTargetNumber(rule.targetText) ?? 0}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
+                                  />
+                                  <span className="text-[10px] text-surface-400">%</span>
+                                  {renderKpiInspector(rule, kpiType)}
+                                </div>
+                              )
+                            }
+
                             return (
                               <div className="flex items-center gap-1">
                                 <input className="flex-1 rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />
