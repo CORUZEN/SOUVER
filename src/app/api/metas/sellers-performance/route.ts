@@ -371,7 +371,7 @@ function parseYearMonth(req: NextRequest) {
 
 /**
  * Build SQL that filters directly by seller codes, date range, and
- * operation type (CODTIPOPER = 1001 — "Pedido de Venda").
+ * operation type aligned with Portal de Vendas ("Nota de venda").
  * Keeps the result well under the 5000-row API limit and avoids
  * transferring thousands of irrelevant orders over the network.
  */
@@ -379,16 +379,17 @@ function buildOrdersSql(
   startDate: string,
   endDateExclusive: string,
   sellerCodes: string[],
-  mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT' = 'STRICT',
+  mode: 'TOP_1101' | 'TIPMOV_V' | 'ANY_MOVEMENT' = 'TOP_1101',
   companyScope: '1' | '2' | 'all' = '1'
 ) {
-  // Primary: filter by CODTIPOPER = 1001 (pedido de venda real)
-  // Fallback 1: TIPMOV IN ('V','P') caso CODTIPOPER não exista na instalação
+  // Regra principal para espelhar o Portal de Vendas:
+  // Tipo de movimento "Nota de venda" + Tipo Operação 1101
+  // Fallback 1: apenas TIPMOV = 'V'
   // Fallback 2: sem filtro de tipo (último recurso)
-  const typeFilter = mode === 'STRICT'
-    ? "AND CAB.CODTIPOPER = 1001\n  "
-    : mode === 'FALLBACK_TIPMOV'
-      ? "AND CAB.TIPMOV IN ('V', 'P')\n  "
+  const typeFilter = mode === 'TOP_1101'
+    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+    : mode === 'TIPMOV_V'
+      ? "AND CAB.TIPMOV = 'V'\n  "
       : ''
 
   let sellerFilter = ''
@@ -417,7 +418,7 @@ SELECT
   NVL(CAB.STATUSNOTA, 'L') AS STATUSNOTA,
   TO_CHAR(CAB.CODEMP) AS CODEMP
 FROM TGFCAB CAB
-INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
@@ -450,7 +451,7 @@ SELECT
   NVL(CAB.STATUSNOTA, 'L') AS STATUSNOTA,
   TO_CHAR(CAB.CODEMP) AS CODEMP
 FROM TGFCAB CAB
-INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
+LEFT JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
@@ -644,27 +645,27 @@ export async function GET(req: NextRequest) {
       .filter((c) => c.length > 0)
 
     // --- Query orders filtered by seller codes in SQL ---
-    // Cascade: CODTIPOPER=1001 → TIPMOV fallback → any movement
+    // Cascade: TIPMOV='V' + CODTIPOPER=1101 -> TIPMOV='V' -> any movement
     let orders: SankhyaOrder[] = []
-    let queryMode: 'CODTIPOPER_1001' | 'TIPMOV_VP' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
+    let queryMode: 'TIPMOV_V_TOP1101' | 'TIPMOV_V' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
 
-    // 1) Primary: CODTIPOPER = 1001 (pedido de venda)
-    const sqlStrict = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'STRICT', companyScope)
+    // 1) Primary: TIPMOV = 'V' + CODTIPOPER = 1101
+    const sqlTop1101 = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'TOP_1101', companyScope)
     try {
-      const records = await queryRows(baseUrl, headers, sqlStrict, appKey, { allowEmpty: true })
+      const records = await queryRows(baseUrl, headers, sqlTop1101, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
-      queryMode = 'CODTIPOPER_1001'
+      queryMode = 'TIPMOV_V_TOP1101'
     } catch {
-      // CODTIPOPER may not exist — try TIPMOV fallback
+      // Top/Tipo de operacao pode divergir no ambiente — tenta apenas TIPMOV='V'
     }
 
-    // 2) Fallback: TIPMOV IN ('V','P') if CODTIPOPER failed
+    // 2) Fallback: TIPMOV = 'V'
     if (queryMode === 'NONE') {
-      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'FALLBACK_TIPMOV', companyScope)
+      const sqlTipmov = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'TIPMOV_V', companyScope)
       try {
         const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
-        queryMode = 'TIPMOV_VP'
+        queryMode = 'TIPMOV_V'
       } catch { /* next fallback */ }
     }
 
