@@ -585,8 +585,8 @@ export default function MetasWorkspace() {
   const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
-  const [devolucaoInspectorOpenKey, setDevolucaoInspectorOpenKey] = useState<string | null>(null)
-  const [devolucaoInspectorSellerId, setDevolucaoInspectorSellerId] = useState('')
+  const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
+  const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -2194,6 +2194,290 @@ export default function MetasWorkspace() {
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
             const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
+            const monthStartIso = `${year}-${String(month + 1).padStart(2, '0')}-01`
+            const stageLabelMap = Object.fromEntries(STAGES.map((s) => [s.key, s.label])) as Record<StageKey, string>
+
+            function getStageEndIso(stage: StageKey) {
+              return cycle.weeks.find((w) => w.key === stage)?.end ?? null
+            }
+
+            function getSellerCode(seller: Salesperson) {
+              return seller.id.replace(/^sankhya-/, '')
+            }
+
+            function getCumulativeRevenue(seller: Salesperson, stageEndIso: string | null) {
+              if (!stageEndIso) return 0
+              return seller.orders.reduce((sum, order) => (order.negotiatedAt <= stageEndIso ? sum + order.totalValue : sum), 0)
+            }
+
+            function getCumulativeReturns(seller: Salesperson, stageEndIso: string | null) {
+              if (!stageEndIso) return 0
+              return seller.returns.reduce((sum, row) => (row.negotiatedAt <= stageEndIso ? sum + row.totalValue : sum), 0)
+            }
+
+            function getDistinctClientsUntil(seller: Salesperson, stageEndIso: string | null) {
+              if (!stageEndIso) return 0
+              const set = new Set<string>()
+              for (const order of seller.orders) {
+                if (order.negotiatedAt > stageEndIso) continue
+                const code = (order.clientCode ?? '').trim()
+                if (code) set.add(code)
+              }
+              return set.size
+            }
+
+            function getTotalDistinctClientsInMonth(seller: Salesperson) {
+              const set = new Set<string>()
+              for (const order of seller.orders) {
+                const code = (order.clientCode ?? '').trim()
+                if (code) set.add(code)
+              }
+              return set.size
+            }
+
+            function renderKpiInspector(rule: GoalRule, kpiType: KpiType) {
+              const inspectorKey = `${block.id}:${rule.id}`
+              const isOpen = kpiInspectorOpenKey === inspectorKey
+              const stageEndIso = getStageEndIso(rule.stage)
+              const selectedSeller =
+                sellersInBlock.find((s) => s.id === kpiInspectorSellerId) ??
+                sellersInBlock[0] ??
+                null
+              const parameterNumber = Math.max(parseTargetNumber(rule.targetText) ?? 0, 0)
+              const stageLabel = stageLabelMap[rule.stage] ?? rule.stage
+
+              return (
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="rounded p-0.5 text-surface-400 hover:bg-surface-100 hover:text-primary-600"
+                    title="Abrir auditoria técnica do KPI"
+                    onClick={() => {
+                      if (isOpen) {
+                        setKpiInspectorOpenKey(null)
+                        return
+                      }
+                      setKpiInspectorOpenKey(inspectorKey)
+                      setKpiInspectorSellerId((prev) => {
+                        if (sellersInBlock.some((s) => s.id === prev)) return prev
+                        return sellersInBlock[0]?.id ?? ''
+                      })
+                    }}
+                  >
+                    <CircleHelp size={14} />
+                  </button>
+                  {isOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setKpiInspectorOpenKey(null)}
+                        aria-hidden="true"
+                      />
+                      <div className="absolute right-0 top-full z-30 mt-1.5 w-96 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5">
+                        <div className="mb-2">
+                          <p className="text-xs font-semibold text-surface-800">Auditoria do KPI (Sankhya)</p>
+                          <p className="text-[10px] text-surface-500">{stageLabel} · Período {formatDateBr(monthStartIso)} a {stageEndIso ? formatDateBr(stageEndIso) : '--'}</p>
+                        </div>
+
+                        {sellersInBlock.length === 0 ? (
+                          <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-2.5 py-2 text-xs text-surface-500">
+                            Nenhum vendedor neste grupo para auditar.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            <div>
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Vendedor</p>
+                              <select
+                                className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs text-surface-800"
+                                value={selectedSeller?.id ?? ''}
+                                onChange={(e) => setKpiInspectorSellerId(e.target.value)}
+                              >
+                                {sellersInBlock.map((sellerOption) => (
+                                  <option key={sellerOption.id} value={sellerOption.id}>{sellerOption.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {selectedSeller ? (() => {
+                              const sellerCode = getSellerCode(selectedSeller)
+                              const revenue = getCumulativeRevenue(selectedSeller, stageEndIso)
+                              const returned = getCumulativeReturns(selectedSeller, stageEndIso)
+                              const distinctClientsCum = getDistinctClientsUntil(selectedSeller, stageEndIso)
+                              const distinctClientsMonth = getTotalDistinctClientsInMonth(selectedSeller)
+                              const teamAverageTicket = (() => {
+                                const tickets = sellers
+                                  .filter((s) => s.totalOrders > 0)
+                                  .map((s) => s.totalValue / Math.max(s.totalOrders, 1))
+                                if (tickets.length === 0) return 0
+                                return tickets.reduce((sum, value) => sum + value, 0) / tickets.length
+                              })()
+                              const orderCountCum = stageEndIso
+                                ? selectedSeller.orders.filter((o) => o.negotiatedAt <= stageEndIso).length
+                                : 0
+                              const avgTicketCum = orderCountCum > 0 ? revenue / orderCountCum : 0
+
+                              let title = 'Resultado apurado'
+                              let lines: Array<{ label: string; value: string }> = []
+                              let resultLabel = 'Resultado'
+                              let resultValue = ''
+                              let ok = false
+
+                              if (kpiType === 'DEVOLUCAO') {
+                                const actualPct = revenue > 0 ? (returned / revenue) * 100 : 0
+                                title = 'Devolução sobre faturado'
+                                lines = [
+                                  { label: 'Faturado no período', value: currency(revenue) },
+                                  { label: 'Devolvido no período', value: currency(returned) },
+                                  { label: 'Limite parametrizado', value: `${num(parameterNumber, 3)}%` },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = `${num(actualPct, 3)}%`
+                                ok = parameterNumber > 0 && actualPct <= parameterNumber
+                              } else if (kpiType === 'BASE_CLIENTES') {
+                                const coveragePct = distinctClientsMonth > 0 ? (distinctClientsCum / distinctClientsMonth) * 100 : 0
+                                title = 'Cobertura da base'
+                                lines = [
+                                  { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
+                                  { label: 'Base de clientes do mês', value: `${distinctClientsMonth}` },
+                                  { label: 'Meta parametrizada', value: `${num(parameterNumber, 2)}%` },
+                                ]
+                                resultLabel = 'Cobertura apurada'
+                                resultValue = `${num(coveragePct, 2)}%`
+                                ok = parameterNumber > 0 && coveragePct >= parameterNumber
+                              } else if (kpiType === 'META_FINANCEIRA') {
+                                const monthlyTargetSafe = block.monthlyTarget > 0 ? block.monthlyTarget : 0
+                                const required = parameterNumber > 0 ? monthlyTargetSafe * (parameterNumber / 100) : monthlyTargetSafe
+                                const progressPct = required > 0 ? (revenue / required) * 100 : 0
+                                title = 'Meta financeira acumulada'
+                                lines = [
+                                  { label: 'Faturado acumulado', value: currency(revenue) },
+                                  { label: 'Meta do bloco', value: currency(monthlyTargetSafe) },
+                                  { label: 'Alvo da etapa', value: required > 0 ? currency(required) : 'Não definido' },
+                                ]
+                                resultLabel = 'Atingimento da etapa'
+                                resultValue = `${num(progressPct, 2)}%`
+                                ok = required > 0 && revenue >= required
+                              } else if (kpiType === 'VOLUME') {
+                                const requiredGroups = Math.max(Math.floor(parameterNumber), 0)
+                                const achievedGroups = (block.weightTargets ?? []).filter((target) => {
+                                  if (!target.brand || target.targetKg <= 0) return false
+                                  const soldKg = brandWeightRows
+                                    .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
+                                    .reduce((sum, row) => sum + row.totalKg, 0)
+                                  return soldKg >= target.targetKg
+                                }).length
+                                title = 'Grupos de peso atingidos'
+                                lines = [
+                                  { label: 'Grupos com meta batida', value: `${achievedGroups}` },
+                                  { label: 'Grupos exigidos no parâmetro', value: `${requiredGroups}` },
+                                  { label: 'Metas de peso no bloco', value: `${(block.weightTargets ?? []).length}` },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = `${achievedGroups}/${requiredGroups || 0}`
+                                ok = requiredGroups > 0 && achievedGroups >= requiredGroups
+                              } else if (kpiType === 'DISTRIBUICAO') {
+                                const parts = rule.targetText.split('|').map((s) => s.trim())
+                                const itemsPart = parts[0] ?? '0'
+                                const itemsIsPercent = itemsPart.includes('%')
+                                const itemsNum = parseDecimal(itemsPart.replace('%', ''), 0)
+                                const totalActiveProducts = productAllowlist.filter((p) => p.active).length
+                                const resolvedItems = itemsIsPercent && totalActiveProducts > 0
+                                  ? Math.ceil(totalActiveProducts * itemsNum / 100)
+                                  : itemsNum
+                                const clientsPct = Math.max(parseDecimal(parts[1] ?? '0', 0), 0)
+                                const coveragePct = distinctClientsMonth > 0 ? (distinctClientsCum / distinctClientsMonth) * 100 : 0
+                                title = 'Distribuição por clientes e itens'
+                                lines = [
+                                  { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
+                                  { label: 'Cobertura da base', value: `${num(coveragePct, 2)}%` },
+                                  { label: 'Itens alvo resolvidos', value: `${num(resolvedItems, 0)} item(ns)` },
+                                  { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = `${num(coveragePct, 2)}% base`
+                                ok = clientsPct > 0 && coveragePct >= clientsPct
+                              } else if (kpiType === 'ITEM_FOCO') {
+                                const { volumePct, devolucaoPct } = parseItemFocoTarget(rule.targetText)
+                                const focusCode = (block.focusProductCode ?? '').trim()
+                                const focusRow = focusCode
+                                  ? (focusProductRows[focusCode] ?? []).find((row) => row.sellerCode === sellerCode)
+                                  : null
+                                const soldKg = focusRow?.soldKg ?? 0
+                                const returnKg = focusRow?.returnKg ?? 0
+                                const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                                const requiredKg = focusTargetKg * (Math.max(volumePct, 0) / 100)
+                                const returnPct = focusTargetKg > 0 ? (returnKg / focusTargetKg) * 100 : 0
+                                const returnOk = devolucaoPct > 0 ? returnPct <= devolucaoPct : true
+                                title = 'Item foco (volume + devolução)'
+                                lines = [
+                                  { label: 'Meta do item foco (kg)', value: `${num(focusTargetKg, 2)} kg` },
+                                  { label: 'Volume mínimo exigido', value: `${num(requiredKg, 2)} kg` },
+                                  { label: 'Vendido do item foco', value: `${num(soldKg, 2)} kg` },
+                                  { label: 'Devolvido do item foco', value: `${num(returnKg, 2)} kg` },
+                                  { label: 'Limite devolução', value: `${num(devolucaoPct, 2)}%` },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = `${num(returnPct, 2)}% dev.`
+                                ok = requiredKg > 0 && soldKg >= requiredKg && returnOk
+                              } else if (kpiType === 'RENTABILIDADE') {
+                                const targetPct = Math.max(parameterNumber, 0)
+                                const threshold = targetPct > 0 ? teamAverageTicket * (targetPct / 100) : 0
+                                title = 'Rentabilidade por ticket médio'
+                                lines = [
+                                  { label: 'Ticket médio acumulado', value: currency(avgTicketCum) },
+                                  { label: 'Ticket médio da equipe', value: currency(teamAverageTicket) },
+                                  { label: 'Parâmetro rentabilidade', value: `${num(targetPct, 2)}%` },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = threshold > 0 ? `${num((avgTicketCum / threshold) * 100, 2)}%` : 'N/A'
+                                ok = threshold > 0 && avgTicketCum >= threshold
+                              } else if (kpiType === 'INADIMPLENCIA') {
+                                title = 'Inadimplência acumulativa'
+                                lines = [
+                                  { label: 'Status do cálculo', value: 'Ainda não implementado' },
+                                  { label: 'Parâmetro cadastrado', value: `${num(parameterNumber, 2)}%` },
+                                  { label: 'Fonte de dados', value: 'Pendente de definição' },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = 'N/A'
+                                ok = false
+                              } else {
+                                title = 'KPI personalizado'
+                                lines = [
+                                  { label: 'Parâmetro textual', value: rule.targetText || '—' },
+                                  { label: 'Tipo de KPI', value: kpiType },
+                                ]
+                                resultLabel = 'Resultado apurado'
+                                resultValue = 'Sem fórmula padrão'
+                                ok = false
+                              }
+
+                              return (
+                                <div className="rounded-lg border border-surface-200 bg-surface-50 p-2.5 text-xs text-surface-700">
+                                  <p className="mb-2 text-[11px] font-semibold text-surface-800">{title}</p>
+                                  <div className="space-y-1.5">
+                                    {lines.map((line) => (
+                                      <div key={line.label} className="flex items-center justify-between gap-2">
+                                        <span>{line.label}</span>
+                                        <strong className="text-surface-900">{line.value}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="mt-2 border-t border-surface-200 pt-2 flex items-center justify-between">
+                                    <span>{resultLabel}</span>
+                                    <strong className={ok ? 'text-emerald-700' : 'text-rose-700'}>{resultValue}</strong>
+                                  </div>
+                                </div>
+                              )
+                            })() : null}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            }
 
             return (
               <Card key={block.id} className="border-surface-200">
@@ -2399,167 +2683,102 @@ export default function MetasWorkspace() {
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.stage} onChange={(e) => updateBlockRule(rule.id, { stage: e.target.value as StageKey })}>{STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
                           <td className="px-3 py-2"><select className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.kpiType ?? 'CUSTOM'} onChange={(e) => { const sel = KPI_CATALOG.find((k) => k.type === e.target.value); const defaultTarget = e.target.value === 'DISTRIBUICAO' ? '0%|0' : e.target.value === 'VOLUME' ? '0' : e.target.value === 'ITEM_FOCO' ? '0|0' : '0%'; updateBlockRule(rule.id, { kpiType: e.target.value as KpiType, kpi: sel?.label ?? rule.kpi, description: sel?.defaultDescription || rule.description, targetText: defaultTarget }) }}>{KPI_CATALOG.map((k) => <option key={k.type} value={k.type}>{k.label}</option>)}</select></td>
                           <td className="px-3 py-2"><input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.description} onChange={(e) => updateBlockRule(rule.id, { description: e.target.value })} /></td>
-                          <td className="px-3 py-2">{rule.kpiType === 'DISTRIBUICAO' ? (() => {
-                            const parts = rule.targetText.split('|')
-                            const itemsPart = parts[0] ?? ''
-                            const isPercent = itemsPart.includes('%')
-                            const itemsVal = itemsPart.replace('%', '')
-                            const clientsVal = parts[1] ?? ''
-                            return (
-                              <div className="flex items-center gap-1">
-                                <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title={isPercent ? '% dos itens totais' : 'Qtd. itens alvo'} value={itemsVal} onChange={(e) => { const v = e.target.value + (isPercent ? '%' : ''); updateBlockRule(rule.id, { targetText: `${v}|${clientsVal}` }) }} />
-                                <button type="button" className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${isPercent ? 'bg-primary-100 text-primary-700' : 'bg-surface-100 text-surface-500'}`} title="Alternar entre % e absoluto" onClick={() => { const v = itemsVal; updateBlockRule(rule.id, { targetText: `${v}${isPercent ? '' : '%'}|${clientsVal}` }) }}>{isPercent ? '%' : 'Nº'}</button>
-                                <span className="text-[10px] text-surface-400">itens</span>
-                                <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title="% da base de clientes" value={clientsVal} onChange={(e) => { updateBlockRule(rule.id, { targetText: `${itemsPart}|${e.target.value}` }) }} />
-                                <span className="text-[10px] text-surface-400">% base</span>
-                              </div>
-                            )
-                          })() : rule.kpiType === 'VOLUME' ? (
-                            <input
-                              className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                              type="number"
-                              min={0}
-                              step={1}
-                              placeholder="0"
-                              title="Quantidade mínima de grupos de produto com meta de peso batida"
-                              value={String(Math.max(0, Math.floor(parseTargetNumber(rule.targetText) ?? 0)))}
-                              onChange={(e) => updateBlockRule(rule.id, { targetText: String(Math.max(0, Math.floor(parseDecimal(e.target.value, 0)))) })}
-                            />
-                          ) : rule.kpiType === 'ITEM_FOCO' ? (() => {
-                            const parsed = parseItemFocoTarget(rule.targetText)
-                            return (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  type="number"
-                                  min={0}
-                                  step="0.1"
-                                  placeholder="0"
-                                  title="% mínimo do volume para item foco"
-                                  value={parsed.volumePct || ''}
-                                  onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.devolucaoPct) })}
-                                />
-                                <span className="text-[10px] text-surface-400">% vol.</span>
-                                <input
-                                  className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  type="number"
-                                  min={0}
-                                  step="0.1"
-                                  placeholder="0"
-                                  title="% máximo de devolução para item foco"
-                                  value={parsed.devolucaoPct || ''}
-                                  onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parsed.volumePct, parseDecimal(e.target.value, 0)) })}
-                                />
-                                <span className="text-[10px] text-surface-400">% dev.</span>
-                              </div>
-                            )
-                          })() : rule.kpiType === 'DEVOLUCAO' ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                placeholder="0"
-                                title="% máximo de devolução sobre o faturado no período"
-                                value={parseTargetNumber(rule.targetText) ?? 0}
-                                onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
-                              />
-                              <span className="text-[10px] text-surface-400">%</span>
-                              {(() => {
-                                const inspectorKey = `${block.id}:${rule.id}`
-                                const isOpen = devolucaoInspectorOpenKey === inspectorKey
-                                const stageLabel = STAGES.find((s) => s.key === rule.stage)?.label ?? rule.stage
-                                const stageEnd = cycle.weeks.find((w) => w.key === rule.stage)?.end ?? null
-                                const selectedSeller =
-                                  sellersInBlock.find((s) => s.id === devolucaoInspectorSellerId) ??
-                                  sellersInBlock[0] ??
-                                  null
-                                const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
-                                const faturado = selectedSeller && stageEnd
-                                  ? selectedSeller.orders.reduce((sum, order) => (order.negotiatedAt <= stageEnd ? sum + order.totalValue : sum), 0)
-                                  : 0
-                                const devolvido = selectedSeller && stageEnd
-                                  ? selectedSeller.returns.reduce((sum, item) => (item.negotiatedAt <= stageEnd ? sum + item.totalValue : sum), 0)
-                                  : 0
-                                const apuradoPct = faturado > 0 ? (devolvido / faturado) * 100 : 0
+                          <td className="px-3 py-2">{(() => {
+                            const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
 
-                                return (
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      className="rounded p-0.5 text-surface-400 hover:bg-surface-100 hover:text-primary-600"
-                                      title="Verificar valores apurados do Sankhya"
-                                      onClick={() => {
-                                        if (isOpen) {
-                                          setDevolucaoInspectorOpenKey(null)
-                                          return
-                                        }
-                                        setDevolucaoInspectorOpenKey(inspectorKey)
-                                        setDevolucaoInspectorSellerId((prev) => {
-                                          if (sellersInBlock.some((s) => s.id === prev)) return prev
-                                          return sellersInBlock[0]?.id ?? ''
-                                        })
-                                      }}
-                                    >
-                                      <CircleHelp size={14} />
-                                    </button>
-                                    {isOpen && (
-                                      <>
-                                        <div
-                                          className="fixed inset-0 z-20"
-                                          onClick={() => setDevolucaoInspectorOpenKey(null)}
-                                          aria-hidden="true"
-                                        />
-                                        <div className="absolute right-0 top-full z-30 mt-1.5 w-80 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5">
-                                          <div className="mb-2">
-                                            <p className="text-xs font-semibold text-surface-800">Auditoria da devolução (Sankhya)</p>
-                                            <p className="text-[10px] text-surface-500">{stageLabel} · Período {formatDateBr(periodStart)} a {stageEnd ? formatDateBr(stageEnd) : '--'}</p>
-                                          </div>
-                                          {sellersInBlock.length > 0 ? (
-                                            <div className="space-y-2">
-                                              <div>
-                                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">Vendedor</p>
-                                                <select
-                                                  className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs text-surface-800"
-                                                  value={selectedSeller?.id ?? ''}
-                                                  onChange={(e) => setDevolucaoInspectorSellerId(e.target.value)}
-                                                >
-                                                  {sellersInBlock.map((sellerOption) => (
-                                                    <option key={sellerOption.id} value={sellerOption.id}>{sellerOption.name}</option>
-                                                  ))}
-                                                </select>
-                                              </div>
-                                              <div className="rounded-lg border border-surface-200 bg-surface-50 p-2.5 text-xs text-surface-700">
-                                                <div className="flex items-center justify-between">
-                                                  <span>Valor faturado no período</span>
-                                                  <strong className="text-surface-900">{currency(faturado)}</strong>
-                                                </div>
-                                                <div className="mt-1.5 flex items-center justify-between">
-                                                  <span>Valor devolvido no período</span>
-                                                  <strong className="text-surface-900">{currency(devolvido)}</strong>
-                                                </div>
-                                                <div className="mt-2 border-t border-surface-200 pt-2 flex items-center justify-between">
-                                                  <span>Resultado apurado</span>
-                                                  <strong className={apuradoPct <= Math.max(parseTargetNumber(rule.targetText) ?? 0, 0) ? 'text-emerald-700' : 'text-rose-700'}>
-                                                    {num(apuradoPct, 3)}%
-                                                  </strong>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-2.5 py-2 text-xs text-surface-500">
-                                              Nenhum vendedor neste grupo para auditar.
-                                            </p>
-                                          )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )
-                              })()}
-                            </div>
-                          ) : <input className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />}</td>
+                            if (kpiType === 'DISTRIBUICAO') {
+                              const parts = rule.targetText.split('|')
+                              const itemsPart = parts[0] ?? ''
+                              const isPercent = itemsPart.includes('%')
+                              const itemsVal = itemsPart.replace('%', '')
+                              const clientsVal = parts[1] ?? ''
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title={isPercent ? '% dos itens totais' : 'Qtd. itens alvo'} value={itemsVal} onChange={(e) => { const v = e.target.value + (isPercent ? '%' : ''); updateBlockRule(rule.id, { targetText: `${v}|${clientsVal}` }) }} />
+                                  <button type="button" className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${isPercent ? 'bg-primary-100 text-primary-700' : 'bg-surface-100 text-surface-500'}`} title="Alternar entre % e absoluto" onClick={() => { const v = itemsVal; updateBlockRule(rule.id, { targetText: `${v}${isPercent ? '' : '%'}|${clientsVal}` }) }}>{isPercent ? '%' : 'Nº'}</button>
+                                  <span className="text-[10px] text-surface-400">itens</span>
+                                  <input className="w-12 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" placeholder="0" title="% da base de clientes" value={clientsVal} onChange={(e) => { updateBlockRule(rule.id, { targetText: `${itemsPart}|${e.target.value}` }) }} />
+                                  <span className="text-[10px] text-surface-400">% base</span>
+                                  {renderKpiInspector(rule, kpiType)}
+                                </div>
+                              )
+                            }
+
+                            if (kpiType === 'VOLUME') {
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    className="w-full rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    placeholder="0"
+                                    title="Quantidade mínima de grupos de produto com meta de peso batida"
+                                    value={String(Math.max(0, Math.floor(parseTargetNumber(rule.targetText) ?? 0)))}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: String(Math.max(0, Math.floor(parseDecimal(e.target.value, 0)))) })}
+                                  />
+                                  {renderKpiInspector(rule, kpiType)}
+                                </div>
+                              )
+                            }
+
+                            if (kpiType === 'ITEM_FOCO') {
+                              const parsed = parseItemFocoTarget(rule.targetText)
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    placeholder="0"
+                                    title="% mínimo do volume para item foco"
+                                    value={parsed.volumePct || ''}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.devolucaoPct) })}
+                                  />
+                                  <span className="text-[10px] text-surface-400">% vol.</span>
+                                  <input
+                                    className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    placeholder="0"
+                                    title="% máximo de devolução para item foco"
+                                    value={parsed.devolucaoPct || ''}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parsed.volumePct, parseDecimal(e.target.value, 0)) })}
+                                  />
+                                  <span className="text-[10px] text-surface-400">% dev.</span>
+                                  {renderKpiInspector(rule, kpiType)}
+                                </div>
+                              )
+                            }
+
+                            if (kpiType === 'DEVOLUCAO') {
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    placeholder="0"
+                                    title="% máximo de devolução sobre o faturado no período"
+                                    value={parseTargetNumber(rule.targetText) ?? 0}
+                                    onChange={(e) => updateBlockRule(rule.id, { targetText: `${Math.max(parseDecimal(e.target.value, 0), 0)}%` })}
+                                  />
+                                  <span className="text-[10px] text-surface-400">%</span>
+                                  {renderKpiInspector(rule, kpiType)}
+                                </div>
+                              )
+                            }
+
+                            return (
+                              <div className="flex items-center gap-1">
+                                <input className="flex-1 rounded border border-surface-200 px-2 py-1.5 text-xs" value={rule.targetText} onChange={(e) => updateBlockRule(rule.id, { targetText: e.target.value })} />
+                                {renderKpiInspector(rule, kpiType)}
+                              </div>
+                            )
+                          })()}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
