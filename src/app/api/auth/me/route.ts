@@ -15,18 +15,24 @@ export async function GET(req: NextRequest) {
 
     const impersonatorToken = req.cookies.get('souver_impersonator_token')?.value
     let impersonation: { active: boolean; developerName: string } | null = null
+    let shouldClearImpersonatorCookie = false
 
     if (impersonatorToken && impersonatorToken !== token) {
       const impersonator = await getCurrentUser(impersonatorToken)
-      if (impersonator?.role?.code === 'DEVELOPER') {
+      if (impersonator?.role?.code === 'DEVELOPER' && impersonator.id !== user.id) {
         impersonation = {
           active: true,
           developerName: impersonator.fullName,
         }
+      } else {
+        // Cookie de locação ficou stale (sessão inválida ou mesmo usuário).
+        shouldClearImpersonatorCookie = true
       }
+    } else if (impersonatorToken && impersonatorToken === token) {
+      shouldClearImpersonatorCookie = true
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       authenticated: true,
       user: {
         id: user.id,
@@ -43,6 +49,12 @@ export async function GET(req: NextRequest) {
     }, {
       headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=30' },
     })
+
+    if (shouldClearImpersonatorCookie) {
+      response.cookies.delete('souver_impersonator_token')
+    }
+
+    return response
   } catch {
     return NextResponse.json({ authenticated: false }, { status: 401 })
   }
