@@ -277,8 +277,8 @@ export default function GestaoUsuariosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Gestão de Usuários</h1>
-          <p className="text-sm text-surface-500">Administração de contas, perfis e controle de acesso.</p>
+          <h1 className="text-xl font-semibold">Governança de Identidades</h1>
+          <p className="text-sm text-surface-500">Operação central para cadastro, manutenção e ciclo de vida das contas corporativas.</p>
           <p className="mt-1 text-xs text-surface-500">{total} {total === 1 ? 'usuário cadastrado' : 'usuários cadastrados'}</p>
         </div>
         <div className="flex items-center gap-2">

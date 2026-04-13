@@ -185,8 +185,8 @@ export default function GestaoPermissoesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Gestão de Permissões</h1>
-          <p className="text-sm text-surface-500">Definição de acessos por grupo e por usuário.</p>
+          <h1 className="text-xl font-semibold">Governança de Acessos</h1>
+          <p className="text-sm text-surface-500">Controle corporativo de privilégios por grupo e delegação de permissões por usuário.</p>
         </div>
         <Link href="/dev">
           <Button variant="outline"><ArrowLeft className="h-4 w-4" />Voltar para Central</Button>
