@@ -688,11 +688,13 @@ export default function MetasWorkspace() {
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
   const hadPendingBeforeKeyChangeRef = useRef(false)
+  const shouldRebaselineAfterAutoMonthInitRef = useRef(false)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [configSaveError, setConfigSaveError] = useState('')
   const [configSaveSuccess, setConfigSaveSuccess] = useState('')
   const [lastSavedConfigSignature, setLastSavedConfigSignature] = useState<string | null>(null)
+  const [isRebaseliningConfig, setIsRebaseliningConfig] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
 
@@ -797,7 +799,11 @@ export default function MetasWorkspace() {
   )
 
   const currentConfigSignature = useMemo(() => stableSerialize(currentConfigPayload), [currentConfigPayload])
-  const hasPendingConfigChanges = isConfigLoaded && lastSavedConfigSignature !== null && currentConfigSignature !== lastSavedConfigSignature
+  const hasPendingConfigChanges =
+    isConfigLoaded &&
+    !isRebaseliningConfig &&
+    lastSavedConfigSignature !== null &&
+    currentConfigSignature !== lastSavedConfigSignature
 
   useEffect(() => {
     hadPendingBeforeKeyChangeRef.current = hasPendingConfigChanges
@@ -813,12 +819,17 @@ export default function MetasWorkspace() {
         customOffDates: [],
       },
     }))
+    if (shouldRebaselineAfterAutoMonthInitRef.current) {
+      setIsRebaseliningConfig(true)
+      shouldRebaselineAfterAutoMonthInitRef.current = false
+    }
   }, [activeKey, activeMonth, month, year])
 
   // ── Month-switch: save old month config, load new month (or inherit from previous) ──
   useEffect(() => {
     if (prevActiveKeyRef.current === activeKey) return
     const shouldRebaselineAfterSwitch = !hadPendingBeforeKeyChangeRef.current
+    shouldRebaselineAfterAutoMonthInitRef.current = shouldRebaselineAfterSwitch
     const oldKey = prevActiveKeyRef.current
     prevActiveKeyRef.current = activeKey
 
@@ -861,9 +872,7 @@ export default function MetasWorkspace() {
     })
 
     if (shouldRebaselineAfterSwitch) {
-      if (configSaveError) setConfigSaveError('')
-      if (configSaveSuccess) setConfigSaveSuccess('')
-      setLastSavedConfigSignature(null)
+      setIsRebaseliningConfig(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
@@ -871,8 +880,20 @@ export default function MetasWorkspace() {
   useEffect(() => {
     if (!isConfigLoaded) return
     if (lastSavedConfigSignature !== null) return
+    if (isRebaseliningConfig) return
     setLastSavedConfigSignature(currentConfigSignature)
-  }, [currentConfigSignature, isConfigLoaded, lastSavedConfigSignature])
+  }, [currentConfigSignature, isConfigLoaded, isRebaseliningConfig, lastSavedConfigSignature])
+
+  useEffect(() => {
+    if (!isRebaseliningConfig) return
+    const timer = setTimeout(() => {
+      setConfigSaveError('')
+      setConfigSaveSuccess('')
+      setLastSavedConfigSignature(currentConfigSignature)
+      setIsRebaseliningConfig(false)
+    }, 180)
+    return () => clearTimeout(timer)
+  }, [currentConfigSignature, isRebaseliningConfig])
 
   useEffect(() => {
     if (!hasPendingConfigChanges) return
