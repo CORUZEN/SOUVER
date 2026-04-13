@@ -44,11 +44,11 @@ async function main() {
   // ── Perfis (Roles) ─────────────────────────────────────────
   console.log('👥 Criando perfis de acesso...')
   const roles = [
-    { name: 'Analista de TI', code: 'IT_ANALYST', description: 'Analista de Tecnologia da Informação' },
+    { name: 'Desenvolvedor', code: 'DEVELOPER', description: 'Administrador geral do sistema com acesso completo' },
     { name: 'Diretoria', code: 'DIRECTORATE', description: 'Gestão executiva e visão estratégica corporativa' },
     { name: 'Gerente Comercial', code: 'COMMERCIAL_MANAGER', description: 'Gestão de vendas e estratégia comercial' },
     { name: 'Gerente de Logística', code: 'LOGISTICS_MANAGER', description: 'Gestão das operações de logística e distribuição' },
-    { name: 'Desenvolvedor', code: 'DEVELOPER', description: 'Administrador geral do sistema com acesso completo' },
+    { name: 'Analista de TI', code: 'IT_ANALYST', description: 'Analista de Tecnologia da Informação' },
     { name: 'Qualidade', code: 'QUALITY', description: 'Inspetor de qualidade' },
     { name: 'Auditoria', code: 'AUDIT', description: 'Auditoria, conformidade e rastreabilidade de processos' },
     { name: 'Recursos Humanos', code: 'HR', description: 'Gestão de pessoas e rotinas de RH' },
