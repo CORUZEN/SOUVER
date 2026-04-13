@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { Bell, ChevronDown, LogOut, CheckCheck, X, User } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -11,7 +11,12 @@ interface UserInfo {
   name: string
   email: string
   role: string
+  roleCode?: string | null
   avatarUrl?: string | null
+  impersonation?: {
+    active: boolean
+    developerName: string
+  } | null
 }
 
 interface Notif {
@@ -60,12 +65,14 @@ export default function Header() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.user) {
-          const { name, email, role, avatarUrl } = data.user
+          const { name, email, role, roleCode, avatarUrl, impersonation } = data.user
           setUser({
             name,
             email,
             role: role?.name ?? role ?? 'Usuário',
+            roleCode: roleCode ?? null,
             avatarUrl: avatarUrl ?? null,
+            impersonation: impersonation ?? null,
           })
         }
       })
@@ -149,6 +156,11 @@ export default function Header() {
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
+  }
+
+  async function handleStopImpersonation() {
+    await fetch('/api/auth/impersonate/stop', { method: 'POST' })
+    window.location.reload()
   }
 
   const displayName = user?.name ?? 'Usuário'
@@ -330,6 +342,27 @@ export default function Header() {
                   <User className="h-4 w-4 text-surface-500" />
                   Ver perfil
                 </Link>
+                {user?.roleCode === 'DEVELOPER' && (
+                  <Link
+                    href="/usuarios"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
+                  >
+                    <Shield className="h-4 w-4 text-surface-500" />
+                    Dev
+                  </Link>
+                )}
+                {user?.impersonation?.active && (
+                  <button
+                    type="button"
+                    onClick={handleStopImpersonation}
+                    className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 transition-colors hover:bg-amber-50"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Voltar para Dev
+                  </button>
+                )}
+                <div className="my-1 border-t border-surface-200" />
                 <button
                   type="button"
                   onClick={handleLogout}

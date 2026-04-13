@@ -13,6 +13,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ authenticated: false }, { status: 401 })
     }
 
+    const impersonatorToken = req.cookies.get('souver_impersonator_token')?.value
+    let impersonation: { active: boolean; developerName: string } | null = null
+
+    if (impersonatorToken && impersonatorToken !== token) {
+      const impersonator = await getCurrentUser(impersonatorToken)
+      if (impersonator?.role?.code === 'DEVELOPER') {
+        impersonation = {
+          active: true,
+          developerName: impersonator.fullName,
+        }
+      }
+    }
+
     return NextResponse.json({
       authenticated: true,
       user: {
@@ -25,6 +38,7 @@ export async function GET(req: NextRequest) {
         roleCode: user.role?.code,
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
+        impersonation,
       },
     }, {
       headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=30' },
