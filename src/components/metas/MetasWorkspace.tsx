@@ -134,6 +134,25 @@ interface ProductAllowlistEntry {
   active: boolean
 }
 
+interface SellerDistributionRow {
+  sellerCode: string
+  clientCode: string
+  productsW1: number
+  productsW2: number
+  productsW3: number
+  productsClosing: number
+  productsMonth: number
+}
+
+interface SellerDistributionItemsRow {
+  sellerCode: string
+  itemsW1: number
+  itemsW2: number
+  itemsW3: number
+  itemsClosing: number
+  itemsMonth: number
+}
+
 type CompanyScopeFilter = '1' | '2' | 'all'
 
 interface PerformanceDiagnostics {
@@ -150,6 +169,17 @@ interface PerformanceDiagnostics {
   sellerBaseFetched?: number
   sellerBaseQueryMode?: string
   sellerBaseErrors?: string[]
+}
+
+interface DistributionDiagnostics {
+  queryModeUsed?: string
+  attempts?: Array<{ mode: string; rows: number; sellerItemsRows?: number; error?: string }>
+  totalRows?: number
+  uniqueSellers?: number
+  uniqueClients?: number
+  sellerCodesRequested?: number
+  productCodesRequested?: number
+  companyScope?: string
 }
 
 interface RuleProgress {
@@ -345,6 +375,16 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function normalizeEntityCode(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d+$/.test(trimmed)) {
+    const normalized = String(Number(trimmed))
+    return normalized === 'NaN' ? trimmed : normalized
+  }
+  return trimmed
+}
+
 function normalizeMonthConfig(input: Partial<MonthConfig> | undefined): MonthConfig {
   const customOffDates = Array.isArray(input?.customOffDates)
     ? Array.from(new Set(input.customOffDates.filter((date): date is string => typeof date === 'string' && Boolean(parseIsoDate(date))))).sort()
@@ -466,6 +506,35 @@ function parseItemFocoTarget(targetText: string) {
     volumePct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
     basePct: Math.max(parseDecimal(numbers[1] ?? '0', 0), 0),
   }
+}
+
+function parseDistribuicaoTarget(targetText: string, totalActiveProducts: number) {
+  const parts = targetText.split('|').map((s) => s.trim())
+  const itemsPart = parts[0] ?? '0'
+  const itemsIsPercent = itemsPart.includes('%')
+  const itemsNum = Math.max(parseDecimal(itemsPart.replace('%', ''), 0), 0)
+  const resolvedItems = itemsIsPercent && totalActiveProducts > 0
+    ? Math.ceil((totalActiveProducts * itemsNum) / 100)
+    : Math.max(Math.floor(itemsNum), 0)
+  const clientsPct = Math.max(parseDecimal((parts[1] ?? '0').replace('%', ''), 0), 0)
+  return { resolvedItems, clientsPct, itemsNum, itemsIsPercent }
+}
+
+function getDistribuicaoProductsByStage(row: SellerDistributionRow, stage: StageKey) {
+  if (stage === 'W1') return row.productsW1
+  if (stage === 'W2') return row.productsW2
+  if (stage === 'W3') return row.productsW3
+  if (stage === 'CLOSING') return row.productsClosing
+  return row.productsMonth
+}
+
+function getDistribuicaoItemsByStage(row: SellerDistributionItemsRow | undefined, stage: StageKey) {
+  if (!row) return 0
+  if (stage === 'W1') return row.itemsW1
+  if (stage === 'W2') return row.itemsW2
+  if (stage === 'W3') return row.itemsW3
+  if (stage === 'CLOSING') return row.itemsClosing
+  return row.itemsMonth
 }
 
 function formatItemFocoTarget(volumePct: number, basePct: number) {
@@ -727,6 +796,11 @@ export default function MetasWorkspace() {
   const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
+  const [distributionRows, setDistributionRows] = useState<SellerDistributionRow[]>([])
+  const [distributionSellerItemsRows, setDistributionSellerItemsRows] = useState<SellerDistributionItemsRow[]>([])
+  const [distributionLoading, setDistributionLoading] = useState(false)
+  const [distributionError, setDistributionError] = useState('')
+  const [distributionDiagnostics, setDistributionDiagnostics] = useState<DistributionDiagnostics | null>(null)
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
@@ -1583,6 +1657,94 @@ export default function MetasWorkspace() {
     () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
     [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
   )
+  const stageEnds = useMemo(() => ({
+    w1: cycle.weeks.find((w) => w.key === 'W1')?.end ?? '',
+    w2: cycle.weeks.find((w) => w.key === 'W2')?.end ?? '',
+    w3: cycle.weeks.find((w) => w.key === 'W3')?.end ?? '',
+    closing: cycle.weeks.find((w) => w.key === 'CLOSING')?.end ?? '',
+  }), [cycle.weeks])
+  const distributionBySellerProduct = useMemo(() => {
+    const bySeller = new Map<string, SellerDistributionRow[]>()
+    for (const row of distributionRows) {
+      const sellerCode = normalizeEntityCode(String(row.sellerCode ?? '').trim())
+      const clientCode = normalizeEntityCode(String(row.clientCode ?? '').trim())
+      if (!sellerCode || !clientCode) continue
+      if (!bySeller.has(sellerCode)) bySeller.set(sellerCode, [])
+      bySeller.get(sellerCode)!.push(row)
+    }
+    return bySeller
+  }, [distributionRows])
+  const distributionItemsBySeller = useMemo(() => {
+    const bySeller = new Map<string, SellerDistributionItemsRow>()
+    for (const row of distributionSellerItemsRows) {
+      const sellerCode = normalizeEntityCode(String(row.sellerCode ?? '').trim())
+      if (!sellerCode) continue
+      bySeller.set(sellerCode, row)
+    }
+    return bySeller
+  }, [distributionSellerItemsRows])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setDistributionLoading(true)
+    setDistributionError('')
+    setDistributionDiagnostics(null)
+
+    const params = new URLSearchParams({
+      year: String(year),
+      month: String(month + 1),
+      companyScope: companyScopeFilter,
+      w1End: stageEnds.w1,
+      w2End: stageEnds.w2,
+      w3End: stageEnds.w3,
+      closingEnd: stageEnds.closing,
+    })
+
+    fetch(`/api/metas/sellers-performance/item-distribution?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar distribuicao de itens.')
+        }
+        return payload
+      })
+      .then((data) => {
+        const rows = Array.isArray(data?.rows) ? data.rows : []
+        const sellerItemsRows = Array.isArray(data?.sellerItems) ? data.sellerItems : []
+        const mapped = rows.map((row: Record<string, unknown>) => ({
+          sellerCode: normalizeEntityCode(String(row.sellerCode ?? '').trim()),
+          clientCode: normalizeEntityCode(String(row.clientCode ?? '').trim()),
+          productsW1: Math.max(Math.floor(parseDecimal(String(row.productsW1 ?? 0), 0)), 0),
+          productsW2: Math.max(Math.floor(parseDecimal(String(row.productsW2 ?? 0), 0)), 0),
+          productsW3: Math.max(Math.floor(parseDecimal(String(row.productsW3 ?? 0), 0)), 0),
+          productsClosing: Math.max(Math.floor(parseDecimal(String(row.productsClosing ?? 0), 0)), 0),
+          productsMonth: Math.max(Math.floor(parseDecimal(String(row.productsMonth ?? 0), 0)), 0),
+        })) as SellerDistributionRow[]
+        const mappedSellerItems = sellerItemsRows.map((row: Record<string, unknown>) => ({
+          sellerCode: normalizeEntityCode(String(row.sellerCode ?? '').trim()),
+          itemsW1: Math.max(Math.floor(parseDecimal(String(row.itemsW1 ?? 0), 0)), 0),
+          itemsW2: Math.max(Math.floor(parseDecimal(String(row.itemsW2 ?? 0), 0)), 0),
+          itemsW3: Math.max(Math.floor(parseDecimal(String(row.itemsW3 ?? 0), 0)), 0),
+          itemsClosing: Math.max(Math.floor(parseDecimal(String(row.itemsClosing ?? 0), 0)), 0),
+          itemsMonth: Math.max(Math.floor(parseDecimal(String(row.itemsMonth ?? 0), 0)), 0),
+        })) as SellerDistributionItemsRow[]
+        setDistributionRows(mapped)
+        setDistributionSellerItemsRows(mappedSellerItems)
+        setDistributionDiagnostics(((data?.diagnostics as DistributionDiagnostics | undefined) ?? null))
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setDistributionRows([])
+        setDistributionSellerItemsRows([])
+        setDistributionDiagnostics(null)
+        setDistributionError(error instanceof Error ? error.message : 'Falha ao carregar distribuicao de itens.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDistributionLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [companyScopeFilter, month, stageEnds.closing, stageEnds.w1, stageEnds.w2, stageEnds.w3, year])
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
   const nextKey = monthKey(nextDate.getFullYear(), nextDate.getMonth())
@@ -1763,23 +1925,27 @@ export default function MetasWorkspace() {
               }
               break
             case 'DISTRIBUICAO': {
-              // targetText format: "X|Y" where X = items target (number or "N%" of total products), Y = clients% of seller base
-              const parts = rule.targetText.split('|').map((s) => s.trim())
-              const itemsPart = parts[0] ?? '0'
-              const itemsIsPercent = itemsPart.includes('%')
-              const itemsNum = parseDecimal(itemsPart.replace('%', ''), 0)
-              const resolvedItems = itemsIsPercent && totalActiveProducts > 0
-                ? Math.ceil(totalActiveProducts * itemsNum / 100)
-                : itemsNum
-              const clientsPct = parseDecimal(parts[1] ?? '0', 0) / 100
+              const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
               const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
-              // Use official client base (parceiros preferenciais) when available.
-              if (resolvedItems > 0 && clientsPct > 0 && baseTotalClients > 0) {
-                const requiredClients = Math.ceil(baseTotalClients * clientsPct)
+              const requiredClients = clientsPct > 0 && baseTotalClients > 0
+                ? Math.ceil(baseTotalClients * (clientsPct / 100))
+                : 0
+              const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+              const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+              const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
+              const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+                const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
+                return sum + (productsByStage >= 1 ? 1 : 0)
+              }, 0)
+              if (!distributionLoading && !distributionError && resolvedItems > 0 && requiredClients > 0 && totalActiveProducts > 0) {
+                const itemsProgress = soldItemsStage / Math.max(resolvedItems, 1)
+                const clientsProgress = clientsWithAnyItems / Math.max(requiredClients, 1)
+                progress = Math.min(itemsProgress, clientsProgress)
+              } else if (resolvedItems > 0 && clientsPct > 0 && baseTotalClients > 0) {
+                // Fallback while distribution matrix is unavailable.
+                const fallbackRequiredClients = Math.ceil(baseTotalClients * (clientsPct / 100))
                 const clientsAchieved = cumStage.distinctClients
-                progress = clientsAchieved / Math.max(requiredClients, 1)
-              } else if (resolvedItems > 0) {
-                progress = cumStage.orderCount / resolvedItems
+                progress = clientsAchieved / Math.max(fallbackRequiredClients, 1)
               } else {
                 progress = cumStage.orderCount > 0 ? 1 : 0
               }
@@ -2679,7 +2845,7 @@ export default function MetasWorkspace() {
             }
 
             function getSellerCode(seller: Salesperson) {
-              return seller.id.replace(/^sankhya-/, '')
+              return normalizeEntityCode(seller.id.replace(/^sankhya-/, ''))
             }
 
             function getCumulativeRevenue(seller: Salesperson, stageEndIso: string | null) {
@@ -2876,27 +3042,53 @@ export default function MetasWorkspace() {
                                   : 'N/A'
                                 ok = requiredGroups > 0 && volumeProgress >= 1
                               } else if (kpiType === 'DISTRIBUICAO') {
-                                const parts = rule.targetText.split('|').map((s) => s.trim())
-                                const itemsPart = parts[0] ?? '0'
-                                const itemsIsPercent = itemsPart.includes('%')
-                                const itemsNum = parseDecimal(itemsPart.replace('%', ''), 0)
                                 const totalActiveProducts = productAllowlist.filter((p) => p.active).length
-                                const resolvedItems = itemsIsPercent && totalActiveProducts > 0
-                                  ? Math.ceil(totalActiveProducts * itemsNum / 100)
-                                  : itemsNum
-                                const clientsPct = Math.max(parseDecimal(parts[1] ?? '0', 0), 0)
-                                const coveragePct = resolvedBaseClients > 0 ? (distinctClientsCum / resolvedBaseClients) * 100 : 0
+                                const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
+                                const requiredClients = clientsPct > 0 && resolvedBaseClients > 0
+                                  ? Math.ceil(resolvedBaseClients * (clientsPct / 100))
+                                  : 0
+                                const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+                                const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+                                const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
+                                const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+                                  const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
+                                  return sum + (productsByStage > 0 ? 1 : 0)
+                                }, 0)
+                                const sellerRowsCount = sellerRows.length
+                                const attemptsSummary = (distributionDiagnostics?.attempts ?? [])
+                                  .map((item) => `${item.mode}:${item.error ? 'erro' : `${item.rows}/${item.sellerItemsRows ?? 0}`}`)
+                                  .join(' | ')
                                 title = 'Distribuição por clientes e itens'
-                                lines = [
-                                  { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
-                                  { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
-                                  { label: 'Cobertura da base', value: `${num(coveragePct, 2)}%` },
-                                  { label: 'Itens alvo resolvidos', value: `${num(resolvedItems, 0)} item(ns)` },
-                                  { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
-                                ]
-                                resultLabel = 'Resultado apurado'
-                                resultValue = `${num(coveragePct, 2)}% base`
-                                ok = clientsPct > 0 && coveragePct >= clientsPct
+                                if (distributionLoading || distributionError) {
+                                  const coveragePct = resolvedBaseClients > 0 ? (distinctClientsCum / resolvedBaseClients) * 100 : 0
+                                  lines = [
+                                    { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
+                                    { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
+                                    { label: 'Clientes únicos acumulados', value: `${distinctClientsCum}` },
+                                    { label: 'Pedidos acumulados na etapa', value: `${orderCountCum}` },
+                                    { label: 'Itens alvo resolvidos', value: `${num(resolvedItems, 0)} item(ns)` },
+                                    { label: 'Status da distribuição por item', value: distributionLoading ? 'Carregando...' : 'Indisponível (fallback ativo)' },
+                                  ]
+                                  resultLabel = 'Resultado parcial'
+                                  resultValue = `${num(coveragePct, 2)}% base`
+                                  ok = false
+                                } else {
+                                  lines = [
+                                    { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
+                                    { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
+                                    { label: 'Clientes alvo (30% da base)', value: `${requiredClients}` },
+                                    { label: 'Produtos ativos considerados', value: `${totalActiveProducts}` },
+                                    { label: 'Itens alvo (SKU únicos)', value: `${num(resolvedItems, 0)} item(ns)` },
+                                    { label: 'Itens vendidos na etapa', value: `${num(soldItemsStage, 0)} item(ns)` },
+                                    { label: 'Clientes com qualquer SKU considerado', value: `${clientsWithAnyItems}` },
+                                    { label: 'Linhas de distribuição (cliente)', value: `${sellerRowsCount}` },
+                                    { label: 'Modo SQL usado', value: distributionDiagnostics?.queryModeUsed ?? 'N/A' },
+                                    { label: 'Tentativas SQL (clientes/itens)', value: attemptsSummary || 'N/A' },
+                                  ]
+                                  resultLabel = 'Resultado apurado'
+                                  resultValue = `${num(soldItemsStage, 0)}/${num(resolvedItems, 0)} itens · ${num(clientsWithAnyItems, 0)}/${num(requiredClients, 0)} clientes`
+                                  ok = resolvedItems > 0 && requiredClients > 0 && soldItemsStage >= resolvedItems && clientsWithAnyItems >= requiredClients
+                                }
                               } else if (kpiType === 'ITEM_FOCO') {
                                 const { volumePct, basePct } = parseItemFocoTarget(rule.targetText)
                                 const focusCode = (block.focusProductCode ?? '').trim()
