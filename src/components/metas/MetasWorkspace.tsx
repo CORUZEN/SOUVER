@@ -1553,8 +1553,6 @@ export default function MetasWorkspace() {
     () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
     [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
   )
-  const pointsTarget = useMemo(() => rules.reduce((sum, rule) => sum + rule.points, 0), [rules])
-  const rewardTarget = useMemo(() => rules.reduce((sum, rule) => sum + rule.rewardValue, 0), [rules])
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
   const nextKey = monthKey(nextDate.getFullYear(), nextDate.getMonth())
@@ -2164,7 +2162,7 @@ export default function MetasWorkspace() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4">
+    <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
       <Card className="relative border-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
         <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-primary-500 via-cyan-400 to-emerald-400" />
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -2431,15 +2429,23 @@ export default function MetasWorkspace() {
                             type="button"
                             className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100"
                             onClick={() =>
-                              setMonthConfigs((prev) => ({
-                                ...prev,
-                                [activeKey]: {
-                                  week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                                  closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                                  customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date),
-                                  sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
-                                },
-                              }))
+                              setConfirmModal({
+                                open: true,
+                                title: 'Excluir período desconsiderado',
+                                message: `Deseja remover a data ${formatDateBr(date)} da lista de períodos desconsiderados? Essa ação não pode ser desfeita.`,
+                                confirmLabel: 'Excluir',
+                                variant: 'danger',
+                                onConfirm: () =>
+                                  setMonthConfigs((prev) => ({
+                                    ...prev,
+                                    [activeKey]: {
+                                      week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                                      closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                                      customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date),
+                                      sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
+                                    },
+                                  })),
+                              })
                             }
                           >
                             {formatDateBr(date)} ×
@@ -2512,17 +2518,25 @@ export default function MetasWorkspace() {
                             type="button"
                             className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
                             onClick={() =>
-                              setMonthConfigs((prev) => ({
-                                ...prev,
-                                [activeKey]: {
-                                  week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                                  closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                                  customOffDates: activeMonth?.customOffDates ?? [],
-                                  sellerIncludedDates: (activeMonth?.sellerIncludedDates ?? []).filter(
-                                    (item) => !(item.sellerId === entry.sellerId && item.date === entry.date)
-                                  ),
-                                },
-                              }))
+                              setConfirmModal({
+                                open: true,
+                                title: 'Excluir data específica',
+                                message: `Deseja remover "${entry.sellerName} • ${formatDateBr(entry.date)}"? Essa ação não pode ser desfeita.`,
+                                confirmLabel: 'Excluir',
+                                variant: 'danger',
+                                onConfirm: () =>
+                                  setMonthConfigs((prev) => ({
+                                    ...prev,
+                                    [activeKey]: {
+                                      week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                                      closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                                      customOffDates: activeMonth?.customOffDates ?? [],
+                                      sellerIncludedDates: (activeMonth?.sellerIncludedDates ?? []).filter(
+                                        (item) => !(item.sellerId === entry.sellerId && item.date === entry.date)
+                                      ),
+                                    },
+                                  })),
+                              })
                             }
                           >
                             {entry.sellerName} • {formatDateBr(entry.date)} ×
@@ -2544,6 +2558,41 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className="border-surface-200">
+              <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Building2 size={14} className="text-indigo-600" />
+                  <h3 className="text-sm font-semibold text-surface-900">Escopo de empresas (Sankhya)</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: '1', label: 'Empresa 1' },
+                    { value: '2', label: 'Empresa 2' },
+                    { value: 'all', label: 'Ambas' },
+                  ] as { value: CompanyScopeFilter; label: string }[]).map(({ value, label }) => {
+                    const active = companyScopeFilter === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCompanyScopeFilter(value)}
+                        className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-all ${
+                          active
+                            ? 'border-indigo-500 bg-white text-indigo-700 shadow-sm'
+                            : 'border-indigo-200 bg-white/80 text-surface-600 hover:border-indigo-300 hover:text-surface-800'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {companyScopeFilter === 'all' && (
+                  <p className="mt-2 text-[11px] text-amber-700">
+                    Consolidado ativo: os totais podem divergir dos relatórios individuais.
+                  </p>
+                )}
+              </div>
+
               <div className="mb-3 flex items-center gap-2"><CircleDollarSign size={16} className="text-emerald-600" /><h2 className="text-base font-semibold text-surface-900">Parâmetros de premiação</h2></div>
               <label className={label}>Salário base<input className={input} type="number" step="0.01" value={salaryBase} onChange={(event) => setSalaryBase(parseDecimal(event.target.value, 0))} /></label>
               <label className={label}>Base de premiação<input className={input} type="number" step="0.01" value={basePremiation} onChange={(event) => setBasePremiation(parseDecimal(event.target.value, 0))} /></label>
@@ -2563,54 +2612,8 @@ export default function MetasWorkspace() {
                   }}
                 />
               </label>
-              <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3 text-sm text-surface-700">
-                <p>Potencial de KPIs: <strong>{currency(rewardTarget)}</strong> | {num(pointsTarget, 3)} pts</p>
-                <p>Base de premiação: <strong>{currency(basePremiation)}</strong></p>
-              </div>
             </Card>
           </div>
-
-          {/* ── Escopo de empresas Sankhya ─────────────────── */}
-          <Card className="border-surface-200">
-            <div className="mb-4 flex items-center gap-2">
-              <Building2 size={16} className="text-indigo-600" />
-              <div>
-                <h2 className="text-base font-semibold text-surface-900">Escopo de empresas (Sankhya)</h2>
-                <p className="mt-0.5 text-xs text-surface-500">Define quais empresas do Sankhya são consideradas no cálculo de pedidos e faturamento.</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {([
-                { value: '1', label: 'Empresa 1', desc: 'Moagem Ouro Verde' },
-                { value: '2', label: 'Empresa 2', desc: 'Moagem Ouro Verde Maceió' },
-                { value: 'all', label: 'Ambas', desc: 'Consolidado geral' },
-              ] as { value: CompanyScopeFilter; label: string; desc: string }[]).map(({ value, label, desc }) => {
-                const active = companyScopeFilter === value
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setCompanyScopeFilter(value)}
-                    className={`flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400/50 ${
-                      active
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-300'
-                        : 'border-surface-200 bg-white text-surface-700 hover:border-surface-300 hover:bg-surface-50'
-                    }`}
-                  >
-                    <span className={`text-sm font-semibold ${active ? 'text-indigo-700' : 'text-surface-800'}`}>{label}</span>
-                    <span className={`text-xs ${active ? 'text-indigo-500' : 'text-surface-500'}`}>{desc}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {companyScopeFilter === 'all' && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Atenção: com ambas as empresas ativas, os totais de pedidos e faturamento incluem todas as filiais e podem divergir dos relatórios individuais do Sankhya.
-              </div>
-            )}
-          </Card>
 
           {/* ── Multi-block KPI system ─────────────────────── */}
           <div className="flex items-center justify-between">
@@ -3018,7 +3021,7 @@ export default function MetasWorkspace() {
                         onClick={() => setConfirmModal({
                           open: true,
                           title: 'Excluir grupo',
-                          message: `Deseja excluir o grupo "${block.title}"? Os vendedores atribuídos voltarão ao grupo padrão.`,
+                          message: `Deseja excluir o grupo "${block.title}"? Os vendedores atribuídos voltarão ao grupo padrão e essa ação não pode ser desfeita.`,
                           confirmLabel: 'Excluir',
                           variant: 'danger',
                           onConfirm: () => {
@@ -3065,7 +3068,7 @@ export default function MetasWorkspace() {
                             onClick={() => setConfirmModal({
                               open: true,
                               title: 'Remover vendedor do grupo',
-                              message: `Deseja remover "${s.name}" do grupo "${block.title}"? O vendedor voltará a usar o grupo padrão.`,
+                              message: `Deseja remover "${s.name}" do grupo "${block.title}"? O vendedor voltará a usar o grupo padrão e essa ação não pode ser desfeita.`,
                               confirmLabel: 'Remover',
                               variant: 'danger',
                               onConfirm: () => updateBlock({ sellerIds: block.sellerIds.filter((id) => id !== s.id) }),
@@ -3310,7 +3313,14 @@ export default function MetasWorkspace() {
                           })()}</td>
                           <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
-                          <td className="px-3 py-2"><button type="button" onClick={() => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
+                          <td className="px-3 py-2"><button type="button" onClick={() => setConfirmModal({
+                            open: true,
+                            title: 'Excluir período/KPI',
+                            message: `Deseja excluir o KPI "${rule.kpi}" do período "${STAGES.find((s) => s.key === rule.stage)?.label ?? rule.stage}"? Essa ação não pode ser desfeita.`,
+                            confirmLabel: 'Excluir',
+                            variant: 'danger',
+                            onConfirm: () => updateBlock({ rules: block.rules.filter((r) => r.id !== rule.id) }),
+                          })} className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600" title="Remover KPI"><span className="text-xs">✕</span></button></td>
                         </tr>
                       ))}
                       <tr className="bg-surface-50 font-semibold">
@@ -3446,10 +3456,17 @@ export default function MetasWorkspace() {
                                 <td className="px-3 py-2">
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const updated = (block.weightTargets ?? []).filter((x) => x.id !== wt.id)
-                                      updateBlock({ weightTargets: updated })
-                                    }}
+                                    onClick={() => setConfirmModal({
+                                      open: true,
+                                      title: 'Excluir grupo de produto',
+                                      message: `Deseja excluir o grupo "${wt.brand || 'Sem marca'}" das metas de peso? Essa ação não pode ser desfeita.`,
+                                      confirmLabel: 'Excluir',
+                                      variant: 'danger',
+                                      onConfirm: () => {
+                                        const updated = (block.weightTargets ?? []).filter((x) => x.id !== wt.id)
+                                        updateBlock({ weightTargets: updated })
+                                      },
+                                    })}
                                     className="rounded p-1 text-surface-400 hover:bg-rose-50 hover:text-rose-600"
                                   >
                                     <X size={12} />
