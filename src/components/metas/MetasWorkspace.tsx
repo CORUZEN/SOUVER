@@ -2169,7 +2169,15 @@ export default function MetasWorkspace() {
           {/* Branding */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Gestão Comercial · Metas</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Painel de Metas — Ouro Verde</h1>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">
+              {view === 'config'
+                ? 'Configurações do Painel de Metas'
+                : view === 'sellers'
+                ? 'Lista de vendedores liberados'
+                : view === 'products'
+                ? 'Lista de produtos das metas'
+                : 'Painel de Metas — Ouro Verde'}
+            </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
