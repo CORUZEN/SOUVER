@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
-import { getAuthUser, hasPermission } from '@/lib/auth/permissions'
+import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 
 const updateUserSchema = z.object({
@@ -22,16 +22,23 @@ const updateUserSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
 })
 
+function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
+  if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Nao autenticado' }, { status: 401 }) }
+  if (user.role?.code !== 'DEVELOPER') {
+    return { ok: false as const, response: NextResponse.json({ message: 'Area Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
+  }
+  return { ok: true as const }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
   const currentUser = await getAuthUser(req)
-  if (!currentUser) return NextResponse.json({ message: 'Nao autenticado' }, { status: 401 })
+  const guard = ensureDeveloper(currentUser)
+  if (!guard.ok) return guard.response
 
-  const canRead = await hasPermission(currentUser.roleId, 'users:read')
-  if (!canRead) return NextResponse.json({ message: 'Sem permissao' }, { status: 403 })
+  const { id } = await params
 
   const user = await prisma.user.findUnique({
     where: { id },
@@ -59,13 +66,11 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
   const currentUser = await getAuthUser(req)
-  if (!currentUser) return NextResponse.json({ message: 'Nao autenticado' }, { status: 401 })
+  const guard = ensureDeveloper(currentUser)
+  if (!guard.ok) return guard.response
 
-  const canEdit = await hasPermission(currentUser.roleId, 'users:edit')
-  if (!canEdit) return NextResponse.json({ message: 'Sem permissao para editar usuarios' }, { status: 403 })
-
+  const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   const userAgent = req.headers.get('user-agent') ?? 'unknown'
 
@@ -105,14 +110,14 @@ export async function PUT(
   })
 
   await auditLog({
-    userId: currentUser.id,
+    userId: currentUser!.id,
     module: 'users',
     action: 'USER_UPDATED',
     entityType: 'user',
     entityId: id,
     oldData: { fullName: target.fullName, email: target.email, login: target.login, isActive: target.isActive },
     newData: rest,
-    description: `Usuario "${target.fullName}" atualizado.`,
+    description: `Usuario "${target.fullName}" atualizado no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
@@ -124,14 +129,13 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
   const currentUser = await getAuthUser(req)
-  if (!currentUser) return NextResponse.json({ message: 'Nao autenticado' }, { status: 401 })
+  const guard = ensureDeveloper(currentUser)
+  if (!guard.ok) return guard.response
 
-  const canDelete = await hasPermission(currentUser.roleId, 'users:delete')
-  if (!canDelete) return NextResponse.json({ message: 'Sem permissao para excluir usuarios' }, { status: 403 })
+  const { id } = await params
 
-  if (currentUser.id === id) {
+  if (currentUser!.id === id) {
     return NextResponse.json({ message: 'Nao e permitido excluir o proprio usuario.' }, { status: 400 })
   }
 
@@ -144,10 +148,6 @@ export async function DELETE(
   })
   if (!target) return NextResponse.json({ message: 'Usuario nao encontrado' }, { status: 404 })
 
-  if (target.role?.code === 'DEVELOPER' && currentUser.role?.code !== 'DEVELOPER') {
-    return NextResponse.json({ message: 'Apenas desenvolvedor pode excluir outro desenvolvedor.' }, { status: 403 })
-  }
-
   try {
     await prisma.user.delete({ where: { id } })
   } catch {
@@ -158,13 +158,13 @@ export async function DELETE(
   }
 
   await auditLog({
-    userId: currentUser.id,
+    userId: currentUser!.id,
     module: 'users',
     action: 'USER_DELETED',
     entityType: 'user',
     entityId: id,
     oldData: { fullName: target.fullName, email: target.email, login: target.login },
-    description: `Usuario "${target.fullName}" excluido permanentemente.`,
+    description: `Usuario "${target.fullName}" excluido permanentemente no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
