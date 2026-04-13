@@ -6,5 +6,5 @@ export const metadata: Metadata = {
 }
 
 export default function DashboardPage() {
-  redirect('/em-desenvolvimento?modulo=metas')
+  redirect('/metas')
 }

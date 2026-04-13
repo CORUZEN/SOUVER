@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from 'next'
 import { Clock3 } from 'lucide-react'
-import MetasWorkspace from '@/components/metas/MetasWorkspace'
+import { redirect } from 'next/navigation'
 import { getModulePlan } from '@/lib/development-modules'
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default async function DevelopmentPage({ searchParams }: DevelopmentPageP
   const selectedModuleKey = resolveModuleKey(resolvedSearchParams)
 
   if (selectedModuleKey === 'metas') {
-    return <MetasWorkspace />
+    redirect('/metas')
   }
 
   const modulePlan = getModulePlan(selectedModuleKey)
@@ -46,5 +46,7 @@ export default async function DevelopmentPage({ searchParams }: DevelopmentPageP
     </div>
   )
 }
+
+
 
 

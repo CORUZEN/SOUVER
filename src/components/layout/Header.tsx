@@ -168,10 +168,12 @@ export default function Header() {
   const currentModuleParam = searchParams.get('modulo')
 
   const headerContext = (() => {
-    if (pathname === '/em-desenvolvimento') {
+    if (pathname === '/metas' || pathname === '/em-desenvolvimento') {
       const fallback = MODULE_PLANS.metas
       const modulePlan =
-        currentModuleParam && MODULE_PLANS[currentModuleParam]
+        pathname === '/metas'
+          ? fallback
+          : currentModuleParam && MODULE_PLANS[currentModuleParam]
           ? MODULE_PLANS[currentModuleParam]
           : fallback
 

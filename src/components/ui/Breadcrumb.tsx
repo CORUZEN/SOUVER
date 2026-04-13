@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: 'Painel Executivo',
+  metas: 'Metas',
   'em-desenvolvimento': 'Em Desenvolvimento',
   usuarios: 'Colaboradores',
   producao: 'Produ\u00E7\u00E3o',
@@ -47,7 +48,7 @@ export default function Breadcrumb({ className }: { className?: string }) {
   return (
     <nav aria-label="Navega\u00E7\u00E3o" className={cn('flex items-center gap-1 text-sm', className)}>
       <Link
-        href="/em-desenvolvimento?modulo=metas"
+        href="/metas"
         className="text-surface-400 hover:text-surface-700 transition-colors"
         aria-label="In\u00EDcio"
       >

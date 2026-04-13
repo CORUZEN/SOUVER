@@ -52,6 +52,7 @@ const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
 const DEFAULT_MODULE: ModuleKey = 'metas'
 const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
 const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
+  metas: '/metas',
   integracoes: '/integracoes',
 }
 
@@ -78,11 +79,13 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
-    pathname !== '/em-desenvolvimento'
-      ? null
-      : selectedModuloParam && ACCESSIBLE_MODULES.includes(selectedModuloParam as ModuleKey)
-        ? (selectedModuloParam as ModuleKey)
-        : DEFAULT_MODULE
+    pathname === '/metas'
+      ? 'metas'
+      : pathname !== '/em-desenvolvimento'
+        ? null
+        : selectedModuloParam && ACCESSIBLE_MODULES.includes(selectedModuloParam as ModuleKey)
+          ? (selectedModuloParam as ModuleKey)
+          : DEFAULT_MODULE
 
   useEffect(() => {
     if (typeof window === 'undefined') return
