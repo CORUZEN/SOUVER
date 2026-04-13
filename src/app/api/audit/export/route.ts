@@ -71,7 +71,16 @@ export async function GET(req: NextRequest) {
   })
 
   const header = ['Data/Hora', 'Usuário', 'Login', 'Módulo', 'Ação', 'Entidade', 'ID Entidade', 'Descrição', 'IP']
-  const rows = logs.map((l) => [
+  const rows = logs.map((l: {
+    createdAt: Date
+    module: string
+    action: string
+    description: string | null
+    entityType: string | null
+    entityId: string | null
+    ipAddress: string | null
+    user: { fullName: string; login: string } | null
+  }) => [
     l.createdAt.toISOString(),
     l.user?.fullName ?? '',
     l.user?.login ?? '',

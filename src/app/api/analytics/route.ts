@@ -3,6 +3,12 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
+type UserSummary = {
+  id: string
+  fullName: string
+  login: string
+}
+
 /**
  * GET /api/analytics — Analytics avançado por módulo e usuário
  *
@@ -48,14 +54,18 @@ export async function GET(req: NextRequest) {
     take: 10,
   })
 
-  const userIds = topUsers.map((u) => u.userId).filter(Boolean) as string[]
+  const userIds = topUsers
+    .map((u: { userId: string | null }) => u.userId)
+    .filter((id: string | null): id is string => Boolean(id))
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
     select: { id: true, fullName: true, login: true },
   })
-  const userMap = new Map(users.map((u) => [u.id, u]))
+  const userMap = new Map<string, UserSummary>(
+    users.map((u: UserSummary): [string, UserSummary] => [u.id, u])
+  )
 
-  const topUsersWithNames = topUsers.map((u) => ({
+  const topUsersWithNames = topUsers.map((u: { userId: string | null; _count: { id: number } }) => ({
     userId: u.userId,
     name: userMap.get(u.userId!)?.fullName ?? 'Desconhecido',
     login: userMap.get(u.userId!)?.login ?? '-',
@@ -101,21 +111,21 @@ export async function GET(req: NextRequest) {
     {
       period,
       since: since.toISOString(),
-      modules: actionsByModule.map((m) => ({ module: m.module, count: m._count.id })),
-      actions: actionsByType.map((a) => ({ action: a.action, count: a._count.id })),
+      modules: actionsByModule.map((m: { module: string; _count: { id: number } }) => ({ module: m.module, count: m._count.id })),
+      actions: actionsByType.map((a: { action: string; _count: { id: number } }) => ({ action: a.action, count: a._count.id })),
       topUsers: topUsersWithNames,
-      dailyActivity: dailyActivity.map((d) => ({
+      dailyActivity: dailyActivity.map((d: { day: Date; count: bigint }) => ({
         day: d.day instanceof Date ? d.day.toISOString().slice(0, 10) : String(d.day),
         count: Number(d.count),
       })),
       production: {
-        byStatus: batchesByStatus.map((b) => ({ status: b.status, count: b._count.id })),
+        byStatus: batchesByStatus.map((b: { status: string; _count: { id: number } }) => ({ status: b.status, count: b._count.id })),
       },
       quality: {
-        bySeverity: ncBySeverity.map((n) => ({ severity: n.severity, count: n._count.id })),
+        bySeverity: ncBySeverity.map((n: { severity: string; _count: { id: number } }) => ({ severity: n.severity, count: n._count.id })),
       },
       logistics: {
-        byType: movementsByType.map((m) => ({ type: m.type, count: m._count.id })),
+        byType: movementsByType.map((m: { type: string; _count: { id: number } }) => ({ type: m.type, count: m._count.id })),
       },
     },
     { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } }

@@ -59,7 +59,7 @@ export async function createNotificationsForRole(
   if (users.length === 0) return 0
 
   const result = await prisma.notification.createMany({
-    data: users.map(u => ({
+    data: users.map((u: { id: string }) => ({
       userId:  u.id,
       type:    params.type,
       title:   params.title,
@@ -82,7 +82,7 @@ export async function createNotificationsForAll(
   if (users.length === 0) return 0
 
   const result = await prisma.notification.createMany({
-    data: users.map(u => ({
+    data: users.map((u: { id: string }) => ({
       userId:  u.id,
       type:    params.type,
       title:   params.title,
@@ -102,7 +102,7 @@ export async function createNotificationsForUsers(
   if (userIds.length === 0) return 0
 
   const result = await prisma.notification.createMany({
-    data: userIds.map(uid => ({
+    data: userIds.map((uid: string) => ({
       userId:  uid,
       type:    params.type,
       title:   params.title,

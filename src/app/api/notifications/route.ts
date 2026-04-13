@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         where: { roleId: role.id, status: 'ACTIVE' },
         select: { id: true },
       })
-      targetIds = users.map(u => u.id)
+      targetIds = users.map((u: { id: string }) => u.id)
     }
   } else {
     return NextResponse.json({ error: 'Informe userId, userIds ou roleCode' }, { status: 400 })
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await prisma.notification.createMany({
-    data: targetIds.map(uid => ({
+    data: targetIds.map((uid: string) => ({
       userId: uid,
       type,
       title,

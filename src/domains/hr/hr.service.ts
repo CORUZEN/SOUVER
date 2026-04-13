@@ -174,7 +174,7 @@ export async function getLoginActivity() {
   `
 
   const byDay = new Map<string, number>(
-    rows.map((r) => [new Date(r.day).toDateString(), Number(r.count)])
+    rows.map((r: { day: Date; count: bigint }) => [new Date(r.day).toDateString(), Number(r.count)])
   )
 
   const result: { date: string; count: number }[] = []

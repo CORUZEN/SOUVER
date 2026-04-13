@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
+import type { Prisma } from '@prisma/client'
 
 const updatePermissionsSchema = z.object({
   permissionCodes: z.array(z.string()).default([]),
@@ -36,13 +37,13 @@ export async function PUT(
     select: { id: true, code: true },
   })
 
-  const validPermissionIds = validPermissions.map((p) => p.id)
+  const validPermissionIds = validPermissions.map((p: { id: string }) => p.id)
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.rolePermission.deleteMany({ where: { roleId: role.id } })
     if (validPermissionIds.length > 0) {
       await tx.rolePermission.createMany({
-        data: validPermissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
+        data: validPermissionIds.map((permissionId: string) => ({ roleId: role.id, permissionId })),
       })
     }
   })
@@ -56,7 +57,7 @@ export async function PUT(
     action: 'PERMISSION_CHANGED',
     entityType: 'role',
     entityId: role.id,
-    newData: { permissionCodes: validPermissions.map((p) => p.code) },
+    newData: { permissionCodes: validPermissions.map((p: { code: string }) => p.code) },
     description: `Permissões do grupo ${role.name} atualizadas no painel Dev.`,
     ipAddress: ip,
     userAgent,
@@ -64,6 +65,6 @@ export async function PUT(
 
   return NextResponse.json({
     message: 'Permissões do grupo atualizadas com sucesso.',
-    appliedPermissions: validPermissions.map((p) => p.code),
+    appliedPermissions: validPermissions.map((p: { code: string }) => p.code),
   })
 }

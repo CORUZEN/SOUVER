@@ -41,7 +41,7 @@ async function main() {
 
   const deleteResult = await prisma.auditLog.deleteMany({
     where: {
-      id: { in: recentFailures.map((item) => item.id) },
+      id: { in: recentFailures.map((item: { id: string }) => item.id) },
     },
   })
 

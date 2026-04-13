@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       select: { currentQty: true, minQty: true, name: true },
     })
     const actualLowStock = lowStockCandidates.filter(
-      i => Number(i.currentQty) <= Number(i.minQty)
+      (i: { currentQty: unknown; minQty: unknown }) => Number(i.currentQty) <= Number(i.minQty)
     )
 
     const dateLabel = yesterday.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 
     if (adminUsers.length > 0) {
       await prisma.notification.createMany({
-        data: adminUsers.map(u => ({
+        data: adminUsers.map((u: { id: string }) => ({
           userId:  u.id,
           type:    'DAILY_REPORT',
           title:   `Resumo diário — ${dateLabel}`,

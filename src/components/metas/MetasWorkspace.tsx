@@ -1150,7 +1150,16 @@ export default function MetasWorkspace() {
             )
             const payload = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar item foco do mês.')
-            const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients?: number }>
+            const rows = ((payload.rows ?? []) as Array<{
+              sellerCode: string
+              sellerName: string
+              soldKg: number
+              returnKg: number
+              soldClients?: number
+            }>).map((row) => ({
+              ...row,
+              soldClients: Number(row.soldClients ?? 0),
+            }))
             setFocusProductRows((prev) => ({ ...prev, [code]: rows }))
           } catch (err: unknown) {
             if (!controller.signal.aborted) {

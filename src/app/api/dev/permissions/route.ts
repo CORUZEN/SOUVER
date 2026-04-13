@@ -1,23 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
 function deny() {
-  return NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 })
+  return NextResponse.json({ message: 'Ãrea Dev exclusiva para desenvolvedor.' }, { status: 403 })
 }
 
 async function requireDeveloper(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user) return { user: null, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
+  if (!user) return { user: null, response: NextResponse.json({ message: 'NÃ£o autenticado' }, { status: 401 }) }
   if (user.role?.code !== 'DEVELOPER') return { user: null, response: deny() }
-  return { user, response: null as NextResponse | null }
+  return { user, response: undefined }
 }
 
 export async function GET(req: NextRequest) {
   const { user, response } = await requireDeveloper(req)
-  if (!user) return response
+  if (!user || response) return response
 
   await ensureRoleCatalog(prisma)
 
@@ -55,14 +55,14 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
-  const roles = sortRolesByCatalogOrder(rolesRaw)
+  const roles = sortRolesByCatalogOrder<(typeof rolesRaw)[number]>(rolesRaw)
 
-  const rolesWithCodes = roles.map((role) => ({
+  const rolesWithCodes = roles.map((role: (typeof rolesRaw)[number]) => ({
     id: role.id,
     name: role.name,
     code: role.code,
     description: role.description,
-    permissionCodes: role.rolePermissions.map((rp) => rp.permission.code),
+    permissionCodes: role.rolePermissions.map((rp: { permission: { code: string } }) => rp.permission.code),
   }))
 
   return NextResponse.json({
@@ -75,21 +75,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { user, response } = await requireDeveloper(req)
-  if (!user) return response
+  if (!user || response) return response
 
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   const userAgent = req.headers.get('user-agent') ?? 'unknown'
 
   const existing = await prisma.role.findUnique({ where: { code: 'ADMINISTRACAO' }, select: { id: true, code: true } })
   if (existing) {
-    return NextResponse.json({ message: 'Grupo Administração já existe.', roleId: existing.id })
+    return NextResponse.json({ message: 'Grupo AdministraÃ§Ã£o jÃ¡ existe.', roleId: existing.id })
   }
 
   const role = await prisma.role.create({
     data: {
-      name: 'Administração',
+      name: 'AdministraÃ§Ã£o',
       code: 'ADMINISTRACAO',
-      description: 'Grupo com permissões amplas operacionais, sem acesso ao painel Dev.',
+      description: 'Grupo com permissÃµes amplas operacionais, sem acesso ao painel Dev.',
     },
     select: { id: true, name: true, code: true },
   })
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
   if (defaultPermissions.length > 0) {
     await prisma.rolePermission.createMany({
-      data: defaultPermissions.map((permission) => ({ roleId: role.id, permissionId: permission.id })),
+      data: defaultPermissions.map((permission: { id: string }) => ({ roleId: role.id, permissionId: permission.id })),
       skipDuplicates: true,
     })
   }
@@ -115,10 +115,11 @@ export async function POST(req: NextRequest) {
     action: 'ROLE_CREATED',
     entityType: 'role',
     entityId: role.id,
-    description: 'Grupo de permissao Administração criado no painel Dev.',
+    description: 'Grupo de permissao AdministraÃ§Ã£o criado no painel Dev.',
     ipAddress: ip,
     userAgent,
   })
 
-  return NextResponse.json({ message: 'Grupo Administração criado com sucesso.', roleId: role.id }, { status: 201 })
+  return NextResponse.json({ message: 'Grupo AdministraÃ§Ã£o criado com sucesso.', roleId: role.id }, { status: 201 })
 }
+

@@ -19,7 +19,7 @@ function toCsv(rows: Record<string, unknown>[]): string {
   }
   const lines = [
     headers.join(','),
-    ...rows.map(r => headers.map(h => escape(r[h])).join(',')),
+    ...rows.map((r: Record<string, unknown>) => headers.map((h: string) => escape(r[h])).join(',')),
   ]
   return lines.join('\n')
 }
@@ -191,7 +191,21 @@ export async function GET(req: NextRequest) {
         'Relatório de Produção',
         [{
           columns: ['Código', 'Produto', 'Tipo', 'Linha', 'Turno', 'Depto', 'Status', 'Qtd.Plan.', 'Qtd.Prod.', 'Unid.', 'Início', 'Fim', 'Criado em'],
-          rows: rows.map(r => [
+          rows: rows.map((r: {
+            Código: string
+            Produto: string
+            Tipo: string
+            Linha: string
+            Turno: string
+            Departamento: string
+            Status: string
+            QtdPlanejada: string
+            QtdProduzida: string
+            Unidade: string
+            Inicio: string
+            Fim: string
+            CriadoEm: string
+          }) => [
             r.Código, r.Produto, r.Tipo, r.Linha, r.Turno, r.Departamento,
             r.Status, r.QtdPlanejada, r.QtdProduzida, r.Unidade, r.Inicio, r.Fim, r.CriadoEm,
           ]),
@@ -237,7 +251,19 @@ export async function GET(req: NextRequest) {
         'Relatório de Estoque / Logística',
         [{
           columns: ['SKU', 'Nome', 'Descrição', 'Categoria', 'Unid.', 'Qtd. Atual', 'Qtd. Mín.', 'Qtd. Máx.', 'Localização', 'Ativo', 'Criado em'],
-          rows: rows.map(r => [
+          rows: rows.map((r: {
+            SKU: string
+            Nome: string
+            Descricao: string
+            Categoria: string
+            Unidade: string
+            QtdAtual: string
+            QtdMinima: string
+            QtdMaxima: string
+            Localizacao: string
+            Ativo: string
+            CriadoEm: string
+          }) => [
             r.SKU, r.Nome, r.Descricao, r.Categoria, r.Unidade,
             r.QtdAtual, r.QtdMinima, r.QtdMaxima, r.Localizacao, r.Ativo, r.CriadoEm,
           ]),
@@ -306,12 +332,28 @@ export async function GET(req: NextRequest) {
           {
             heading: 'Inspeções',
             columns: ['Lote', 'Tipo Inspeção', 'Resultado', 'Inspetor', 'Data', 'Observações'],
-            rows: iRows.map(r => [r.Lote, r.TipoInspecao, r.Resultado, r.Inspetor, r.Data, r.Observacoes]),
+            rows: iRows.map((r: {
+              Lote: string
+              TipoInspecao: string
+              Resultado: string
+              Inspetor: string
+              Data: string
+              Observacoes: string
+            }) => [r.Lote, r.TipoInspecao, r.Resultado, r.Inspetor, r.Data, r.Observacoes]),
           },
           {
             heading: 'Não Conformidades',
             columns: ['Título', 'Lote', 'Severidade', 'Status', 'Aberto em', 'Aberto por', 'Resolução', 'Resolvido em'],
-            rows: ncRows.map(r => [r.Titulo, r.Lote, r.Severidade, r.Status, r.AbertoEm, r.AbertoPor, r.Resolucao, r.ResolvidoEm]),
+            rows: ncRows.map((r: {
+              Titulo: string
+              Lote: string
+              Severidade: string
+              Status: string
+              AbertoEm: string
+              AbertoPor: string
+              Resolucao: string
+              ResolvidoEm: string
+            }) => [r.Titulo, r.Lote, r.Severidade, r.Status, r.AbertoEm, r.AbertoPor, r.Resolucao, r.ResolvidoEm]),
           },
         ],
         `qualidade_${ts}.pdf`,
@@ -377,7 +419,18 @@ export async function GET(req: NextRequest) {
         'Relatório de Recursos Humanos',
         [{
           columns: ['Nome', 'Email', 'Login', 'Telefone', 'Perfil', 'Departamento', 'Status', '2FA', 'Últ. Login', 'Criado em'],
-          rows: rows.map(r => [
+          rows: rows.map((r: {
+            Nome: string
+            Email: string
+            Login: string
+            Telefone: string
+            Perfil: string
+            Departamento: string
+            Status: string
+            '2FA': string
+            ÚltimoLogin: string
+            CriadoEm: string
+          }) => [
             r.Nome, r.Email, r.Login, r.Telefone, r.Perfil,
             r.Departamento, r.Status, r['2FA'], r['ÚltimoLogin'], r.CriadoEm,
           ]),

@@ -30,7 +30,14 @@ export async function GET(req: NextRequest) {
     },
   })
 
-  const result = sessions.map(s => ({
+  const result = sessions.map((s: {
+    id: string
+    ipAddress: string | null
+    userAgent: string | null
+    deviceName: string | null
+    startedAt: Date
+    expiresAt: Date
+  }) => ({
     ...s,
     isCurrent: s.id === currentSessionId,
   }))
