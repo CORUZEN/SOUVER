@@ -257,19 +257,24 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       >
         <div
           className={cn(
-            'relative h-16 flex items-center border-b border-surface-700/50',
-            isCollapsed ? 'justify-center px-2' : 'px-4'
+            'relative flex items-center border-b border-surface-700/50',
+            isCollapsed ? 'h-[72px] justify-center px-2.5' : 'h-16 px-4'
           )}
         >
           <div className={cn('w-full', isCollapsed ? 'flex justify-center' : 'flex items-center gap-3 pr-8')}>
             <div className={cn('flex shrink-0', isCollapsed ? 'justify-center' : 'justify-start')}>
-              <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-xl">
+              <div
+                className={cn(
+                  'relative shrink-0 overflow-hidden',
+                  isCollapsed ? 'h-[56px] w-[56px] rounded-lg' : 'h-[84px] w-[84px] rounded-xl'
+                )}
+              >
                 <Image
                   src="/branding/ouroverde.png"
                   alt="Logo Ouro Verde"
                   fill
                   priority
-                  sizes="84px"
+                  sizes={isCollapsed ? '56px' : '84px'}
                   className="object-contain"
                 />
               </div>
