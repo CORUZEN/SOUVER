@@ -1,4 +1,4 @@
-import { BarChart3, Factory, ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 import { Manrope } from 'next/font/google'
 import { cn } from '@/lib/utils'
 
@@ -7,9 +7,6 @@ const manrope = Manrope({
   weight: ['400', '500', '600', '700', '800'],
   display: 'swap',
 })
-
-const leftPanelBackgroundImage =
-  process.env.NEXT_PUBLIC_AUTH_LEFT_BG_IMAGE ?? '/images/auth-enterprise-bg.svg'
 
 export default function AuthLayout({
   children,
@@ -25,58 +22,34 @@ export default function AuthLayout({
         <div className="mx-auto flex min-h-full w-full max-w-360 items-center">
           <div className="grid w-full overflow-hidden rounded-[28px] border border-white/20 bg-white/6 shadow-[0_24px_70px_rgba(2,8,23,0.45)] backdrop-blur-md lg:grid-cols-[1.08fr_0.92fr]">
             <section className="order-2 relative min-h-90 overflow-hidden lg:order-1">
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                  backgroundImage: `linear-gradient(140deg, rgba(4, 14, 32, 0.88), rgba(6, 78, 59, 0.68)), url("${leftPanelBackgroundImage}")`,
-                }}
-              />
+              <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(4,14,32,0.9),rgba(6,78,59,0.72))]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.28),transparent_52%),radial-gradient(circle_at_82%_16%,rgba(56,189,248,0.24),transparent_45%)]" />
 
-              <div className="relative z-10 flex h-full flex-col justify-between p-7 text-white sm:p-10 lg:p-10 xl:p-12">
-                <div className="animate-[authFadeUp_650ms_ease-out]">
-                  <div className="mb-5 inline-flex items-center gap-3 rounded-full border border-white/30 bg-white/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/90 backdrop-blur-xl">
-                    Sistema Ouro Verde
+              <div className="relative z-10 flex h-full items-center justify-center p-7 sm:p-10 lg:p-10 xl:p-12">
+                <div className="w-full max-w-2xl space-y-6">
+                  <div className="animate-[authFadeUp_620ms_ease-out] rounded-3xl border border-white/30 bg-white/12 p-5 shadow-[0_12px_40px_rgba(2,8,23,0.35)] backdrop-blur-xl sm:p-6">
+                    <div className="relative h-36 w-full sm:h-40">
+                      <Image
+                        src="/branding/graoverde.png"
+                        alt="Logo Grão Verde"
+                        fill
+                        priority
+                        className="object-contain"
+                      />
+                    </div>
                   </div>
-                  <h1 className="max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl lg:text-[2.75rem]">
-                    Plataforma empresarial com acesso seguro e operação integrada.
-                  </h1>
-                  <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/82 sm:text-base">
-                    Gerencie produção, auditoria, pessoas e indicadores em uma única experiência
-                    corporativa.
-                  </p>
-                </div>
 
-                <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:mt-8 lg:grid-cols-1">
-                  <article className="animate-[authFadeUp_760ms_ease-out] rounded-2xl border border-white/30 bg-white/12 p-4 backdrop-blur-xl [animation-fill-mode:both]">
-                    <div className="mb-2 inline-flex rounded-lg bg-white/20 p-2">
-                      <ShieldCheck className="h-4 w-4 text-emerald-100" />
+                  <div className="animate-[authFadeUp_760ms_ease-out] rounded-3xl border border-white/30 bg-white/12 p-5 shadow-[0_12px_40px_rgba(2,8,23,0.35)] backdrop-blur-xl sm:p-6 [animation-fill-mode:both]">
+                    <div className="relative h-36 w-full sm:h-40">
+                      <Image
+                        src="/branding/ouroverde.png"
+                        alt="Logo Ouro Verde"
+                        fill
+                        priority
+                        className="object-contain"
+                      />
                     </div>
-                    <p className="text-sm font-semibold text-white">Conformidade e segurança</p>
-                    <p className="mt-1 text-xs text-white/75">
-                      Controle de acesso, trilhas de auditoria e proteção para dados sensíveis.
-                    </p>
-                  </article>
-
-                  <article className="animate-[authFadeUp_900ms_ease-out] rounded-2xl border border-white/30 bg-white/12 p-4 backdrop-blur-xl [animation-fill-mode:both]">
-                    <div className="mb-2 inline-flex rounded-lg bg-white/20 p-2">
-                      <BarChart3 className="h-4 w-4 text-cyan-100" />
-                    </div>
-                    <p className="text-sm font-semibold text-white">Indicadores em tempo real</p>
-                    <p className="mt-1 text-xs text-white/75">
-                      Decisões mais rápidas com dashboards executivos e visão consolidada.
-                    </p>
-                  </article>
-
-                  <article className="animate-[authFadeUp_1040ms_ease-out] rounded-2xl border border-white/30 bg-white/12 p-4 backdrop-blur-xl [animation-fill-mode:both] sm:col-span-2 lg:col-span-1">
-                    <div className="mb-2 inline-flex rounded-lg bg-white/20 p-2">
-                      <Factory className="h-4 w-4 text-emerald-100" />
-                    </div>
-                    <p className="text-sm font-semibold text-white">Operação industrial conectada</p>
-                    <p className="mt-1 text-xs text-white/75">
-                      Padronização entre plantas, equipes e processos de ponta a ponta.
-                    </p>
-                  </article>
+                  </div>
                 </div>
               </div>
             </section>
