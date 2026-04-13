@@ -63,6 +63,7 @@ interface CampaignPrize {
 
 interface MonthConfig {
   week1StartDate: string
+  closingWeekEndDate?: string
   customOffDates: string[]
 }
 
@@ -338,6 +339,16 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function resolveClosingEndDate(raw: string | undefined, year: number, month: number) {
+  if (!raw) return null
+  const parsed = parseIsoDate(raw)
+  if (!parsed) return null
+  const start = new Date(year, month, 1)
+  const end = new Date(year, month + 1, 0)
+  if (parsed < start || parsed > end) return null
+  return toIsoDate(parsed)
+}
+
 function getSellerWeightTargetRatios(
   weightTargets: WeightTarget[],
   brandWeightRows: Array<{ sellerCode: string; brand: string; totalKg: number }>,
@@ -505,7 +516,7 @@ function nationalHolidays(year: number) {
   return [...fixed.map(([m, d]) => toIsoDate(new Date(year, m - 1, d))), ...movable.map((date) => toIsoDate(date))]
 }
 
-function buildCycle(startIso: string, year: number, month: number, blocked: Set<string>) {
+function buildCycle(startIso: string, closingEndIso: string, year: number, month: number, blocked: Set<string>) {
   const start = parseIsoDate(startIso)
   const monthStart = new Date(year, month, 1)
   const monthEnd = new Date(year, month + 1, 0)
@@ -520,11 +531,14 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
   }
 
   const baseStart = start < monthStart ? monthStart : start
+  const configuredEnd = resolveClosingEndDate(closingEndIso, year, month)
+  const cycleEndBase = configuredEnd ? parseIsoDate(configuredEnd) ?? monthEnd : monthEnd
+  const cycleEnd = cycleEndBase < baseStart ? baseStart : cycleEndBase
   const weekStages = STAGES.filter((s) => s.key !== 'FULL')
 
   weekStages.forEach((stage, index) => {
     const stageStart = addDays(baseStart, index * 7)
-    if (stageStart > monthEnd) {
+    if (stageStart > cycleEnd) {
       weeks.push({
         key: stage.key,
         label: stage.label,
@@ -535,8 +549,8 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
       return
     }
 
-    const rawStageEnd = stage.key === 'CLOSING' ? monthEnd : addDays(stageStart, 4)
-    const stageEnd = rawStageEnd > monthEnd ? monthEnd : rawStageEnd
+    const rawStageEnd = stage.key === 'CLOSING' ? cycleEnd : addDays(stageStart, 4)
+    const stageEnd = rawStageEnd > cycleEnd ? cycleEnd : rawStageEnd
     const visibleStart = stageStart < monthStart ? monthStart : stageStart
 
     const business: string[] = []
@@ -557,7 +571,7 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
 
   // FULL stage: entire month
   const fullBusiness: string[] = []
-  for (let cursor = new Date(monthStart); cursor <= monthEnd; cursor = addDays(cursor, 1)) {
+  for (let cursor = new Date(baseStart); cursor <= cycleEnd; cursor = addDays(cursor, 1)) {
     const weekday = cursor.getDay()
     const iso = toIsoDate(cursor)
     if (weekday >= 1 && weekday <= 5 && !blocked.has(iso)) fullBusiness.push(iso)
@@ -565,13 +579,13 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
   weeks.push({
     key: 'FULL',
     label: 'Todo o período',
-    start: toIsoDate(monthStart),
-    end: toIsoDate(monthEnd),
+    start: toIsoDate(baseStart),
+    end: toIsoDate(cycleEnd),
     businessDays: fullBusiness,
   })
 
   let lastBusinessDate: string | null = null
-  for (let d = new Date(monthEnd); d >= monthStart; d = addDays(d, -1)) {
+  for (let d = new Date(cycleEnd); d >= baseStart; d = addDays(d, -1)) {
     const wd = d.getDay()
     const iso = toIsoDate(d)
     if (wd >= 1 && wd <= 5 && !blocked.has(iso)) {
@@ -584,9 +598,11 @@ function buildCycle(startIso: string, year: number, month: number, blocked: Set<
   return { weeks, totalBusinessDays, lastBusinessDate }
 }
 
-function hasMonthEnded(year: number, month: number) {
-  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999)
-  return new Date().getTime() > monthEnd.getTime()
+function hasMonthEnded(year: number, month: number, closingEndIso: string) {
+  const resolved = resolveClosingEndDate(closingEndIso, year, month)
+  const [closingYear, closingMonth, closingDay] = (resolved ?? toIsoDate(new Date(year, month + 1, 0))).split('-').map(Number)
+  const cycleEnd = new Date(closingYear, closingMonth - 1, closingDay, 23, 59, 59, 999)
+  return new Date().getTime() > cycleEnd.getTime()
 }
 
 export default function MetasWorkspace() {
@@ -754,6 +770,7 @@ export default function MetasWorkspace() {
       ...prev,
       [activeKey]: {
         week1StartDate: firstMonday(year, month),
+        closingWeekEndDate: '',
         customOffDates: [],
       },
     }))
@@ -1376,14 +1393,17 @@ export default function MetasWorkspace() {
     return set
   }, [activeMonth?.customOffDates, includeNational, year])
 
-  const cycle = useMemo(() => buildCycle(activeMonth?.week1StartDate ?? '', year, month, blockedSet), [activeMonth?.week1StartDate, blockedSet, month, year])
+  const cycle = useMemo(
+    () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
+    [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
+  )
   const pointsTarget = useMemo(() => rules.reduce((sum, rule) => sum + rule.points, 0), [rules])
   const rewardTarget = useMemo(() => rules.reduce((sum, rule) => sum + rule.rewardValue, 0), [rules])
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
   const nextKey = monthKey(nextDate.getFullYear(), nextDate.getMonth())
   const nextConfigured = Boolean(monthConfigs[nextKey]?.week1StartDate)
-  const standby = !activeMonth?.week1StartDate || (hasMonthEnded(year, month) && !nextConfigured)
+  const standby = !activeMonth?.week1StartDate || (hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && !nextConfigured)
 
   const snapshots = useMemo<SellerSnapshot[]>(() => {
     const todayIso = toIsoDate(new Date())
@@ -2168,10 +2188,11 @@ export default function MetasWorkspace() {
                 <h2 className="text-base font-semibold text-surface-900">Calendário operacional mensal</h2>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className={label}>Mês<select className={input} value={month} onChange={(event) => setMonth(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
                 <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
-                <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
+                <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, closingWeekEndDate: (activeMonth?.closingWeekEndDate && activeMonth.closingWeekEndDate >= event.target.value) ? activeMonth.closingWeekEndDate : '', customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
+                <label className={label}>Fim do fechamento<input className={input} type="date" min={activeMonth?.week1StartDate || `${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.closingWeekEndDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2180,7 +2201,7 @@ export default function MetasWorkspace() {
               </div>
 
               <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Datas personalizadas de bloqueio</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Desconsiderar data</p>
                 <div className="mt-2 flex gap-2">
                   <input type="date" className="w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
                   <button
@@ -2189,7 +2210,7 @@ export default function MetasWorkspace() {
                       if (!customDate) return
                       const list = activeMonth?.customOffDates ?? []
                       if (list.includes(customDate)) return
-                      setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), customOffDates: [...list, customDate].sort() } }))
+                      setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '', customOffDates: [...list, customDate].sort() } }))
                       setCustomDate('')
                     }}
                     className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
@@ -2197,12 +2218,12 @@ export default function MetasWorkspace() {
                     <Plus size={12} /> Adicionar
                   </button>
                 </div>
-                {(activeMonth?.customOffDates?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-2">{activeMonth?.customOffDates.map((date) => <button key={date} type="button" className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100" onClick={() => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date) } }))}>{formatDateBr(date)} ×</button>)}</div> : null}
+                {(activeMonth?.customOffDates?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-2">{activeMonth?.customOffDates.map((date) => <button key={date} type="button" className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100" onClick={() => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '', customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date) } }))}>{formatDateBr(date)} ×</button>)}</div> : null}
               </div>
 
               <div className="mt-3 grid gap-2 md:grid-cols-4">{cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => <div key={week.key} className="rounded-lg border border-surface-200 bg-white p-2.5 text-xs"><p className="font-semibold text-surface-700">{week.label}</p><p className="mt-1 text-surface-600">{formatDateBr(week.start)} - {formatDateBr(week.end)}</p><p className="text-surface-500">Dias úteis: {week.businessDays.length}</p></div>)}</div>
 
-              {standby ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{!activeMonth?.week1StartDate ? 'Mês em standby: defina a data de início da 1ª semana para ativar o ciclo.' : `Mês selecionado encerrou em ${formatDateBr(cycle.lastBusinessDate)}. O sistema permanece em standby até configurar o início do mês seguinte.`}</div> : null}
+              {standby ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{!activeMonth?.week1StartDate ? 'Mês em standby: defina a data de início da 1ª semana para ativar o ciclo.' : `Período selecionado encerrou em ${formatDateBr(cycle.lastBusinessDate)}. O sistema permanece em standby até configurar o início do próximo ciclo.`}</div> : null}
             </Card>
 
             <Card className="border-surface-200">
@@ -4058,7 +4079,7 @@ export default function MetasWorkspace() {
                     })
                     .filter((row): row is NonNullable<typeof row> => row !== null)
 
-                    const periodClosed = hasMonthEnded(year, month) && Boolean(cycle.lastBusinessDate)
+                    const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
                     const avgPoints = rows.length > 0
                       ? rows.reduce((sum, row) => sum + row.pointsAchieved, 0) / rows.length
                       : 0
@@ -4308,7 +4329,7 @@ export default function MetasWorkspace() {
           </Card>
 
           <Card className="border-surface-200">
-            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro do mês selecionado e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do início do próximo mês.</p>
+            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis no intervalo configurado (início da 1ª semana até o fim do fechamento, quando informado) e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do próximo ciclo.</p>
           </Card>
         </>
       )}
