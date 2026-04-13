@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -260,20 +261,15 @@ export default function Sidebar({ appVersion }: SidebarProps) {
             isCollapsed ? 'justify-center px-2' : 'gap-3 px-5'
           )}
         >
-          <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-            <svg
-              className="w-4.5 h-4.5 text-white"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-emerald-300/45 bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-700 shadow-[0_8px_22px_rgba(16,185,129,0.38)]">
+            <Image
+              src="/branding/ouroverde-badge.png"
+              alt="Logo Ouro Verde"
+              fill
+              priority
+              sizes="40px"
+              className="object-cover"
+            />
           </div>
 
           {!isCollapsed && (

@@ -14,6 +14,11 @@ export const metadata: Metadata = {
     template: '%s | OURO VERDE | Café pra vida inteira!',
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
+  icons: {
+    icon: '/branding/ouroverde-badge.png',
+    shortcut: '/branding/ouroverde-badge.png',
+    apple: '/apple-icon.png',
+  },
   robots: { index: false, follow: false },
 }
 
