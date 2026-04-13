@@ -339,6 +339,20 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function stableSerialize(value: unknown): string {
+  const normalize = (input: unknown): unknown => {
+    if (Array.isArray(input)) return input.map(normalize)
+    if (input && typeof input === 'object') {
+      const entries = Object.entries(input as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, val]) => [key, normalize(val)])
+      return Object.fromEntries(entries)
+    }
+    return input
+  }
+  return JSON.stringify(normalize(value))
+}
+
 function resolveClosingEndDate(raw: string | undefined, year: number, month: number) {
   if (!raw) return null
   const parsed = parseIsoDate(raw)
@@ -674,6 +688,10 @@ export default function MetasWorkspace() {
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
+  const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [configSaveError, setConfigSaveError] = useState('')
+  const [configSaveSuccess, setConfigSaveSuccess] = useState('')
+  const [lastSavedConfigSignature, setLastSavedConfigSignature] = useState<string | null>(null)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
 
@@ -764,6 +782,22 @@ export default function MetasWorkspace() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const mergedMetaConfigs = useMemo<Record<string, MetaConfig>>(
+    () => ({
+      ...metaConfigs,
+      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+    }),
+    [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, metaConfigs, prizes, ruleBlocks, salaryBase]
+  )
+
+  const currentConfigPayload = useMemo(
+    () => ({ scope: '1', metaConfigs: mergedMetaConfigs, monthConfigs }),
+    [mergedMetaConfigs, monthConfigs]
+  )
+
+  const currentConfigSignature = useMemo(() => stableSerialize(currentConfigPayload), [currentConfigPayload])
+  const hasPendingConfigChanges = isConfigLoaded && lastSavedConfigSignature !== null && currentConfigSignature !== lastSavedConfigSignature
+
   useEffect(() => {
     if (activeMonth) return
     setMonthConfigs((prev) => ({
@@ -822,24 +856,41 @@ export default function MetasWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
 
-  // ── Debounced save to API (database) ────────────────────────────────────
   useEffect(() => {
     if (!isConfigLoaded) return
-    const merged: Record<string, MetaConfig> = {
-      ...metaConfigs,
-      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
-    }
-    const timer = setTimeout(() => {
-      fetch('/api/metas/config', {
+    if (lastSavedConfigSignature !== null) return
+    setLastSavedConfigSignature(currentConfigSignature)
+  }, [currentConfigSignature, isConfigLoaded, lastSavedConfigSignature])
+
+  useEffect(() => {
+    if (!hasPendingConfigChanges) return
+    if (configSaveSuccess) setConfigSaveSuccess('')
+  }, [configSaveSuccess, hasPendingConfigChanges])
+
+  async function handleSaveConfigEdits() {
+    if (isSavingConfig || !hasPendingConfigChanges) return
+    setIsSavingConfig(true)
+    setConfigSaveError('')
+    setConfigSaveSuccess('')
+    try {
+      const response = await fetch('/api/metas/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: '1', metaConfigs: merged, monthConfigs }),
-      }).catch((err: unknown) => {
-        console.error('[Metas] Falha ao salvar configuração na API:', err)
+        body: JSON.stringify(currentConfigPayload),
       })
-    }, 1200)
-    return () => clearTimeout(timer)
-  }, [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, isConfigLoaded, metaConfigs, month, monthConfigs, prizes, ruleBlocks, salaryBase])
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao salvar edições do painel de metas.')
+      }
+      setMetaConfigs(mergedMetaConfigs)
+      setLastSavedConfigSignature(currentConfigSignature)
+      setConfigSaveSuccess('Edições salvas com sucesso.')
+    } catch (error) {
+      setConfigSaveError(error instanceof Error ? error.message : 'Falha ao salvar edições do painel de metas.')
+    } finally {
+      setIsSavingConfig(false)
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -2181,6 +2232,26 @@ export default function MetasWorkspace() {
 
       {view === 'config' ? (
         <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`inline-flex h-2.5 w-2.5 rounded-full ${hasPendingConfigChanges ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span className={hasPendingConfigChanges ? 'font-semibold text-amber-700' : 'font-medium text-surface-600'}>
+                {hasPendingConfigChanges ? 'Alterações pendentes de salvamento' : 'Todas as alterações estão salvas'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveConfigEdits}
+              disabled={!hasPendingConfigChanges || isSavingConfig}
+              className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-surface-300"
+            >
+              {isSavingConfig ? 'Salvando...' : 'Salvar edições'}
+            </button>
+          </div>
+
+          {configSaveError ? <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{configSaveError}</div> : null}
+          {configSaveSuccess ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{configSaveSuccess}</div> : null}
+
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-surface-200">
               <div className="mb-3 flex items-center gap-2">
