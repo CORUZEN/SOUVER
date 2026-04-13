@@ -3073,17 +3073,17 @@ export default function MetasWorkspace() {
                                   resultValue = `${num(coveragePct, 2)}% base`
                                   ok = false
                                 } else {
+                                  const itemsGoalOk = resolvedItems > 0 && soldItemsStage >= resolvedItems
+                                  const clientsGoalOk = requiredClients > 0 && clientsWithAnyItems >= requiredClients
                                   lines = [
+                                    { label: 'Produtos considerados na meta', value: `${totalActiveProducts}` },
+                                    { label: 'Meta de itens (SKU únicos)', value: `${num(resolvedItems, 0)} item(ns)` },
+                                    { label: 'Itens vendidos no período', value: `${num(soldItemsStage, 0)} item(ns)` },
+                                    { label: 'Status itens', value: itemsGoalOk ? 'Conquistado' : 'Ainda não atingiu' },
                                     { label: 'Base total de clientes do vendedor', value: `${resolvedBaseClients}` },
-                                    { label: 'Parâmetro de base', value: `${num(clientsPct, 2)}%` },
-                                    { label: 'Clientes alvo (30% da base)', value: `${requiredClients}` },
-                                    { label: 'Produtos ativos considerados', value: `${totalActiveProducts}` },
-                                    { label: 'Itens alvo (SKU únicos)', value: `${num(resolvedItems, 0)} item(ns)` },
-                                    { label: 'Itens vendidos na etapa', value: `${num(soldItemsStage, 0)} item(ns)` },
-                                    { label: 'Clientes com qualquer SKU considerado', value: `${clientsWithAnyItems}` },
-                                    { label: 'Linhas de distribuição (cliente)', value: `${sellerRowsCount}` },
-                                    { label: 'Modo SQL usado', value: distributionDiagnostics?.queryModeUsed ?? 'N/A' },
-                                    { label: 'Tentativas SQL (clientes/itens)', value: attemptsSummary || 'N/A' },
+                                    { label: 'Meta de clientes', value: `${requiredClients} (${num(clientsPct, 0)}% da base)` },
+                                    { label: 'Clientes atendidos com qualquer SKU da meta', value: `${clientsWithAnyItems}` },
+                                    { label: 'Status clientes', value: clientsGoalOk ? 'Conquistado' : 'Ainda não atingiu' },
                                   ]
                                   resultLabel = 'Resultado apurado'
                                   resultValue = `${num(soldItemsStage, 0)}/${num(resolvedItems, 0)} itens · ${num(clientsWithAnyItems, 0)}/${num(requiredClients, 0)} clientes`
