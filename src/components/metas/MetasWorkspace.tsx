@@ -2574,11 +2574,11 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className="border-surface-200">
+              <div className="mb-3 flex items-center gap-2">
+                <Building2 size={14} className="text-indigo-600" />
+                <h2 className="text-base font-semibold text-surface-900">Escopo de empresas (Sankhya)</h2>
+              </div>
               <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <Building2 size={14} className="text-indigo-600" />
-                  <h3 className="text-sm font-semibold text-surface-900">Escopo de empresas (Sankhya)</h3>
-                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {([
                     { value: '1', label: 'Empresa 1' },
@@ -2602,11 +2602,6 @@ export default function MetasWorkspace() {
                     )
                   })}
                 </div>
-                {companyScopeFilter === 'all' && (
-                  <p className="mt-2 text-[11px] text-amber-700">
-                    Consolidado ativo: os totais podem divergir dos relatórios individuais.
-                  </p>
-                )}
               </div>
 
               <div className="mb-3 flex items-center gap-2"><CircleDollarSign size={16} className="text-emerald-600" /><h2 className="text-base font-semibold text-surface-900">Parâmetros de premiação</h2></div>
@@ -3021,19 +3016,27 @@ export default function MetasWorkspace() {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="min-w-64 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-                          value={selectedBlockId}
-                          onChange={(e) => setSelectedBlockId(e.target.value)}
-                        >
-                          {ruleBlocks.map((optionBlock) => (
-                            <option key={optionBlock.id} value={optionBlock.id}>
-                              {optionBlock.title}
-                              {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="flex items-end gap-2">
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                            Vendedor/Grupo ativo
+                          </span>
+                          <div className="relative min-w-72">
+                            <select
+                              className="w-full appearance-none rounded-xl border border-surface-200 bg-white px-3 py-2.5 pr-9 text-sm font-semibold text-surface-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                              value={selectedBlockId}
+                              onChange={(e) => setSelectedBlockId(e.target.value)}
+                            >
+                              {ruleBlocks.map((optionBlock) => (
+                                <option key={optionBlock.id} value={optionBlock.id}>
+                                  {optionBlock.title}
+                                  {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                          </div>
+                        </label>
                         <button
                           type="button"
                           title="Editar nome do vendedor/grupo"
@@ -3041,7 +3044,7 @@ export default function MetasWorkspace() {
                             setBlockTitleDraft(block.title)
                             setIsEditingBlockTitle(true)
                           }}
-                          className="inline-flex items-center justify-center rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 text-surface-600 hover:bg-surface-50 hover:text-primary-700"
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-surface-200 bg-white px-3 text-surface-600 shadow-sm transition-all hover:border-surface-300 hover:bg-surface-50 hover:text-primary-700"
                         >
                           <Pencil size={13} />
                         </button>
