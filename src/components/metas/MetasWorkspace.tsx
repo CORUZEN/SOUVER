@@ -687,6 +687,7 @@ export default function MetasWorkspace() {
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
+  const hadPendingBeforeKeyChangeRef = useRef(false)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [configSaveError, setConfigSaveError] = useState('')
@@ -799,6 +800,10 @@ export default function MetasWorkspace() {
   const hasPendingConfigChanges = isConfigLoaded && lastSavedConfigSignature !== null && currentConfigSignature !== lastSavedConfigSignature
 
   useEffect(() => {
+    hadPendingBeforeKeyChangeRef.current = hasPendingConfigChanges
+  }, [hasPendingConfigChanges])
+
+  useEffect(() => {
     if (activeMonth) return
     setMonthConfigs((prev) => ({
       ...prev,
@@ -813,6 +818,7 @@ export default function MetasWorkspace() {
   // ── Month-switch: save old month config, load new month (or inherit from previous) ──
   useEffect(() => {
     if (prevActiveKeyRef.current === activeKey) return
+    const shouldRebaselineAfterSwitch = !hadPendingBeforeKeyChangeRef.current
     const oldKey = prevActiveKeyRef.current
     prevActiveKeyRef.current = activeKey
 
@@ -853,6 +859,12 @@ export default function MetasWorkspace() {
 
       return updated
     })
+
+    if (shouldRebaselineAfterSwitch) {
+      if (configSaveError) setConfigSaveError('')
+      if (configSaveSuccess) setConfigSaveSuccess('')
+      setLastSavedConfigSignature(null)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
 
