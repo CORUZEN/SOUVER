@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { fetchSankhyaLiveCatalog } from '@/lib/integrations/sankhya-live-catalog'
 
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!(await canAccessIntegrations(authUser))) {
+    return NextResponse.json({ message: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   try {
     const payload = await fetchSankhyaLiveCatalog()

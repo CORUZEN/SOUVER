@@ -23,3 +23,27 @@ export async function hasPermission(
   })
   return !!perm
 }
+
+const INTEGRATIONS_ALLOWED_ROLE_CODES = new Set(['DEVELOPER', 'IT_ANALYST'])
+
+export interface AuthzUserLike {
+  roleId?: string | null
+  role?: {
+    code?: string | null
+  } | null
+}
+
+/** Regra central para acesso ao painel de integrações. */
+export async function canAccessIntegrations(user: AuthzUserLike | null | undefined): Promise<boolean> {
+  if (!user) return false
+
+  const roleCode = user.role?.code?.toUpperCase() ?? null
+  if (!roleCode) return false
+
+  // Diretoria não deve acessar o painel de integrações.
+  if (roleCode === 'DIRECTORATE') return false
+
+  if (INTEGRATIONS_ALLOWED_ROLE_CODES.has(roleCode)) return true
+
+  return hasPermission(user.roleId, 'integrations:read')
+}

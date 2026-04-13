@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { Settings, ShieldCheck, Users, KeyRound, User, Monitor, Plug } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
@@ -62,6 +63,20 @@ const SETTINGS_CARDS = [
 ]
 
 export default function ConfiguracoesPage() {
+  const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations)))
+      .catch(() => setCanAccessIntegrations(false))
+  }, [])
+
+  const visibleCards = SETTINGS_CARDS.filter((card) => {
+    if (card.href !== '/integracoes') return true
+    return canAccessIntegrations
+  })
+
   return (
     <div className="space-y-6">
       <div>
@@ -75,7 +90,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SETTINGS_CARDS.map(({ icon: Icon, title, description, href, color, bg, available }) => (
+        {visibleCards.map(({ icon: Icon, title, description, href, color, bg, available }) => (
           available ? (
             <Link key={title} href={href} className="block group">
               <Card className="h-full transition-shadow hover:shadow-md">

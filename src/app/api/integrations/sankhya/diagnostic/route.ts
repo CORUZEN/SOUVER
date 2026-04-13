@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 
@@ -183,6 +183,9 @@ function sanitizeTableName(raw: string): string {
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!(await canAccessIntegrations(authUser))) {
+    return NextResponse.json({ message: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -268,3 +271,4 @@ ORDER BY V.CODVEND
     )
   }
 }
+

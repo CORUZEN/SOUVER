@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import {
   asTrimmedString,
@@ -62,6 +62,9 @@ export async function GET(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const { id } = await params
   const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10)
@@ -112,6 +115,9 @@ export async function PATCH(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const { id } = await params
   const body = await req.json().catch(() => null)
@@ -174,6 +180,9 @@ export async function DELETE(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const { id } = await params
   const existing = await prisma.integration.findUnique({ where: { id } })

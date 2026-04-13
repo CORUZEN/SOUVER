@@ -1,7 +1,13 @@
-import { NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { fetchSankhyaDataDictionary } from '@/lib/integrations/sankhya-data-dictionary'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const authUser = await getAuthUser(req)
+  if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!(await canAccessIntegrations(authUser))) {
+    return NextResponse.json({ message: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
   try {
     const payload = await fetchSankhyaDataDictionary()
     const url = new URL(req.url)
@@ -26,8 +32,9 @@ export async function GET(req: Request) {
     const message =
       error instanceof Error
         ? error.message
-        : 'Falha inesperada ao coletar o dicionário de dados da Sankhya.'
+        : 'Falha inesperada ao coletar o dicionÃ¡rio de dados da Sankhya.'
 
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

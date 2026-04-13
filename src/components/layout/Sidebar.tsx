@@ -74,6 +74,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [isRhExpanded, setIsRhExpanded] = useState(false)
   const [isReportsExpanded, setIsReportsExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
@@ -95,6 +96,15 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
     mediaQuery.addEventListener('change', onChange)
     return () => mediaQuery.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations))
+      })
+      .catch(() => setCanAccessIntegrations(false))
   }, [])
 
   function openDevelopmentModal(moduleLabel: string) {
@@ -323,6 +333,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               <div className="space-y-0.5">
                 {itemKeys.map((itemKey) => {
                   const moduleKey = itemKey as ModuleKey
+                  if (moduleKey === 'integracoes' && !canAccessIntegrations) return null
 
                   if (moduleKey === 'rh') {
                     return (

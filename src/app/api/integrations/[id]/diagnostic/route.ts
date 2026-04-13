@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 
@@ -246,6 +246,9 @@ export async function POST(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const { id } = await params
   const integration = await prisma.integration.findUnique({ where: { id } })

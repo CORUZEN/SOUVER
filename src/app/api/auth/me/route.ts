@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/session'
+import { canAccessIntegrations } from '@/lib/auth/permissions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,6 +33,8 @@ export async function GET(req: NextRequest) {
       shouldClearImpersonatorCookie = true
     }
 
+    const integrationsAccess = await canAccessIntegrations(user)
+
     const response = NextResponse.json({
       authenticated: true,
       user: {
@@ -42,6 +45,7 @@ export async function GET(req: NextRequest) {
         avatarUrl: user.avatarUrl,
         role: user.role?.name ?? user.role?.code ?? 'Usuário',
         roleCode: user.role?.code,
+        canAccessIntegrations: integrationsAccess,
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
         impersonation,
@@ -59,4 +63,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 401 })
   }
 }
+
 

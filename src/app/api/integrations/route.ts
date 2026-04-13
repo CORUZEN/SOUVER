@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { canAccessIntegrations, getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import {
   asTrimmedString,
@@ -20,6 +20,9 @@ const ALLOWED_STATUS = new Set<IntegrationStatus>(['ACTIVE', 'INACTIVE', 'ERROR'
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const integrations = await prisma.integration.findMany({
     include: {
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
     orderBy: { name: 'asc' },
   })
 
-  const enriched = integrations.map((integration) => {
+  const enriched = integrations.map((integration: any) => {
     const config = parseStoredConfig(integration.configEncrypted)
 
     return {
@@ -49,6 +52,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+  if (!(await canAccessIntegrations(user))) {
+    return NextResponse.json({ error: 'Sem permissao para acessar Integracoes.' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => null)
   const name = asTrimmedString(body?.name)
@@ -104,3 +110,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ integration }, { status: 201 })
 }
+

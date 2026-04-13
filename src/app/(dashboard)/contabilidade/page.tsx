@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
@@ -24,7 +24,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Skeleton'
 
-// ─── Tipos ───────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface KpiData {
   production?: {
@@ -79,7 +79,7 @@ interface IntegrationData {
   }
 }
 
-// ─── Componentes auxiliares ──────────────────────────────────────
+// â”€â”€â”€ Componentes auxiliares â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function KpiCard({
   label,
@@ -152,13 +152,14 @@ function Row({ label, value, highlight }: { label: string; value: string | numbe
   )
 }
 
-// ─── Página principal ────────────────────────────────────────────
+// â”€â”€â”€ PÃ¡gina principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ContabilidadePage() {
   const [data, setData]       = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(false)
   const [intData, setIntData] = useState<IntegrationData | null>(null)
   const [intLoading, setIntLoading] = useState(false)
+  const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -169,15 +170,33 @@ export default function ContabilidadePage() {
   }, [])
 
   const fetchIntegrations = useCallback(async () => {
+    if (!canAccessIntegrations) return
     setIntLoading(true)
     try {
       const res = await fetch('/api/integrations/summary')
       if (res.ok) setIntData(await res.json())
     } catch { /* silencioso */ }
     finally { setIntLoading(false) }
+  }, [canAccessIntegrations])
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations)))
+      .catch(() => setCanAccessIntegrations(false))
   }, [])
 
-  useEffect(() => { fetchData(); fetchIntegrations() }, [fetchData, fetchIntegrations])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  useEffect(() => {
+    if (!canAccessIntegrations) {
+      setIntData(null)
+      return
+    }
+    fetchIntegrations()
+  }, [canAccessIntegrations, fetchIntegrations])
 
   const p  = data?.production
   const inv = data?.inventory
@@ -191,7 +210,7 @@ export default function ContabilidadePage() {
   return (
     <div className="flex flex-col gap-6 p-6">
 
-      {/* ── Cabeçalho ── */}
+      {/* â”€â”€ CabeÃ§alho â”€â”€ */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center shrink-0">
@@ -199,7 +218,7 @@ export default function ContabilidadePage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-surface-900 leading-tight">Contabilidade</h1>
-            <p className="text-xs text-surface-500">Visão gerencial consolidada — Café Ouro Verde</p>
+            <p className="text-xs text-surface-500">VisÃ£o gerencial consolidada â€” CafÃ© Ouro Verde</p>
           </div>
         </div>
         <button
@@ -212,10 +231,10 @@ export default function ContabilidadePage() {
         </button>
       </div>
 
-      {/* ── KPIs resumo ── */}
+      {/* â”€â”€ KPIs resumo â”€â”€ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Lotes em Produção"
+          label="Lotes em ProduÃ§Ã£o"
           value={loading ? null : p?.inProgress ?? 0}
           sub={`${p?.finished ?? 0} finalizados hoje`}
           icon={Factory}
@@ -233,7 +252,7 @@ export default function ContabilidadePage() {
         <KpiCard
           label="NCs Abertas"
           value={loading ? null : q?.openNCs ?? 0}
-          sub={`${q?.criticalNCs ?? 0} críticas`}
+          sub={`${q?.criticalNCs ?? 0} crÃ­ticas`}
           icon={AlertTriangle}
           iconBg="bg-red-600"
           trend={q?.openNCs ? 'down' : 'up'}
@@ -248,11 +267,11 @@ export default function ContabilidadePage() {
         />
       </div>
 
-      {/* ── Seções por módulo ── */}
+      {/* â”€â”€ SeÃ§Ãµes por mÃ³dulo â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* Produção */}
-        <SectionCard title="Produção — Lotes" icon={Factory} iconBg="bg-amber-600">
+        {/* ProduÃ§Ã£o */}
+        <SectionCard title="ProduÃ§Ã£o â€” Lotes" icon={Factory} iconBg="bg-amber-600">
           {loading ? <Spinner /> : p ? (
             <>
               <Row label="Total de lotes cadastrados" value={p.totalBatches}       />
@@ -260,35 +279,35 @@ export default function ContabilidadePage() {
               <Row label="Lotes abertos (aguardando)"  value={p.openCount}         />
               <Row label="Finalizados hoje"            value={p.finishedToday}     />
               <Row label="Cancelados"                  value={p.cancelled}  highlight={p.cancelled > 0} />
-              <Row label="Volume produzido (kg/un)"    value={p.totalProducedQty ?? '—'} />
+              <Row label="Volume produzido (kg/un)"    value={p.totalProducedQty ?? 'â€”'} />
             </>
           ) : <p className="text-sm text-surface-400">Sem dados</p>}
         </SectionCard>
 
         {/* Estoque */}
-        <SectionCard title="Logística — Estoque" icon={Truck} iconBg="bg-cyan-600">
+        <SectionCard title="LogÃ­stica â€” Estoque" icon={Truck} iconBg="bg-cyan-600">
           {loading ? <Spinner /> : inv ? (
             <>
               <Row label="Total de itens"                value={inv.totalItems}    />
               <Row label="Itens ativos"                  value={inv.activeItems}   />
-              <Row label="Itens com estoque crítico"     value={inv.lowStockCount} highlight={inv.lowStockCount > 0} />
-              <Row label="Movimentações totais"          value={inv.totalMovements} />
-              <Row label="Movimentações hoje"            value={inv.movementsToday ?? 0} />
+              <Row label="Itens com estoque crÃ­tico"     value={inv.lowStockCount} highlight={inv.lowStockCount > 0} />
+              <Row label="MovimentaÃ§Ãµes totais"          value={inv.totalMovements} />
+              <Row label="MovimentaÃ§Ãµes hoje"            value={inv.movementsToday ?? 0} />
             </>
           ) : <p className="text-sm text-surface-400">Sem dados</p>}
         </SectionCard>
 
         {/* Qualidade */}
-        <SectionCard title="Qualidade — Inspeções e NCs" icon={ShieldCheck} iconBg="bg-emerald-600">
+        <SectionCard title="Qualidade â€” InspeÃ§Ãµes e NCs" icon={ShieldCheck} iconBg="bg-emerald-600">
           {loading ? <Spinner /> : q ? (
             <>
-              <Row label="Total de inspeções realizadas"    value={q.totalRecords}        />
-              <Row label="Inspeções aprovadas"              value={q.approvedRecords}     />
-              <Row label="Inspeções reprovadas"             value={q.rejectedRecords}     highlight={q.rejectedRecords > 0} />
-              <Row label="Taxa de aprovação"                value={approvalRate !== null ? `${approvalRate}%` : '—'} />
+              <Row label="Total de inspeÃ§Ãµes realizadas"    value={q.totalRecords}        />
+              <Row label="InspeÃ§Ãµes aprovadas"              value={q.approvedRecords}     />
+              <Row label="InspeÃ§Ãµes reprovadas"             value={q.rejectedRecords}     highlight={q.rejectedRecords > 0} />
+              <Row label="Taxa de aprovaÃ§Ã£o"                value={approvalRate !== null ? `${approvalRate}%` : 'â€”'} />
               <Row label="NCs abertas"                      value={q.openNCs}             highlight={q.openNCs > 0} />
-              <Row label="NCs críticas"                     value={q.criticalNCs}         highlight={q.criticalNCs > 0} />
-              <Row label="NCs resolvidas no mês"            value={q.resolvedThisMonth}   />
+              <Row label="NCs crÃ­ticas"                     value={q.criticalNCs}         highlight={q.criticalNCs > 0} />
+              <Row label="NCs resolvidas no mÃªs"            value={q.resolvedThisMonth}   />
             </>
           ) : <p className="text-sm text-surface-400">Sem dados</p>}
         </SectionCard>
@@ -299,16 +318,16 @@ export default function ContabilidadePage() {
             <>
               <Row label="Total de colaboradores"        value={hr.total}         />
               <Row label="Colaboradores ativos"          value={hr.totalActive}   />
-              <Row label="Com autenticação 2FA ativa"    value={hr.with2FA}       />
+              <Row label="Com autenticaÃ§Ã£o 2FA ativa"    value={hr.with2FA}       />
               <Row label="Conectados hoje"               value={hr.loggedToday}   />
-              <Row label="Usuários online agora"         value={data?.activeUsers ?? 0} />
+              <Row label="UsuÃ¡rios online agora"         value={data?.activeUsers ?? 0} />
             </>
           ) : <p className="text-sm text-surface-400">Sem dados</p>}
         </SectionCard>
 
       </div>
 
-      {/* ── Indicadores de desempenho ── */}
+      {/* â”€â”€ Indicadores de desempenho â”€â”€ */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2.5">
@@ -322,33 +341,33 @@ export default function ContabilidadePage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
-                label: 'Eficiência de Produção',
+                label: 'EficiÃªncia de ProduÃ§Ã£o',
                 value: p && p.totalBatches > 0
                   ? `${Math.round(((p.finished) / p.totalBatches) * 100)}%`
-                  : '—',
-                desc: 'Lotes concluídos / total',
+                  : 'â€”',
+                desc: 'Lotes concluÃ­dos / total',
                 good: true,
               },
               {
                 label: 'Taxa de Qualidade',
-                value: approvalRate !== null ? `${approvalRate}%` : '—',
-                desc: 'Inspeções aprovadas',
+                value: approvalRate !== null ? `${approvalRate}%` : 'â€”',
+                desc: 'InspeÃ§Ãµes aprovadas',
                 good: approvalRate !== null && approvalRate >= 90,
               },
               {
                 label: 'Cobertura 2FA',
                 value: hr && hr.total > 0
                   ? `${Math.round((hr.with2FA / hr.total) * 100)}%`
-                  : '—',
+                  : 'â€”',
                 desc: 'Colaboradores protegidos',
                 good: hr ? hr.with2FA === hr.total : false,
               },
               {
-                label: 'Ocupação Estoque',
+                label: 'OcupaÃ§Ã£o Estoque',
                 value: inv && inv.totalItems > 0
                   ? `${inv.activeItems} items`
-                  : '—',
-                desc: `${inv?.lowStockCount ?? 0} abaixo do mínimo`,
+                  : 'â€”',
+                desc: `${inv?.lowStockCount ?? 0} abaixo do mÃ­nimo`,
                 good: !inv?.lowStockCount,
               },
             ].map(({ label, value, desc, good }) => (
@@ -365,26 +384,26 @@ export default function ContabilidadePage() {
         </CardContent>
       </Card>
 
-      {/* ── Integrações Externas — Visão Estratégica ── */}
-      <Card>
+      {/* â”€â”€ IntegraÃ§Ãµes Externas â€” VisÃ£o EstratÃ©gica â”€â”€ */}
+      {canAccessIntegrations && <Card>
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-sky-600 flex items-center justify-center shrink-0">
               <Globe className="w-4 h-4 text-white" />
             </div>
-            <CardTitle>Integrações Externas — Fontes de Dados</CardTitle>
+            <CardTitle>IntegraÃ§Ãµes Externas â€” Fontes de Dados</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           {intLoading ? <Spinner /> : !intData ? (
-            <p className="text-sm text-surface-400">Dados indisponíveis</p>
+            <p className="text-sm text-surface-400">Dados indisponÃ­veis</p>
           ) : (
             <div className="space-y-4">
-              {/* KPIs de integrações */}
+              {/* KPIs de integraÃ§Ãµes */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="rounded-xl border border-surface-100 p-3 text-center">
                   <p className="text-2xl font-bold text-surface-900">{intData.summary.total}</p>
-                  <p className="text-xs text-surface-500">Integrações</p>
+                  <p className="text-xs text-surface-500">IntegraÃ§Ãµes</p>
                 </div>
                 <div className="rounded-xl border border-surface-100 p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-600">{intData.summary.active}</p>
@@ -400,7 +419,7 @@ export default function ContabilidadePage() {
                 </div>
               </div>
 
-              {/* Lista de integrações */}
+              {/* Lista de integraÃ§Ãµes */}
               {intData.integrations.length > 0 && (
                 <div className="space-y-2">
                   {intData.integrations.map((ig) => (
@@ -423,7 +442,7 @@ export default function ContabilidadePage() {
                         }`}>{ig.status}</span>
                         {ig.lastSyncAt && (
                           <p className="text-[10px] text-surface-400 mt-0.5">
-                            Último sync: {new Date(ig.lastSyncAt).toLocaleDateString('pt-BR')}
+                            Ãšltimo sync: {new Date(ig.lastSyncAt).toLocaleDateString('pt-BR')}
                           </p>
                         )}
                       </div>
@@ -432,10 +451,10 @@ export default function ContabilidadePage() {
                 </div>
               )}
 
-              {/* Últimos logs */}
+              {/* Ãšltimos logs */}
               {intData.recentLogs.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-surface-600 mb-2">Últimas Atividades</p>
+                  <p className="text-xs font-semibold text-surface-600 mb-2">Ãšltimas Atividades</p>
                   <div className="space-y-1">
                     {intData.recentLogs.slice(0, 5).map((log) => (
                       <div key={log.id} className="flex items-center justify-between text-xs py-1.5 border-b border-surface-50 last:border-0">
@@ -457,29 +476,29 @@ export default function ContabilidadePage() {
 
               <div className="text-center pt-2">
                 <Link href="/integracoes" className="text-xs text-primary-600 hover:underline font-medium">
-                  Gerenciar Integrações →
+                  Gerenciar IntegraÃ§Ãµes â†’
                 </Link>
               </div>
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* ── Links rápidos ── */}
+      {/* â”€â”€ Links rÃ¡pidos â”€â”€ */}
       <Card>
         <CardHeader>
-          <CardTitle>Navegação Rápida</CardTitle>
+          <CardTitle>NavegaÃ§Ã£o RÃ¡pida</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'Produção',    href: '/producao',    icon: Factory,      bg: 'bg-amber-50',   text: 'text-amber-700'   },
-              { label: 'Logística',   href: '/logistica',   icon: Truck,        bg: 'bg-cyan-50',    text: 'text-cyan-700'    },
+              { label: 'ProduÃ§Ã£o',    href: '/producao',    icon: Factory,      bg: 'bg-amber-50',   text: 'text-amber-700'   },
+              { label: 'LogÃ­stica',   href: '/logistica',   icon: Truck,        bg: 'bg-cyan-50',    text: 'text-cyan-700'    },
               { label: 'Qualidade',   href: '/qualidade',   icon: ShieldCheck,  bg: 'bg-emerald-50', text: 'text-emerald-700' },
-              { label: 'Relatórios',  href: '/relatorios',  icon: TrendingUp,   bg: 'bg-indigo-50',  text: 'text-indigo-700'  },
+              { label: 'RelatÃ³rios',  href: '/relatorios',  icon: TrendingUp,   bg: 'bg-indigo-50',  text: 'text-indigo-700'  },
               { label: 'RH',          href: '/rh',          icon: Users,        bg: 'bg-violet-50',  text: 'text-violet-700'  },
-              { label: 'Integrações', href: '/integracoes', icon: Plug,         bg: 'bg-surface-50', text: 'text-surface-700' },
-            ].map(({ label, href, icon: Icon, bg, text }) => (
+              { label: 'IntegraÃ§Ãµes', href: '/integracoes', icon: Plug,         bg: 'bg-surface-50', text: 'text-surface-700' },
+            ].filter((item) => item.href !== '/integracoes' || canAccessIntegrations).map(({ label, href, icon: Icon, bg, text }) => (
               <Link
                 key={href}
                 href={href}
