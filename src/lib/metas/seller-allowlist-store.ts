@@ -1,10 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { prisma } from '@/lib/prisma'
 import type { AllowedSeller } from './seller-allowlist'
-import { METAS_ALLOWED_SELLERS } from './seller-allowlist'
-
-const TARGET_DIR = join(process.cwd(), 'src', 'generated')
-const TARGET_FILE = join(TARGET_DIR, 'metas-sellers-allowlist.json')
 
 function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
   const sanitized = input
@@ -18,27 +13,36 @@ function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
 
   const dedup = new Map<string, AllowedSeller>()
   for (const seller of sanitized) {
-    const key = `${seller.code ?? ''}|${seller.partnerCode ?? ''}|${seller.name.toUpperCase()}`
+    const key = seller.name.toUpperCase()
     if (!dedup.has(key)) dedup.set(key, seller)
   }
   return [...dedup.values()]
 }
 
 export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
-  try {
-    const raw = await readFile(TARGET_FILE, 'utf8')
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return normalizeList(METAS_ALLOWED_SELLERS)
-    return normalizeList(parsed as AllowedSeller[])
-  } catch {
-    return normalizeList(METAS_ALLOWED_SELLERS)
-  }
+  const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
+  return rows.map((r) => ({
+    code: r.code,
+    partnerCode: r.partnerCode,
+    name: r.name,
+    active: r.active,
+  }))
 }
 
 export async function writeSellerAllowlist(input: AllowedSeller[]) {
   const normalized = normalizeList(input)
-  await mkdir(TARGET_DIR, { recursive: true })
-  await writeFile(TARGET_FILE, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+  await prisma.$transaction([
+    prisma.metasSeller.deleteMany(),
+    prisma.metasSeller.createMany({
+      data: normalized.map((s) => ({
+        code: s.code ?? null,
+        partnerCode: s.partnerCode ?? null,
+        name: s.name,
+        active: s.active,
+      })),
+      skipDuplicates: true,
+    }),
+  ])
   return normalized
 }
 

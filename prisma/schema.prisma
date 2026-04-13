@@ -587,7 +587,6 @@ enum IntegrationStatus {
 
 // ──────────────────────────────────────────────
 // CONFIGURAÇÃO DO PAINEL DE METAS
-// ──────────────────────────────────────────────
 // Stores the full metas workspace config per company scope.
 // `scopeKey` = "all" | "1" | "2" (company scope).
 // Each month's config lives inside `metaConfigs` JSON.
@@ -620,4 +619,53 @@ model IntegrationLog {
   integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   @@map("integration_logs")
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 7 — LISTAS DE REFERÊNCIA (METAS + FATURAMENTO)
+// ═══════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// METAS — LISTA DE VENDEDORES PERMITIDOS
+// ──────────────────────────────────────────────
+model MetasSeller {
+  id          String   @id @default(cuid())
+  code        String?
+  partnerCode String?  @map("partner_code")
+  name        String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("metas_sellers")
+}
+
+// ──────────────────────────────────────────────
+// METAS — LISTA DE PRODUTOS PERMITIDOS
+// ──────────────────────────────────────────────
+model MetasProduct {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  brand       String
+  unit        String
+  mobility    String   @default("SIM")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("metas_products")
+}
+
+// ──────────────────────────────────────────────
+// FATURAMENTO — LISTA DE CIDADES
+// ──────────────────────────────────────────────
+model FaturamentoCity {
+  id     String @id @default(cuid())
+  code   String @unique
+  name   String
+  ufCode String @map("uf_code")
+  uf     String
+
+  @@map("faturamento_cities")
 }

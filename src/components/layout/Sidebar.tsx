@@ -74,6 +74,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [devTargetLabel, setDevTargetLabel] = useState('')
   const [isRhExpanded, setIsRhExpanded] = useState(false)
   const [isReportsExpanded, setIsReportsExpanded] = useState(false)
+  const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
 
@@ -360,6 +361,33 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                           onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
                         })}
                         {!isCollapsed && isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
+                      </div>
+                    )
+                  }
+
+                  if (moduleKey === 'logistica') {
+                    const isFaturamentoActive = pathname === '/logistica/faturamento-diario'
+                    return (
+                      <div key={moduleKey} className="space-y-0.5">
+                        {renderMenuItem('logistica', {
+                          expandable: true,
+                          expanded: isLogisticaExpanded,
+                          onToggleExpand: () => setIsLogisticaExpanded((prev) => !prev),
+                        })}
+                        {!isCollapsed && isLogisticaExpanded && (
+                          <Link
+                            href="/logistica/faturamento-diario"
+                            className={cn(
+                              'w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer text-left',
+                              isFaturamentoActive
+                                ? 'bg-emerald-500 text-white shadow-[0_6px_18px_rgba(16,185,129,0.35)]'
+                                : 'text-surface-400 hover:bg-emerald-500/12 hover:text-emerald-100'
+                            )}
+                          >
+                            <ClipboardList className="w-4 h-4 shrink-0" />
+                            <span className="flex-1 min-w-0 truncate text-sm font-medium">Planejamento de Faturamento</span>
+                          </Link>
+                        )}
                       </div>
                     )
                   }

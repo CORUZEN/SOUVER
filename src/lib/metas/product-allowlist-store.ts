@@ -1,14 +1,9 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { prisma } from '@/lib/prisma'
 import {
   type AllowedProduct,
-  METAS_ALLOWED_PRODUCTS,
   isAllowedProductBrand,
   normalizeBrand,
 } from './product-allowlist'
-
-const TARGET_DIR = join(process.cwd(), 'src', 'generated')
-const TARGET_FILE = join(TARGET_DIR, 'metas-products-allowlist.json')
 
 function normalizeList(input: AllowedProduct[]): AllowedProduct[] {
   const sanitized = input
@@ -26,26 +21,39 @@ function normalizeList(input: AllowedProduct[]): AllowedProduct[] {
 
   const dedup = new Map<string, AllowedProduct>()
   for (const product of sanitized) {
-    const key = `${product.code}|${product.description.toUpperCase()}|${product.brand}|${product.unit}`
+    const key = product.code
     if (!dedup.has(key)) dedup.set(key, product)
   }
   return [...dedup.values()].sort((a, b) => a.description.localeCompare(b.description))
 }
 
 export async function readProductAllowlist(): Promise<AllowedProduct[]> {
-  try {
-    const raw = await readFile(TARGET_FILE, 'utf8')
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return normalizeList(METAS_ALLOWED_PRODUCTS)
-    return normalizeList(parsed as AllowedProduct[])
-  } catch {
-    return normalizeList(METAS_ALLOWED_PRODUCTS)
-  }
+  const rows = await prisma.metasProduct.findMany({ orderBy: { description: 'asc' } })
+  return rows.map((r) => ({
+    code: r.code,
+    description: r.description,
+    brand: r.brand,
+    unit: r.unit,
+    mobility: (r.mobility === 'SIM' ? 'SIM' : 'NAO') as 'SIM' | 'NAO',
+    active: r.active,
+  }))
 }
 
 export async function writeProductAllowlist(input: AllowedProduct[]) {
   const normalized = normalizeList(input)
-  await mkdir(TARGET_DIR, { recursive: true })
-  await writeFile(TARGET_FILE, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+  await prisma.$transaction([
+    prisma.metasProduct.deleteMany(),
+    prisma.metasProduct.createMany({
+      data: normalized.map((p) => ({
+        code: p.code,
+        description: p.description,
+        brand: p.brand,
+        unit: p.unit,
+        mobility: p.mobility,
+        active: p.active,
+      })),
+      skipDuplicates: true,
+    }),
+  ])
   return normalized
 }
