@@ -6,6 +6,20 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
 
+  // Garante cargos-base esperados pelo painel Dev.
+  await prisma.role.upsert({
+    where: { code: 'IT_ANALYST' },
+    update: {
+      name: 'Analista de TI',
+      description: 'Analista de Tecnologia da Informação',
+    },
+    create: {
+      name: 'Analista de TI',
+      code: 'IT_ANALYST',
+      description: 'Analista de Tecnologia da Informação',
+    },
+  })
+
   const roles = await prisma.role.findMany({
     orderBy: { name: 'asc' },
     select: {

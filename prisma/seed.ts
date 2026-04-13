@@ -49,6 +49,7 @@ async function main() {
     { name: 'Gerente', code: 'MANAGER', description: 'Acesso de gerência por setor' },
     { name: 'Supervisor', code: 'SUPERVISOR', description: 'Supervisão operacional' },
     { name: 'Auxiliar', code: 'AUXILIARY', description: 'Acesso operacional básico' },
+    { name: 'Analista de TI', code: 'IT_ANALYST', description: 'Analista de Tecnologia da Informação' },
     { name: 'Produção', code: 'PRODUCTION', description: 'Operador de produção' },
     { name: 'Logística', code: 'LOGISTICS', description: 'Operador de logística' },
     { name: 'Qualidade', code: 'QUALITY', description: 'Inspetor de qualidade' },
