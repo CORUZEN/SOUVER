@@ -687,7 +687,7 @@ export default function MetasWorkspace() {
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
-  const hadPendingBeforeKeyChangeRef = useRef(false)
+  const pendingBeforePeriodChangeRef = useRef(false)
   const shouldRebaselineAfterAutoMonthInitRef = useRef(false)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
@@ -805,9 +805,21 @@ export default function MetasWorkspace() {
     lastSavedConfigSignature !== null &&
     currentConfigSignature !== lastSavedConfigSignature
 
-  useEffect(() => {
-    hadPendingBeforeKeyChangeRef.current = hasPendingConfigChanges
-  }, [hasPendingConfigChanges])
+  function handleMonthChange(nextMonth: number) {
+    pendingBeforePeriodChangeRef.current = hasPendingConfigChanges
+    setMonth(nextMonth)
+  }
+
+  function handleYearChange(nextYear: number) {
+    pendingBeforePeriodChangeRef.current = hasPendingConfigChanges
+    setYear(nextYear)
+  }
+
+  function handlePeriodChange(nextYear: number, nextMonth: number) {
+    pendingBeforePeriodChangeRef.current = hasPendingConfigChanges
+    setYear(nextYear)
+    setMonth(nextMonth)
+  }
 
   useEffect(() => {
     if (activeMonth) return
@@ -828,7 +840,8 @@ export default function MetasWorkspace() {
   // ── Month-switch: save old month config, load new month (or inherit from previous) ──
   useEffect(() => {
     if (prevActiveKeyRef.current === activeKey) return
-    const shouldRebaselineAfterSwitch = !hadPendingBeforeKeyChangeRef.current
+    const shouldRebaselineAfterSwitch = !pendingBeforePeriodChangeRef.current
+    pendingBeforePeriodChangeRef.current = false
     shouldRebaselineAfterAutoMonthInitRef.current = shouldRebaselineAfterSwitch
     const oldKey = prevActiveKeyRef.current
     prevActiveKeyRef.current = activeKey
@@ -2149,7 +2162,11 @@ export default function MetasWorkspace() {
                         <button
                           type="button"
                           aria-label="Mês anterior"
-                          onClick={() => { if (month === 0) { setMonth(11); setYear((y) => y - 1) } else { setMonth((m) => m - 1) } }}
+                          onClick={() => {
+                            const nextMonth = month === 0 ? 11 : month - 1
+                            const nextYear = month === 0 ? year - 1 : year
+                            handlePeriodChange(nextYear, nextMonth)
+                          }}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-surface-50 text-surface-600 hover:bg-surface-100 hover:text-surface-900"
                         >
                           <ChevronLeft size={15} />
@@ -2158,7 +2175,7 @@ export default function MetasWorkspace() {
                         <div className="flex flex-1 items-center gap-2">
                           <select
                             value={month}
-                            onChange={(e) => setMonth(Number(e.target.value))}
+                            onChange={(e) => handleMonthChange(Number(e.target.value))}
                             className="flex-1 rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                           >
                             {MONTHS.map((name, idx) => (
@@ -2167,7 +2184,7 @@ export default function MetasWorkspace() {
                           </select>
                           <select
                             value={year}
-                            onChange={(e) => setYear(Number(e.target.value))}
+                            onChange={(e) => handleYearChange(Number(e.target.value))}
                             className="w-24 rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                           >
                             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
@@ -2179,7 +2196,11 @@ export default function MetasWorkspace() {
                         <button
                           type="button"
                           aria-label="Próximo mês"
-                          onClick={() => { if (month === 11) { setMonth(0); setYear((y) => y + 1) } else { setMonth((m) => m + 1) } }}
+                          onClick={() => {
+                            const nextMonth = month === 11 ? 0 : month + 1
+                            const nextYear = month === 11 ? year + 1 : year
+                            handlePeriodChange(nextYear, nextMonth)
+                          }}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-200 bg-surface-50 text-surface-600 hover:bg-surface-100 hover:text-surface-900"
                         >
                           <ChevronRight size={15} />
@@ -2188,7 +2209,10 @@ export default function MetasWorkspace() {
 
                       <button
                         type="button"
-                        onClick={() => { const now = new Date(); setMonth(now.getMonth()); setYear(now.getFullYear()) }}
+                        onClick={() => {
+                          const now = new Date()
+                          handlePeriodChange(now.getFullYear(), now.getMonth())
+                        }}
                         className="mt-2 w-full rounded-lg border border-surface-200 bg-surface-50 py-1.5 text-xs font-semibold text-surface-600 hover:bg-surface-100 hover:text-surface-900"
                       >
                         Ir para mês atual
@@ -2293,8 +2317,8 @@ export default function MetasWorkspace() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <label className={label}>Mês<select className={input} value={month} onChange={(event) => setMonth(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
-                <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
+                <label className={label}>Mês<select className={input} value={month} onChange={(event) => handleMonthChange(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
+                <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => handleYearChange(Number(event.target.value))} /></label>
                 <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, closingWeekEndDate: (activeMonth?.closingWeekEndDate && activeMonth.closingWeekEndDate >= event.target.value) ? activeMonth.closingWeekEndDate : '', customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
                 <label className={label}>Fim do fechamento<input className={input} type="date" min={activeMonth?.week1StartDate || `${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.closingWeekEndDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
               </div>
