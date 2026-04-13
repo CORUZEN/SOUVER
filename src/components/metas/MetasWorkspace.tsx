@@ -65,6 +65,11 @@ interface MonthConfig {
   week1StartDate: string
   closingWeekEndDate?: string
   customOffDates: string[]
+  sellerIncludedDates: Array<{
+    sellerId: string
+    sellerName: string
+    date: string
+  }>
 }
 
 interface MetaConfig {
@@ -339,6 +344,30 @@ function parseDecimal(input: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function normalizeMonthConfig(input: Partial<MonthConfig> | undefined): MonthConfig {
+  const customOffDates = Array.isArray(input?.customOffDates)
+    ? Array.from(new Set(input.customOffDates.filter((date): date is string => typeof date === 'string' && Boolean(parseIsoDate(date))))).sort()
+    : []
+  const sellerIncludedDatesRaw = Array.isArray(input?.sellerIncludedDates) ? input.sellerIncludedDates : []
+  const sellerIncludedDatesMap = new Map<string, { sellerId: string; sellerName: string; date: string }>()
+  for (const entry of sellerIncludedDatesRaw) {
+    const sellerId = typeof entry?.sellerId === 'string' ? entry.sellerId : ''
+    const date = typeof entry?.date === 'string' ? entry.date : ''
+    if (!sellerId || !date || !parseIsoDate(date)) continue
+    const sellerName = typeof entry.sellerName === 'string' ? entry.sellerName : ''
+    sellerIncludedDatesMap.set(`${sellerId}::${date}`, { sellerId, sellerName, date })
+  }
+  const sellerIncludedDates = Array.from(sellerIncludedDatesMap.values())
+    .sort((a, b) => (a.date === b.date ? a.sellerName.localeCompare(b.sellerName, 'pt-BR') : a.date.localeCompare(b.date)))
+
+  return {
+    week1StartDate: typeof input?.week1StartDate === 'string' ? input.week1StartDate : '',
+    closingWeekEndDate: typeof input?.closingWeekEndDate === 'string' ? input.closingWeekEndDate : '',
+    customOffDates,
+    sellerIncludedDates,
+  }
+}
+
 function stableSerialize(value: unknown): string {
   const normalize = (input: unknown): unknown => {
     if (Array.isArray(input)) return input.map(normalize)
@@ -492,8 +521,24 @@ function isDateWithinRange(isoDate: string, startIso: string | null, endIso: str
 }
 
 function findStageForDate(isoDate: string, weeks: CycleWeek[]): StageKey | null {
-  const withWindow = weeks.find((week) => isDateWithinRange(isoDate, week.start, week.end))
-  return withWindow?.key ?? null
+  const withBusinessDay = weeks.find((week) => week.key !== 'FULL' && week.businessDays.includes(isoDate))
+  return withBusinessDay?.key ?? null
+}
+
+function findStageForIncludedDate(isoDate: string, weeks: CycleWeek[]): StageKey | null {
+  const operationalWeeks = weeks
+    .filter((week): week is CycleWeek & { start: string; end: string } => week.key !== 'FULL' && Boolean(week.start && week.end))
+    .sort((a, b) => a.start.localeCompare(b.start))
+
+  if (operationalWeeks.length === 0) return null
+  const direct = operationalWeeks.find((week) => isDateWithinRange(isoDate, week.start, week.end))
+  if (direct) return direct.key
+
+  const previous = [...operationalWeeks].reverse().find((week) => week.end < isoDate)
+  if (previous) return previous.key
+
+  const next = operationalWeeks.find((week) => week.start > isoDate)
+  return next?.key ?? null
 }
 
 function easterSunday(year: number) {
@@ -637,6 +682,8 @@ export default function MetasWorkspace() {
   const [extraMinPoints, setExtraMinPoints] = useState(0.6)
   const [extraMinPointsInput, setExtraMinPointsInput] = useState('0,60')
   const [customDate, setCustomDate] = useState('')
+  const [sellerIncludeDate, setSellerIncludeDate] = useState('')
+  const [sellerIncludeSellerId, setSellerIncludeSellerId] = useState('')
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellersLoading, setSellersLoading] = useState(true)
@@ -740,7 +787,11 @@ export default function MetasWorkspace() {
       .then((r) => r.json())
       .then((data: { metaConfigs?: unknown; monthConfigs?: unknown }) => {
         if (data.monthConfigs && typeof data.monthConfigs === 'object' && !Array.isArray(data.monthConfigs)) {
-          setMonthConfigs(data.monthConfigs as Record<string, MonthConfig>)
+          const rawMonthConfigs = data.monthConfigs as Record<string, Partial<MonthConfig>>
+          const normalizedMonthConfigs = Object.fromEntries(
+            Object.entries(rawMonthConfigs).map(([key, value]) => [key, normalizeMonthConfig(value)])
+          )
+          setMonthConfigs(normalizedMonthConfigs)
         }
         if (data.metaConfigs && typeof data.metaConfigs === 'object' && !Array.isArray(data.metaConfigs)) {
           const mc = data.metaConfigs as Record<string, MetaConfig>
@@ -825,11 +876,12 @@ export default function MetasWorkspace() {
     if (activeMonth) return
     setMonthConfigs((prev) => ({
       ...prev,
-      [activeKey]: {
+      [activeKey]: normalizeMonthConfig({
         week1StartDate: firstMonday(year, month),
         closingWeekEndDate: '',
         customOffDates: [],
-      },
+        sellerIncludedDates: [],
+      }),
     }))
     if (shouldRebaselineAfterAutoMonthInitRef.current) {
       setIsRebaseliningConfig(true)
@@ -1490,6 +1542,13 @@ export default function MetasWorkspace() {
     return set
   }, [activeMonth?.customOffDates, includeNational, year])
 
+  const sellerIncludedDateEntries = useMemo(() => {
+    return (activeMonth?.sellerIncludedDates ?? []).map((entry) => {
+      const sellerName = sellers.find((seller) => seller.id === entry.sellerId)?.name ?? entry.sellerName ?? entry.sellerId
+      return { ...entry, sellerName }
+    })
+  }, [activeMonth?.sellerIncludedDates, sellers])
+
   const cycle = useMemo(
     () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
     [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
@@ -1528,6 +1587,11 @@ export default function MetasWorkspace() {
         const blockPointsTarget = blockRules.reduce((sum, rule) => sum + rule.points, 0)
         const blockRewardTarget = blockRules.reduce((sum, rule) => sum + rule.rewardValue, 0)
         const activePointsTarget = blockRules.filter((r) => stageStarted.has(r.stage)).reduce((sum, rule) => sum + rule.points, 0)
+        const sellerIncludedDates = new Set(
+          (activeMonth?.sellerIncludedDates ?? [])
+            .filter((entry) => entry.sellerId === seller.id)
+            .map((entry) => entry.date)
+        )
 
         const stageMetrics = STAGES.reduce(
           (acc, stage) => {
@@ -1538,7 +1602,10 @@ export default function MetasWorkspace() {
         )
 
         for (const order of seller.orders) {
-          const stage = findStageForDate(order.negotiatedAt, cycle.weeks)
+          let stage = findStageForDate(order.negotiatedAt, cycle.weeks)
+          if (!stage && sellerIncludedDates.has(order.negotiatedAt)) {
+            stage = findStageForIncludedDate(order.negotiatedAt, cycle.weeks)
+          }
           if (!stage) continue
           stageMetrics[stage].orderCount += 1
           stageMetrics[stage].totalValue += order.totalValue
@@ -1821,7 +1888,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sellers])
+  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -2319,8 +2386,8 @@ export default function MetasWorkspace() {
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className={label}>Mês<select className={input} value={month} onChange={(event) => handleMonthChange(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
                 <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => handleYearChange(Number(event.target.value))} /></label>
-                <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, closingWeekEndDate: (activeMonth?.closingWeekEndDate && activeMonth.closingWeekEndDate >= event.target.value) ? activeMonth.closingWeekEndDate : '', customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
-                <label className={label}>Fim do fechamento<input className={input} type="date" min={activeMonth?.week1StartDate || `${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.closingWeekEndDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [] } }))} /></label>
+                <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, closingWeekEndDate: (activeMonth?.closingWeekEndDate && activeMonth.closingWeekEndDate >= event.target.value) ? activeMonth.closingWeekEndDate : '', customOffDates: activeMonth?.customOffDates ?? [], sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [] } }))} /></label>
+                <label className={label}>Fim do fechamento<input className={input} type="date" min={activeMonth?.week1StartDate || `${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.closingWeekEndDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [], sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [] } }))} /></label>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2329,24 +2396,146 @@ export default function MetasWorkspace() {
               </div>
 
               <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Desconsiderar data</p>
-                <div className="mt-2 flex gap-2">
-                  <input type="date" className="w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!customDate) return
-                      const list = activeMonth?.customOffDates ?? []
-                      if (list.includes(customDate)) return
-                      setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '', customOffDates: [...list, customDate].sort() } }))
-                      setCustomDate('')
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
-                  >
-                    <Plus size={12} /> Adicionar
-                  </button>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Desconsiderar data</p>
+                    <div className="mt-2 flex gap-2">
+                      <input type="date" className="w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!customDate) return
+                          const list = activeMonth?.customOffDates ?? []
+                          if (list.includes(customDate)) return
+                          setMonthConfigs((prev) => ({
+                            ...prev,
+                            [activeKey]: {
+                              week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                              closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                              customOffDates: [...list, customDate].sort(),
+                              sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
+                            },
+                          }))
+                          setCustomDate('')
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+                      >
+                        <Plus size={12} /> Adicionar
+                      </button>
+                    </div>
+                    {(activeMonth?.customOffDates?.length ?? 0) > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeMonth?.customOffDates.map((date) => (
+                          <button
+                            key={date}
+                            type="button"
+                            className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100"
+                            onClick={() =>
+                              setMonthConfigs((prev) => ({
+                                ...prev,
+                                [activeKey]: {
+                                  week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                                  closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                                  customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date),
+                                  sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
+                                },
+                              }))
+                            }
+                          >
+                            {formatDateBr(date)} ×
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="border-t border-surface-200 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Considerar data específica</p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-[minmax(220px,1fr)_170px_auto]">
+                      <select
+                        className="rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800"
+                        value={sellerIncludeSellerId}
+                        onChange={(event) => setSellerIncludeSellerId(event.target.value)}
+                      >
+                        <option value="">Selecionar vendedor</option>
+                        {sellers
+                          .slice()
+                          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                          .map((seller) => (
+                            <option key={seller.id} value={seller.id}>
+                              {seller.name}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        type="date"
+                        className="rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm"
+                        value={sellerIncludeDate}
+                        min={`${year}-${String(month + 1).padStart(2, '0')}-01`}
+                        max={toIsoDate(new Date(year, month + 1, 0))}
+                        onChange={(event) => setSellerIncludeDate(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!sellerIncludeSellerId || !sellerIncludeDate) return
+                          const seller = sellers.find((item) => item.id === sellerIncludeSellerId)
+                          if (!seller) return
+                          const list = activeMonth?.sellerIncludedDates ?? []
+                          if (list.some((entry) => entry.sellerId === seller.id && entry.date === sellerIncludeDate)) return
+                          const next = [
+                            ...list,
+                            { sellerId: seller.id, sellerName: seller.name, date: sellerIncludeDate },
+                          ].sort((a, b) => (a.date === b.date ? a.sellerName.localeCompare(b.sellerName, 'pt-BR') : a.date.localeCompare(b.date)))
+                          setMonthConfigs((prev) => ({
+                            ...prev,
+                            [activeKey]: {
+                              week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                              closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                              customOffDates: activeMonth?.customOffDates ?? [],
+                              sellerIncludedDates: next,
+                            },
+                          }))
+                          setSellerIncludeDate('')
+                        }}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                      >
+                        <Plus size={12} /> Incluir
+                      </button>
+                    </div>
+
+                    {sellerIncludedDateEntries.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {sellerIncludedDateEntries.map((entry) => (
+                          <button
+                            key={`${entry.sellerId}-${entry.date}`}
+                            type="button"
+                            className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                            onClick={() =>
+                              setMonthConfigs((prev) => ({
+                                ...prev,
+                                [activeKey]: {
+                                  week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
+                                  closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
+                                  customOffDates: activeMonth?.customOffDates ?? [],
+                                  sellerIncludedDates: (activeMonth?.sellerIncludedDates ?? []).filter(
+                                    (item) => !(item.sellerId === entry.sellerId && item.date === entry.date)
+                                  ),
+                                },
+                              }))
+                            }
+                          >
+                            {entry.sellerName} • {formatDateBr(entry.date)} ×
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-surface-500">
+                        Sem exceções cadastradas. Use essa área para incluir sábados, domingos ou feriados para vendedores específicos.
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {(activeMonth?.customOffDates?.length ?? 0) > 0 ? <div className="mt-2 flex flex-wrap gap-2">{activeMonth?.customOffDates.map((date) => <button key={date} type="button" className="rounded-full border border-surface-200 bg-white px-2.5 py-1 text-xs text-surface-600 hover:bg-surface-100" onClick={() => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '', customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date) } }))}>{formatDateBr(date)} ×</button>)}</div> : null}
               </div>
 
               <div className="mt-3 grid gap-2 md:grid-cols-4">{cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => <div key={week.key} className="rounded-lg border border-surface-200 bg-white p-2.5 text-xs"><p className="font-semibold text-surface-700">{week.label}</p><p className="mt-1 text-surface-600">{formatDateBr(week.start)} - {formatDateBr(week.end)}</p><p className="text-surface-500">Dias úteis: {week.businessDays.length}</p></div>)}</div>
