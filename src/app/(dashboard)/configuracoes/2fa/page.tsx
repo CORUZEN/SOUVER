@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { KeyRound, Shield, ShieldCheck, ShieldOff, Copy, Check, ChevronLeft } from 'lucide-react'
@@ -28,7 +28,7 @@ export default function TwoFactorPage() {
 
   // Check current 2FA status
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.user) setIs2FAEnabled(data.user.twoFactorEnabled ?? false)
@@ -46,14 +46,14 @@ export default function TwoFactorPage() {
       setSetupData(data)
       setStep('setup')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao iniciar configuração.')
+      setError(e instanceof Error ? e.message : 'Erro ao iniciar configuraÃ§Ã£o.')
     } finally {
       setIsLoading(false)
     }
   }
 
   async function verifyAndEnable() {
-    if (!totp.trim()) return setError('Digite o código do aplicativo.')
+    if (!totp.trim()) return setError('Digite o cÃ³digo do aplicativo.')
     setError(null)
     setIsLoading(true)
     try {
@@ -68,14 +68,14 @@ export default function TwoFactorPage() {
       setIs2FAEnabled(true)
       setStep('backup-codes')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Código inválido.')
+      setError(e instanceof Error ? e.message : 'CÃ³digo invÃ¡lido.')
     } finally {
       setIsLoading(false)
     }
   }
 
   async function disable2FA() {
-    if (!totp.trim()) return setError('Digite o código para desabilitar.')
+    if (!totp.trim()) return setError('Digite o cÃ³digo para desabilitar.')
     setError(null)
     setIsLoading(true)
     try {
@@ -90,7 +90,7 @@ export default function TwoFactorPage() {
       setTotp('')
       setStep('status')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Código inválido.')
+      setError(e instanceof Error ? e.message : 'CÃ³digo invÃ¡lido.')
     } finally {
       setIsLoading(false)
     }
@@ -119,15 +119,15 @@ export default function TwoFactorPage() {
         <div>
           <h1 className="text-xl font-semibold text-surface-900 flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-primary-600" />
-            Autenticação de Dois Fatores
+            AutenticaÃ§Ã£o de Dois Fatores
           </h1>
           <p className="text-sm text-surface-500 mt-0.5">
-            Proteção adicional para sua conta com TOTP.
+            ProteÃ§Ã£o adicional para sua conta com TOTP.
           </p>
         </div>
       </div>
 
-      {/* ── Status / enable screen ─────────────────────────── */}
+      {/* â”€â”€ Status / enable screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {step === 'status' && (
         <Card>
           <div className="flex items-center gap-4">
@@ -144,8 +144,8 @@ export default function TwoFactorPage() {
               </p>
               <p className="text-xs text-surface-500 mt-0.5">
                 {is2FAEnabled
-                  ? 'Sua conta está protegida com autenticação de dois fatores.'
-                  : 'Habilite o 2FA para aumentar a segurança da sua conta.'}
+                  ? 'Sua conta estÃ¡ protegida com autenticaÃ§Ã£o de dois fatores.'
+                  : 'Habilite o 2FA para aumentar a seguranÃ§a da sua conta.'}
               </p>
             </div>
             <Button
@@ -160,7 +160,7 @@ export default function TwoFactorPage() {
           {is2FAEnabled && (
             <div className="mt-4 pt-4 border-t border-surface-100 space-y-3">
               <p className="text-sm text-surface-700">
-                Para desabilitar, confirme com o código do seu aplicativo autenticador:
+                Para desabilitar, confirme com o cÃ³digo do seu aplicativo autenticador:
               </p>
               {error && (
                 <p className="text-xs text-error-600 bg-error-50 border border-error-200 rounded-lg px-3 py-2">
@@ -168,7 +168,7 @@ export default function TwoFactorPage() {
                 </p>
               )}
               <Input
-                label="Código TOTP"
+                label="CÃ³digo TOTP"
                 value={totp}
                 onChange={(e) => setTotp(e.target.value)}
                 placeholder="000 000"
@@ -184,20 +184,20 @@ export default function TwoFactorPage() {
           {!is2FAEnabled && (
             <div className="mt-4 pt-4 border-t border-surface-100">
               <p className="text-sm text-surface-600 mb-3">
-                Você precisará de um aplicativo autenticador como{' '}
+                VocÃª precisarÃ¡ de um aplicativo autenticador como{' '}
                 <strong>Google Authenticator</strong>, <strong>Authy</strong> ou{' '}
                 <strong>Microsoft Authenticator</strong>.
               </p>
               <Button loading={isLoading} onClick={startSetup} className="w-full">
                 <Shield className="w-4 h-4" />
-                Começar Configuração
+                ComeÃ§ar ConfiguraÃ§Ã£o
               </Button>
             </div>
           )}
         </Card>
       )}
 
-      {/* ── Setup screen ──────────────────────────────────── */}
+      {/* â”€â”€ Setup screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {step === 'setup' && setupData && (
         <Card>
           <div className="space-y-5">
@@ -206,7 +206,7 @@ export default function TwoFactorPage() {
                 1. Escaneie o QR Code
               </h2>
               <p className="text-xs text-surface-500">
-                Abra seu aplicativo autenticador e escaneie o código abaixo.
+                Abra seu aplicativo autenticador e escaneie o cÃ³digo abaixo.
               </p>
             </div>
 
@@ -214,19 +214,19 @@ export default function TwoFactorPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={setupData.qrDataUrl}
-                alt="QR Code para configuração do 2FA"
+                alt="QR Code para configuraÃ§Ã£o do 2FA"
                 className="w-48 h-48 rounded-lg border border-surface-200"
               />
             </div>
 
             <div className="bg-surface-50 rounded-lg p-3 border border-surface-200">
-              <p className="text-xs text-surface-500 mb-1">Ou insira o código manualmente:</p>
+              <p className="text-xs text-surface-500 mb-1">Ou insira o cÃ³digo manualmente:</p>
               <p className="text-xs font-mono text-surface-800 break-all">{setupData.secret}</p>
             </div>
 
             <div>
               <h2 className="text-sm font-semibold text-surface-900 mb-3">
-                2. Digite o código gerado
+                2. Digite o cÃ³digo gerado
               </h2>
               {error && (
                 <p className="text-xs text-error-600 bg-error-50 border border-error-200 rounded-lg px-3 py-2 mb-3">
@@ -234,7 +234,7 @@ export default function TwoFactorPage() {
                 </p>
               )}
               <Input
-                label="Código TOTP (6 dígitos)"
+                label="CÃ³digo TOTP (6 dÃ­gitos)"
                 value={totp}
                 onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
@@ -255,7 +255,7 @@ export default function TwoFactorPage() {
         </Card>
       )}
 
-      {/* ── Backup codes ──────────────────────────────────── */}
+      {/* â”€â”€ Backup codes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {step === 'backup-codes' && (
         <Card>
           <div className="space-y-4">
@@ -264,14 +264,14 @@ export default function TwoFactorPage() {
               <div>
                 <h2 className="text-sm font-semibold text-surface-900">2FA habilitado com sucesso!</h2>
                 <p className="text-xs text-surface-500 mt-0.5">
-                  Guarde seus códigos de backup em local seguro.
+                  Guarde seus cÃ³digos de backup em local seguro.
                 </p>
               </div>
             </div>
 
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-xs text-amber-800 font-medium">
-                ⚠️ Atenção: estes códigos serão exibidos apenas uma vez. Cada código pode ser usado apenas uma vez caso você perca acesso ao seu aplicativo autenticador.
+                âš ï¸ AtenÃ§Ã£o: estes cÃ³digos serÃ£o exibidos apenas uma vez. Cada cÃ³digo pode ser usado apenas uma vez caso vocÃª perca acesso ao seu aplicativo autenticador.
               </p>
             </div>
 
@@ -286,7 +286,7 @@ export default function TwoFactorPage() {
             <div className="flex gap-3">
               <Button variant="outline" onClick={copyBackupCodes} className="flex-1">
                 {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copiado!' : 'Copiar códigos'}
+                {copied ? 'Copiado!' : 'Copiar cÃ³digos'}
               </Button>
               <Link href="/configuracoes" className="flex-1">
                 <Button className="w-full">Concluir</Button>
@@ -298,3 +298,4 @@ export default function TwoFactorPage() {
     </div>
   )
 }
+

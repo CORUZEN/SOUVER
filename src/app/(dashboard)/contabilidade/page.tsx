@@ -180,7 +180,7 @@ export default function ContabilidadePage() {
   }, [canAccessIntegrations])
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations)))
       .catch(() => setCanAccessIntegrations(false))
@@ -518,3 +518,4 @@ export default function ContabilidadePage() {
     </div>
   )
 }
+

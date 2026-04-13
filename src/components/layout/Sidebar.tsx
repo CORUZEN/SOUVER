@@ -99,7 +99,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   }, [])
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations))
@@ -441,4 +441,5 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     </>
   )
 }
+
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
@@ -14,7 +14,7 @@ import {
   CheckCheck,
 } from 'lucide-react'
 
-// ─── Tipos ───────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ConversationType = 'DIRECT' | 'GROUP' | 'DEPARTMENT'
 
@@ -55,7 +55,7 @@ interface Me {
   fullName: string
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function initials(name: string) {
   return name
@@ -106,7 +106,7 @@ const CONV_TYPE_COLOR: Record<ConversationType, string> = {
   DEPARTMENT: 'bg-amber-500',
 }
 
-// ─── Componente principal ─────────────────────────────────────────
+// â”€â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ComunicacaoPage() {
   const [me,            setMe]            = useState<Me | null>(null)
@@ -127,9 +127,9 @@ export default function ComunicacaoPage() {
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null)
   const inputRef   = useRef<HTMLTextAreaElement>(null)
 
-  // Carrega usuário atual via token JWT
+  // Carrega usuÃ¡rio atual via token JWT
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => setMe(d.user ?? null))
+    fetch('/api/auth/me', { cache: 'no-store' }).then(r => r.json()).then(d => setMe(d.user ?? null))
   }, [])
 
   // Carrega conversas
@@ -142,7 +142,7 @@ export default function ComunicacaoPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
-  // Carrega usuários disponíveis para modal
+  // Carrega usuÃ¡rios disponÃ­veis para modal
   const loadUsers = useCallback(async () => {
     const r = await fetch('/api/hr/collaborators?pageSize=50&compact=true')
     if (!r.ok) return
@@ -189,7 +189,7 @@ export default function ComunicacaoPage() {
     }
   }, [activeId, loadMessages, loadConversations])
 
-  // Scroll automático
+  // Scroll automÃ¡tico
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -255,11 +255,11 @@ export default function ComunicacaoPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* ── Sidebar conversas ──────────────────────────────── */}
+      {/* â”€â”€ Sidebar conversas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="w-72 shrink-0 bg-surface-50 border-r border-surface-200 flex flex-col">
         {/* Header sidebar */}
         <div className="p-4 border-b border-surface-200 flex items-center justify-between">
-          <span className="font-bold text-surface-900 text-lg">Comunicação</span>
+          <span className="font-bold text-surface-900 text-lg">ComunicaÃ§Ã£o</span>
           <button
             onClick={() => { setShowModal(true); loadUsers() }}
             className="p-1.5 rounded-lg hover:bg-surface-200 transition-colors"
@@ -275,7 +275,7 @@ export default function ComunicacaoPage() {
             <Search size={14} className="absolute left-2.5 top-2.5 text-surface-400" />
             <input
               className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-surface-100 border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="Buscar conversa…"
+              placeholder="Buscar conversaâ€¦"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -325,7 +325,7 @@ export default function ComunicacaoPage() {
         </ul>
       </aside>
 
-      {/* ── Painel principal ──────────────────────────────────── */}
+      {/* â”€â”€ Painel principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeConv && me ? (
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header do chat */}
@@ -346,7 +346,7 @@ export default function ComunicacaoPage() {
             {grouped.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-surface-400 gap-2">
                 <MessageSquare size={40} className="opacity-30" />
-                <p className="text-sm">Nenhuma mensagem ainda. Diga olá!</p>
+                <p className="text-sm">Nenhuma mensagem ainda. Diga olÃ¡!</p>
               </div>
             )}
             {grouped.map(group => (
@@ -402,7 +402,7 @@ export default function ComunicacaoPage() {
               ref={inputRef}
               rows={1}
               className="flex-1 resize-none rounded-xl border border-surface-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-32"
-              placeholder="Digite uma mensagem… (Enter para enviar)"
+              placeholder="Digite uma mensagemâ€¦ (Enter para enviar)"
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -429,7 +429,7 @@ export default function ComunicacaoPage() {
         </div>
       )}
 
-      {/* ── Modal nova conversa ────────────────────────────── */}
+      {/* â”€â”€ Modal nova conversa â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[85vh]">
@@ -476,16 +476,16 @@ export default function ComunicacaoPage() {
                 </div>
               )}
 
-              {/* Busca de usuários */}
+              {/* Busca de usuÃ¡rios */}
               <div>
                 <label className="block text-xs text-surface-500 mb-1.5 font-medium">
-                  {newType === 'DIRECT' ? 'Selecione o usuário' : 'Adicionar membros'}
+                  {newType === 'DIRECT' ? 'Selecione o usuÃ¡rio' : 'Adicionar membros'}
                 </label>
                 <div className="relative mb-2">
                   <Search size={13} className="absolute left-2.5 top-2.5 text-surface-400" />
                   <input
                     className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="Buscar colaborador…"
+                    placeholder="Buscar colaboradorâ€¦"
                     value={userSearch}
                     onChange={e => setUserSearch(e.target.value)}
                   />
@@ -550,3 +550,4 @@ export default function ComunicacaoPage() {
     </div>
   )
 }
+

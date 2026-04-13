@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
@@ -64,15 +64,15 @@ interface KPIData {
 const STATUS_ITEMS = [
   { label: 'Sistema',        status: 'online',               icon: CheckCircle2, color: 'text-green-500'  },
   { label: 'Banco de Dados', status: 'online (Neon)',         icon: CheckCircle2, color: 'text-green-500'  },
-  { label: 'Integrações',    status: 'não configuradas',      icon: AlertTriangle, color: 'text-orange-500' },
+  { label: 'IntegraÃ§Ãµes',    status: 'nÃ£o configuradas',      icon: AlertTriangle, color: 'text-orange-500' },
 ]
 
 const PERIOD_OPTIONS = [
   { value: 'today',   label: 'Hoje' },
   { value: 'week',    label: 'Esta semana' },
-  { value: 'month',   label: 'Este mês' },
-  { value: 'quarter', label: 'Últimos 90 dias' },
-  { value: 'all',     label: 'Todo o período' },
+  { value: 'month',   label: 'Este mÃªs' },
+  { value: 'quarter', label: 'Ãšltimos 90 dias' },
+  { value: 'all',     label: 'Todo o perÃ­odo' },
 ]
 
 function DeltaBadge({ value }: { value: number | null | undefined }) {
@@ -133,12 +133,12 @@ export default function DashboardView() {
   }, [period])
 
   useEffect(() => {
-    // Buscar KPIs, perfil e tendência em PARALELO
+    // Buscar KPIs, perfil e tendÃªncia em PARALELO
     const ctrl = new AbortController()
 
     Promise.all([
       loadKpis(),
-      fetch('/api/auth/me', { signal: ctrl.signal })
+      fetch('/api/auth/me', { cache: 'no-store', signal: ctrl.signal })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
         .catch(() => null),
@@ -162,7 +162,7 @@ export default function DashboardView() {
       section:   'production' as const,
       label:     'Lotes em Andamento',
       value:     loadingKpis ? null : kpis?.production.inProgressCount ?? 0,
-      sub:       `${kpis?.production.openCount ?? 0} abertos · ${kpis?.production.finishedToday ?? 0} finalizados hoje`,
+      sub:       `${kpis?.production.openCount ?? 0} abertos Â· ${kpis?.production.finishedToday ?? 0} finalizados hoje`,
       deltaKey:  'totalBatches',
       icon:      PlayCircle,
       color:     'text-amber-600',
@@ -172,7 +172,7 @@ export default function DashboardView() {
       section:   'inventory' as const,
       label:     'Itens em Estoque',
       value:     loadingKpis ? null : kpis?.inventory.totalItems ?? 0,
-      sub:       `${kpis?.inventory.movementsToday ?? 0} movimentação${(kpis?.inventory.movementsToday ?? 0) !== 1 ? 'ões' : ''} hoje`,
+      sub:       `${kpis?.inventory.movementsToday ?? 0} movimentaÃ§Ã£o${(kpis?.inventory.movementsToday ?? 0) !== 1 ? 'Ãµes' : ''} hoje`,
       deltaKey:  'totalMovements',
       icon:      Package,
       color:     'text-cyan-600',
@@ -182,7 +182,7 @@ export default function DashboardView() {
       section:   'quality' as const,
       label:     'NCs Abertas',
       value:     loadingKpis ? null : kpis?.quality.openNCs ?? 0,
-      sub:       `${kpis?.quality.criticalNCs ?? 0} crítica${(kpis?.quality.criticalNCs ?? 0) !== 1 ? 's' : ''} · ${kpis?.quality.totalRecords ?? 0} inspeções`,
+      sub:       `${kpis?.quality.criticalNCs ?? 0} crÃ­tica${(kpis?.quality.criticalNCs ?? 0) !== 1 ? 's' : ''} Â· ${kpis?.quality.totalRecords ?? 0} inspeÃ§Ãµes`,
       deltaKey:  'openNCs',
       icon:      ShieldCheck,
       color:     'text-emerald-600',
@@ -212,14 +212,14 @@ export default function DashboardView() {
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho */}
+      {/* CabeÃ§alho */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-surface-900">Painel Executivo</h1>
-          <p className="text-sm text-surface-500 mt-0.5">Visão geral da operação — Fábrica Café Ouro Verde</p>
+          <p className="text-sm text-surface-500 mt-0.5">VisÃ£o geral da operaÃ§Ã£o â€” FÃ¡brica CafÃ© Ouro Verde</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Seletor de período */}
+          {/* Seletor de perÃ­odo */}
           <select
             value={period}
             onChange={e => handlePeriodChange(e.target.value)}
@@ -239,7 +239,7 @@ export default function DashboardView() {
           {vis && (
             <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">
               <Users className="w-3 h-3" />
-              Visão personalizada
+              VisÃ£o personalizada
             </span>
           )}
           <TrendingUp className="w-4 h-4 text-primary-600" />
@@ -271,7 +271,7 @@ export default function DashboardView() {
         ))}
       </div>
 
-      {/* ── Resumo de Pendências (1.7.5) ── */}
+      {/* â”€â”€ Resumo de PendÃªncias (1.7.5) â”€â”€ */}
       {!loadingKpis && kpis && (() => {
         const items: { label: string; href: string; color: string; icon: React.ElementType }[] = []
         if (show.production && (kpis.production.openCount > 0 || kpis.production.inProgressCount > 0)) {
@@ -279,10 +279,10 @@ export default function DashboardView() {
           items.push({ label: `${n} lote${n !== 1 ? 's' : ''} em aberto / andamento`, href: '/producao', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: PlayCircle })
         }
         if (show.quality && kpis.quality.criticalNCs > 0) {
-          items.push({ label: `${kpis.quality.criticalNCs} NC${kpis.quality.criticalNCs !== 1 ? 's' : ''} crítica${kpis.quality.criticalNCs !== 1 ? 's' : ''} em aberto`, href: '/qualidade', color: 'text-red-700 bg-red-50 border-red-200', icon: AlertTriangle })
+          items.push({ label: `${kpis.quality.criticalNCs} NC${kpis.quality.criticalNCs !== 1 ? 's' : ''} crÃ­tica${kpis.quality.criticalNCs !== 1 ? 's' : ''} em aberto`, href: '/qualidade', color: 'text-red-700 bg-red-50 border-red-200', icon: AlertTriangle })
         }
         if (show.inventory && kpis.inventory.lowStockCount > 0) {
-          items.push({ label: `${kpis.inventory.lowStockCount} item${kpis.inventory.lowStockCount !== 1 ? 'ns' : ''} abaixo do estoque mínimo`, href: '/logistica', color: 'text-orange-700 bg-orange-50 border-orange-200', icon: Package })
+          items.push({ label: `${kpis.inventory.lowStockCount} item${kpis.inventory.lowStockCount !== 1 ? 'ns' : ''} abaixo do estoque mÃ­nimo`, href: '/logistica', color: 'text-orange-700 bg-orange-50 border-orange-200', icon: Package })
         }
         if (items.length === 0) return null
         return (
@@ -292,7 +292,7 @@ export default function DashboardView() {
                 <AlertTriangle className="w-5 h-5 text-yellow-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-yellow-900 text-sm mb-2">Pendências que requerem atenção</h3>
+                <h3 className="font-semibold text-yellow-900 text-sm mb-2">PendÃªncias que requerem atenÃ§Ã£o</h3>
                 <div className="flex flex-wrap gap-2">
                   {items.map(({ label, href, color, icon: Icon }) => (
                     <a
@@ -318,17 +318,17 @@ export default function DashboardView() {
             <CheckCircle2 className="w-5 h-5 text-primary-700" />
           </div>
           <div>
-            <h3 className="font-semibold text-primary-900 text-sm">Fase 5 concluída — Sistema Ouro Verde completo</h3>
+            <h3 className="font-semibold text-primary-900 text-sm">Fase 5 concluÃ­da â€” Sistema Ouro Verde completo</h3>
             <p className="text-sm text-primary-700 mt-1 leading-relaxed">
-              Todos os módulos estão ativos: Produção, Logística, Qualidade, RH, Relatórios,
-              Comunicação Interna, Notificações, Departamentos, Perfis de Acesso e Recuperação de Senha.
+              Todos os mÃ³dulos estÃ£o ativos: ProduÃ§Ã£o, LogÃ­stica, Qualidade, RH, RelatÃ³rios,
+              ComunicaÃ§Ã£o Interna, NotificaÃ§Ãµes, Departamentos, Perfis de Acesso e RecuperaÃ§Ã£o de Senha.
               KPIs refletem dados reais do banco de dados.
             </p>
           </div>
         </div>
       </Card>
 
-      {/* Status + Módulos */}
+      {/* Status + MÃ³dulos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader><CardTitle>Status do Sistema</CardTitle></CardHeader>
@@ -348,29 +348,29 @@ export default function DashboardView() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Módulos Ativos</CardTitle></CardHeader>
+          <CardHeader><CardTitle>MÃ³dulos Ativos</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2.5">
               {[
-                { label: 'Autenticação + 2FA',               done: true },
-                { label: 'Gestão de Usuários e Perfis',      done: true },
+                { label: 'AutenticaÃ§Ã£o + 2FA',               done: true },
+                { label: 'GestÃ£o de UsuÃ¡rios e Perfis',      done: true },
                 { label: 'Trilha de Auditoria',              done: true },
-                { label: 'Produção — Lotes e Apontamentos',   done: true },
-                { label: 'Logística — Estoque e Movimentações', done: true },
-                { label: 'Qualidade — NCs e Inspeções',      done: true },
+                { label: 'ProduÃ§Ã£o â€” Lotes e Apontamentos',   done: true },
+                { label: 'LogÃ­stica â€” Estoque e MovimentaÃ§Ãµes', done: true },
+                { label: 'Qualidade â€” NCs e InspeÃ§Ãµes',      done: true },
                 { label: 'Recursos Humanos',                 done: true },
-                { label: 'Relatórios e Indicadores + CSV',   done: true },
-                { label: 'Comunicação Interna (Chat)',        done: true },
-                { label: 'Notificações em tempo real',        done: true },
+                { label: 'RelatÃ³rios e Indicadores + CSV',   done: true },
+                { label: 'ComunicaÃ§Ã£o Interna (Chat)',        done: true },
+                { label: 'NotificaÃ§Ãµes em tempo real',        done: true },
                 { label: 'Departamentos + CRUD',             done: true },
-                { label: 'Perfis de Acesso (visão)',         done: true },
-                { label: 'Recuperação de Senha',             done: true },
-                { label: 'Integrações Externas',             done: true },
+                { label: 'Perfis de Acesso (visÃ£o)',         done: true },
+                { label: 'RecuperaÃ§Ã£o de Senha',             done: true },
+                { label: 'IntegraÃ§Ãµes Externas',             done: true },
                 { label: 'Contabilidade Gerencial',          done: true },
               ].map(({ label, done }, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-sm text-surface-600">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${done ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-400'}`}>
-                    {done ? '✓' : String(i + 1)}
+                    {done ? 'âœ“' : String(i + 1)}
                   </span>
                   {label}
                 </div>
@@ -380,14 +380,14 @@ export default function DashboardView() {
         </Card>
       </div>
 
-      {/* ── Gráficos ── */}
+      {/* â”€â”€ GrÃ¡ficos â”€â”€ */}
       {show.charts && (
         <div className={`grid grid-cols-1 gap-4 ${show.production && show.quality ? 'lg:grid-cols-2' : ''}`}>
 
-          {/* Produção — Distribuição de Status */}
+          {/* ProduÃ§Ã£o â€” DistribuiÃ§Ã£o de Status */}
           {show.production && (
             <Card>
-              <CardHeader><CardTitle>Produção — Status dos Lotes</CardTitle></CardHeader>
+              <CardHeader><CardTitle>ProduÃ§Ã£o â€” Status dos Lotes</CardTitle></CardHeader>
               <CardContent>
                 {loadingKpis ? (
                   <div className="flex justify-center py-8"><Spinner /></div>
@@ -416,16 +416,16 @@ export default function DashboardView() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p className="text-sm text-surface-400 text-center py-10">Sem dados disponíveis</p>
+                  <p className="text-sm text-surface-400 text-center py-10">Sem dados disponÃ­veis</p>
                 )}
               </CardContent>
             </Card>
           )}
 
-          {/* Qualidade — NCs e Inspeções */}
+          {/* Qualidade â€” NCs e InspeÃ§Ãµes */}
           {show.quality && (
             <Card>
-              <CardHeader><CardTitle>Qualidade — Visão Geral</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Qualidade â€” VisÃ£o Geral</CardTitle></CardHeader>
               <CardContent>
                 {loadingKpis ? (
                   <div className="flex justify-center py-8"><Spinner /></div>
@@ -435,8 +435,8 @@ export default function DashboardView() {
                       <Pie
                         data={[
                           { name: 'NCs Abertas',  value: kpis.quality.openNCs    || 0, color: '#ef4444' },
-                          { name: 'NCs Críticas', value: kpis.quality.criticalNCs || 0, color: '#f97316' },
-                          { name: 'Inspeções',    value: kpis.quality.totalRecords || 0, color: '#22c55e' },
+                          { name: 'NCs CrÃ­ticas', value: kpis.quality.criticalNCs || 0, color: '#f97316' },
+                          { name: 'InspeÃ§Ãµes',    value: kpis.quality.totalRecords || 0, color: '#22c55e' },
                         ].filter(d => d.value > 0)}
                         cx="50%"
                         cy="50%"
@@ -458,7 +458,7 @@ export default function DashboardView() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p className="text-sm text-surface-400 text-center py-10">Sem dados disponíveis</p>
+                  <p className="text-sm text-surface-400 text-center py-10">Sem dados disponÃ­veis</p>
                 )}
               </CardContent>
             </Card>
@@ -467,17 +467,17 @@ export default function DashboardView() {
         </div>
       )}
 
-      {/* ── Tendência 7 dias ── */}
+      {/* â”€â”€ TendÃªncia 7 dias â”€â”€ */}
       {show.charts && (
         <Card>
           <CardHeader>
-            <CardTitle>Tendência dos Últimos 7 Dias</CardTitle>
+            <CardTitle>TendÃªncia dos Ãšltimos 7 Dias</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingTrend ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : trendData.length === 0 ? (
-              <p className="text-sm text-surface-400 text-center py-10">Sem dados de tendência disponíveis</p>
+              <p className="text-sm text-surface-400 text-center py-10">Sem dados de tendÃªncia disponÃ­veis</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -487,12 +487,12 @@ export default function DashboardView() {
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                     formatter={(value, name) => {
-                      const labels: Record<string, string> = { batches: 'Lotes', movements: 'Movimentações', ncs: 'NCs' }
+                      const labels: Record<string, string> = { batches: 'Lotes', movements: 'MovimentaÃ§Ãµes', ncs: 'NCs' }
                       return [value, labels[String(name)] ?? name]
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} formatter={name => {
-                    const labels: Record<string, string> = { batches: 'Lotes', movements: 'Movimentações', ncs: 'NCs' }
+                    const labels: Record<string, string> = { batches: 'Lotes', movements: 'MovimentaÃ§Ãµes', ncs: 'NCs' }
                     return labels[name] ?? name
                   }} />
                   {show.production && (
@@ -513,3 +513,4 @@ export default function DashboardView() {
     </div>
   )
 }
+

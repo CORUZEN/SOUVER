@@ -1,4 +1,4 @@
-import Image from 'next/image'
+﻿import Image from 'next/image'
 import { Manrope } from 'next/font/google'
 import { cn } from '@/lib/utils'
 
@@ -31,9 +31,10 @@ export default function AuthLayout({
                     <div className="relative h-36 w-full sm:h-40">
                       <Image
                         src="/branding/graoverde.png"
-                        alt="Logo Grão Verde"
+                        alt="Logo GrÃ£o Verde"
                         fill
                         priority
+                        sizes="(max-width: 640px) 80vw, 520px"
                         className="object-contain"
                       />
                     </div>
@@ -46,6 +47,7 @@ export default function AuthLayout({
                         alt="Logo Ouro Verde"
                         fill
                         priority
+                        sizes="(max-width: 640px) 80vw, 520px"
                         className="object-contain"
                       />
                     </div>
@@ -59,7 +61,7 @@ export default function AuthLayout({
               <div className="relative z-10 w-full max-w-md animate-[authFadeUp_580ms_ease-out]">
                 {children}
                 <p className="mt-8 text-center text-xs text-slate-500">
-                  Sistema Ouro Verde © {new Date().getFullYear()}. Todos os direitos reservados.
+                  Sistema Ouro Verde Â© {new Date().getFullYear()}. Todos os direitos reservados.
                 </p>
               </div>
             </section>

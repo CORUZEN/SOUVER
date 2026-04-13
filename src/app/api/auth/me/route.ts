@@ -2,16 +2,23 @@
 import { getCurrentUser } from '@/lib/auth/session'
 import { canAccessIntegrations } from '@/lib/auth/permissions'
 
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  Vary: 'Cookie',
+}
+
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get('souver_token')?.value
     if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+      return NextResponse.json({ authenticated: false }, { status: 401, headers: NO_CACHE_HEADERS })
     }
 
     const user = await getCurrentUser(token)
     if (!user) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+      return NextResponse.json({ authenticated: false }, { status: 401, headers: NO_CACHE_HEADERS })
     }
 
     const impersonatorToken = req.cookies.get('souver_impersonator_token')?.value
@@ -51,7 +58,7 @@ export async function GET(req: NextRequest) {
         impersonation,
       },
     }, {
-      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=30' },
+      headers: NO_CACHE_HEADERS,
     })
 
     if (shouldClearImpersonatorCookie) {
@@ -60,7 +67,7 @@ export async function GET(req: NextRequest) {
 
     return response
   } catch {
-    return NextResponse.json({ authenticated: false }, { status: 401 })
+    return NextResponse.json({ authenticated: false }, { status: 401, headers: NO_CACHE_HEADERS })
   }
 }
 

@@ -101,7 +101,7 @@ export default function GestaoUsuariosPage() {
   }, [isDeveloper, page, search, filterRole, filterDept, filterStatus])
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
@@ -354,3 +354,4 @@ export default function GestaoUsuariosPage() {
     </div>
   )
 }
+

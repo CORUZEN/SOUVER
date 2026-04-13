@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -17,8 +17,8 @@ const SETTINGS_CARDS = [
   },
   {
     icon: KeyRound,
-    title: 'Autenticação de Dois Fatores',
-    description: 'Adicione uma camada extra de segurança com TOTP (Google Authenticator, Authy).',
+    title: 'AutenticaÃ§Ã£o de Dois Fatores',
+    description: 'Adicione uma camada extra de seguranÃ§a com TOTP (Google Authenticator, Authy).',
     href: '/configuracoes/2fa',
     color: 'text-green-600',
     bg: 'bg-green-50',
@@ -27,7 +27,7 @@ const SETTINGS_CARDS = [
   {
     icon: Users,
     title: 'Perfis de Acesso',
-    description: 'Visualize os perfis e suas permissões no sistema.',
+    description: 'Visualize os perfis e suas permissÃµes no sistema.',
     href: '/configuracoes/perfis',
     color: 'text-purple-600',
     bg: 'bg-purple-50',
@@ -35,8 +35,8 @@ const SETTINGS_CARDS = [
   },
   {
     icon: Monitor,
-    title: 'Sessões Ativas',
-    description: 'Visualize e encerre sessões ativas em outros dispositivos.',
+    title: 'SessÃµes Ativas',
+    description: 'Visualize e encerre sessÃµes ativas em outros dispositivos.',
     href: '/configuracoes/sessoes',
     color: 'text-sky-600',
     bg: 'bg-sky-50',
@@ -45,7 +45,7 @@ const SETTINGS_CARDS = [
   {
     icon: ShieldCheck,
     title: 'Trilha de Auditoria',
-    description: 'Acesse o histórico completo de ações realizadas no sistema.',
+    description: 'Acesse o histÃ³rico completo de aÃ§Ãµes realizadas no sistema.',
     href: '/auditoria',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
@@ -53,8 +53,8 @@ const SETTINGS_CARDS = [
   },
   {
     icon: Plug,
-    title: 'Integrações',
-    description: 'Gerencie integrações com Sankhya e outros sistemas externos.',
+    title: 'IntegraÃ§Ãµes',
+    description: 'Gerencie integraÃ§Ãµes com Sankhya e outros sistemas externos.',
     href: '/integracoes',
     color: 'text-indigo-600',
     bg: 'bg-indigo-50',
@@ -66,7 +66,7 @@ export default function ConfiguracoesPage() {
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations)))
       .catch(() => setCanAccessIntegrations(false))
@@ -82,10 +82,10 @@ export default function ConfiguracoesPage() {
       <div>
         <h1 className="text-xl font-semibold text-surface-900 flex items-center gap-2">
           <Settings className="w-5 h-5 text-primary-600" />
-          Configurações
+          ConfiguraÃ§Ãµes
         </h1>
         <p className="text-sm text-surface-500 mt-0.5">
-          Gerencie suas preferências e configurações do sistema.
+          Gerencie suas preferÃªncias e configuraÃ§Ãµes do sistema.
         </p>
       </div>
 
@@ -130,3 +130,4 @@ export default function ConfiguracoesPage() {
     </div>
   )
 }
+

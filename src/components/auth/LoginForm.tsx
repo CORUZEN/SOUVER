@@ -1,6 +1,6 @@
-'use client'
+﻿'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -12,6 +12,11 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target
@@ -20,16 +25,30 @@ export default function LoginForm() {
     if (apiError) setApiError('')
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit() {
+    if (!hydrated || loading) return
+
+    const nextErrors: Record<string, string> = {}
+    if (!form.login.trim()) nextErrors.login = 'Informe o login ou e-mail.'
+    if (!form.password.trim()) nextErrors.password = 'Informe a senha.'
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors)
+      return
+    }
+
     setLoading(true)
     setApiError('')
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000)
 
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        signal: controller.signal,
       })
 
       const data = await res.json()
@@ -54,15 +73,20 @@ export default function LoginForm() {
       }
 
       window.location.href = '/dashboard'
-    } catch {
-      setApiError('Falha de conexão. Tente novamente.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setApiError('A autenticacao demorou mais que o esperado. Tente novamente.')
+      } else {
+        setApiError('Falha de conexao. Tente novamente.')
+      }
     } finally {
+      window.clearTimeout(timeoutId)
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+    <div className="space-y-4">
       <Input
         label="Login ou E-mail"
         name="login"
@@ -76,6 +100,12 @@ export default function LoginForm() {
         className="h-11 rounded-xl border-slate-300/90 bg-white/90 text-slate-900 placeholder:text-slate-400 focus:ring-emerald-500"
         required
         autoFocus
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            void handleSubmit()
+          }
+        }}
       />
 
       <Input
@@ -99,6 +129,12 @@ export default function LoginForm() {
           </button>
         }
         required
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            void handleSubmit()
+          }
+        }}
       />
 
       {apiError && (
@@ -118,14 +154,18 @@ export default function LoginForm() {
       )}
 
       <Button
-        type="submit"
+        type="button"
+        onClick={() => {
+          void handleSubmit()
+        }}
         variant="primary"
         size="lg"
-        loading={loading}
+        loading={loading || !hydrated}
+        disabled={!hydrated || loading}
         className="mt-2 h-12 w-full rounded-xl bg-slate-900 text-white shadow-[0_10px_30px_rgba(15,23,42,0.22)] transition hover:bg-slate-800 focus-visible:ring-slate-900"
       >
         <LogIn className="h-4 w-4" />
-        {loading ? 'Autenticando...' : 'Entrar'}
+        {!hydrated ? 'Carregando...' : loading ? 'Autenticando...' : 'Entrar'}
       </Button>
 
       <div className="pt-1 text-center">
@@ -136,6 +176,6 @@ export default function LoginForm() {
           Esqueci minha senha
         </Link>
       </div>
-    </form>
+    </div>
   )
 }

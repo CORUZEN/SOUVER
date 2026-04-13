@@ -15,7 +15,7 @@ export default function DevPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
@@ -101,3 +101,4 @@ export default function DevPage() {
     </div>
   )
 }
+

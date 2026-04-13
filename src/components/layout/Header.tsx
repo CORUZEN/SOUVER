@@ -61,7 +61,7 @@ export default function Header() {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.user) {
@@ -412,3 +412,4 @@ export default function Header() {
     </header>
   )
 }
+
