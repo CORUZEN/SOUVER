@@ -6,6 +6,19 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
 
+  await prisma.department.upsert({
+    where: { code: 'DESENV' },
+    update: {
+      name: 'Desenvolvimento',
+      description: 'Engenharia e desenvolvimento de software',
+    },
+    create: {
+      name: 'Desenvolvimento',
+      code: 'DESENV',
+      description: 'Engenharia e desenvolvimento de software',
+    },
+  })
+
   const departments = await prisma.department.findMany({
     orderBy: { name: 'asc' },
     select: {

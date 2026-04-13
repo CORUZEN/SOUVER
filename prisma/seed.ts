@@ -21,6 +21,7 @@ async function main() {
   console.log('📁 Criando departamentos...')
   const departments = [
     { name: 'Diretoria', code: 'DIR', description: 'Diretoria e Gestão Executiva' },
+    { name: 'Desenvolvimento', code: 'DESENV', description: 'Engenharia e desenvolvimento de software' },
     { name: 'Gerência', code: 'GER', description: 'Gerência Geral' },
     { name: 'Produção', code: 'PROD', description: 'Linha de Produção' },
     { name: 'Logística', code: 'LOG', description: 'Logística e Expedição' },

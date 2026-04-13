@@ -231,7 +231,6 @@ export default function GestaoUsuariosPage() {
     { key: 'fullName', header: 'Usuário', render: (_, row) => <span className="text-sm font-medium">{row.fullName}</span> },
     { key: 'email', header: 'E-mail', render: (v) => <span className="text-xs text-surface-600">{String(v)}</span> },
     { key: 'role', header: 'Cargo', render: (_, row) => row.role ? <Badge variant="secondary">{row.role.name}</Badge> : <span className="text-xs text-surface-400">Sem cargo</span> },
-    { key: 'group', header: 'Grupo', render: (_, row) => <span className="text-xs font-semibold">{row.role?.name ?? '-'}</span> },
     { key: 'department', header: 'Departamento', render: (_, row) => <span className="text-xs">{row.department?.name ?? '-'}</span> },
     { key: 'isActive', header: 'Status', render: (_, row) => <Badge variant={row.isActive ? 'success' : 'error'}>{row.isActive ? 'Ativo' : 'Inativo'}</Badge> },
     { key: 'lastLoginAt', header: 'Último acesso', render: (v) => <span className="text-xs">{v ? new Date(String(v)).toLocaleString('pt-BR') : 'Nunca'}</span> },
@@ -329,7 +328,7 @@ export default function GestaoUsuariosPage() {
             <Select label="Cargo" value={form.roleId} onChange={(e) => setForm((p) => ({ ...p, roleId: e.target.value }))} options={roleFormOptions} />
             <Select label="Departamento" value={form.departmentId} onChange={(e) => setForm((p) => ({ ...p, departmentId: e.target.value }))} options={[{ value: '', label: 'Sem departamento' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
-          <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Grupo de permissões: ${selectedRole.name}` : 'Sem grupo de permissões definido.'}</div>
+          <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Cargo selecionado: ${selectedRole.name}` : 'Sem cargo definido.'}</div>
           {editingUser && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />Usuário ativo</label>}
         </div>
       </Modal>

@@ -113,11 +113,11 @@ export default function GestaoPermissoesPage() {
     try {
       const r = await fetch('/api/dev/permissions', { method: 'POST' })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao criar grupo Administração.')
-      setPermMessage(d.message ?? 'Grupo Administração criado com sucesso.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao criar cargo Administração.')
+      setPermMessage(d.message ?? 'Cargo Administração criado com sucesso.')
       await fetchPermissionsPanel()
     } catch (e) {
-      setPermMessage(e instanceof Error ? e.message : 'Falha ao criar grupo.')
+      setPermMessage(e instanceof Error ? e.message : 'Falha ao criar cargo.')
     } finally {
       setCreatingAdminGroup(false)
     }
@@ -133,8 +133,8 @@ export default function GestaoPermissoesPage() {
         body: JSON.stringify({ permissionCodes: selectedRolePermissionCodes }),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar permissões do grupo.')
-      setPermMessage('Permissões do grupo atualizadas com sucesso.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar permissões do cargo.')
+      setPermMessage('Permissões do cargo atualizadas com sucesso.')
       await fetchPermissionsPanel()
     } catch (e) {
       setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar permissões.')
@@ -153,11 +153,11 @@ export default function GestaoPermissoesPage() {
         body: JSON.stringify({ roleId: selectedUserRoleId || null }),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar grupo do usuário.')
-      setPermMessage('Grupo de permissões do usuário atualizado.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar cargo do usuário.')
+      setPermMessage('Cargo do usuário atualizado.')
       await fetchPermissionsPanel()
     } catch (e) {
-      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar grupo do usuário.')
+      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar cargo do usuário.')
     } finally {
       setSavingUserRole(false)
     }
@@ -179,14 +179,14 @@ export default function GestaoPermissoesPage() {
     )
   }
 
-  const groupedRoleOptions = [{ value: '', label: 'Sem grupo' }, ...devRoles.map((r) => ({ value: r.id, label: r.name }))]
+  const groupedRoleOptions = [{ value: '', label: 'Sem cargo' }, ...devRoles.map((r) => ({ value: r.id, label: r.name }))]
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Governança de Acessos</h1>
-          <p className="text-sm text-surface-500">Controle corporativo de privilégios por grupo e delegação de permissões por usuário.</p>
+          <p className="text-sm text-surface-500">Controle corporativo de privilégios por cargo e delegação de permissões por usuário.</p>
         </div>
         <Link href="/dev">
           <Button variant="outline"><ArrowLeft className="h-4 w-4" />Voltar para Central</Button>
@@ -197,13 +197,13 @@ export default function GestaoPermissoesPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Painel de Permissões</h2>
-            <p className="text-sm text-surface-600">Ajuste permissões por grupo e por usuário.</p>
+            <p className="text-sm text-surface-600">Ajuste permissões por cargo e por usuário.</p>
           </div>
-          {!hasAdministrationGroup && <Button variant="outline" onClick={createAdministrationGroup} loading={creatingAdminGroup}>Criar grupo Administração</Button>}
+          {!hasAdministrationGroup && <Button variant="outline" onClick={createAdministrationGroup} loading={creatingAdminGroup}>Criar cargo Administração</Button>}
         </div>
 
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Grupo Administração não acessa esta página Dev. Esta página é exclusiva do Desenvolvedor.
+          Cargo Administração não acessa esta página Dev. Esta página é exclusiva do Desenvolvedor.
         </div>
 
         {permMessage && <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm">{permMessage}</div>}
@@ -211,7 +211,7 @@ export default function GestaoPermissoesPage() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <div className="space-y-3 rounded-lg border border-surface-200 p-4">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">Permissões por grupo</h3>
+              <h3 className="text-sm font-semibold">Permissões por cargo</h3>
               <Select options={devRoles.map((r) => ({ value: r.id, label: r.name }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
             </div>
             <div className="max-h-90 space-y-3 overflow-y-auto rounded-lg border border-surface-200 p-3">
@@ -237,18 +237,18 @@ export default function GestaoPermissoesPage() {
             </div>
             <div className="flex justify-end">
               <Button onClick={saveRolePermissions} loading={savingRolePermissions} disabled={!selectedRoleId || selectedRoleData?.code === 'DEVELOPER'}>
-                Salvar permissões do grupo
+                Salvar permissões do cargo
               </Button>
             </div>
           </div>
 
           <div className="space-y-3 rounded-lg border border-surface-200 p-4">
             <h3 className="text-sm font-semibold">Permissões por usuário</h3>
-            <p className="text-xs text-surface-500">Defina qual grupo de permissões o usuário vai usar.</p>
+            <p className="text-xs text-surface-500">Defina qual cargo o usuário vai usar.</p>
             <Select label="Usuário" options={devUsers.map((u) => ({ value: u.id, label: `${u.fullName} (${u.login})` }))} value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} />
-            <Select label="Grupo de permissões" options={groupedRoleOptions} value={selectedUserRoleId} onChange={(e) => setSelectedUserRoleId(e.target.value)} />
+            <Select label="Cargo" options={groupedRoleOptions} value={selectedUserRoleId} onChange={(e) => setSelectedUserRoleId(e.target.value)} />
             <div className="flex justify-end">
-              <Button onClick={saveUserGroup} loading={savingUserRole} disabled={!selectedUserId}>Salvar grupo do usuário</Button>
+              <Button onClick={saveUserGroup} loading={savingUserRole} disabled={!selectedUserId}>Salvar cargo do usuário</Button>
             </div>
           </div>
         </div>
