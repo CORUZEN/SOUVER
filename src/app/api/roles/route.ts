@@ -1,33 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
+import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
 
-  // Garante cargos-base esperados pelo painel Dev.
-  await prisma.role.upsert({
-    where: { code: 'IT_ANALYST' },
-    update: {
-      name: 'Analista de TI',
-      description: 'Analista de Tecnologia da Informação',
-    },
-    create: {
-      name: 'Analista de TI',
-      code: 'IT_ANALYST',
-      description: 'Analista de Tecnologia da Informação',
-    },
-  })
+  await ensureRoleCatalog(prisma)
 
-  const roles = await prisma.role.findMany({
-    orderBy: { name: 'asc' },
+  const rolesRaw = await prisma.role.findMany({
+    where: { code: { in: ROLE_CATALOG_CODES } },
     select: {
       id: true, name: true, code: true, description: true,
       requireTwoFactor: true,
       _count: { select: { users: true, rolePermissions: true } },
     },
   })
+
+  const roles = sortRolesByCatalogOrder(rolesRaw)
 
   return NextResponse.json({ roles })
 }

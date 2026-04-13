@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
+import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
 function deny() {
   return NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 })
@@ -18,9 +19,11 @@ export async function GET(req: NextRequest) {
   const { user, response } = await requireDeveloper(req)
   if (!user) return response
 
-  const [roles, permissions, users] = await Promise.all([
+  await ensureRoleCatalog(prisma)
+
+  const [rolesRaw, permissions, users, administrationGroup] = await Promise.all([
     prisma.role.findMany({
-      orderBy: { name: 'asc' },
+      where: { code: { in: ROLE_CATALOG_CODES } },
       select: {
         id: true,
         name: true,
@@ -46,7 +49,13 @@ export async function GET(req: NextRequest) {
         role: { select: { id: true, name: true, code: true } },
       },
     }),
+    prisma.role.findUnique({
+      where: { code: 'ADMINISTRACAO' },
+      select: { id: true },
+    }),
   ])
+
+  const roles = sortRolesByCatalogOrder(rolesRaw)
 
   const rolesWithCodes = roles.map((role) => ({
     id: role.id,
@@ -60,7 +69,7 @@ export async function GET(req: NextRequest) {
     roles: rolesWithCodes,
     permissions,
     users,
-    hasAdministrationGroup: rolesWithCodes.some((r) => r.code === 'ADMINISTRACAO'),
+    hasAdministrationGroup: Boolean(administrationGroup),
   })
 }
 

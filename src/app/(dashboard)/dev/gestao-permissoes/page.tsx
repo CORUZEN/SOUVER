@@ -179,7 +179,7 @@ export default function GestaoPermissoesPage() {
     )
   }
 
-  const groupedRoleOptions = [{ value: '', label: 'Sem grupo' }, ...devRoles.map((r) => ({ value: r.id, label: `${r.name} (${r.code})` }))]
+  const groupedRoleOptions = [{ value: '', label: 'Sem grupo' }, ...devRoles.map((r) => ({ value: r.id, label: r.name }))]
 
   return (
     <div className="space-y-6">
@@ -212,7 +212,7 @@ export default function GestaoPermissoesPage() {
           <div className="space-y-3 rounded-lg border border-surface-200 p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">Permissões por grupo</h3>
-              <Select options={devRoles.map((r) => ({ value: r.id, label: `${r.name} (${r.code})` }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
+              <Select options={devRoles.map((r) => ({ value: r.id, label: r.name }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
             </div>
             <div className="max-h-90 space-y-3 overflow-y-auto rounded-lg border border-surface-200 p-3">
               {Object.entries(groupedPermissions).map(([module, list]) => (

@@ -44,19 +44,17 @@ async function main() {
   // ── Perfis (Roles) ─────────────────────────────────────────
   console.log('👥 Criando perfis de acesso...')
   const roles = [
-    { name: 'Desenvolvedor', code: 'DEVELOPER', description: 'Administrador geral do sistema com acesso completo' },
-    { name: 'Gestão / Diretoria', code: 'MANAGEMENT', description: 'Acesso gerencial completo' },
-    { name: 'Gerente', code: 'MANAGER', description: 'Acesso de gerência por setor' },
-    { name: 'Supervisor', code: 'SUPERVISOR', description: 'Supervisão operacional' },
-    { name: 'Auxiliar', code: 'AUXILIARY', description: 'Acesso operacional básico' },
     { name: 'Analista de TI', code: 'IT_ANALYST', description: 'Analista de Tecnologia da Informação' },
-    { name: 'Produção', code: 'PRODUCTION', description: 'Operador de produção' },
-    { name: 'Logística', code: 'LOGISTICS', description: 'Operador de logística' },
+    { name: 'Diretoria', code: 'DIRECTORATE', description: 'Gestão executiva e visão estratégica corporativa' },
+    { name: 'Gerente Comercial', code: 'COMMERCIAL_MANAGER', description: 'Gestão de vendas e estratégia comercial' },
+    { name: 'Gerente de Logística', code: 'LOGISTICS_MANAGER', description: 'Gestão das operações de logística e distribuição' },
+    { name: 'Desenvolvedor', code: 'DEVELOPER', description: 'Administrador geral do sistema com acesso completo' },
     { name: 'Qualidade', code: 'QUALITY', description: 'Inspetor de qualidade' },
-    { name: 'RH', code: 'HR', description: 'Gestão de pessoas' },
+    { name: 'Auditoria', code: 'AUDIT', description: 'Auditoria, conformidade e rastreabilidade de processos' },
+    { name: 'Recursos Humanos', code: 'HR', description: 'Gestão de pessoas e rotinas de RH' },
     { name: 'Contabilidade', code: 'ACCOUNTING', description: 'Financeiro e contábil' },
-    { name: 'Depósito / Armazenamento', code: 'WAREHOUSE', description: 'Operador de depósito' },
-    { name: 'Visualizador / Auditoria', code: 'VIEWER', description: 'Somente leitura e auditoria' },
+    { name: 'Produção', code: 'PRODUCTION', description: 'Operação e controle de produção' },
+    { name: 'Assistente de Logística', code: 'LOGISTICS_ASSISTANT', description: 'Suporte operacional à logística' },
   ]
 
   for (const role of roles) {
@@ -81,13 +79,13 @@ async function main() {
   const actions = ['read', 'create', 'edit', 'delete', 'approve', 'export', 'admin']
 
   const permissions: { module: string; action: string; code: string; description: string }[] = []
-  for (const module of modules) {
+  for (const moduleName of modules) {
     for (const action of actions) {
       permissions.push({
-        module,
+        module: moduleName,
         action,
-        code: `${module}:${action}`,
-        description: `${action.charAt(0).toUpperCase() + action.slice(1)} em ${module}`,
+        code: `${moduleName}:${action}`,
+        description: `${action.charAt(0).toUpperCase() + action.slice(1)} em ${moduleName}`,
       })
     }
   }
