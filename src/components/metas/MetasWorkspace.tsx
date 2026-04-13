@@ -11,6 +11,7 @@ import {
   CircleHelp,
   CircleDollarSign,
   Plus,
+  Pencil,
   RotateCcw,
   Search,
   Settings2,
@@ -729,6 +730,8 @@ export default function MetasWorkspace() {
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
+  const [isEditingBlockTitle, setIsEditingBlockTitle] = useState(false)
+  const [blockTitleDraft, setBlockTitleDraft] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
@@ -767,6 +770,11 @@ export default function MetasWorkspace() {
       window.removeEventListener('scroll', handleViewportChange, true)
     }
   }, [])
+
+  useEffect(() => {
+    setIsEditingBlockTitle(false)
+    setBlockTitleDraft('')
+  }, [selectedBlockId])
 
   useEffect(() => {
     // ── Load config from API (database) ──────────────────────────────────
@@ -2638,27 +2646,6 @@ export default function MetasWorkspace() {
             </button>
           </div>
 
-          {/* Block selector tabs */}
-          {ruleBlocks.length > 1 && (
-            <div className="flex flex-wrap gap-1 rounded-lg border border-surface-200 bg-surface-50 p-1">
-              {ruleBlocks.map((block) => (
-                <button
-                  key={block.id}
-                  type="button"
-                  onClick={() => setSelectedBlockId(block.id)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    selectedBlockId === block.id
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-surface-600 hover:bg-surface-200'
-                  }`}
-                >
-                  {block.title}
-                  {block.sellerIds.length > 0 && <span className="ml-1 text-[10px] opacity-75">({block.sellerIds.length})</span>}
-                </button>
-              ))}
-            </div>
-          )}
-
           {(() => {
             const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
             const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
@@ -2992,11 +2979,74 @@ export default function MetasWorkspace() {
               <Card key={block.id} className="border-surface-200">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <input
-                      className="rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-                      value={block.title}
-                      onChange={(e) => updateBlock({ title: e.target.value })}
-                    />
+                    {isEditingBlockTitle ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          autoFocus
+                          className="min-w-64 rounded-lg border border-primary-300 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                          value={blockTitleDraft}
+                          onChange={(e) => setBlockTitleDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const normalized = blockTitleDraft.trim()
+                              if (normalized) updateBlock({ title: normalized })
+                              setIsEditingBlockTitle(false)
+                            }
+                            if (e.key === 'Escape') {
+                              setIsEditingBlockTitle(false)
+                              setBlockTitleDraft(block.title)
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const normalized = blockTitleDraft.trim()
+                            if (normalized) updateBlock({ title: normalized })
+                            setIsEditingBlockTitle(false)
+                          }}
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingBlockTitle(false)
+                            setBlockTitleDraft(block.title)
+                          }}
+                          className="rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-surface-600 hover:bg-surface-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="min-w-64 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-sm font-semibold text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                          value={selectedBlockId}
+                          onChange={(e) => setSelectedBlockId(e.target.value)}
+                        >
+                          {ruleBlocks.map((optionBlock) => (
+                            <option key={optionBlock.id} value={optionBlock.id}>
+                              {optionBlock.title}
+                              {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          title="Editar nome do vendedor/grupo"
+                          onClick={() => {
+                            setBlockTitleDraft(block.title)
+                            setIsEditingBlockTitle(true)
+                          }}
+                          className="inline-flex items-center justify-center rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 text-surface-600 hover:bg-surface-50 hover:text-primary-700"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      </div>
+                    )}
                     {block.sellerIds.length === 0 && (
                       <Badge variant="secondary">Grupo padrão — aplica a vendedores não atribuídos</Badge>
                     )}
