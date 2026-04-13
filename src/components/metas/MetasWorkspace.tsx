@@ -1557,6 +1557,19 @@ export default function MetasWorkspace() {
     })
   }, [activeMonth?.sellerIncludedDates, sellers])
 
+  const sellerSpecificDatesFooterSummary = useMemo(() => {
+    const entries = sellerIncludedDateEntries
+    if (entries.length === 0) return ''
+    const uniqueSellerCount = new Set(entries.map((entry) => entry.sellerId)).size
+    const uniqueDateCount = new Set(entries.map((entry) => entry.date)).size
+    const preview = entries
+      .slice(0, 3)
+      .map((entry) => `${entry.sellerName} (${formatDateBr(entry.date)})`)
+      .join(', ')
+    const more = entries.length > 3 ? ` e mais ${entries.length - 3}` : ''
+    return ` Exceções ativas para este mês: ${entries.length} data(s) específica(s), envolvendo ${uniqueSellerCount} vendedor(es) em ${uniqueDateCount} data(s). ${preview}${more}.`
+  }, [sellerIncludedDateEntries])
+
   const cycle = useMemo(
     () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
     [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
@@ -2648,6 +2661,7 @@ export default function MetasWorkspace() {
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
             const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
+            const otherSellerBlocksCount = ruleBlocks.filter((b) => b.id !== block.id && b.sellerIds.length > 0).length
             const monthStartIso = `${year}-${String(month + 1).padStart(2, '0')}-01`
             const stageLabelMap = Object.fromEntries(STAGES.map((s) => [s.key, s.label])) as Record<StageKey, string>
 
@@ -3405,20 +3419,49 @@ export default function MetasWorkspace() {
                       <Boxes size={14} className="text-cyan-600" />
                       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Metas de peso por grupo de produto</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newTarget: WeightTarget = {
-                          id: `wt-${Date.now()}`,
-                          brand: '',
-                          targetKg: 0,
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={otherSellerBlocksCount === 0}
+                        onClick={() =>
+                          setConfirmModal({
+                            open: true,
+                            title: 'Aplicar metas de peso a todos',
+                            message: `Aplicar os grupos de produto e metas (kg) do bloco "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve os dados atuais desses blocos no mês selecionado.`,
+                            confirmLabel: 'Aplicar a todos',
+                            variant: 'primary',
+                            onConfirm: () =>
+                              setRuleBlocks((prev) =>
+                                prev.map((candidate) => {
+                                  if (candidate.id === block.id || candidate.sellerIds.length === 0) return candidate
+                                  const clonedTargets = (block.weightTargets ?? []).map((wt, index) => ({
+                                    ...wt,
+                                    id: `wt-${Date.now()}-${candidate.id}-${index}`,
+                                  }))
+                                  return { ...candidate, weightTargets: clonedTargets }
+                                })
+                              ),
+                          })
                         }
-                        updateBlock({ weightTargets: [...(block.weightTargets ?? []), newTarget] })
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-cyan-300 bg-cyan-50/50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-50 transition-colors"
-                    >
-                      <Plus size={11} /> Adicionar grupo
-                    </button>
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Users size={11} /> Aplicar a todos os vendedores
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTarget: WeightTarget = {
+                            id: `wt-${Date.now()}`,
+                            brand: '',
+                            targetKg: 0,
+                          }
+                          updateBlock({ weightTargets: [...(block.weightTargets ?? []), newTarget] })
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-dashed border-cyan-300 bg-cyan-50/50 px-2.5 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-50 transition-colors"
+                      >
+                        <Plus size={11} /> Adicionar grupo
+                      </button>
+                    </div>
                   </div>
                   {(!block.weightTargets || block.weightTargets.length === 0) ? (
                     <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-3 py-4 text-center text-xs text-surface-400">
@@ -3577,6 +3620,33 @@ export default function MetasWorkspace() {
                       <Target size={14} className="text-indigo-600" />
                       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Item foco do mês</p>
                     </div>
+                    <button
+                      type="button"
+                      disabled={otherSellerBlocksCount === 0}
+                      onClick={() =>
+                        setConfirmModal({
+                          open: true,
+                          title: 'Aplicar item foco a todos',
+                          message: `Aplicar o item foco e a meta (kg) do bloco "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve o item foco atual dos demais blocos no mês selecionado.`,
+                          confirmLabel: 'Aplicar a todos',
+                          variant: 'primary',
+                          onConfirm: () =>
+                            setRuleBlocks((prev) =>
+                              prev.map((candidate) => {
+                                if (candidate.id === block.id || candidate.sellerIds.length === 0) return candidate
+                                return {
+                                  ...candidate,
+                                  focusProductCode: block.focusProductCode ?? '',
+                                  focusTargetKg: block.focusTargetKg ?? 0,
+                                }
+                              })
+                            ),
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Users size={11} /> Aplicar a todos os vendedores
+                    </button>
                   </div>
 
                   <div className="grid gap-3 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-[1.6fr_0.7fr] md:items-end">
@@ -4724,7 +4794,7 @@ export default function MetasWorkspace() {
           </Card>
 
           <Card className="border-surface-200">
-            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis no intervalo configurado (início da 1ª semana até o fim do fechamento, quando informado) e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do próximo ciclo.</p>
+            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis no intervalo configurado (início da 1ª semana até o fim do fechamento, quando informado) e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do próximo ciclo.{sellerSpecificDatesFooterSummary}</p>
           </Card>
         </>
       )}
