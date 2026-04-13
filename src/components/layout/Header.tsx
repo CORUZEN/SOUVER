@@ -190,6 +190,30 @@ export default function Header() {
       }
     }
 
+    if (pathname === '/dev') {
+      return {
+        eyebrow: 'Área Dev • Governança',
+        title: 'Central do Desenvolvedor',
+        subtitle: 'Acesso corporativo para gestão de usuários e permissões do sistema',
+      }
+    }
+
+    if (pathname.startsWith('/dev/gestao-usuarios')) {
+      return {
+        eyebrow: 'Área Dev • Identidades',
+        title: 'Gestão de Usuários',
+        subtitle: 'Administração de contas, status e ciclo de acesso corporativo',
+      }
+    }
+
+    if (pathname.startsWith('/dev/gestao-permissoes')) {
+      return {
+        eyebrow: 'Área Dev • Acessos',
+        title: 'Gestão de Permissões',
+        subtitle: 'Controle de grupos, privilégios e delegação de acesso por usuário',
+      }
+    }
+
     if (pathname.startsWith('/configuracoes')) {
       return {
         eyebrow: 'Configurações • Perfil',
@@ -344,7 +368,7 @@ export default function Header() {
                 </Link>
                 {user?.roleCode === 'DEVELOPER' && (
                   <Link
-                    href="/usuarios"
+                    href="/dev"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
                   >
