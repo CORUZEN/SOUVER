@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
@@ -6,23 +6,23 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 
 const createUserSchema = z.object({
-  fullName: z.string().min(2, 'Nome deve ter no minimo 2 caracteres').max(120),
-  email: z.string().email('E-mail invalido'),
+  fullName: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(120),
+  email: z.string().email('E-mail inválido'),
   login: z
     .string()
-    .min(3, 'Login deve ter no minimo 3 caracteres')
+    .min(3, 'Login deve ter no mínimo 3 caracteres')
     .max(30)
     .regex(/^[a-zA-Z0-9._-]+$/, 'Login deve conter apenas letras, numeros, . - _'),
   phone: z.string().optional().nullable(),
-  password: z.string().min(8, 'Senha deve ter no minimo 8 caracteres'),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
   departmentId: z.string().optional().nullable(),
   roleId: z.string().optional().nullable(),
 })
 
 function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
-  if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Nao autenticado' }, { status: 401 }) }
+  if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
   if (user.role?.code !== 'DEVELOPER') {
-    return { ok: false as const, response: NextResponse.json({ message: 'Area Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
+    return { ok: false as const, response: NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
   }
   return { ok: true as const }
 }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   const parsed = createUserSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { message: 'Dados invalidos.', errors: parsed.error.flatten().fieldErrors },
+      { message: 'Dados inválidos.', errors: parsed.error.flatten().fieldErrors },
       { status: 400 }
     )
   }
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
   })
   if (existing) {
     const field = existing.email === email ? 'e-mail' : 'login'
-    return NextResponse.json({ message: `Este ${field} ja esta em uso.` }, { status: 409 })
+    return NextResponse.json({ message: `Este ${field} já esta em uso.` }, { status: 409 })
   }
 
   const passwordHash = await hashPassword(password)
@@ -133,10 +133,10 @@ export async function POST(req: NextRequest) {
     entityType: 'user',
     entityId: created.id,
     newData: { fullName, email, login, departmentId, roleId },
-    description: `Usuario "${fullName}" criado no painel Dev.`,
+    description: `Usuário "${fullName}" criado no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
 
-  return NextResponse.json({ message: 'Usuario criado com sucesso.', user: created }, { status: 201 })
+  return NextResponse.json({ message: 'Usuário criado com sucesso.', user: created }, { status: 201 })
 }

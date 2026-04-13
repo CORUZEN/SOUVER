@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
@@ -7,7 +7,7 @@ import { auditLog } from '@/domains/audit/audit.service'
 
 const updateUserSchema = z.object({
   fullName: z.string().min(2).max(120).optional(),
-  email: z.string().email('E-mail invalido').optional(),
+  email: z.string().email('E-mail inválido').optional(),
   login: z
     .string()
     .min(3)
@@ -23,9 +23,9 @@ const updateUserSchema = z.object({
 })
 
 function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
-  if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Nao autenticado' }, { status: 401 }) }
+  if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
   if (user.role?.code !== 'DEVELOPER') {
-    return { ok: false as const, response: NextResponse.json({ message: 'Area Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
+    return { ok: false as const, response: NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
   }
   return { ok: true as const }
 }
@@ -58,7 +58,7 @@ export async function GET(
     },
   })
 
-  if (!user) return NextResponse.json({ message: 'Usuario nao encontrado' }, { status: 404 })
+  if (!user) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   return NextResponse.json({ user })
 }
 
@@ -75,13 +75,13 @@ export async function PUT(
   const userAgent = req.headers.get('user-agent') ?? 'unknown'
 
   const target = await prisma.user.findUnique({ where: { id }, select: { id: true, fullName: true, email: true, login: true, isActive: true } })
-  if (!target) return NextResponse.json({ message: 'Usuario nao encontrado' }, { status: 404 })
+  if (!target) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
 
   const body = await req.json()
   const parsed = updateUserSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { message: 'Dados invalidos.', errors: parsed.error.flatten().fieldErrors },
+      { message: 'Dados inválidos.', errors: parsed.error.flatten().fieldErrors },
       { status: 400 }
     )
   }
@@ -90,11 +90,11 @@ export async function PUT(
 
   if (rest.email && rest.email !== target.email) {
     const conflict = await prisma.user.findFirst({ where: { email: rest.email, NOT: { id } } })
-    if (conflict) return NextResponse.json({ message: 'Este e-mail ja esta em uso.' }, { status: 409 })
+    if (conflict) return NextResponse.json({ message: 'Este e-mail já esta em uso.' }, { status: 409 })
   }
   if (rest.login && rest.login !== target.login) {
     const conflict = await prisma.user.findFirst({ where: { login: rest.login, NOT: { id } } })
-    if (conflict) return NextResponse.json({ message: 'Este login ja esta em uso.' }, { status: 409 })
+    if (conflict) return NextResponse.json({ message: 'Este login já esta em uso.' }, { status: 409 })
   }
 
   const updateData: Record<string, unknown> = { ...rest }
@@ -117,12 +117,12 @@ export async function PUT(
     entityId: id,
     oldData: { fullName: target.fullName, email: target.email, login: target.login, isActive: target.isActive },
     newData: rest,
-    description: `Usuario "${target.fullName}" atualizado no painel Dev.`,
+    description: `Usuário "${target.fullName}" atualizado no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
 
-  return NextResponse.json({ message: 'Usuario atualizado com sucesso.', user: updated })
+  return NextResponse.json({ message: 'Usuário atualizado com sucesso.', user: updated })
 }
 
 export async function DELETE(
@@ -136,7 +136,7 @@ export async function DELETE(
   const { id } = await params
 
   if (currentUser!.id === id) {
-    return NextResponse.json({ message: 'Nao e permitido excluir o proprio usuario.' }, { status: 400 })
+    return NextResponse.json({ message: 'Não e permitido excluir o proprio usuário.' }, { status: 400 })
   }
 
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
@@ -146,13 +146,13 @@ export async function DELETE(
     where: { id },
     select: { id: true, fullName: true, email: true, login: true, role: { select: { code: true } } },
   })
-  if (!target) return NextResponse.json({ message: 'Usuario nao encontrado' }, { status: 404 })
+  if (!target) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
 
   try {
     await prisma.user.delete({ where: { id } })
   } catch {
     return NextResponse.json(
-      { message: 'Nao foi possivel excluir este usuario porque ele possui historico vinculado. Desative-o em vez de excluir.' },
+      { message: 'Não foi possível excluir este usuário porque ele possui histórico vinculado. Desative-o em vez de excluir.' },
       { status: 409 }
     )
   }
@@ -164,10 +164,10 @@ export async function DELETE(
     entityType: 'user',
     entityId: id,
     oldData: { fullName: target.fullName, email: target.email, login: target.login },
-    description: `Usuario "${target.fullName}" excluido permanentemente no painel Dev.`,
+    description: `Usuário "${target.fullName}" excluido permanentemente no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
 
-  return NextResponse.json({ message: 'Usuario excluido com sucesso.' })
+  return NextResponse.json({ message: 'Usuário excluido com sucesso.' })
 }

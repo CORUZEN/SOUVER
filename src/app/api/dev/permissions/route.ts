@@ -1,15 +1,15 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 
 function deny() {
-  return NextResponse.json({ message: 'Area Dev exclusiva para desenvolvedor.' }, { status: 403 })
+  return NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 })
 }
 
 async function requireDeveloper(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user) return { user: null, response: NextResponse.json({ message: 'Nao autenticado' }, { status: 401 }) }
+  if (!user) return { user: null, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
   if (user.role?.code !== 'DEVELOPER') return { user: null, response: deny() }
   return { user, response: null as NextResponse | null }
 }
@@ -73,14 +73,14 @@ export async function POST(req: NextRequest) {
 
   const existing = await prisma.role.findUnique({ where: { code: 'ADMINISTRACAO' }, select: { id: true, code: true } })
   if (existing) {
-    return NextResponse.json({ message: 'Grupo Administracao ja existe.', roleId: existing.id })
+    return NextResponse.json({ message: 'Grupo Administração já existe.', roleId: existing.id })
   }
 
   const role = await prisma.role.create({
     data: {
-      name: 'Administracao',
+      name: 'Administração',
       code: 'ADMINISTRACAO',
-      description: 'Grupo com permissoes amplas operacionais, sem acesso ao painel Dev.',
+      description: 'Grupo com permissões amplas operacionais, sem acesso ao painel Dev.',
     },
     select: { id: true, name: true, code: true },
   })
@@ -106,10 +106,10 @@ export async function POST(req: NextRequest) {
     action: 'ROLE_CREATED',
     entityType: 'role',
     entityId: role.id,
-    description: 'Grupo de permissao Administracao criado no painel Dev.',
+    description: 'Grupo de permissao Administração criado no painel Dev.',
     ipAddress: ip,
     userAgent,
   })
 
-  return NextResponse.json({ message: 'Grupo Administracao criado com sucesso.', roleId: role.id }, { status: 201 })
+  return NextResponse.json({ message: 'Grupo Administração criado com sucesso.', roleId: role.id }, { status: 201 })
 }

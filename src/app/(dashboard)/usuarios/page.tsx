@@ -105,7 +105,7 @@ export default function UsuariosPage() {
       })
       const r = await fetch(`/api/users?${params}`)
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Erro ao carregar usuarios.')
+      if (!r.ok) throw new Error(d.message ?? 'Erro ao carregar usuários.')
       setUsers(d.users ?? [])
       setTotal(d.total ?? 0)
     } catch (e) {
@@ -119,7 +119,7 @@ export default function UsuariosPage() {
     if (!isDeveloper) return
     const r = await fetch('/api/dev/permissions')
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d.message ?? 'Erro ao carregar painel de permissoes.')
+    if (!r.ok) throw new Error(d.message ?? 'Erro ao carregar painel de permissões.')
     setDevRoles(d.roles ?? [])
     setDevUsers(d.users ?? [])
     setPermissions(d.permissions ?? [])
@@ -194,7 +194,7 @@ export default function UsuariosPage() {
     setSaving(true)
     try {
       if (!form.fullName.trim() || !form.login.trim() || !form.email.trim()) throw new Error('Preencha nome, login e e-mail.')
-      if (!editingUser && !form.password.trim()) throw new Error('Senha obrigatoria para novo usuario.')
+      if (!editingUser && !form.password.trim()) throw new Error('Senha obrigatoria para novo usuário.')
       const payload: Record<string, unknown> = {
         fullName: form.fullName,
         login: form.login,
@@ -209,13 +209,13 @@ export default function UsuariosPage() {
       const method = editingUser ? 'PUT' : 'POST'
       const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar usuario.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar usuário.')
       setModalOpen(false)
       setConfirmOpen(false)
       await fetchUsers()
       await fetchPermissionsPanel()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : 'Erro ao salvar usuario.')
+      setFormError(e instanceof Error ? e.message : 'Erro ao salvar usuário.')
     } finally {
       setSaving(false)
     }
@@ -234,7 +234,7 @@ export default function UsuariosPage() {
   async function doDelete(user: UserRow) {
     const r = await fetch(`/api/users/${user.id}`, { method: 'DELETE' })
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d.message ?? 'Falha ao excluir usuario.')
+    if (!r.ok) throw new Error(d.message ?? 'Falha ao excluir usuário.')
   }
 
   async function doImpersonate(user: UserRow) {
@@ -244,7 +244,7 @@ export default function UsuariosPage() {
       body: JSON.stringify({ userId: user.id }),
     })
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d.message ?? 'Falha ao locar como usuario.')
+    if (!r.ok) throw new Error(d.message ?? 'Falha ao locar como usuário.')
     window.location.href = '/'
   }
 
@@ -259,7 +259,7 @@ export default function UsuariosPage() {
       setConfirmOpen(false)
       await fetchUsers()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : 'Falha na acao.')
+      setFormError(e instanceof Error ? e.message : 'Falha na ação.')
     } finally {
       setConfirming(false)
     }
@@ -270,8 +270,8 @@ export default function UsuariosPage() {
     try {
       const r = await fetch('/api/dev/permissions', { method: 'POST' })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao criar grupo Administracao.')
-      setPermMessage(d.message ?? 'Grupo Administracao criado com sucesso.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao criar grupo Administração.')
+      setPermMessage(d.message ?? 'Grupo Administração criado com sucesso.')
       await fetchPermissionsPanel()
     } catch (e) {
       setPermMessage(e instanceof Error ? e.message : 'Falha ao criar grupo.')
@@ -290,11 +290,11 @@ export default function UsuariosPage() {
         body: JSON.stringify({ permissionCodes: selectedRolePermissionCodes }),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar permissoes do grupo.')
-      setPermMessage('Permissoes do grupo atualizadas com sucesso.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar permissões do grupo.')
+      setPermMessage('Permissões do grupo atualizadas com sucesso.')
       await fetchPermissionsPanel()
     } catch (e) {
-      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar permissoes.')
+      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar permissões.')
     } finally {
       setSavingRolePermissions(false)
     }
@@ -310,28 +310,28 @@ export default function UsuariosPage() {
         body: JSON.stringify({ roleId: selectedUserRoleId || null }),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar grupo do usuario.')
-      setPermMessage('Grupo de permissoes do usuario atualizado.')
+      if (!r.ok) throw new Error(d.message ?? 'Falha ao salvar grupo do usuário.')
+      setPermMessage('Grupo de permissões do usuário atualizado.')
       await fetchUsers()
       await fetchPermissionsPanel()
     } catch (e) {
-      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar grupo do usuario.')
+      setPermMessage(e instanceof Error ? e.message : 'Falha ao salvar grupo do usuário.')
     } finally {
       setSavingUserRole(false)
     }
   }
 
   const columns: Column<UserRow>[] = [
-    { key: 'fullName', header: 'Usuario', render: (_, row) => <span className="text-sm font-medium">{row.fullName}</span> },
+    { key: 'fullName', header: 'Usuário', render: (_, row) => <span className="text-sm font-medium">{row.fullName}</span> },
     { key: 'email', header: 'E-mail', render: (v) => <span className="text-xs text-surface-600">{String(v)}</span> },
     { key: 'role', header: 'Cargo', render: (_, row) => row.role ? <Badge variant="secondary">{row.role.name}</Badge> : <span className="text-xs text-surface-400">Sem cargo</span> },
     { key: 'group', header: 'Grupo', render: (_, row) => <span className="text-xs font-semibold">{row.role?.code ?? '-'}</span> },
     { key: 'department', header: 'Departamento', render: (_, row) => <span className="text-xs">{row.department?.name ?? '-'}</span> },
     { key: 'isActive', header: 'Status', render: (_, row) => <Badge variant={row.isActive ? 'success' : 'error'}>{row.isActive ? 'Ativo' : 'Inativo'}</Badge> },
-    { key: 'lastLoginAt', header: 'Ultimo acesso', render: (v) => <span className="text-xs">{v ? new Date(String(v)).toLocaleString('pt-BR') : 'Nunca'}</span> },
+    { key: 'lastLoginAt', header: 'Último acesso', render: (v) => <span className="text-xs">{v ? new Date(String(v)).toLocaleString('pt-BR') : 'Nunca'}</span> },
     {
       key: 'id',
-      header: 'Acoes',
+      header: 'Ações',
       render: (_, row) => {
         const self = row.id === currentUser?.id
         return (
@@ -355,7 +355,7 @@ export default function UsuariosPage() {
           <div className="rounded-lg bg-red-50 p-2 text-red-700"><Lock className="h-5 w-5" /></div>
           <div>
             <h1 className="text-lg font-semibold">Acesso restrito</h1>
-            <p className="text-sm text-surface-600 mt-1">Esta pagina Dev e exclusiva do usuario Desenvolvedor.</p>
+            <p className="text-sm text-surface-600 mt-1">Esta página Dev é exclusiva do usuário Desenvolvedor.</p>
           </div>
         </div>
       </div>
@@ -371,11 +371,11 @@ export default function UsuariosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Painel Dev de Usuarios</h1>
-          <p className="text-sm text-surface-500">Gestao de contas, grupos de permissoes e controle de acesso.</p>
-          <p className="text-xs text-surface-500 mt-1">{total} {total === 1 ? 'usuario cadastrado' : 'usuarios cadastrados'}</p>
+          <h1 className="text-xl font-semibold">Painel Dev de Usuários</h1>
+          <p className="text-sm text-surface-500">Gestão de contas, grupos de permissões e controle de acesso.</p>
+          <p className="text-xs text-surface-500 mt-1">{total} {total === 1 ? 'usuário cadastrado' : 'usuários cadastrados'}</p>
         </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4" />Novo usuario</Button>
+        <Button onClick={openCreate}><Plus className="h-4 w-4" />Novo usuário</Button>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -390,28 +390,28 @@ export default function UsuariosPage() {
       </div>
 
       {usersError ? (
-        <ErrorState title="Erro ao carregar usuarios" description={usersError} onRetry={fetchUsers} />
+        <ErrorState title="Erro ao carregar usuários" description={usersError} onRetry={fetchUsers} />
       ) : (
-        <Table<UserRow> columns={columns} data={users} rowKey={(r) => r.id} isLoading={loadingUsers} emptyMessage="Nenhum usuario encontrado." emptyIcon={<Users className="h-10 w-10" />} totalCount={total} page={page} pageSize={20} onPageChange={setPage} />
+        <Table<UserRow> columns={columns} data={users} rowKey={(r) => r.id} isLoading={loadingUsers} emptyMessage="Nenhum usuário encontrado." emptyIcon={<Users className="h-10 w-10" />} totalCount={total} page={page} pageSize={20} onPageChange={setPage} />
       )}
 
       <div className="rounded-xl border border-surface-200 bg-white p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Painel de Permissoes</h2>
-            <p className="text-sm text-surface-600">Ajuste permissoes por grupo e por usuario.</p>
+            <h2 className="text-lg font-semibold">Painel de Permissões</h2>
+            <p className="text-sm text-surface-600">Ajuste permissões por grupo e por usuário.</p>
           </div>
-          {!hasAdministrationGroup && <Button variant="outline" onClick={createAdministrationGroup} loading={creatingAdminGroup}>Criar grupo Administracao</Button>}
+          {!hasAdministrationGroup && <Button variant="outline" onClick={createAdministrationGroup} loading={creatingAdminGroup}>Criar grupo Administração</Button>}
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Grupo Administracao nao acessa esta pagina Dev. Esta pagina e exclusiva do Desenvolvedor.
+          Grupo Administração não acessa esta página Dev. Esta página é exclusiva do Desenvolvedor.
         </div>
         {permMessage && <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm">{permMessage}</div>}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <div className="rounded-lg border border-surface-200 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">Permissoes por grupo</h3>
+              <h3 className="text-sm font-semibold">Permissões por grupo</h3>
               <Select options={devRoles.map((r) => ({ value: r.id, label: `${r.name} (${r.code})` }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
             </div>
             <div className="max-h-90 overflow-y-auto rounded-lg border border-surface-200 p-3 space-y-3">
@@ -428,7 +428,7 @@ export default function UsuariosPage() {
                           disabled={selectedRoleData?.code === 'DEVELOPER'}
                           className="mt-0.5 h-4 w-4"
                         />
-                        <span><strong>{p.code}</strong><span className="block text-surface-500">{p.description ?? 'Sem descricao'}</span></span>
+                        <span><strong>{p.code}</strong><span className="block text-surface-500">{p.description ?? 'Sem descrição'}</span></span>
                       </label>
                     ))}
                   </div>
@@ -437,18 +437,18 @@ export default function UsuariosPage() {
             </div>
             <div className="flex justify-end">
               <Button onClick={saveRolePermissions} loading={savingRolePermissions} disabled={!selectedRoleId || selectedRoleData?.code === 'DEVELOPER'}>
-                Salvar permissoes do grupo
+                Salvar permissões do grupo
               </Button>
             </div>
           </div>
 
           <div className="rounded-lg border border-surface-200 p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Permissoes por usuario</h3>
-            <p className="text-xs text-surface-500">Defina qual grupo de permissoes o usuario vai usar.</p>
-            <Select label="Usuario" options={devUsers.map((u) => ({ value: u.id, label: `${u.fullName} (${u.login})` }))} value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} />
-            <Select label="Grupo de permissoes" options={groupedRoleOptions} value={selectedUserRoleId} onChange={(e) => setSelectedUserRoleId(e.target.value)} />
+            <h3 className="text-sm font-semibold">Permissões por usuário</h3>
+            <p className="text-xs text-surface-500">Defina qual grupo de permissões o usuário vai usar.</p>
+            <Select label="Usuário" options={devUsers.map((u) => ({ value: u.id, label: `${u.fullName} (${u.login})` }))} value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} />
+            <Select label="Grupo de permissões" options={groupedRoleOptions} value={selectedUserRoleId} onChange={(e) => setSelectedUserRoleId(e.target.value)} />
             <div className="flex justify-end">
-              <Button onClick={saveUserGroup} loading={savingUserRole} disabled={!selectedUserId}>Salvar grupo do usuario</Button>
+              <Button onClick={saveUserGroup} loading={savingUserRole} disabled={!selectedUserId}>Salvar grupo do usuário</Button>
             </div>
           </div>
         </div>
@@ -457,46 +457,46 @@ export default function UsuariosPage() {
       <Modal
         open={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title={editingUser ? 'Editar usuario' : 'Cadastrar novo usuario'}
-        description={editingUser ? `Editando ${editingUser.fullName}` : 'Defina os dados para criar o usuario.'}
+        title={editingUser ? 'Editar usuário' : 'Cadastrar novo usuário'}
+        description={editingUser ? `Editando ${editingUser.fullName}` : 'Defina os dados para criar o usuário.'}
         size="lg"
-        footer={<><Button variant="outline" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button><Button onClick={() => { setConfirmType('save'); setConfirmOpen(true) }} loading={saving}>{editingUser ? 'Salvar alteracoes' : 'Cadastrar usuario'}</Button></>}
+        footer={<><Button variant="outline" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button><Button onClick={() => { setConfirmType('save'); setConfirmOpen(true) }} loading={saving}>{editingUser ? 'Salvar alterações' : 'Cadastrar usuário'}</Button></>}
       >
         <div className="space-y-4">
           {formError && <div className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-700">{formError}</div>}
-          <Input label="Nome completo" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Ex.: Joao da Silva" required />
+          <Input label="Nome completo" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Ex.: João da Silva" required />
           <div className="grid grid-cols-2 gap-4">
             <Input label="Login" value={form.login} onChange={(e) => setForm((p) => ({ ...p, login: e.target.value }))} placeholder="joao.silva" required />
             <Input label="E-mail" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="joao@empresa.com" required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label="Telefone" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="(11) 99999-9999" />
-            <Input label={editingUser ? 'Nova senha (opcional)' : 'Senha'} type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Minimo 8 caracteres" required={!editingUser} />
+            <Input label={editingUser ? 'Nova senha (opcional)' : 'Senha'} type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Mínimo 8 caracteres" required={!editingUser} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Select label="Cargo" value={form.roleId} onChange={(e) => setForm((p) => ({ ...p, roleId: e.target.value }))} options={roleFormOptions} />
             <Select label="Departamento" value={form.departmentId} onChange={(e) => setForm((p) => ({ ...p, departmentId: e.target.value }))} options={[{ value: '', label: 'Sem departamento' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
-          <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Grupo de permissoes: ${selectedRole.code}` : 'Sem grupo de permissoes definido.'}</div>
-          {editingUser && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />Usuario ativo</label>}
+          <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Grupo de permissões: ${selectedRole.code}` : 'Sem grupo de permissões definido.'}</div>
+          {editingUser && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />Usuário ativo</label>}
         </div>
       </Modal>
 
       <Modal
         open={confirmOpen}
         onClose={() => !confirming && setConfirmOpen(false)}
-        title="Confirmacao critica"
-        description="Esta acao pode impactar dados e acessos."
+        title="Confirmação crítica"
+        description="Esta ação pode impactar dados e acessos."
         size="sm"
         footer={<><Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={confirming}>Cancelar</Button><Button variant={confirmType === 'delete' ? 'danger' : 'primary'} onClick={confirmAction} loading={confirming}>{confirmType === 'delete' ? 'Excluir' : 'Confirmar'}</Button></>}
       >
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700 shrink-0" />
           <p className="text-sm text-amber-800">
-            {confirmType === 'save' && 'Confirme para salvar os dados do usuario.'}
-            {confirmType === 'toggle' && `Confirme para alterar o status de ${confirmUser?.fullName ?? 'usuario'}.`}
-            {confirmType === 'delete' && `Confirme para excluir ${confirmUser?.fullName ?? 'usuario'}.`}
-            {confirmType === 'impersonate' && `Confirme para locar como ${confirmUser?.fullName ?? 'usuario'}.`}
+            {confirmType === 'save' && 'Confirme para salvar os dados do usuário.'}
+            {confirmType === 'toggle' && `Confirme para alterar o status de ${confirmUser?.fullName ?? 'usuário'}.`}
+            {confirmType === 'delete' && `Confirme para excluir ${confirmUser?.fullName ?? 'usuário'}.`}
+            {confirmType === 'impersonate' && `Confirme para locar como ${confirmUser?.fullName ?? 'usuário'}.`}
           </p>
         </div>
       </Modal>

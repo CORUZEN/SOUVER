@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth/permissions'
@@ -13,22 +13,22 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ message: 'Nao autenticado' }, { status: 401 })
+  if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
   if (user.role?.code !== 'DEVELOPER') {
-    return NextResponse.json({ message: 'Area Dev exclusiva para desenvolvedor.' }, { status: 403 })
+    return NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 })
   }
 
   const { id } = await params
   const role = await prisma.role.findUnique({ where: { id }, select: { id: true, code: true, name: true } })
-  if (!role) return NextResponse.json({ message: 'Grupo nao encontrado.' }, { status: 404 })
+  if (!role) return NextResponse.json({ message: 'Grupo não encontrado.' }, { status: 404 })
 
   if (role.code === 'DEVELOPER') {
-    return NextResponse.json({ message: 'Grupo DEVELOPER nao pode ser alterado por este painel.' }, { status: 400 })
+    return NextResponse.json({ message: 'Grupo DEVELOPER não pode ser alterado por este painel.' }, { status: 400 })
   }
 
   const parsed = updatePermissionsSchema.safeParse(await req.json())
   if (!parsed.success) {
-    return NextResponse.json({ message: 'Dados invalidos.' }, { status: 400 })
+    return NextResponse.json({ message: 'Dados inválidos.' }, { status: 400 })
   }
 
   const validPermissions = await prisma.permission.findMany({
@@ -57,13 +57,13 @@ export async function PUT(
     entityType: 'role',
     entityId: role.id,
     newData: { permissionCodes: validPermissions.map((p) => p.code) },
-    description: `Permissoes do grupo ${role.name} atualizadas no painel Dev.`,
+    description: `Permissões do grupo ${role.name} atualizadas no painel Dev.`,
     ipAddress: ip,
     userAgent,
   })
 
   return NextResponse.json({
-    message: 'Permissoes do grupo atualizadas com sucesso.',
+    message: 'Permissões do grupo atualizadas com sucesso.',
     appliedPermissions: validPermissions.map((p) => p.code),
   })
 }
