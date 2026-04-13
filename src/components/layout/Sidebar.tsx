@@ -276,11 +276,17 @@ export default function Sidebar({ appVersion }: SidebarProps) {
             </div>
 
             {!isCollapsed && (
-              <div className="min-w-0">
-                <p className="text-surface-300 text-[11.5px] font-semibold tracking-[0.1em] uppercase leading-tight break-normal [word-break:keep-all]">
-                  Sistema Empresarial
-                </p>
-              </div>
+              <>
+                <div
+                  aria-hidden="true"
+                  className="h-8 w-px shrink-0 bg-gradient-to-b from-surface-500/20 via-surface-200/70 to-surface-500/20"
+                />
+                <div className="min-w-0">
+                  <p className="text-surface-300 text-[11.5px] font-semibold tracking-[0.1em] uppercase leading-tight break-normal [word-break:keep-all]">
+                    Sistema Empresarial
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
