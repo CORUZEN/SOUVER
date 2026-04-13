@@ -15,8 +15,11 @@ export const metadata: Metadata = {
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
   icons: {
-    icon: '/branding/ouroverde-badge.png',
-    shortcut: '/branding/ouroverde-badge.png',
+    icon: [
+      { url: '/branding/ouroverde-badge.png', type: 'image/png' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
+    ],
+    shortcut: '/favicon.ico',
     apple: '/apple-icon.png',
   },
   robots: { index: false, follow: false },

@@ -160,8 +160,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           ? 'gap-3 pl-8 pr-3 py-2.5'
           : 'gap-3 px-3 py-2.5',
       isActive
-        ? 'bg-primary-600 text-white shadow-sm'
-        : 'text-surface-400 hover:bg-surface-800 hover:text-white'
+        ? 'bg-emerald-500 text-white shadow-[0_6px_18px_rgba(16,185,129,0.35)]'
+        : 'text-surface-400 hover:bg-emerald-500/12 hover:text-emerald-100'
     )
 
     if (isAccessible) {
@@ -258,26 +258,31 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         <div
           className={cn(
             'relative h-16 flex items-center border-b border-surface-700/50',
-            isCollapsed ? 'justify-center px-2' : 'gap-3 px-5'
+            isCollapsed ? 'justify-center px-2' : 'px-4'
           )}
         >
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-emerald-300/45 bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-700 shadow-[0_8px_22px_rgba(16,185,129,0.38)]">
-            <Image
-              src="/branding/ouroverde-badge.png"
-              alt="Logo Ouro Verde"
-              fill
-              priority
-              sizes="40px"
-              className="object-cover"
-            />
-          </div>
-
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1 pr-5">
-              <p className="text-white text-sm font-semibold tracking-wide uppercase leading-tight">OURO VERDE</p>
-              <p className="text-surface-400 text-[11px] tracking-wide uppercase leading-tight break-words">SISTEMA EMPRESARIAL</p>
+          <div className={cn('w-full', isCollapsed ? 'flex justify-center' : 'flex items-center gap-3 pr-8')}>
+            <div className={cn('flex shrink-0', isCollapsed ? 'justify-center' : 'justify-start')}>
+              <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-xl">
+                <Image
+                  src="/branding/ouroverde.png"
+                  alt="Logo Ouro Verde"
+                  fill
+                  priority
+                  sizes="84px"
+                  className="object-contain"
+                />
+              </div>
             </div>
-          )}
+
+            {!isCollapsed && (
+              <div className="min-w-0">
+                <p className="text-surface-300 text-[11.5px] font-semibold tracking-[0.1em] uppercase leading-tight break-normal [word-break:keep-all]">
+                  Sistema Empresarial
+                </p>
+              </div>
+            )}
+          </div>
 
           {!isCollapsed && (
             <button
