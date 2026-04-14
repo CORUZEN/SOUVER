@@ -272,7 +272,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         <div
           className={cn(
             'relative flex items-center border-b border-surface-700/50',
-            isCollapsed ? 'h-[72px] justify-center px-2.5' : 'h-16 px-4'
+            isCollapsed ? 'h-18 justify-center px-2.5' : 'h-16 px-4'
           )}
         >
           <div className={cn('w-full', isCollapsed ? 'flex justify-center' : 'flex items-center gap-3 pr-8')}>
@@ -280,7 +280,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               <div
                 className={cn(
                   'relative shrink-0 overflow-hidden',
-                  isCollapsed ? 'h-[56px] w-[56px] rounded-lg' : 'h-[84px] w-[84px] rounded-xl'
+                  isCollapsed ? 'h-14 w-14 rounded-lg' : 'h-21 w-21 rounded-xl'
                 )}
               >
                 <Image
@@ -298,10 +298,10 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               <>
                 <div
                   aria-hidden="true"
-                  className="h-8 w-px shrink-0 bg-gradient-to-b from-surface-500/20 via-surface-200/70 to-surface-500/20"
+                  className="h-8 w-px shrink-0 bg-linear-to-b from-surface-500/20 via-surface-200/70 to-surface-500/20"
                 />
                 <div className="min-w-0">
-                  <p className="text-surface-300 text-[11.5px] font-semibold tracking-[0.1em] uppercase leading-tight break-normal [word-break:keep-all]">
+                  <p className="text-surface-300 text-[11.5px] font-semibold tracking-widest uppercase leading-tight break-keep">
                     Sistema Empresarial
                   </p>
                 </div>
@@ -417,14 +417,14 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
       {showDevModal && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-950/60 backdrop-blur-[2px] p-4"
+          className="fixed inset-0 z-70 flex items-center justify-center bg-surface-950/60 backdrop-blur-[2px] p-4"
           onClick={closeDevelopmentModal}
         >
           <div
             className="w-full max-w-md overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-surface-900 via-surface-800 to-primary-900 px-5 py-4 text-white">
+            <div className="bg-linear-to-r from-surface-900 via-surface-800 to-primary-900 px-5 py-4 text-white">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">

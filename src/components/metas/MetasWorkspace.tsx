@@ -2979,7 +2979,7 @@ export default function MetasWorkspace() {
             disabled={!canMutateConfig}
             className={
               !canMutateConfig
-                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                ? 'opacity-85 [&_button:disabled]:cursor-not-allowed! [&_button:disabled]:border-surface-300! [&_button:disabled]:bg-surface-100! [&_button:disabled]:text-surface-500! [&_button:disabled]:shadow-none!'
                 : undefined
             }
           >
@@ -3475,7 +3475,7 @@ export default function MetasWorkspace() {
                         aria-hidden="true"
                       />
                       <div
-                        className="fixed z-[70] w-96 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5"
+                        className="fixed z-70 w-96 rounded-xl border border-surface-200 bg-white p-3 shadow-xl ring-1 ring-black/5"
                         style={{
                           top: kpiInspectorAnchor?.top ?? 0,
                           left: kpiInspectorAnchor?.left ?? 0,
@@ -4947,7 +4947,7 @@ export default function MetasWorkspace() {
             disabled={!canMutateSellers}
             className={
               !canMutateSellers
-                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                ? 'opacity-85 [&_button:disabled]:cursor-not-allowed! [&_button:disabled]:border-surface-300! [&_button:disabled]:bg-surface-100! [&_button:disabled]:text-surface-500! [&_button:disabled]:shadow-none!'
                 : undefined
             }
           >
@@ -5111,7 +5111,7 @@ export default function MetasWorkspace() {
             disabled={!canMutateProducts}
             className={
               !canMutateProducts
-                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                ? 'opacity-85 [&_button:disabled]:cursor-not-allowed! [&_button:disabled]:border-surface-300! [&_button:disabled]:bg-surface-100! [&_button:disabled]:text-surface-500! [&_button:disabled]:shadow-none!'
                 : undefined
             }
           >
@@ -5751,25 +5751,25 @@ export default function MetasWorkspace() {
                         <div className="mt-3 grid gap-2 sm:grid-cols-4">
                           <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-700">Vendedores monitorados</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">Vendedores monitorados</p>
                             <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{rows.length}</p>
                             <p className="text-[10px] text-sky-700">Base ativa no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-indigo-700">Clientes únicos atendidos</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Clientes únicos atendidos</p>
                             <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">{num(corporateUniqueClients, 0)}</p>
                             <p className="text-[10px] text-indigo-700">Total no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-700">Pontuação média da equipe</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Pontuação média da equipe</p>
                             <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgPoints, 2)} pts</p>
                             <p className="text-[10px] text-cyan-700">Média geral de pontos alcançados no ciclo</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">KPIs conquistados no ciclo</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">KPIs conquistados no ciclo</p>
                             <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">{kpiSummary.hit}/{kpiSummary.total}</p>
                             <p className="text-[10px] text-emerald-700">
                               {periodClosed ? `Gap médio para 1,00 pt: ${num(avgGapToFull, 2)} pts` : 'Parcial até a data atual'}
@@ -5836,7 +5836,7 @@ export default function MetasWorkspace() {
                                     <div className="relative overflow-hidden border-b border-slate-200/80">
                                       <div className="px-3 py-3">
                                         <div>
-                                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Painel do vendedor</p>
+                                          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Painel do vendedor</p>
                                           <p className="text-base font-semibold text-slate-900">{row.fullName}</p>
                                           <p className="text-[11px] text-slate-500">Resumo executivo de performance e KPIs no período selecionado.</p>
                                         </div>
@@ -5880,7 +5880,7 @@ export default function MetasWorkspace() {
                                   </div>
 
                                   <div className="mt-3">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">KPIs e parâmetros do ciclo</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">KPIs e parâmetros do ciclo</p>
                                     <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                       {sellerBlock.rules.map((rule) => {
                                         const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
