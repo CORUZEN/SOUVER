@@ -931,9 +931,11 @@ export default function MetasWorkspace() {
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
+  const [readOnlyBlockPickerOpen, setReadOnlyBlockPickerOpen] = useState(false)
   const [isEditingBlockTitle, setIsEditingBlockTitle] = useState(false)
   const [blockTitleDraft, setBlockTitleDraft] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
+  const readOnlyBlockPickerRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -975,6 +977,16 @@ export default function MetasWorkspace() {
     if (showPeriodPicker) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showPeriodPicker])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (readOnlyBlockPickerRef.current && !readOnlyBlockPickerRef.current.contains(e.target as Node)) {
+        setReadOnlyBlockPickerOpen(false)
+      }
+    }
+    if (readOnlyBlockPickerOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [readOnlyBlockPickerOpen])
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -3256,7 +3268,7 @@ export default function MetasWorkspace() {
           </div>
 
           {/* ── Multi-block KPI system ─────────────────────── */}
-          <div className="flex items-center justify-between">
+          <div className="mt-4 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Target size={16} className="text-primary-600" />
               <h2 className="text-base font-semibold text-surface-900">Grupos de parâmetros por vendedor</h2>
@@ -3701,20 +3713,81 @@ export default function MetasWorkspace() {
                           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                             Vendedor/Grupo ativo
                           </span>
-                          <div className="relative min-w-72">
-                            <select
-                              className="w-full appearance-none rounded-xl border border-surface-200 bg-white px-3 py-2.5 pr-9 text-sm font-semibold text-surface-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                              value={selectedBlockId}
-                              onChange={(e) => setSelectedBlockId(e.target.value)}
-                            >
-                              {ruleBlocks.map((optionBlock) => (
-                                <option key={optionBlock.id} value={optionBlock.id}>
-                                  {optionBlock.title}
-                                  {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                          <div className="relative min-w-72" ref={canMutateConfig ? undefined : readOnlyBlockPickerRef}>
+                            {canMutateConfig ? (
+                              <>
+                                <select
+                                  className="w-full appearance-none rounded-xl border border-surface-200 bg-white px-3 py-2.5 pr-9 text-sm font-semibold text-surface-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                                  value={selectedBlockId}
+                                  onChange={(e) => setSelectedBlockId(e.target.value)}
+                                >
+                                  {ruleBlocks.map((optionBlock) => (
+                                    <option key={optionBlock.id} value={optionBlock.id}>
+                                      {optionBlock.title}
+                                      {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                              </>
+                            ) : (
+                              <>
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setReadOnlyBlockPickerOpen((prev) => !prev)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault()
+                                      setReadOnlyBlockPickerOpen((prev) => !prev)
+                                    }
+                                  }}
+                                  className="w-full rounded-xl border border-surface-200 bg-white px-3 py-2.5 pr-9 text-sm font-semibold text-surface-900 shadow-sm transition-all hover:bg-surface-50"
+                                >
+                                  {(() => {
+                                    const selectedOption = ruleBlocks.find((optionBlock) => optionBlock.id === selectedBlockId) ?? block
+                                    return `${selectedOption.title}${selectedOption.sellerIds.length > 0 ? ` (${selectedOption.sellerIds.length})` : ''}`
+                                  })()}
+                                </div>
+                                <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                                {readOnlyBlockPickerOpen ? (
+                                  <>
+                                    <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-xl border border-surface-200 bg-white shadow-xl ring-1 ring-black/5">
+                                      <ul className="max-h-64 overflow-y-auto py-1">
+                                        {ruleBlocks.map((optionBlock) => {
+                                          const active = selectedBlockId === optionBlock.id
+                                          const label = `${optionBlock.title}${optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}`
+                                          return (
+                                            <li key={optionBlock.id}>
+                                              <div
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() => {
+                                                  setSelectedBlockId(optionBlock.id)
+                                                  setReadOnlyBlockPickerOpen(false)
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === 'Enter' || event.key === ' ') {
+                                                    event.preventDefault()
+                                                    setSelectedBlockId(optionBlock.id)
+                                                    setReadOnlyBlockPickerOpen(false)
+                                                  }
+                                                }}
+                                                className={`px-3 py-2 text-xs font-semibold transition-colors ${
+                                                  active ? 'bg-primary-50 text-primary-700' : 'text-surface-700 hover:bg-surface-50'
+                                                }`}
+                                              >
+                                                {label}
+                                              </div>
+                                            </li>
+                                          )
+                                        })}
+                                      </ul>
+                                    </div>
+                                  </>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </label>
                         <button
