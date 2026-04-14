@@ -38,6 +38,7 @@ type CashCalcMode = 'PERCENT' | 'FIXED'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
 type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
 type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
+type RewardMode = 'CURRENCY' | 'PERCENT'
 
 interface GoalRule {
   id: string
@@ -225,6 +226,7 @@ interface SellerSnapshot {
   kpiRewardAchieved: number
   rewardAchieved: number
   rewardTarget: number
+  rewardMode: RewardMode
   status: 'SUPEROU' | 'NO_ALVO' | 'ATENCAO' | 'CRITICO'
   gapToTarget: number
   ruleProgress: RuleProgress[]
@@ -305,6 +307,20 @@ const SELLER_PROFILE_LABEL: Record<SellerProfileType, string> = {
   ANTIGO_1: 'Antigo (1%)',
   ANTIGO_15: 'Antigo (1,5%)',
   SUPERVISOR: 'Supervisor',
+}
+
+function isPercentRewardProfile(profileType: SellerProfileType) {
+  return profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15'
+}
+
+function getPercentRewardCap(profileType: SellerProfileType) {
+  if (profileType === 'ANTIGO_1') return 1
+  if (profileType === 'ANTIGO_15') return 1.5
+  return 0
+}
+
+function getRewardModeFromProfile(profileType: SellerProfileType): RewardMode {
+  return isPercentRewardProfile(profileType) ? 'PERCENT' : 'CURRENCY'
 }
 
 function normalizeSellerProfileType(value: unknown): SellerProfileType {
@@ -443,6 +459,11 @@ function formatDateBr(iso: string | null) {
 
 function currency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
+
+function formatRewardValue(value: number, mode: RewardMode) {
+  if (mode === 'PERCENT') return `${num(value, 2)}%`
+  return currency(value)
 }
 
 function num(value: number, max = 2) {
@@ -2413,6 +2434,9 @@ export default function MetasWorkspace() {
     return sellers
       .map((seller) => {
         const block = findBlockForSeller(seller.id, ruleBlocks)
+        const blockProfileType = resolveBlockProfileType(block)
+        const rewardMode = getRewardModeFromProfile(blockProfileType)
+        const percentRewardCap = getPercentRewardCap(blockProfileType)
         const blockRules = block.rules
         const blockPointsTarget = blockRules.reduce((sum, rule) => sum + rule.points, 0)
         const blockRewardTarget = blockRules.reduce((sum, rule) => sum + rule.rewardValue, 0)
@@ -2714,6 +2738,7 @@ export default function MetasWorkspace() {
         }, 0)
 
         const campaignCashTarget = prizes.reduce((sum, prize) => {
+          if (rewardMode === 'PERCENT') return sum
           if (!prize.active || prize.type !== 'CASH') return sum
           const monthlyTargetBase = Math.max(block.monthlyTarget, 0)
           const rewardValue = Math.max(prize.rewardValue, 0)
@@ -2721,6 +2746,7 @@ export default function MetasWorkspace() {
         }, 0)
 
         const campaignCashAchieved = prizes.reduce((sum, prize) => {
+          if (rewardMode === 'PERCENT') return sum
           if (!prize.active || prize.type !== 'CASH') return sum
           if (pointsAchieved < prize.minPoints) return sum
           const monthlyTargetBase = Math.max(block.monthlyTarget, 0)
@@ -2728,9 +2754,12 @@ export default function MetasWorkspace() {
           return sum + (prize.cashMode === 'FIXED' ? rewardValue : (monthlyTargetBase * rewardValue) / 100)
         }, 0)
 
-        const extraBonusEligible = pointsAchieved >= extraMinPoints
+        const extraBonusEligible = rewardMode === 'CURRENCY' && pointsAchieved >= extraMinPoints
         const extraBonusAchieved = extraBonusEligible ? Math.max(extraBonus, 0) : 0
-        const rewardAchieved = kpiRewardAchieved + campaignCashAchieved + extraBonusAchieved
+        const rewardAchieved =
+          rewardMode === 'PERCENT'
+            ? Math.min(Math.max(kpiRewardAchieved, 0), percentRewardCap)
+            : kpiRewardAchieved + campaignCashAchieved + extraBonusAchieved
 
         const ratio = activePointsTarget > 0 ? pointsAchieved / activePointsTarget : 0
 
@@ -2759,9 +2788,16 @@ export default function MetasWorkspace() {
           averageTicket,
           pointsAchieved,
           pointsTarget: blockPointsTarget,
-          kpiRewardAchieved,
+          kpiRewardAchieved:
+            rewardMode === 'PERCENT'
+              ? Math.min(Math.max(kpiRewardAchieved, 0), percentRewardCap)
+              : kpiRewardAchieved,
           rewardAchieved,
-          rewardTarget: blockRewardTarget + campaignCashTarget + Math.max(extraBonus, 0),
+          rewardTarget:
+            rewardMode === 'PERCENT'
+              ? percentRewardCap
+              : blockRewardTarget + campaignCashTarget + Math.max(extraBonus, 0),
+          rewardMode,
           status,
           gapToTarget: Math.max(blockPointsTarget - pointsAchieved, 0),
           ruleProgress,
@@ -2769,7 +2805,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sankhyaTargets, sellers])
+  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, resolveBlockProfileType, ruleBlocks, sankhyaTargets, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -2944,20 +2980,23 @@ export default function MetasWorkspace() {
     const groups: Record<SellerSnapshot['status'], number> = {
       SUPEROU: 0, NO_ALVO: 0, ATENCAO: 0, CRITICO: 0,
     }
+    const monetarySnapshots = snapshots.filter((snapshot) => snapshot.rewardMode === 'CURRENCY')
     let totalEarned = 0
     let totalTarget = 0
     let totalKpiHit = 0
     let totalKpiTarget = 0
     for (const s of snapshots) {
-      groups[s.status] += s.rewardAchieved
-      totalEarned += s.rewardAchieved
-      totalTarget += s.rewardTarget
       const block = ruleBlocks.find((b) => b.id === s.blockId) ?? ruleBlocks[0]
       totalKpiTarget += block.rules.length
       totalKpiHit += block.rules.reduce((sum, rule) => {
         const progress = s.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
         return sum + (progress >= 1 ? 1 : 0)
       }, 0)
+    }
+    for (const s of monetarySnapshots) {
+      groups[s.status] += s.rewardAchieved
+      totalEarned += s.rewardAchieved
+      totalTarget += s.rewardTarget
     }
     const radius = 52
     const circumference = 2 * Math.PI * radius
@@ -2996,9 +3035,16 @@ export default function MetasWorkspace() {
         name: getSellerShortName(s.seller.name),
         earned: s.rewardAchieved,
         target: s.rewardTarget,
+        mode: s.rewardMode,
         status: s.status,
       }))
-      .sort((a, b) => b.earned - a.earned)
+      .sort((a, b) => {
+        const ratioA = a.target > 0 ? a.earned / a.target : 0
+        const ratioB = b.target > 0 ? b.earned / b.target : 0
+        if (ratioB !== ratioA) return ratioB - ratioA
+        if (b.earned !== a.earned) return b.earned - a.earned
+        return a.name.localeCompare(b.name)
+      })
   }, [snapshots])
 
   const stageSeries = useMemo(
@@ -3728,6 +3774,8 @@ export default function MetasWorkspace() {
           {(() => {
             const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
             const activeBlockProfileType = resolveBlockProfileType(block)
+            const blockRewardMode = getRewardModeFromProfile(activeBlockProfileType)
+            const blockPercentRewardCap = getPercentRewardCap(activeBlockProfileType)
             const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
             const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
@@ -4546,10 +4594,15 @@ export default function MetasWorkspace() {
 
                 {/* KPI rules table */}
                 <div className="overflow-x-auto">
+                  {blockRewardMode === 'PERCENT' ? (
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+                      Perfil percentual: premiação acumulada de 0,00% até {num(blockPercentRewardCap, 2)}%.
+                    </p>
+                  ) : null}
                   <table className="min-w-full divide-y divide-surface-200 text-sm">
                     <thead>
                       <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                        <th className="px-3 py-2">Período</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">Premiação</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th>
+                        <th className="px-3 py-2">Período</th><th className="px-3 py-2">KPI</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Parâmetro</th><th className="px-3 py-2">{blockRewardMode === 'PERCENT' ? 'Premiação (%)' : 'Premiação'}</th><th className="px-3 py-2">Pontos</th><th className="px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
@@ -4685,7 +4738,24 @@ export default function MetasWorkspace() {
                               </div>
                             )
                           })()}</td>
-                          <td className="px-3 py-2"><input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} /></td>
+                          <td className="px-3 py-2">
+                            {blockRewardMode === 'PERCENT' ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs"
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  max={blockPercentRewardCap}
+                                  value={rule.rewardValue}
+                                  onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })}
+                                />
+                                <span className="text-[10px] text-surface-400">%</span>
+                              </div>
+                            ) : (
+                              <input className="w-24 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.01" value={rule.rewardValue} onChange={(e) => updateBlockRule(rule.id, { rewardValue: parseDecimal(e.target.value, 0) })} />
+                            )}
+                          </td>
                           <td className="px-3 py-2"><input className="w-20 rounded border border-surface-200 px-2 py-1.5 text-xs" type="number" step="0.001" value={rule.points} onChange={(e) => updateBlockRule(rule.id, { points: parseDecimal(e.target.value, 0) })} /></td>
                           <td className="px-3 py-2"><button type="button" onClick={() => setConfirmModal({
                             open: true,
@@ -4709,7 +4779,16 @@ export default function MetasWorkspace() {
                           })()}
                           {block.sellerIds.length > 0 && <span className="ml-2 text-primary-600">| {block.sellerIds.length} vendedor(es)</span>}
                         </td>
-                        <td className="px-3 py-2 text-xs text-surface-700">{currency(block.rules.reduce((s, r) => s + r.rewardValue, 0))}</td>
+                        <td className="px-3 py-2 text-xs text-surface-700">
+                          {(() => {
+                            const configuredReward = block.rules.reduce((sum, r) => sum + r.rewardValue, 0)
+                            if (blockRewardMode === 'PERCENT') {
+                              const exceedsCap = configuredReward > blockPercentRewardCap
+                              return `${num(configuredReward, 2)}%${exceedsCap ? ` (teto ${num(blockPercentRewardCap, 2)}%)` : ''}`
+                            }
+                            return currency(configuredReward)
+                          })()}
+                        </td>
                         <td className="px-3 py-2 text-xs text-surface-700">{num(block.rules.reduce((s, r) => s + r.points, 0), 3)}</td>
                         <td className="px-3 py-2"></td>
                       </tr>
@@ -5822,6 +5901,9 @@ export default function MetasWorkspace() {
               <p className="mt-1.5 text-xs text-surface-500">
                 {num(rewardDonut.pctCommitted, 1)}% comprometido da previsão de {currency(rewardDonut.totalTarget)}
               </p>
+              <p className="mt-1 text-[10px] text-surface-400">
+                Perfis antigos (1%/1,5%) são exibidos em percentual e não entram neste custo em R$.
+              </p>
             </Card>
 
             <Card className={executiveMetricCardClass}>
@@ -6128,7 +6210,7 @@ export default function MetasWorkspace() {
                                 <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-surface-500 leading-none mb-1.5">{row.name}</p>
                                 {/* value */}
                                 <p className={`text-[13px] font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-300' : 'text-surface-900'}`}>
-                                  {currency(row.earned)}
+                                  {formatRewardValue(row.earned, row.mode)}
                                 </p>
                                 {/* progress + max */}
                                 <div className="mt-2 space-y-1">
@@ -6139,7 +6221,7 @@ export default function MetasWorkspace() {
                                     />
                                   </div>
                                   {row.target > 0 && (
-                                    <p className="text-[9px] tabular-nums text-surface-400 leading-none">máx. {currency(row.target)}</p>
+                                    <p className="text-[9px] tabular-nums text-surface-400 leading-none">máx. {formatRewardValue(row.target, row.mode)}</p>
                                   )}
                                 </div>
                               </div>
@@ -6291,7 +6373,9 @@ export default function MetasWorkspace() {
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{currency(row.rewardAchieved)}</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
+                                    {formatRewardValue(row.rewardAchieved, row.snapshot.rewardMode)}
+                                  </span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
                                     {num(row.uniqueClients, 0)}/{num(row.baseClients, 0)}
                                   </span>
@@ -6342,7 +6426,9 @@ export default function MetasWorkspace() {
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Premiação por KPIs</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.kpiRewardAchieved)}</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">
+                                          {formatRewardValue(row.snapshot.kpiRewardAchieved, row.snapshot.rewardMode)}
+                                        </p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Clientes atendidos</p>
