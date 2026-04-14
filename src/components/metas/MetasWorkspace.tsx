@@ -4784,7 +4784,7 @@ export default function MetasWorkspace() {
                             const configuredReward = block.rules.reduce((sum, r) => sum + r.rewardValue, 0)
                             if (blockRewardMode === 'PERCENT') {
                               const exceedsCap = configuredReward > blockPercentRewardCap
-                              return `${num(configuredReward, 2)}%${exceedsCap ? ` (teto ${num(blockPercentRewardCap, 2)}%)` : ''}`
+                              return `${num(configuredReward, 2)}% de ${num(blockPercentRewardCap, 2)}%${exceedsCap ? ' (limitado ao teto)' : ''}`
                             }
                             return currency(configuredReward)
                           })()}
