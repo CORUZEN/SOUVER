@@ -471,8 +471,12 @@ function normalizeMonthConfig(
   const normalizedWeekPeriods = OPERATIONAL_STAGE_KEYS.reduce<Record<OperationalStageKey, { start: string; end: string }>>((acc, stageKey) => {
     const fallback = defaultWeekPeriods[stageKey]
     const rawPeriod = (inputWeekPeriods as Partial<Record<OperationalStageKey, { start?: string; end?: string }>>)[stageKey]
-    const start = clampIsoToMonth(String(rawPeriod?.start ?? fallback.start ?? ''), year, month)
-    const end = clampIsoToMonth(String(rawPeriod?.end ?? fallback.end ?? ''), year, month)
+    const explicitStart = clampIsoToMonth(String(rawPeriod?.start ?? ''), year, month)
+    const explicitEnd = clampIsoToMonth(String(rawPeriod?.end ?? ''), year, month)
+    const fallbackStart = clampIsoToMonth(String(fallback.start ?? ''), year, month)
+    const fallbackEnd = clampIsoToMonth(String(fallback.end ?? ''), year, month)
+    const start = explicitStart || fallbackStart
+    const end = explicitEnd || fallbackEnd
     if (!start || !end || start > end) {
       acc[stageKey] = { start: '', end: '' }
     } else {
@@ -2901,10 +2905,7 @@ export default function MetasWorkspace() {
                             />
                           </label>
                         </div>
-                        <p className="mt-2 text-surface-600">
-                          {week?.start && week?.end ? `${formatDateBr(week.start)} - ${formatDateBr(week.end)}` : 'Período não definido'}
-                        </p>
-                        <p className="text-surface-500">Dias úteis: {week?.businessDays.length ?? 0}</p>
+                        <p className="mt-2 text-surface-500">Dias úteis: {week?.businessDays.length ?? 0}</p>
                       </div>
                     )
                   })}
