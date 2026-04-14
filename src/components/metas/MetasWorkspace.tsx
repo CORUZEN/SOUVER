@@ -867,6 +867,7 @@ export default function MetasWorkspace() {
   const [productCodeFilter, setProductCodeFilter] = useState('')
   const [productDescriptionFilter, setProductDescriptionFilter] = useState('')
   const [productBrandFilter, setProductBrandFilter] = useState('')
+  const [productShowOnlyInactive, setProductShowOnlyInactive] = useState(false)
   const [companyScopeFilter, setCompanyScopeFilter] = useState<CompanyScopeFilter>('all')
   const [showPeriodPicker, setShowPeriodPicker] = useState(false)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
@@ -2303,9 +2304,17 @@ export default function MetasWorkspace() {
       const descriptionOk =
         descriptionFilter.length === 0 || product.description.toUpperCase().includes(descriptionFilter)
       const brandOk = brandFilter.length === 0 || product.brand.toUpperCase().includes(brandFilter)
-      return codeOk && descriptionOk && brandOk
+      const statusOk = !productShowOnlyInactive || !product.active
+      return codeOk && descriptionOk && brandOk && statusOk
     })
-  }, [productAllowlist, productCodeFilter, productDescriptionFilter, productBrandFilter])
+  }, [productAllowlist, productCodeFilter, productDescriptionFilter, productBrandFilter, productShowOnlyInactive])
+
+  const productAllowlistStats = useMemo(() => {
+    const total = productAllowlist.length
+    const active = productAllowlist.filter((product) => product.active).length
+    const inactive = Math.max(total - active, 0)
+    return { total, active, inactive }
+  }, [productAllowlist])
 
   const rewardDonut = useMemo(() => {
     const palette: Record<SellerSnapshot['status'], string> = {
@@ -4407,6 +4416,32 @@ export default function MetasWorkspace() {
                   </label>
                 </div>
 
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-surface-200 bg-surface-50 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                      Liberados: {productAllowlistStats.active}
+                    </span>
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700">
+                      Não liberados: {productAllowlistStats.inactive}
+                    </span>
+                    <span className="rounded-full border border-surface-200 bg-white px-2.5 py-1 font-medium text-surface-600">
+                      Exibindo: {filteredProductAllowlist.length} de {productAllowlistStats.total}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={productAllowlistStats.inactive === 0 && !productShowOnlyInactive}
+                    onClick={() => setProductShowOnlyInactive((prev) => !prev)}
+                    className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      productShowOnlyInactive
+                        ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'border-surface-300 bg-white text-surface-700 hover:bg-surface-100'
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {productShowOnlyInactive ? 'Mostrar todos' : 'Ver somente não liberados'}
+                  </button>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-surface-200 text-sm">
                     <thead>
@@ -4421,40 +4456,50 @@ export default function MetasWorkspace() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                      {filteredProductAllowlist.map((product, index) => (
-                        <tr key={`product-allow-${product.code}-${index}`}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-primary-600"
-                              checked={product.active}
-                              onChange={(event) =>
-                                setProductAllowlist((prev) =>
-                                  prev.map((item) =>
-                                    item.code === product.code && item.description === product.description
-                                      ? { ...item, active: event.target.checked }
-                                      : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-xs text-surface-700">{product.code}</td>
-                          <td className="px-3 py-2 text-xs text-surface-700">{product.description}</td>
-                          <td className="px-3 py-2 text-xs text-surface-700">{product.brand}</td>
-                          <td className="px-3 py-2 text-xs text-surface-700">{product.unit}</td>
-                          <td className="px-3 py-2 text-xs text-surface-700">{product.mobility}</td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() => removeProductAndSave(product.code, product.description)}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                            >
-                              Remover
-                            </button>
+                      {filteredProductAllowlist.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={7}>
+                            {productShowOnlyInactive
+                              ? 'Nenhum produto não liberado encontrado com os filtros atuais.'
+                              : 'Nenhum produto encontrado com os filtros atuais.'}
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredProductAllowlist.map((product, index) => (
+                          <tr key={`product-allow-${product.code}-${index}`}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-primary-600"
+                                checked={product.active}
+                                onChange={(event) =>
+                                  setProductAllowlist((prev) =>
+                                    prev.map((item) =>
+                                      item.code === product.code && item.description === product.description
+                                        ? { ...item, active: event.target.checked }
+                                        : item
+                                    )
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-xs text-surface-700">{product.code}</td>
+                            <td className="px-3 py-2 text-xs text-surface-700">{product.description}</td>
+                            <td className="px-3 py-2 text-xs text-surface-700">{product.brand}</td>
+                            <td className="px-3 py-2 text-xs text-surface-700">{product.unit}</td>
+                            <td className="px-3 py-2 text-xs text-surface-700">{product.mobility}</td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => removeProductAndSave(product.code, product.description)}
+                                className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                              >
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
