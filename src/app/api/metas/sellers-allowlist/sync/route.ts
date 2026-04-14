@@ -274,6 +274,14 @@ function parseSellerRecords(records: RawRecord[]): SellerRow[] {
   return [...dedup.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
+function normalizeSellerName(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   // --- Strategy: single combined query with TIPO and ATIVO filters in SQL ---
   // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) — also accept full-text values
@@ -368,22 +376,58 @@ export async function POST(req: NextRequest) {
     const remoteSellers = await querySellers(baseUrl, headers, appKey)
     const existing = await readSellerAllowlist()
 
-    const existingByCode = new Map(existing.map((item) => [String(item.code ?? '').trim(), item]))
-    const merged = remoteSellers.map((seller) => {
-      const prev = existingByCode.get(seller.code)
-      return {
-        code: seller.code,
-        partnerCode: seller.partnerCode ?? prev?.partnerCode ?? null,
-        name: seller.name,
-        active: prev?.active ?? true,
+    // Incremental sync:
+    // - keeps manual active/inactive state
+    // - keeps existing manual sellers
+    // - adds only sellers missing from local allowlist
+    const merged = [...existing]
+    const indexByCode = new Map<string, number>()
+    const indexByName = new Map<string, number>()
+    for (let i = 0; i < merged.length; i += 1) {
+      const code = String(merged[i].code ?? '').trim()
+      if (code) indexByCode.set(code, i)
+      const normalizedName = normalizeSellerName(String(merged[i].name ?? ''))
+      if (normalizedName) indexByName.set(normalizedName, i)
+    }
+
+    let added = 0
+    for (const seller of remoteSellers) {
+      const normalizedName = normalizeSellerName(seller.name)
+      const codeMatchIndex = indexByCode.get(seller.code)
+      const nameMatchIndex = codeMatchIndex == null ? indexByName.get(normalizedName) : codeMatchIndex
+      const foundIndex = nameMatchIndex ?? -1
+
+      if (foundIndex >= 0) {
+        const prev = merged[foundIndex]
+        merged[foundIndex] = {
+          ...prev,
+          code: seller.code ? seller.code : (prev.code ?? null),
+          partnerCode: seller.partnerCode ?? prev.partnerCode ?? null,
+          name: seller.name || prev.name,
+          active: prev.active,
+        }
+        if (seller.code) indexByCode.set(seller.code, foundIndex)
+        indexByName.set(normalizedName, foundIndex)
+      } else {
+        const nextIndex = merged.length
+        merged.push({
+          code: seller.code,
+          partnerCode: seller.partnerCode ?? null,
+          name: seller.name,
+          active: true,
+        })
+        indexByCode.set(seller.code, nextIndex)
+        indexByName.set(normalizedName, nextIndex)
+        added += 1
       }
-    })
+    }
 
     const saved = await writeSellerAllowlist(merged)
     return NextResponse.json({
       ok: true,
       integration: { id: integration.id, name: integration.name },
       imported: remoteSellers.length,
+      added,
       sellers: saved,
     })
   } catch (error) {

@@ -527,21 +527,42 @@ export async function POST(req: NextRequest) {
     const remoteProducts = await queryProducts(baseUrl, headers, appKey)
     const existing = await readProductAllowlist()
 
-    const existingByCode = new Map(existing.map((item) => [item.code, item]))
-    const merged: AllowedProduct[] = remoteProducts.map((product) => {
-      const prev = existingByCode.get(product.code)
-      return {
-        ...product,
-        unit: product.unit,
-        active: prev?.active ?? true,
+    // Incremental sync:
+    // - never duplicates (key: code)
+    // - keeps manual active/inactive state
+    // - keeps existing items that are no longer returned by Sankhya
+    // - adds only missing Sankhya products
+    const mergedByCode = new Map(existing.map((item) => [item.code, item]))
+    let added = 0
+
+    for (const product of remoteProducts) {
+      const prev = mergedByCode.get(product.code)
+      if (prev) {
+        mergedByCode.set(product.code, {
+          ...prev,
+          description: product.description,
+          brand: product.brand,
+          unit: product.unit,
+          mobility: product.mobility,
+          active: prev.active,
+        })
+      } else {
+        mergedByCode.set(product.code, {
+          ...product,
+          active: true,
+        })
+        added += 1
       }
-    })
+    }
+
+    const merged: AllowedProduct[] = [...mergedByCode.values()]
 
     const saved = await writeProductAllowlist(merged)
     return NextResponse.json({
       ok: true,
       integration: { id: integration.id, name: integration.name },
       imported: remoteProducts.length,
+      added,
       allowedBrands: METAS_ALLOWED_PRODUCT_BRANDS,
       products: saved,
     })

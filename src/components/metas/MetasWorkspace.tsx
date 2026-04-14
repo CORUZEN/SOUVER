@@ -1589,9 +1589,10 @@ export default function MetasWorkspace() {
         }))
       )
       const imported = Number(data?.imported ?? 0)
+      const added = Number(data?.added ?? 0)
       setAllowlistSuccess(
         imported > 0
-          ? `Sincronizacao concluida: ${imported} vendedores importados do Sankhya.`
+          ? `Sincronizacao concluida: ${added} novo(s) vendedor(es) adicionado(s) e ${imported} registro(s) processado(s) do Sankhya.`
           : 'Sincronizacao concluida, sem vendedores novos.'
       )
     } catch (error) {
@@ -1743,9 +1744,10 @@ export default function MetasWorkspace() {
         }))
       )
       const imported = Number(data?.imported ?? 0)
+      const added = Number(data?.added ?? 0)
       setProductAllowlistSuccess(
         imported > 0
-          ? `Sincronizacao concluida: ${imported} produtos importados do Sankhya.`
+          ? `Sincronizacao concluida: ${added} novo(s) produto(s) adicionado(s) e ${imported} registro(s) processado(s) do Sankhya.`
           : 'Sincronizacao concluida, sem produtos novos.'
       )
     } catch (error) {
