@@ -18,21 +18,21 @@
     "partnerCode": "16443",
     "name": "CAIO CESAR DE JESUS DE BRITO L",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_1"
   },
   {
     "code": "28",
     "partnerCode": "15873",
     "name": "CRISLAINE DA SILVA LIMA",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_1"
   },
   {
     "code": "7",
     "partnerCode": "15594",
     "name": "EDER CRUZ DE LIMA",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_15"
   },
   {
     "code": "15",
@@ -46,21 +46,21 @@
     "partnerCode": "16944",
     "name": "EUFRASIA MARISIA VIEIRA GOMES",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_15"
   },
   {
     "code": "9",
     "partnerCode": "15559",
     "name": "EVANDSON DOS SANTOS FERRO",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_15"
   },
   {
     "code": "10",
     "partnerCode": "16737",
     "name": "IZABEL CRISTINA BAHIA DOS SANT",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_15"
   },
   {
     "code": "29",
@@ -109,7 +109,7 @@
     "partnerCode": "15503",
     "name": "MARIA JOSE",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_1"
   },
   {
     "code": "23",
@@ -123,7 +123,7 @@
     "partnerCode": "16643",
     "name": "RICARDO HENRIQUE VIEIRA",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_1"
   },
   {
     "code": "18",
@@ -137,6 +137,6 @@
     "partnerCode": "16931",
     "name": "ROSILAINE FERREIRA",
     "active": true,
-    "profileType": "NOVATO"
+    "profileType": "ANTIGO_1"
   }
 ]

@@ -331,11 +331,16 @@ function inferKpiType(kpi: string): KpiType {
 }
 
 function getSellerShortName(fullName: string) {
+  const normalizedName = fullName.replace(/\s*\(\d+\)\s*$/, '').trim()
   const PREPS = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
-  const parts = fullName.trim().split(/\s+/)
+  const parts = normalizedName.split(/\s+/)
   const toTitle = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   const meaningful = parts.filter((word) => !PREPS.has(word.toLowerCase()))
   return meaningful.slice(0, 2).map(toTitle).join(' ')
+}
+
+function stripLegacySellerCounterSuffix(value: string) {
+  return value.replace(/\s*\(\d+\)\s*$/, '').trim()
 }
 
 const DEFAULT_RULES: GoalRule[] = [
@@ -1209,6 +1214,7 @@ export default function MetasWorkspace() {
     const migrateBlocks = (raw: unknown): RuleBlock[] => {
       if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
         ...b,
+        title: (b.sellerIds?.length ?? 0) > 0 ? stripLegacySellerCounterSuffix(String(b.title ?? '')) : String(b.title ?? ''),
         sellerProfileType: normalizeSellerProfileType(b.sellerProfileType),
         monthlyTarget: b.monthlyTarget ?? 0,
         sellerIds: b.sellerIds ?? [],
@@ -1726,11 +1732,42 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     if (view !== 'config') return
+    if (!canViewSellers) return
+    if (allowlistLoading) return
+    if (allowlist.length > 0) return
+    void loadAllowlist()
+  }, [allowlist.length, allowlistLoading, canViewSellers, view])
+
+  useEffect(() => {
+    if (view !== 'config') return
     if (!canViewConfig) return
     if (productAllowlistLoading) return
     if (productAllowlist.length > 0) return
     void loadProductAllowlist()
   }, [canViewConfig, productAllowlist.length, productAllowlistLoading, view])
+
+  useEffect(() => {
+    if (allowlist.length === 0) return
+    setRuleBlocks((prev) => {
+      let changed = false
+      const next = prev.map((block) => {
+        if (block.sellerIds.length === 0) return block
+        const uniqueProfiles = Array.from(
+          new Set(
+            block.sellerIds
+              .map((sellerId) => sellerProfileByCode.get(toSellerCodeFromId(sellerId)))
+              .filter((profile): profile is SellerProfileType => Boolean(profile))
+          )
+        )
+        if (uniqueProfiles.length !== 1) return block
+        const resolvedProfile = uniqueProfiles[0]
+        if (normalizeSellerProfileType(block.sellerProfileType) === resolvedProfile) return block
+        changed = true
+        return { ...block, sellerProfileType: resolvedProfile }
+      })
+      return changed ? next : prev
+    })
+  }, [allowlist.length, sellerProfileByCode])
 
   function addSellerToAllowlistFromModal() {
     const selectedSeller = sellers.find((seller) => seller.id === addAllowlistModal.selectedSellerId)
@@ -3564,6 +3601,18 @@ export default function MetasWorkspace() {
 
           {(() => {
             const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
+            const resolveBlockProfileType = (candidate: RuleBlock): SellerProfileType => {
+              if (candidate.sellerIds.length === 0) return normalizeSellerProfileType(candidate.sellerProfileType)
+              const uniqueProfiles = Array.from(
+                new Set(
+                  candidate.sellerIds
+                    .map((sellerId) => sellerProfileByCode.get(toSellerCodeFromId(sellerId)))
+                    .filter((profile): profile is SellerProfileType => Boolean(profile))
+                )
+              )
+              if (uniqueProfiles.length === 1) return uniqueProfiles[0]
+              return normalizeSellerProfileType(candidate.sellerProfileType)
+            }
             const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
             const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
@@ -4020,9 +4069,8 @@ export default function MetasWorkspace() {
                                 >
                                   {ruleBlocks.map((optionBlock) => (
                                     <option key={optionBlock.id} value={optionBlock.id}>
-                                      {optionBlock.title}
-                                      {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
-                                      {` · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(optionBlock.sellerProfileType)]}`}
+                                      {stripLegacySellerCounterSuffix(optionBlock.title)}
+                                      {` · ${SELLER_PROFILE_LABEL[resolveBlockProfileType(optionBlock)]}`}
                                     </option>
                                   ))}
                                 </select>
@@ -4044,7 +4092,7 @@ export default function MetasWorkspace() {
                                 >
                                   {(() => {
                                     const selectedOption = ruleBlocks.find((optionBlock) => optionBlock.id === selectedBlockId) ?? block
-                                    return `${selectedOption.title}${selectedOption.sellerIds.length > 0 ? ` (${selectedOption.sellerIds.length})` : ''} · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(selectedOption.sellerProfileType)]}`
+                                    return `${stripLegacySellerCounterSuffix(selectedOption.title)} · ${SELLER_PROFILE_LABEL[resolveBlockProfileType(selectedOption)]}`
                                   })()}
                                 </div>
                                 <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
@@ -4054,7 +4102,7 @@ export default function MetasWorkspace() {
                                       <ul className="max-h-64 overflow-y-auto py-1">
                                         {ruleBlocks.map((optionBlock) => {
                                           const active = selectedBlockId === optionBlock.id
-                                          const label = `${optionBlock.title}${optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''} · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(optionBlock.sellerProfileType)]}`
+                                          const label = `${stripLegacySellerCounterSuffix(optionBlock.title)} · ${SELLER_PROFILE_LABEL[resolveBlockProfileType(optionBlock)]}`
                                           return (
                                             <li key={optionBlock.id}>
                                               <div
@@ -4087,9 +4135,6 @@ export default function MetasWorkspace() {
                               </>
                             )}
                           </div>
-                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-600">
-                            Perfil de KPIs: {SELLER_PROFILE_LABEL[normalizeSellerProfileType(block.sellerProfileType)]}
-                          </p>
                         </label>
                         <button
                           type="button"
@@ -4286,6 +4331,7 @@ export default function MetasWorkspace() {
                           </button>
                         </span>
                       ))}
+                      {assignedSellers.length === 0 ? (
                       <div className="relative">
                         <button
                           type="button"
@@ -4373,6 +4419,7 @@ export default function MetasWorkspace() {
                           </>
                         )}
                       </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -6504,7 +6551,7 @@ export default function MetasWorkspace() {
                 const cloned: RuleBlock = {
                   ...source,
                   id: newId,
-                  title: seller.name.split(' ').slice(0, 2).join(' '),
+                  title: stripLegacySellerCounterSuffix(seller.name).split(' ').slice(0, 2).join(' '),
                   sellerProfileType: selectedProfileType,
                   sellerIds: [seller.id],
                   rules: cloneRulesWithFreshIds(source.rules, `rule-${selectedProfileType}-${newId}`),
