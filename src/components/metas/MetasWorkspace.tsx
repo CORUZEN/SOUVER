@@ -12,6 +12,7 @@ import {
   CircleDollarSign,
   Plus,
   Pencil,
+  RefreshCw,
   RotateCcw,
   Search,
   Settings2,
@@ -920,6 +921,15 @@ export default function MetasWorkspace() {
   const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
   const [brandWeightLoading, setBrandWeightLoading] = useState(false)
   const [brandWeightError, setBrandWeightError] = useState('')
+  // Sankhya configured targets (meta financeira + metas de peso por marca) — Vidya Force
+  const [sankhyaTargets, setSankhyaTargets] = useState<Array<{
+    sellerCode: string
+    sellerName: string
+    financialTarget: number
+    weightTargets: Array<{ brand: string; targetKg: number }>
+  }>>([])
+  const [sankhyaTargetsLoading, setSankhyaTargetsLoading] = useState(false)
+  const [sankhyaTargetsError, setSankhyaTargetsError] = useState('')
   const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
@@ -1433,6 +1443,28 @@ export default function MetasWorkspace() {
       .finally(() => { if (!controller.signal.aborted) setBrandWeightLoading(false) })
     return () => controller.abort()
   }, [companyScopeFilter, month, year])
+
+  // ── Sankhya configured targets (financial + weight per brand) ─────────
+  useEffect(() => {
+    const controller = new AbortController()
+    setSankhyaTargetsLoading(true)
+    setSankhyaTargetsError('')
+    fetch(
+      `/api/metas/sankhya-targets?year=${year}&month=${month + 1}`,
+      { signal: controller.signal }
+    )
+      .then(async (res) => {
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar metas configuradas do Sankhya.')
+        setSankhyaTargets(payload.sellers ?? [])
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        setSankhyaTargetsError(err instanceof Error ? err.message : 'Falha ao carregar metas configuradas do Sankhya.')
+      })
+      .finally(() => { if (!controller.signal.aborted) setSankhyaTargetsLoading(false) })
+    return () => controller.abort()
+  }, [month, year])
 
   useEffect(() => {
     setFocusProductRows({})
@@ -2134,7 +2166,14 @@ export default function MetasWorkspace() {
         }
 
         const sellerCode = seller.id.replace(/^sankhya-/, '')
-        const weightTargetRatios = getSellerWeightTargetRatios(block.weightTargets ?? [], brandWeightRows, sellerCode)
+        // Resolve effective weight targets: Sankhya value when available, fallback to stored value
+        const sankhyaSellerData = sankhyaTargets.find((t) => t.sellerCode === sellerCode)
+        const effectiveWeightTargets = (block.weightTargets ?? []).map((wt) => {
+          if (!wt.brand || !sankhyaSellerData) return wt
+          const sk = sankhyaSellerData.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+          return sk ? { ...wt, targetKg: sk.targetKg } : wt
+        })
+        const weightTargetRatios = getSellerWeightTargetRatios(effectiveWeightTargets, brandWeightRows, sellerCode)
         const achievedWeightGroups = weightTargetRatios.filter((ratio) => ratio >= 1).length
 
         const focusCode = (block.focusProductCode ?? '').trim()
@@ -2147,7 +2186,12 @@ export default function MetasWorkspace() {
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
         const teamAverageTicketSafe = Math.max(teamAverageTicket, 0.00001)
-        const monthlyTargetSafe = block.monthlyTarget > 0 ? block.monthlyTarget : teamAverageValueSafe
+        // Meta financeira: usa valor do Sankhya quando disponível, senão usa o configurado manualmente no bloco
+        const sankhyaFinancialTarget = sankhyaSellerData?.financialTarget ?? null
+        const resolvedMonthlyTarget = (sankhyaFinancialTarget ?? 0) > 0
+          ? sankhyaFinancialTarget!
+          : (block.monthlyTarget > 0 ? block.monthlyTarget : 0)
+        const monthlyTargetSafe = resolvedMonthlyTarget > 0 ? resolvedMonthlyTarget : teamAverageValueSafe
 
         const ruleProgress = blockRules.map((rule) => {
           // Skip rules for stages that haven't started yet
@@ -2374,7 +2418,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sellers])
+  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, ruleBlocks, sankhyaTargets, sellers])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -3466,7 +3510,11 @@ export default function MetasWorkspace() {
                                 resultValue = `${num(coveragePct, 2)}%`
                                 ok = parameterNumber > 0 && coveragePct >= parameterNumber
                               } else if (kpiType === 'META_FINANCEIRA') {
-                                const monthlyTargetSafe = block.monthlyTarget > 0 ? block.monthlyTarget : 0
+                                const sellerSankhyaData = sankhyaTargets.find((t) => t.sellerCode === sellerCode)
+                                const resolvedFinancial = (sellerSankhyaData?.financialTarget ?? 0) > 0
+                                  ? sellerSankhyaData!.financialTarget
+                                  : block.monthlyTarget
+                                const monthlyTargetSafe = resolvedFinancial > 0 ? resolvedFinancial : 0
                                 const required = parameterNumber > 0 ? monthlyTargetSafe * (parameterNumber / 100) : monthlyTargetSafe
                                 const progressPct = required > 0 ? (revenue / required) * 100 : 0
                                 title = 'Meta financeira acumulada'
@@ -3480,7 +3528,13 @@ export default function MetasWorkspace() {
                                 ok = required > 0 && revenue >= required
                               } else if (kpiType === 'VOLUME') {
                                 const requiredGroups = Math.max(Math.floor(parameterNumber), 0)
-                                const ratios = getSellerWeightTargetRatios(block.weightTargets ?? [], brandWeightRows, sellerCode)
+                                const sellerSankhyaData = sankhyaTargets.find((t) => t.sellerCode === sellerCode)
+                                const effectiveWt = (block.weightTargets ?? []).map((wt) => {
+                                  if (!wt.brand || !sellerSankhyaData) return wt
+                                  const sk = sellerSankhyaData.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+                                  return sk ? { ...wt, targetKg: sk.targetKg } : wt
+                                })
+                                const ratios = getSellerWeightTargetRatios(effectiveWt, brandWeightRows, sellerCode)
                                 const achievedGroups = ratios.filter((ratio) => ratio >= 1).length
                                 const volumeProgress = requiredGroups > 0
                                   ? getVolumeProgressByClosestTargets(ratios, requiredGroups)
@@ -3854,22 +3908,64 @@ export default function MetasWorkspace() {
                 {/* Meta em dinheiro + seller assignment */}
                 <div className="mb-3 grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className={label}>
-                      Meta financeira do mês (R$)
-                      <input
-                        className={input}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={block.monthlyTarget}
-                        onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
-                      />
-                    </label>
-                    <p className="mt-1 text-[10px] text-surface-400">
-                      {block.monthlyTarget > 0
-                        ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
-                        : 'Sem meta financeira definida — usa a média da equipe como referência.'}
-                    </p>
+                    <label className={label}>Meta financeira do mês (R$)</label>
+                    {(() => {
+                      const blockSellerCodes = block.sellerIds.map((sid) => {
+                        const s = sellers.find((x) => x.id === sid)
+                        return (s ? s.id : sid).replace(/^sankhya-/, '')
+                      })
+                      let sankhyaTotal: number | null = null
+                      for (const sc of blockSellerCodes) {
+                        const sd = sankhyaTargets.find((t) => t.sellerCode === sc)
+                        if (sd && sd.financialTarget > 0) sankhyaTotal = (sankhyaTotal ?? 0) + sd.financialTarget
+                      }
+                      if (sankhyaTargetsLoading) {
+                        return (
+                          <div className="mt-1 flex h-10 items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 text-xs text-surface-400">
+                            <span className="animate-pulse">Carregando do Sankhya...</span>
+                          </div>
+                        )
+                      }
+                      if (sankhyaTotal !== null && sankhyaTotal > 0) {
+                        return (
+                          <>
+                            <div className="mt-1 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                              <span className="text-sm font-semibold text-emerald-800">{currency(sankhyaTotal)}</span>
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
+                            </div>
+                            <p className="mt-1 text-[10px] text-emerald-700">
+                              Coletado automaticamente do Sankhya para {blockSellerCodes.length === 1 ? 'este vendedor' : `${blockSellerCodes.length} vendedores`} neste bloco.
+                            </p>
+                          </>
+                        )
+                      }
+                      // Sankhya carregou mas não encontrou meta para os vendedores deste bloco
+                      if (sankhyaTargets.length > 0) {
+                        return (
+                          <div className="mt-1 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            <span className="text-xs text-amber-700">Sem meta financeira configurada no Sankhya para este vendedor.</span>
+                          </div>
+                        )
+                      }
+                      // Sankhya ainda não conectado — input manual como fallback
+                      return (
+                        <label className={label}>
+                          <input
+                            className={input}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={block.monthlyTarget}
+                            onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
+                          />
+                          <p className="mt-1 text-[10px] text-surface-400">
+                            {block.monthlyTarget > 0
+                              ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
+                              : 'Sem meta financeira configurada — usa a média da equipe como referência.'}
+                          </p>
+                        </label>
+                      )
+                    })()}
                   </div>
                   <div>
                     <p className={label}>Vendedores neste bloco</p>
@@ -4140,7 +4236,13 @@ export default function MetasWorkspace() {
                       <tr className="bg-surface-50 font-semibold">
                         <td className="px-3 py-2 text-xs text-surface-500" colSpan={4}>
                           Totais — {block.rules.length} KPIs
-                          {block.monthlyTarget > 0 && <span className="ml-2 text-emerald-600">| Meta: {currency(block.monthlyTarget)}</span>}
+                          {(() => {
+                            const blockSellerCodes = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return (s ? s.id : sid).replace(/^sankhya-/, '') })
+                            const sankhyaFin = blockSellerCodes.reduce<number | null>((acc, sc) => { const sd = sankhyaTargets.find((t) => t.sellerCode === sc); if (sd && sd.financialTarget > 0) return (acc ?? 0) + sd.financialTarget; return acc }, null)
+                            const displayTarget = sankhyaFin ?? (block.monthlyTarget > 0 ? block.monthlyTarget : null)
+                            if (!displayTarget) return null
+                            return <span className="ml-2 text-emerald-600">| Meta: {currency(displayTarget)}{sankhyaFin !== null && <span className="ml-1 text-[9px] font-semibold text-emerald-500">●S</span>}</span>
+                          })()}
                           {block.sellerIds.length > 0 && <span className="ml-2 text-primary-600">| {block.sellerIds.length} vendedor(es)</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-surface-700">{currency(block.rules.reduce((s, r) => s + r.rewardValue, 0))}</td>
@@ -4200,11 +4302,34 @@ export default function MetasWorkspace() {
                       >
                         <Plus size={11} /> Adicionar grupo
                       </button>
+                      {(() => {
+                        // Show sync button only when Sankhya has brands for sellers in this block
+                        const blockSellerCodes = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return (s ? s.id : sid).replace(/^sankhya-/, '') })
+                        const sankhyaBrands = [...new Set(
+                          blockSellerCodes.flatMap((sc) => (sankhyaTargets.find((t) => t.sellerCode === sc)?.weightTargets ?? []).map((w) => w.brand))
+                        )]
+                        if (sankhyaBrands.length === 0) return null
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const existing = new Set((block.weightTargets ?? []).map((w) => w.brand.toUpperCase()))
+                              const newTargets: WeightTarget[] = sankhyaBrands
+                                .filter((brand) => !existing.has(brand.toUpperCase()))
+                                .map((brand) => ({ id: `wt-sankhya-${Date.now()}-${brand}`, brand, targetKg: 0 }))
+                              if (newTargets.length > 0) updateBlock({ weightTargets: [...(block.weightTargets ?? []), ...newTargets] })
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          >
+                            <RefreshCw size={11} /> Sincronizar grupos do Sankhya
+                          </button>
+                        )
+                      })()}
                     </div>
                   </div>
                   {(!block.weightTargets || block.weightTargets.length === 0) ? (
                     <p className="rounded-lg border border-dashed border-surface-200 bg-surface-50 px-3 py-4 text-center text-xs text-surface-400">
-                      Nenhuma meta de peso definida. Clique em "Adicionar grupo" para configurar.
+                      Nenhuma meta de peso definida. Clique em &quot;Adicionar grupo&quot; ou &quot;Sincronizar grupos do Sankhya&quot; para configurar.
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -4231,7 +4356,17 @@ export default function MetasWorkspace() {
                                 return r.brand === wt.brand.toUpperCase() && sellerCodes.some((sc) => r.sellerCode === sc)
                               })
                               .reduce((sum, r) => sum + r.totalKg, 0)
-                            const rawProgress = wt.targetKg > 0 ? actualKg / wt.targetKg : 0
+                            // Effective target: sum of Sankhya targets for sellers in this block, fallback to stored value
+                            const sankhyaTargetKg = wt.brand
+                              ? sellerCodes.reduce<number | null>((acc, sc) => {
+                                  const sd = sankhyaTargets.find((t) => t.sellerCode === sc)
+                                  const sw = sd?.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+                                  if (sw) return (acc ?? 0) + sw.targetKg
+                                  return acc
+                                }, null)
+                              : null
+                            const effectiveTargetKg = sankhyaTargetKg ?? wt.targetKg
+                            const rawProgress = effectiveTargetKg > 0 ? actualKg / effectiveTargetKg : 0
                             const progressPct = rawProgress * 100
                             const barPct = Math.min(progressPct, 100)
                             const progressColor = rawProgress >= 1 ? 'bg-emerald-500' : rawProgress >= 0.8 ? 'bg-cyan-500' : rawProgress >= 0.6 ? 'bg-amber-400' : 'bg-rose-400'
@@ -4258,18 +4393,31 @@ export default function MetasWorkspace() {
                                   </select>
                                 </td>
                                 <td className="px-3 py-2">
-                                  <input
-                                    className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0"
-                                    value={wt.targetKg || ''}
-                                    onChange={(e) => {
-                                      const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
-                                      updateBlock({ weightTargets: updated })
-                                    }}
-                                  />
+                                  {sankhyaTargetsLoading ? (
+                                    <span className="text-surface-400 text-xs animate-pulse">Carregando...</span>
+                                  ) : sankhyaTargetKg !== null ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-semibold text-surface-800">{num(sankhyaTargetKg, 2)} kg</span>
+                                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
+                                    </div>
+                                  ) : sankhyaTargets.length > 0 ? (
+                                    // Sankhya carregou mas não tem meta para este vendedor/marca
+                                    <span className="text-[11px] text-amber-600" title="Sem meta configurada no Sankhya para este grupo">— sem meta no Sankhya</span>
+                                  ) : (
+                                    // Sankhya ainda não conectado — mantém input manual como fallback
+                                    <input
+                                      className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0"
+                                      value={wt.targetKg || ''}
+                                      onChange={(e) => {
+                                        const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
+                                        updateBlock({ weightTargets: updated })
+                                      }}
+                                    />
+                                  )}
                                 </td>
                                 <td className="px-3 py-2 text-xs text-surface-700">
                                   {brandWeightLoading ? (
@@ -4277,13 +4425,13 @@ export default function MetasWorkspace() {
                                   ) : brandWeightError ? (
                                     <span className="text-amber-600" title={brandWeightError}>—</span>
                                   ) : (
-                                    <span className={actualKg >= wt.targetKg && wt.targetKg > 0 ? 'font-semibold text-emerald-600' : ''}>
+                                    <span className={actualKg >= effectiveTargetKg && effectiveTargetKg > 0 ? 'font-semibold text-emerald-600' : ''}>
                                       {num(actualKg, 2)} kg
                                     </span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2">
-                                  {wt.targetKg > 0 ? (
+                                  {effectiveTargetKg > 0 ? (
                                     <div className="flex items-center gap-2">
                                       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-200">
                                         <div className={`h-full transition-[width] duration-700 ${progressColor}`} style={{ width: `${barPct}%` }} />
@@ -4320,10 +4468,24 @@ export default function MetasWorkspace() {
                           })}
                           <tr className="bg-surface-50 font-semibold border-t border-surface-200">
                             <td className="px-3 py-2 text-xs text-surface-500">
-                              Total — {(block.weightTargets ?? []).filter((w) => w.targetKg > 0).length} metas de peso configuradas
+                              {(() => {
+                                const countWithTarget = (block.weightTargets ?? []).filter((w) => {
+                                  const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                  const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
+                                  return (sankhyaKg ?? w.targetKg) > 0
+                                }).length
+                                return `Total — ${countWithTarget} metas de peso configuradas`
+                              })()}
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
-                              {num((block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0), 2)} kg
+                              {(() => {
+                                const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                const total = (block.weightTargets ?? []).reduce((sum, w) => {
+                                  const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
+                                  return sum + (sankhyaKg ?? w.targetKg)
+                                }, 0)
+                                return <>{num(total, 2)} kg{(block.weightTargets ?? []).some((w) => { const sc2 = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') }); return sc2.some((c) => sankhyaTargets.find((t) => t.sellerCode === c)?.weightTargets.some((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase())) }) && <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0 text-[9px] font-semibold text-emerald-600 border border-emerald-200">Sankhya</span>}</>
+                              })()}
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
                               {(() => {
@@ -4335,7 +4497,10 @@ export default function MetasWorkspace() {
                             <td className="px-3 py-2 text-xs" colSpan={2}>
                               {(() => {
                                 const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
-                                const totalTarget = (block.weightTargets ?? []).reduce((s, w) => s + w.targetKg, 0)
+                                const totalTarget = (block.weightTargets ?? []).reduce((sum, w) => {
+                                  const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
+                                  return sum + (sankhyaKg ?? w.targetKg)
+                                }, 0)
                                 const totalActual = (block.weightTargets ?? []).reduce((sum, wt) => sum + brandWeightRows.filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sc.length === 0 || sc.some((c) => r.sellerCode === c))).reduce((s2, r) => s2 + r.totalKg, 0), 0)
                                 if (totalTarget <= 0) return <span className="text-surface-400">—</span>
                                 const pct = totalActual / totalTarget * 100
