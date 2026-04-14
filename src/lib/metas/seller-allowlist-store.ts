@@ -73,14 +73,15 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
         profileType: normalizeSellerProfileType(r.profileType),
       }))
 
-      // Backward compatibility:
-      // if the running Prisma client/environment does not expose `profileType`,
-      // merge profile values from the legacy file so the UI does not lose selection after refresh.
-      const hasProfileTypeInRows = rows.some((r: { profileType?: unknown }) => typeof r.profileType === 'string')
-      if (hasProfileTypeInRows) return fromDb
-
       const legacy = normalizeList(await readLegacyAllowlistFile())
       if (legacy.length === 0) return fromDb
+
+      // Backward compatibility and recovery path:
+      // If DB profiles look degraded (all NOVATO) but legacy has richer profile data,
+      // reuse legacy profile types by code/name match and self-heal DB best-effort.
+      const dbHasNonNovato = fromDb.some((seller: AllowedSeller) => normalizeSellerProfileType(seller.profileType) !== 'NOVATO')
+      const legacyHasNonNovato = legacy.some((seller: AllowedSeller) => normalizeSellerProfileType(seller.profileType) !== 'NOVATO')
+      const shouldRecoverProfilesFromLegacy = !dbHasNonNovato && legacyHasNonNovato
 
       const legacyByCode = new Map<string, AllowedSeller>()
       const legacyByName = new Map<string, AllowedSeller>()
@@ -90,12 +91,24 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
         legacyByName.set(seller.name.trim().toUpperCase(), seller)
       }
 
-      return fromDb.map((seller: AllowedSeller) => {
+      const merged = fromDb.map((seller: AllowedSeller) => {
         const codeKey = String(seller.code ?? '').trim()
         const nameKey = seller.name.trim().toUpperCase()
         const matched = (codeKey ? legacyByCode.get(codeKey) : undefined) ?? legacyByName.get(nameKey)
-        return matched ? { ...seller, profileType: normalizeSellerProfileType(matched.profileType) } : seller
+        if (!matched) return seller
+        if (!shouldRecoverProfilesFromLegacy) return seller
+        return { ...seller, profileType: normalizeSellerProfileType(matched.profileType) }
       })
+
+      if (shouldRecoverProfilesFromLegacy) {
+        try {
+          await writeSellerAllowlist(merged)
+        } catch {
+          // Best-effort DB self-heal only; returning merged already fixes UI rendering.
+        }
+      }
+
+      return merged
     }
   } catch {
     // Fallback below keeps local usage resilient when DB is unavailable.

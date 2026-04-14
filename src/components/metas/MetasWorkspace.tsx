@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Boxes,
   Building2,
@@ -479,6 +479,15 @@ function parseMonthKeyToYearMonth(key: string) {
     return null
   }
   return { year: parsedYear, month: parsedMonthIndex }
+}
+
+function findClosestMonthConfigKey(keys: string[], targetKey: string) {
+  if (keys.length === 0) return undefined
+  const sorted = [...keys].sort()
+  const previous = [...sorted].reverse().find((key) => key < targetKey)
+  if (previous) return previous
+  const next = sorted.find((key) => key > targetKey)
+  return next
 }
 
 function clampIsoToMonth(raw: string, year: number, month: number): string {
@@ -1060,14 +1069,84 @@ export default function MetasWorkspace() {
     }
     return map
   }, [allowlist])
+  const sellerProfileByName = useMemo(() => {
+    const map = new Map<string, SellerProfileType>()
+    for (const seller of allowlist) {
+      const normalizedName = normalizeSellerNameForLookup(String(seller.name ?? ''))
+      if (!normalizedName) continue
+      map.set(normalizedName, normalizeSellerProfileType(seller.profileType))
+    }
+    return map
+  }, [allowlist])
+  const sellerProfileByShortName = useMemo(() => {
+    const map = new Map<string, SellerProfileType>()
+    for (const seller of allowlist) {
+      const shortName = getSellerShortName(String(seller.name ?? ''))
+      const normalizedShortName = normalizeSellerNameForLookup(shortName)
+      if (!normalizedShortName) continue
+      map.set(normalizedShortName, normalizeSellerProfileType(seller.profileType))
+    }
+    return map
+  }, [allowlist])
+  const sellerNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const seller of sellers) map.set(seller.id, seller.name)
+    return map
+  }, [sellers])
+  const resolveSellerProfileForId = useCallback((sellerId: string): SellerProfileType | null => {
+    const sellerCode = toSellerCodeFromId(sellerId)
+    const byCode = sellerCode ? sellerProfileByCode.get(sellerCode) : undefined
+    if (byCode) return byCode
+    const sellerName = sellerNameById.get(sellerId)
+    if (!sellerName) return null
+    const normalizedName = normalizeSellerNameForLookup(sellerName)
+    const byName = sellerProfileByName.get(normalizedName)
+    if (byName) return byName
+    const byShortName = sellerProfileByShortName.get(normalizeSellerNameForLookup(getSellerShortName(sellerName)))
+    if (byShortName) return byShortName
+    const prefixName = Array.from(sellerProfileByName.entries()).find(([allowlistName]) => allowlistName.startsWith(normalizedName))
+    if (prefixName) return prefixName[1]
+    const containedName = Array.from(sellerProfileByName.entries()).find(([allowlistName]) => normalizedName.includes(allowlistName))
+    if (containedName) return containedName[1]
+    return byName ?? null
+  }, [sellerNameById, sellerProfileByCode, sellerProfileByName, sellerProfileByShortName])
+  const resolveBlockProfileType = useCallback((candidate: RuleBlock): SellerProfileType => {
+    if (candidate.sellerIds.length === 0) return normalizeSellerProfileType(candidate.sellerProfileType)
+    const uniqueProfiles = Array.from(
+      new Set(
+        candidate.sellerIds
+          .map((sellerId) => resolveSellerProfileForId(sellerId))
+          .filter((profile): profile is SellerProfileType => Boolean(profile))
+      )
+    )
+    if (uniqueProfiles.length === 1) return uniqueProfiles[0]
+    const normalizedTitle = normalizeSellerNameForLookup(stripLegacySellerCounterSuffix(candidate.title))
+    if (normalizedTitle) {
+      const byShortTitle = sellerProfileByShortName.get(normalizedTitle)
+      if (byShortTitle) return byShortTitle
+      const prefixed = Array.from(sellerProfileByName.entries()).find(([allowlistName]) => allowlistName.startsWith(normalizedTitle))
+      if (prefixed) return prefixed[1]
+    }
+    return normalizeSellerProfileType(candidate.sellerProfileType)
+  }, [resolveSellerProfileForId, sellerProfileByName, sellerProfileByShortName])
   const closeAddAllowlistModal = () =>
     setAddAllowlistModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
   const closeApplyKpiModal = () => setApplyKpiModal({ open: false, sourceBlockId: '', selectedSellerIds: [] })
+  const kpiApplySourceBlock = useMemo(
+    () => ruleBlocks.find((block) => block.id === applyKpiModal.sourceBlockId) ?? null,
+    [applyKpiModal.sourceBlockId, ruleBlocks]
+  )
+  const kpiApplySourceProfile = useMemo(
+    () => (kpiApplySourceBlock ? resolveBlockProfileType(kpiApplySourceBlock) : null),
+    [kpiApplySourceBlock, resolveBlockProfileType]
+  )
   const kpiApplyTargetOptions = useMemo(() => {
     if (!applyKpiModal.sourceBlockId) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
+    if (!kpiApplySourceProfile) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
     const bySeller = new Map<string, { sellerId: string; sellerName: string; blockId: string; blockTitle: string }>()
     for (const candidate of ruleBlocks) {
       if (candidate.id === applyKpiModal.sourceBlockId || candidate.sellerIds.length === 0) continue
+      if (resolveBlockProfileType(candidate) !== kpiApplySourceProfile) continue
       for (const sellerId of candidate.sellerIds) {
         if (bySeller.has(sellerId)) continue
         const sellerName = sellers.find((seller) => seller.id === sellerId)?.name ?? sellerId.replace(/^sankhya-/, '')
@@ -1080,7 +1159,7 @@ export default function MetasWorkspace() {
       }
     }
     return Array.from(bySeller.values()).sort((a, b) => a.sellerName.localeCompare(b.sellerName))
-  }, [applyKpiModal.sourceBlockId, ruleBlocks, sellers])
+  }, [applyKpiModal.sourceBlockId, kpiApplySourceProfile, resolveBlockProfileType, ruleBlocks, sellers])
   const selectedKpiApplySellerIds = useMemo(
     () => new Set(applyKpiModal.selectedSellerIds),
     [applyKpiModal.selectedSellerIds]
@@ -1104,7 +1183,8 @@ export default function MetasWorkspace() {
   }, [applyKpiModal.open, kpiApplyTargetOptions])
 
   const applyKpiRulesToSelectedSellers = () => {
-    const selectedIds = new Set(applyKpiModal.selectedSellerIds)
+    const validTargetIds = new Set(kpiApplyTargetOptions.map((option) => option.sellerId))
+    const selectedIds = new Set(applyKpiModal.selectedSellerIds.filter((sellerId) => validTargetIds.has(sellerId)))
     if (selectedIds.size === 0) return
     setRuleBlocks((prev) => {
       const sourceBlock = prev.find((block) => block.id === applyKpiModal.sourceBlockId)
@@ -1264,8 +1344,8 @@ export default function MetasWorkspace() {
             setExtraMinPoints(cfg.extraMinPoints ?? 0.6)
             setExtraMinPointsInput(num(cfg.extraMinPoints ?? 0.6, 2))
           } else {
-            // Inherit from closest previous month that has config
-            const source = Object.keys(normalized).sort().reverse().find((k) => k < monthKey(year, month))
+            // Inherit from the closest configured month (prefer previous, fallback to next)
+            const source = findClosestMonthConfigKey(Object.keys(normalized), monthKey(year, month))
             if (source) {
               const src = normalized[source]
               setRuleBlocks(src.ruleBlocks)
@@ -1397,8 +1477,8 @@ export default function MetasWorkspace() {
         setExtraMinPoints(cfg.extraMinPoints)
         setExtraMinPointsInput(num(cfg.extraMinPoints, 2))
       } else {
-        // Inherit from closest previous month that has config
-        const source = Object.keys(updated).sort().reverse().find((k) => k < activeKey)
+        // Inherit from the closest configured month (prefer previous, fallback to next)
+        const source = findClosestMonthConfigKey(Object.keys(updated), activeKey)
         if (source) {
           const src = updated[source]
           setRuleBlocks(src.ruleBlocks)
@@ -1752,22 +1832,14 @@ export default function MetasWorkspace() {
       let changed = false
       const next = prev.map((block) => {
         if (block.sellerIds.length === 0) return block
-        const uniqueProfiles = Array.from(
-          new Set(
-            block.sellerIds
-              .map((sellerId) => sellerProfileByCode.get(toSellerCodeFromId(sellerId)))
-              .filter((profile): profile is SellerProfileType => Boolean(profile))
-          )
-        )
-        if (uniqueProfiles.length !== 1) return block
-        const resolvedProfile = uniqueProfiles[0]
+        const resolvedProfile = resolveBlockProfileType(block)
         if (normalizeSellerProfileType(block.sellerProfileType) === resolvedProfile) return block
         changed = true
         return { ...block, sellerProfileType: resolvedProfile }
       })
       return changed ? next : prev
     })
-  }, [allowlist.length, sellerProfileByCode])
+  }, [allowlist.length, resolveBlockProfileType])
 
   function addSellerToAllowlistFromModal() {
     const selectedSeller = sellers.find((seller) => seller.id === addAllowlistModal.selectedSellerId)
@@ -3601,18 +3673,7 @@ export default function MetasWorkspace() {
 
           {(() => {
             const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
-            const resolveBlockProfileType = (candidate: RuleBlock): SellerProfileType => {
-              if (candidate.sellerIds.length === 0) return normalizeSellerProfileType(candidate.sellerProfileType)
-              const uniqueProfiles = Array.from(
-                new Set(
-                  candidate.sellerIds
-                    .map((sellerId) => sellerProfileByCode.get(toSellerCodeFromId(sellerId)))
-                    .filter((profile): profile is SellerProfileType => Boolean(profile))
-                )
-              )
-              if (uniqueProfiles.length === 1) return uniqueProfiles[0]
-              return normalizeSellerProfileType(candidate.sellerProfileType)
-            }
+            const activeBlockProfileType = resolveBlockProfileType(block)
             const updateBlock = (patch: Partial<RuleBlock>) => setRuleBlocks((prev) => prev.map((b) => b.id === block.id ? { ...b, ...patch } : b))
             const updateBlockRule = (ruleId: string, patch: Partial<GoalRule>) => updateBlock({ rules: block.rules.map((r) => r.id === ruleId ? { ...r, ...patch } : r) })
             const assignedSellers = sellers.filter((s) => block.sellerIds.includes(s.id))
@@ -3622,7 +3683,12 @@ export default function MetasWorkspace() {
             const otherSellerIdsForKpiApply = Array.from(
               new Set(
                 ruleBlocks
-                  .filter((candidate) => candidate.id !== block.id && candidate.sellerIds.length > 0)
+                  .filter(
+                    (candidate) =>
+                      candidate.id !== block.id &&
+                      candidate.sellerIds.length > 0 &&
+                      resolveBlockProfileType(candidate) === activeBlockProfileType
+                  )
                   .flatMap((candidate) => candidate.sellerIds)
               )
             )
@@ -6265,8 +6331,9 @@ export default function MetasWorkspace() {
         onClose={closeApplyKpiModal}
         title="Aplicar parâmetros de KPI"
         description={(() => {
-          const sourceTitle = ruleBlocks.find((block) => block.id === applyKpiModal.sourceBlockId)?.title ?? 'grupo selecionado'
-          return `Selecione os vendedores que receberão os parâmetros de KPI do bloco "${sourceTitle}".`
+          const sourceTitle = kpiApplySourceBlock?.title ?? 'grupo selecionado'
+          const profileLabel = kpiApplySourceProfile ? SELLER_PROFILE_LABEL[kpiApplySourceProfile] : 'perfil selecionado'
+          return `Selecione os vendedores do perfil "${profileLabel}" que receberão os parâmetros de KPI do bloco "${sourceTitle}".`
         })()}
         size="lg"
         footer={
@@ -6303,7 +6370,7 @@ export default function MetasWorkspace() {
                 }
                 className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500/40"
               />
-              Selecionar todos os vendedores
+              Selecionar todos do perfil atual
             </label>
             <p className="mt-1 text-xs text-surface-500">
               {applyKpiModal.selectedSellerIds.length} de {kpiApplyTargetOptions.length} selecionado(s).
@@ -6312,7 +6379,7 @@ export default function MetasWorkspace() {
 
           {kpiApplyTargetOptions.length === 0 ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
-              Não há vendedores em outros blocos para receber os parâmetros.
+              Não há vendedores de mesmo perfil em outros blocos para receber os parâmetros.
             </p>
           ) : (
             <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-surface-200 bg-white p-2">
