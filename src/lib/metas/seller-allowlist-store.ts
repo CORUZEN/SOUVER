@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { METAS_ALLOWED_SELLERS, normalizeSellerProfileType, type AllowedSeller } from './seller-allowlist'
 
@@ -35,6 +35,15 @@ async function readLegacyAllowlistFile(): Promise<AllowedSeller[]> {
   }
 }
 
+async function writeLegacyAllowlistFile(input: AllowedSeller[]) {
+  try {
+    await mkdir(dirname(LEGACY_ALLOWLIST_FILE), { recursive: true })
+    await writeFile(LEGACY_ALLOWLIST_FILE, `${JSON.stringify(input, null, 2)}\n`, 'utf8')
+  } catch {
+    // Legacy file is best-effort only.
+  }
+}
+
 function isProfileTypeUnsupportedError(error: unknown) {
   if (!error || typeof error !== 'object') return false
   const message = String((error as { message?: unknown }).message ?? '')
@@ -48,15 +57,45 @@ function isProfileTypeUnsupportedError(error: unknown) {
 
 export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
   try {
-    const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
+    const rows: Array<{
+      code: string | null
+      partnerCode: string | null
+      name: string
+      active: boolean
+      profileType?: string | null
+    }> = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
     if (rows.length > 0) {
-      return rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean; profileType: string | null }) => ({
+      const fromDb = rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean; profileType?: string | null }) => ({
         code: r.code,
         partnerCode: r.partnerCode,
         name: r.name,
         active: r.active,
         profileType: normalizeSellerProfileType(r.profileType),
       }))
+
+      // Backward compatibility:
+      // if the running Prisma client/environment does not expose `profileType`,
+      // merge profile values from the legacy file so the UI does not lose selection after refresh.
+      const hasProfileTypeInRows = rows.some((r: { profileType?: unknown }) => typeof r.profileType === 'string')
+      if (hasProfileTypeInRows) return fromDb
+
+      const legacy = normalizeList(await readLegacyAllowlistFile())
+      if (legacy.length === 0) return fromDb
+
+      const legacyByCode = new Map<string, AllowedSeller>()
+      const legacyByName = new Map<string, AllowedSeller>()
+      for (const seller of legacy) {
+        const codeKey = String(seller.code ?? '').trim()
+        if (codeKey) legacyByCode.set(codeKey, seller)
+        legacyByName.set(seller.name.trim().toUpperCase(), seller)
+      }
+
+      return fromDb.map((seller: AllowedSeller) => {
+        const codeKey = String(seller.code ?? '').trim()
+        const nameKey = seller.name.trim().toUpperCase()
+        const matched = (codeKey ? legacyByCode.get(codeKey) : undefined) ?? legacyByName.get(nameKey)
+        return matched ? { ...seller, profileType: normalizeSellerProfileType(matched.profileType) } : seller
+      })
     }
   } catch {
     // Fallback below keeps local usage resilient when DB is unavailable.
@@ -109,9 +148,11 @@ export async function writeSellerAllowlist(input: AllowedSeller[]) {
 
   try {
     await withProfileType()
+    await writeLegacyAllowlistFile(normalized)
   } catch (error) {
     if (!isProfileTypeUnsupportedError(error)) throw error
     await withoutProfileType()
+    await writeLegacyAllowlistFile(normalized)
   }
 
   return normalized
