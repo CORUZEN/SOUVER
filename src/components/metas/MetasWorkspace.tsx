@@ -3996,7 +3996,6 @@ export default function MetasWorkspace() {
                           <>
                             <div className="mt-1 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                               <span className="text-sm font-semibold text-emerald-800">{currency(sankhyaTotal)}</span>
-                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
                             </div>
                             <p className="mt-1 text-[10px] text-emerald-700">
                               Coletado automaticamente do Sankhya para {blockSellerCodes.length === 1 ? 'este vendedor' : `${blockSellerCodes.length} vendedores`} neste bloco.
@@ -4323,7 +4322,7 @@ export default function MetasWorkspace() {
                             const sankhyaFin = blockSellerCodes.reduce<number | null>((acc, sc) => { const sd = sankhyaTargets.find((t) => t.sellerCode === sc); if (sd && sd.financialTarget > 0) return (acc ?? 0) + sd.financialTarget; return acc }, null)
                             const displayTarget = sankhyaFin ?? (block.monthlyTarget > 0 ? block.monthlyTarget : null)
                             if (!displayTarget) return null
-                            return <span className="ml-2 text-emerald-600">| Meta: {currency(displayTarget)}{sankhyaFin !== null && <span className="ml-1 text-[9px] font-semibold text-emerald-500">●S</span>}</span>
+                            return <span className="ml-2 text-emerald-600">| Meta: {currency(displayTarget)}</span>
                           })()}
                           {block.sellerIds.length > 0 && <span className="ml-2 text-primary-600">| {block.sellerIds.length} vendedor(es)</span>}
                         </td>
@@ -4480,10 +4479,7 @@ export default function MetasWorkspace() {
                                   {sankhyaTargetsLoading ? (
                                     <span className="text-surface-400 text-xs animate-pulse">Carregando...</span>
                                   ) : sankhyaTargetKg !== null ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-semibold text-surface-800">{num(sankhyaTargetKg, 2)} kg</span>
-                                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
-                                    </div>
+                                    <span className="text-xs font-semibold text-surface-800">{num(sankhyaTargetKg, 2)} kg</span>
                                   ) : (() => {
                                     // No Sankhya data — show period-specific manual input
                                     const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
@@ -4587,8 +4583,7 @@ export default function MetasWorkspace() {
                                   return sankhyaConnected ? (w.manualKgByPeriod?.[periodKey] ?? 0) : w.targetKg
                                 }
                                 const total = (block.weightTargets ?? []).reduce((sum, w) => sum + resolveKg(w), 0)
-                                const hasSankhya = (block.weightTargets ?? []).some((w) => sc.some((c) => sankhyaTargets.find((t) => t.sellerCode === c)?.weightTargets.some((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase())))
-                                return <>{num(total, 2)} kg{hasSankhya && <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0 text-[9px] font-semibold text-emerald-600 border border-emerald-200">Sankhya</span>}</>
+                                return <>{num(total, 2)} kg</>
                               })()}
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
