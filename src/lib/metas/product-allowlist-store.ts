@@ -1,9 +1,14 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
 import {
   type AllowedProduct,
+  METAS_ALLOWED_PRODUCTS,
   isAllowedProductBrand,
   normalizeBrand,
 } from './product-allowlist'
+
+const LEGACY_ALLOWLIST_FILE = join(process.cwd(), 'src', 'generated', 'metas-products-allowlist.json')
 
 function normalizeList(input: AllowedProduct[]): AllowedProduct[] {
   const sanitized = input
@@ -27,16 +32,45 @@ function normalizeList(input: AllowedProduct[]): AllowedProduct[] {
   return [...dedup.values()].sort((a, b) => a.description.localeCompare(b.description))
 }
 
+async function readLegacyAllowlistFile(): Promise<AllowedProduct[]> {
+  try {
+    const raw = await readFile(LEGACY_ALLOWLIST_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as AllowedProduct[]
+  } catch {
+    return []
+  }
+}
+
 export async function readProductAllowlist(): Promise<AllowedProduct[]> {
-  const rows = await prisma.metasProduct.findMany({ orderBy: { description: 'asc' } })
-  return rows.map((r) => ({
-    code: r.code,
-    description: r.description,
-    brand: r.brand,
-    unit: r.unit,
-    mobility: (r.mobility === 'SIM' ? 'SIM' : 'NAO') as 'SIM' | 'NAO',
-    active: r.active,
-  }))
+  try {
+    const rows = await prisma.metasProduct.findMany({ orderBy: { description: 'asc' } })
+    if (rows.length > 0) {
+      return rows.map((r: { code: string; description: string; brand: string; unit: string; mobility: string; active: boolean }) => ({
+        code: r.code,
+        description: r.description,
+        brand: r.brand,
+        unit: r.unit,
+        mobility: (r.mobility === 'SIM' ? 'SIM' : 'NAO') as 'SIM' | 'NAO',
+        active: r.active,
+      }))
+    }
+  } catch {
+    // Fallback below keeps local usage resilient when DB is unavailable.
+  }
+
+  const legacy = await readLegacyAllowlistFile()
+  const normalizedFallback = normalizeList(legacy.length > 0 ? legacy : METAS_ALLOWED_PRODUCTS)
+  if (normalizedFallback.length === 0) return []
+
+  try {
+    await writeProductAllowlist(normalizedFallback)
+  } catch {
+    // Return fallback list even if DB seeding fails.
+  }
+
+  return normalizedFallback
 }
 
 export async function writeProductAllowlist(input: AllowedProduct[]) {

@@ -21,7 +21,7 @@ function normalizeList(input: City[]): City[] {
 
 export async function readCityList(): Promise<City[]> {
   const rows = await prisma.faturamentoCity.findMany({ orderBy: { name: 'asc' } })
-  return rows.map((r) => ({
+  return rows.map((r: { code: string; name: string; ufCode: string; uf: string }) => ({
     code: r.code,
     name: r.name,
     ufCode: r.ufCode,

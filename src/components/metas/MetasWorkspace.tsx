@@ -1331,7 +1331,7 @@ export default function MetasWorkspace() {
       // Recarrega visao de desempenho imediatamente.
       setSellersLoading(true)
       setSellersError('')
-      const perfResponse = await fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}`)
+      const perfResponse = await fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`)
       const perfData = await perfResponse.json().catch(() => ({}))
       if (perfResponse.ok) {
         const remoteSellers = (perfData?.sellers ?? []) as Array<{

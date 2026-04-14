@@ -1,5 +1,9 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
-import type { AllowedSeller } from './seller-allowlist'
+import { METAS_ALLOWED_SELLERS, type AllowedSeller } from './seller-allowlist'
+
+const LEGACY_ALLOWLIST_FILE = join(process.cwd(), 'src', 'generated', 'metas-sellers-allowlist.json')
 
 function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
   const sanitized = input
@@ -19,14 +23,43 @@ function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
   return [...dedup.values()]
 }
 
+async function readLegacyAllowlistFile(): Promise<AllowedSeller[]> {
+  try {
+    const raw = await readFile(LEGACY_ALLOWLIST_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as AllowedSeller[]
+  } catch {
+    return []
+  }
+}
+
 export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
-  const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
-  return rows.map((r) => ({
-    code: r.code,
-    partnerCode: r.partnerCode,
-    name: r.name,
-    active: r.active,
-  }))
+  try {
+    const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
+    if (rows.length > 0) {
+      return rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean }) => ({
+        code: r.code,
+        partnerCode: r.partnerCode,
+        name: r.name,
+        active: r.active,
+      }))
+    }
+  } catch {
+    // Fallback below keeps local usage resilient when DB is unavailable.
+  }
+
+  const legacy = await readLegacyAllowlistFile()
+  const normalizedFallback = normalizeList(legacy.length > 0 ? legacy : METAS_ALLOWED_SELLERS)
+  if (normalizedFallback.length === 0) return []
+
+  try {
+    await writeSellerAllowlist(normalizedFallback)
+  } catch {
+    // Return fallback list even if DB seeding fails.
+  }
+
+  return normalizedFallback
 }
 
 export async function writeSellerAllowlist(input: AllowedSeller[]) {
@@ -45,4 +78,3 @@ export async function writeSellerAllowlist(input: AllowedSeller[]) {
   ])
   return normalized
 }
-
