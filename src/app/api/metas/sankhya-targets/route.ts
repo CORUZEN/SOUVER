@@ -13,7 +13,8 @@ type RawRecord = Record<string, unknown>
  *   AD_TVDYCFGPFM   — main config per seller per month
  *   AD_TVDYVEN      — sellers linked to each config
  *   AD_TVDYDRTIPT   — financial (money) targets per config
- *   AD_TVDYPFMPRO   — weight (kg) targets per brand per config
+ *   AD_TVDYPFMTOP   — weight (kg) targets per brand per config (primary)
+ *   AD_TVDYPFMPRO   — weight (kg) targets per brand per config (secondary/fallback)
  *
  * Response shape:
  * {
@@ -254,13 +255,14 @@ async function discoverFkColumns(
   headers: Record<string, string>,
   appKey?: string | null,
 ): Promise<{ childFk: string; parentPk: string }> {
-  const DEFAULT = { childFk: 'AD_TVDYCFGPFMID', parentPk: 'AD_TVDYCFGPFMID' }
+  // NUCFGPFM is the confirmed FK/PK from Sankhya schema inspection
+  const DEFAULT = { childFk: 'NUCFGPFM', parentPk: 'NUCFGPFM' }
   try {
     const sql = `
 SELECT TABLE_NAME, COLUMN_NAME
 FROM ALL_TAB_COLUMNS
-WHERE TABLE_NAME IN ('AD_TVDYCFGPFM', 'AD_TVDYDRTIPT', 'AD_TVDYPFMPRO', 'AD_TVDYVEN')
-  AND (COLUMN_NAME LIKE 'AD_TVDYCFGPFM%' OR COLUMN_NAME = 'NROCONFIGURACAO')
+WHERE TABLE_NAME IN ('AD_TVDYCFGPFM', 'AD_TVDYDRTIPT', 'AD_TVDYPFMTOP', 'AD_TVDYPFMPRO', 'AD_TVDYVEN')
+  AND (COLUMN_NAME LIKE 'AD_TVDYCFGPFM%' OR COLUMN_NAME LIKE 'NUCFG%' OR COLUMN_NAME = 'NROCONFIGURACAO')
 ORDER BY TABLE_NAME, COLUMN_ID`.trim()
 
     const rows = await queryRows(baseUrl, headers, sql, appKey)
@@ -275,11 +277,13 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
       colsByTable[tbl].push(col)
     }
 
-    // Find FK in child tables (prefer AD_TVDYCFGPFM* over NROCONFIGURACAO)
-    const childTables = ['AD_TVDYDRTIPT', 'AD_TVDYPFMPRO', 'AD_TVDYVEN']
+    // Find FK in child tables — prefer NUCFG*, then AD_TVDYCFGPFM*, then NROCONFIGURACAO
+    const childTables = ['AD_TVDYDRTIPT', 'AD_TVDYPFMPRO', 'AD_TVDYVEN', 'AD_TVDYPFMTOP']
     let childFk = ''
     for (const tbl of childTables) {
-      const found = (colsByTable[tbl] ?? []).find((c) => c.startsWith('AD_TVDYCFGPFM'))
+      const cols = colsByTable[tbl] ?? []
+      const found = cols.find((c) => c.startsWith('NUCFG'))
+        ?? cols.find((c) => c.startsWith('AD_TVDYCFGPFM'))
       if (found) { childFk = found; break }
     }
     if (!childFk) {
@@ -294,10 +298,10 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
     let parentPk = ''
     if (parentCols.includes(childFk)) {
       parentPk = childFk
-    } else if (parentCols.includes('NROCONFIGURACAO')) {
-      parentPk = 'NROCONFIGURACAO'
     } else {
-      parentPk = parentCols.find((c) => c.startsWith('AD_TVDYCFGPFM')) ?? childFk
+      parentPk = parentCols.find((c) => c.startsWith('NUCFG'))
+        ?? parentCols.find((c) => c.startsWith('AD_TVDYCFGPFM'))
+        ?? (parentCols.includes('NROCONFIGURACAO') ? 'NROCONFIGURACAO' : childFk)
     }
     if (!parentPk) parentPk = childFk
 
@@ -306,66 +310,110 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
   return DEFAULT
 }
 
-/** Build multiple SQL variants for each join strategy as a fallback cascade. */
+/**
+ * Build SQL variants in priority order.
+ *
+ * Confirmed schema (from Sankhya admin panel):
+ *   AD_TVDYCFGPFM  : NUCFGPFM (PK), DTINI, DTFIM, TITULO
+ *   AD_TVDYVEN     : CODVEN (seller code — NOT CODVEND), NUCFGPFM (FK), GRUPO
+ *   AD_TVDYDRTIPT  : NUCFGPFM (FK), META, TIPO (NUMBER — 1=performance), DIRETRIZ, PESO, PERCACRESC
+ *   AD_TVDYPFMPRO  : NUCFGPFM (FK), MARCA, VALOR (weight targets — correct table)
+ *   AD_TVDYPFMTOP  : NUCFGPFM (FK), CODTIPOPER, TIPO (VARCHAR2 — NOT a brand-weight table)
+ */
 function buildSqlVariants(
   type: 'financial' | 'weight',
+  year: number,
+  month: number,
   startDate: string,
   endDate: string,
   childFk: string,
   parentPk: string,
 ): string[] {
-  const makeFinancial = (cFk: string, pPk: string) => `
+  const mm = String(month).padStart(2, '0')
+  const yyyymm = `${year}-${mm}`
+
+  // Financial: CODVEN (not CODVEND), no APELIDO, TIPO is NUMBER (not string)
+  const makeFinancial = (cFk: string, pPk: string, dateExpr: string, tipoFilter: string) => `
 SELECT
-  TO_CHAR(VEN.CODVEND) AS CODVEND,
-  NVL(TRIM(VEN.APELIDO), TO_CHAR(VEN.CODVEND)) AS VENDEDOR,
+  TO_CHAR(VEN.CODVEN) AS CODVEND,
+  TRIM(NVL(CFG.TITULO, TO_CHAR(VEN.CODVEN))) AS VENDEDOR,
   SUM(NVL(DIR.META, 0)) AS META_FINANCEIRA
 FROM AD_TVDYCFGPFM CFG
 INNER JOIN AD_TVDYVEN VEN ON VEN.${cFk} = CFG.${pPk}
 INNER JOIN AD_TVDYDRTIPT DIR ON DIR.${cFk} = CFG.${pPk}
-WHERE CFG.DTINICIAL >= TO_DATE('${startDate}', 'YYYY-MM-DD')
-  AND CFG.DTINICIAL < TO_DATE('${endDate}', 'YYYY-MM-DD')
-  AND UPPER(TRIM(NVL(DIR.TIPO, 'PERFORMANCE'))) = 'PERFORMANCE'
-  AND VEN.CODVEND > 0
-GROUP BY VEN.CODVEND, VEN.APELIDO
-ORDER BY VEN.CODVEND`.trim()
+WHERE ${dateExpr}${tipoFilter}  AND VEN.CODVEN > 0
+GROUP BY VEN.CODVEN, CFG.TITULO
+ORDER BY VEN.CODVEN`.trim()
 
-  const makeWeight = (cFk: string, pPk: string) => `
+  // Weight: AD_TVDYPFMPRO has MARCA+VALOR; TIPO is VARCHAR2 in this table
+  const makeWeight = (weightTable: string, cFk: string, pPk: string, dateExpr: string, tipoFilter: string) => `
 SELECT
-  TO_CHAR(VEN.CODVEND) AS CODVEND,
-  NVL(TRIM(VEN.APELIDO), TO_CHAR(VEN.CODVEND)) AS VENDEDOR,
+  TO_CHAR(VEN.CODVEN) AS CODVEND,
+  TRIM(NVL(CFG.TITULO, TO_CHAR(VEN.CODVEN))) AS VENDEDOR,
   UPPER(NVL(TRIM(PRO.MARCA), 'SEM MARCA')) AS MARCA,
   SUM(NVL(PRO.VALOR, 0)) AS META_KG
 FROM AD_TVDYCFGPFM CFG
 INNER JOIN AD_TVDYVEN VEN ON VEN.${cFk} = CFG.${pPk}
-INNER JOIN AD_TVDYPFMPRO PRO ON PRO.${cFk} = CFG.${pPk}
-WHERE CFG.DTINICIAL >= TO_DATE('${startDate}', 'YYYY-MM-DD')
-  AND CFG.DTINICIAL < TO_DATE('${endDate}', 'YYYY-MM-DD')
-  AND UPPER(TRIM(NVL(PRO.TIPO, 'PESO'))) = 'PESO'
-  AND VEN.CODVEND > 0
+INNER JOIN ${weightTable} PRO ON PRO.${cFk} = CFG.${pPk}
+WHERE ${dateExpr}${tipoFilter}  AND VEN.CODVEN > 0
   AND TRIM(PRO.MARCA) IS NOT NULL
-GROUP BY VEN.CODVEND, VEN.APELIDO, PRO.MARCA
-ORDER BY VEN.CODVEND, PRO.MARCA`.trim()
+GROUP BY VEN.CODVEN, CFG.TITULO, PRO.MARCA
+ORDER BY VEN.CODVEN, PRO.MARCA`.trim()
 
-  const make = type === 'financial' ? makeFinancial : makeWeight
-  // Ordered join strategy cascade:
-  // 1) Discovered columns (most specific)
-  // 2) childFk → NROCONFIGURACAO  (FK in child, business key in parent)
-  // 3) AD_TVDYCFGPFMID → AD_TVDYCFGPFMID  (Sankhya standard)
-  // 4) NROCONFIGURACAO → NROCONFIGURACAO  (both use business sequence)
-  const pairs: [string, string][] = [
-    [childFk, parentPk],
-    [childFk, 'NROCONFIGURACAO'],
-    ['AD_TVDYCFGPFMID', 'AD_TVDYCFGPFMID'],
-    ['NROCONFIGURACAO', 'NROCONFIGURACAO'],
+  // Date strategies — DTINI confirmed correct; DTINICIAL kept as legacy fallback
+  const dtA = `CFG.DTINI >= TO_DATE('${startDate}', 'YYYY-MM-DD')\n  AND CFG.DTINI < TO_DATE('${endDate}', 'YYYY-MM-DD')\n`
+  const dtB = `EXTRACT(YEAR FROM CFG.DTINI) = ${year}\n  AND EXTRACT(MONTH FROM CFG.DTINI) = ${month}\n`
+  const dtC = `TO_CHAR(CFG.DTINI, 'YYYY-MM') = '${yyyymm}'\n`
+  const dtD = `CFG.DTINICIAL >= TO_DATE('${startDate}', 'YYYY-MM-DD')\n  AND CFG.DTINICIAL < TO_DATE('${endDate}', 'YYYY-MM-DD')\n`
+  const dtE = `EXTRACT(YEAR FROM CFG.DTINICIAL) = ${year}\n  AND EXTRACT(MONTH FROM CFG.DTINICIAL) = ${month}\n`
+
+  // TIPO filters — financial TIPO is NUMBER; weight TIPO is VARCHAR2
+  const noTipo = ''
+  const numericTipo1 = `  AND DIR.TIPO = 1\n`           // AD_TVDYDRTIPT.TIPO is NUMBER
+  const weightTipoPeso = `  AND UPPER(TRIM(NVL(PRO.TIPO, 'PESO'))) = 'PESO'\n`  // AD_TVDYPFMPRO.TIPO is VARCHAR2
+
+  // JOIN strategies — NUCFGPFM confirmed; keep others as fallback
+  const joins: [string, string][] = [
+    ['NUCFGPFM', 'NUCFGPFM'],            // confirmed correct
+    [childFk, parentPk],                 // discovered via ALL_TAB_COLUMNS
+    ['AD_TVDYCFGPFMID', 'AD_TVDYCFGPFMID'], // legacy assumption
+    ['NROCONFIGURACAO', 'NROCONFIGURACAO'],  // business key fallback
   ]
+
   const seen = new Set<string>()
   const variants: string[] = []
-  for (const [cFk, pPk] of pairs) {
-    const key = `${cFk}|${pPk}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    variants.push(make(cFk, pPk))
+
+  const addFin = (cFk: string, pPk: string, dt: string, tipo: string) => {
+    const sql = makeFinancial(cFk, pPk, dt, tipo)
+    if (!seen.has(sql)) { seen.add(sql); variants.push(sql) }
   }
+  const addWgt = (tbl: string, cFk: string, pPk: string, dt: string, tipo: string) => {
+    const sql = makeWeight(tbl, cFk, pPk, dt, tipo)
+    if (!seen.has(sql)) { seen.add(sql); variants.push(sql) }
+  }
+
+  if (type === 'financial') {
+    // P1: known-correct (NUCFGPFM + DTINI) × no TIPO filter (TIPO may be any numeric value)
+    for (const dt of [dtA, dtB, dtC]) addFin('NUCFGPFM', 'NUCFGPFM', dt, noTipo)
+    // P2: same + explicit numeric TIPO=1 (from observed data)
+    for (const dt of [dtA, dtB, dtC]) addFin('NUCFGPFM', 'NUCFGPFM', dt, numericTipo1)
+    // P3: all join fallbacks × DTINI × no TIPO
+    for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addFin(cFk, pPk, dt, noTipo)
+    // P4: all join fallbacks × legacy DTINICIAL × no TIPO
+    for (const [cFk, pPk] of joins) for (const dt of [dtD, dtE]) addFin(cFk, pPk, dt, noTipo)
+  } else {
+    // P1: AD_TVDYPFMPRO (confirmed has MARCA+VALOR) + NUCFGPFM + DTINI × no TIPO
+    for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', 'NUCFGPFM', 'NUCFGPFM', dt, noTipo)
+    // P2: same + PESO varchar TIPO filter
+    for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', 'NUCFGPFM', 'NUCFGPFM', dt, weightTipoPeso)
+    // P3: all join fallbacks × AD_TVDYPFMPRO × DTINI × no TIPO
+    for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', cFk, pPk, dt, noTipo)
+    // P4: legacy DTINICIAL × fallbacks
+    for (const [cFk, pPk] of joins) for (const dt of [dtD, dtE]) addWgt('AD_TVDYPFMPRO', cFk, pPk, dt, noTipo)
+    // P5: AD_TVDYPFMTOP last resort (different structure — may not have MARCA/VALOR)
+    for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMTOP', cFk, pPk, dt, noTipo)
+  }
+
   return variants
 }
 
@@ -375,14 +423,18 @@ async function queryWithFallback(
   headers: Record<string, string>,
   sqlVariants: string[],
   appKey?: string | null,
-): Promise<{ rows: RawRecord[]; sqlIndex: number }> {
+): Promise<{ rows: RawRecord[]; sqlIndex: number; errors: string[] }> {
+  const errors: string[] = []
   for (let i = 0; i < sqlVariants.length; i++) {
     try {
       const rows = await queryRows(baseUrl, headers, sqlVariants[i], appKey)
-      if (rows.length > 0) return { rows, sqlIndex: i }
-    } catch { /* try next */ }
+      if (rows.length > 0) return { rows, sqlIndex: i, errors }
+      errors.push(`variant[${i}]: 0 rows`)
+    } catch (err) {
+      errors.push(`variant[${i}]: ${err instanceof Error ? err.message.slice(0, 80) : 'erro'}`)
+    }
   }
-  return { rows: [], sqlIndex: -1 }
+  return { rows: [], sqlIndex: -1, errors }
 }
 
 export async function GET(req: NextRequest) {
@@ -424,8 +476,8 @@ export async function GET(req: NextRequest) {
     const { childFk, parentPk } = await discoverFkColumns(baseUrl, headers, appKey)
 
     // Build cascades of SQL variants and run both in parallel
-    const financialVariants = buildSqlVariants('financial', startDate, endDate, childFk, parentPk)
-    const weightVariants = buildSqlVariants('weight', startDate, endDate, childFk, parentPk)
+    const financialVariants = buildSqlVariants('financial', year, month, startDate, endDate, childFk, parentPk)
+    const weightVariants = buildSqlVariants('weight', year, month, startDate, endDate, childFk, parentPk)
 
     const [financialResult, weightResult] = await Promise.all([
       queryWithFallback(baseUrl, headers, financialVariants, appKey),
@@ -497,6 +549,10 @@ export async function GET(req: NextRequest) {
         weightRows: weightData.length,
         financialSqlIndex: financialResult.sqlIndex,
         weightSqlIndex: weightResult.sqlIndex,
+        financialErrors: financialResult.errors.slice(-5),
+        weightErrors: weightResult.errors.slice(-5),
+        variantsTriedFinancial: financialVariants.length,
+        variantsTriedWeight: weightVariants.length,
       },
     })
   } catch (error) {
