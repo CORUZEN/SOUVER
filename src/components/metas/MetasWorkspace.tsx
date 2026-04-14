@@ -3015,8 +3015,8 @@ export default function MetasWorkspace() {
                                 title = 'Meta financeira acumulada'
                                 lines = [
                                   { label: 'Faturado acumulado', value: currency(revenue) },
-                                  { label: 'Meta do bloco', value: currency(monthlyTargetSafe) },
-                                  { label: 'Alvo da etapa', value: required > 0 ? currency(required) : 'Não definido' },
+                                  { label: 'Meta do Vendedor', value: currency(monthlyTargetSafe) },
+                                  { label: 'Meta desta etapa', value: required > 0 ? currency(required) : 'Não definido' },
                                 ]
                                 resultLabel = 'Atingimento da etapa'
                                 resultValue = `${num(progressPct, 2)}%`
