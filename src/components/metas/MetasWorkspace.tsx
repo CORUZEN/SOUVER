@@ -51,7 +51,8 @@ interface GoalRule {
 interface WeightTarget {
   id: string
   brand: string        // product brand (MARCA from Sankhya / product allowlist)
-  targetKg: number    // monthly weight target in kg
+  targetKg: number    // legacy fallback (used when Sankhya not connected)
+  manualKgByPeriod?: Record<string, number> // manual values keyed by 'YYYY-MM' — used when Sankhya connected but no data for period
 }
 
 interface CampaignPrize {
@@ -2212,12 +2213,23 @@ export default function MetasWorkspace() {
         }
 
         const sellerCode = seller.id.replace(/^sankhya-/, '')
-        // Resolve effective weight targets: Sankhya value when available, fallback to stored value
+        // Resolve effective weight targets: Sankhya value when available, manual-by-period when Sankhya connected but no period data, legacy targetKg otherwise
+        const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
         const sankhyaSellerData = sankhyaTargets.find((t) => t.sellerCode === sellerCode)
         const effectiveWeightTargets = (block.weightTargets ?? []).map((wt) => {
-          if (!wt.brand || !sankhyaSellerData) return wt
-          const sk = sankhyaSellerData.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
-          return sk ? { ...wt, targetKg: sk.targetKg } : wt
+          if (!wt.brand) return wt
+          // Prefer Sankhya live data
+          if (sankhyaSellerData) {
+            const sk = sankhyaSellerData.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+            if (sk) return { ...wt, targetKg: sk.targetKg }
+          }
+          // Sankhya connected — use period-specific manual value (0 if not set for this period)
+          if (sankhyaConnected) {
+            const manualVal = wt.manualKgByPeriod?.[periodKey] ?? 0
+            return { ...wt, targetKg: manualVal }
+          }
+          // Sankhya not connected — use legacy targetKg
+          return wt
         })
         const weightTargetRatios = getSellerWeightTargetRatios(effectiveWeightTargets, brandWeightRows, sellerCode)
         const achievedWeightGroups = weightTargetRatios.filter((ratio) => ratio >= 1).length
@@ -2522,10 +2534,14 @@ export default function MetasWorkspace() {
     [ruleBlocks, snapshots]
   )
   // Sum of all weight targets across all blocks (all brands, all sellers)
-  const corporateTotalWeightTarget = useMemo(
-    () => ruleBlocks.reduce((sum, block) => sum + (block.weightTargets ?? []).reduce((s, wt) => s + (wt.targetKg > 0 ? wt.targetKg : 0), 0), 0),
-    [ruleBlocks]
-  )
+  const corporateTotalWeightTarget = useMemo(() => {
+    const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
+    return ruleBlocks.reduce((sum, block) => sum + (block.weightTargets ?? []).reduce((s, wt) => {
+      const sk = sankhyaTargets.flatMap((t) => t.weightTargets).find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+      const val = sk ? sk.targetKg : sankhyaConnected ? (wt.manualKgByPeriod?.[periodKey] ?? 0) : wt.targetKg
+      return s + (val > 0 ? val : 0)
+    }, 0), 0)
+  }, [ruleBlocks, sankhyaTargets, sankhyaConnected, year, month])
   // Total actual weight by brand (sum across all fetched rows)
   const corporateTotalWeightActual = useMemo(
     () => brandWeightRows.reduce((sum, r) => sum + r.totalKg, 0),
@@ -4423,7 +4439,8 @@ export default function MetasWorkspace() {
                                 return r.brand === wt.brand.toUpperCase() && sellerCodes.some((sc) => r.sellerCode === sc)
                               })
                               .reduce((sum, r) => sum + r.totalKg, 0)
-                            // Effective target: sum of Sankhya targets for sellers in this block, fallback to stored value
+                            // Effective target: Sankhya first, then period-specific manual, then legacy
+                            const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
                             const sankhyaTargetKg = wt.brand
                               ? sellerCodes.reduce<number | null>((acc, sc) => {
                                   const sd = sankhyaTargets.find((t) => t.sellerCode === sc)
@@ -4432,7 +4449,8 @@ export default function MetasWorkspace() {
                                   return acc
                                 }, null)
                               : null
-                            const effectiveTargetKg = sankhyaTargetKg ?? wt.targetKg
+                            const manualKg = wt.manualKgByPeriod?.[periodKey] ?? (sankhyaConnected ? 0 : wt.targetKg)
+                            const effectiveTargetKg = sankhyaTargetKg ?? manualKg
                             const rawProgress = effectiveTargetKg > 0 ? actualKg / effectiveTargetKg : 0
                             const progressPct = rawProgress * 100
                             const barPct = Math.min(progressPct, 100)
@@ -4467,38 +4485,37 @@ export default function MetasWorkspace() {
                                       <span className="text-xs font-semibold text-surface-800">{num(sankhyaTargetKg, 2)} kg</span>
                                       <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
                                     </div>
-                                  ) : sankhyaTargets.length > 0 ? (
-                                    // Sankhya tem dados do período mas não para este vendedor/marca — input manual
-                                    <input
-                                      className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="0"
-                                      value={wt.targetKg || ''}
-                                      onChange={(e) => {
-                                        const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
+                                  ) : (() => {
+                                    // No Sankhya data — show period-specific manual input
+                                    const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
+                                    const manualVal = sankhyaConnected
+                                      ? (wt.manualKgByPeriod?.[periodKey] ?? 0)
+                                      : wt.targetKg
+                                    const saveManual = (val: number) => {
+                                      if (sankhyaConnected) {
+                                        const updated = (block.weightTargets ?? []).map((x) =>
+                                          x.id === wt.id
+                                            ? { ...x, manualKgByPeriod: { ...x.manualKgByPeriod, [periodKey]: val } }
+                                            : x
+                                        )
                                         updateBlock({ weightTargets: updated })
-                                      }}
-                                    />
-                                  ) : sankhyaConnected ? (
-                                    // Período sem dados no Sankhya — input manual
-                                    <span className="text-[11px] text-orange-500" title="Sankhya conectado mas sem dados neste período">— sem dados</span>
-                                  ) : (
-                                    // Sankhya ainda não conectado — mantém input manual como fallback
-                                    <input
-                                      className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="0"
-                                      value={wt.targetKg || ''}
-                                      onChange={(e) => {
-                                        const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
+                                      } else {
+                                        const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: val } : x)
                                         updateBlock({ weightTargets: updated })
-                                      }}
-                                    />
-                                  )}
+                                      }
+                                    }
+                                    return (
+                                      <input
+                                        className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0"
+                                        value={manualVal || ''}
+                                        onChange={(e) => saveManual(parseDecimal(e.target.value, 0))}
+                                      />
+                                    )
+                                  })()}
                                 </td>
                                 <td className="px-3 py-2 text-xs text-surface-700">
                                   {brandWeightLoading ? (
@@ -4550,22 +4567,29 @@ export default function MetasWorkspace() {
                           <tr className="bg-surface-50 font-semibold border-t border-surface-200">
                             <td className="px-3 py-2 text-xs text-surface-500">
                               {(() => {
-                                const countWithTarget = (block.weightTargets ?? []).filter((w) => {
-                                  const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
+                                const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
+                                const resolveKg = (w: typeof block.weightTargets[0]) => {
                                   const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
-                                  return (sankhyaKg ?? w.targetKg) > 0
-                                }).length
+                                  if (sankhyaKg !== null) return sankhyaKg
+                                  return sankhyaConnected ? (w.manualKgByPeriod?.[periodKey] ?? 0) : w.targetKg
+                                }
+                                const countWithTarget = (block.weightTargets ?? []).filter((w) => resolveKg(w) > 0).length
                                 return `Total — ${countWithTarget} metas de peso configuradas`
                               })()}
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
                               {(() => {
+                                const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
                                 const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
-                                const total = (block.weightTargets ?? []).reduce((sum, w) => {
+                                const resolveKg = (w: typeof block.weightTargets[0]) => {
                                   const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
-                                  return sum + (sankhyaKg ?? w.targetKg)
-                                }, 0)
-                                return <>{num(total, 2)} kg{(block.weightTargets ?? []).some((w) => { const sc2 = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') }); return sc2.some((c) => sankhyaTargets.find((t) => t.sellerCode === c)?.weightTargets.some((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase())) }) && <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0 text-[9px] font-semibold text-emerald-600 border border-emerald-200">Sankhya</span>}</>
+                                  if (sankhyaKg !== null) return sankhyaKg
+                                  return sankhyaConnected ? (w.manualKgByPeriod?.[periodKey] ?? 0) : w.targetKg
+                                }
+                                const total = (block.weightTargets ?? []).reduce((sum, w) => sum + resolveKg(w), 0)
+                                const hasSankhya = (block.weightTargets ?? []).some((w) => sc.some((c) => sankhyaTargets.find((t) => t.sellerCode === c)?.weightTargets.some((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase())))
+                                return <>{num(total, 2)} kg{hasSankhya && <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0 text-[9px] font-semibold text-emerald-600 border border-emerald-200">Sankhya</span>}</>
                               })()}
                             </td>
                             <td className="px-3 py-2 text-xs text-surface-700">
@@ -4577,17 +4601,18 @@ export default function MetasWorkspace() {
                             </td>
                             <td className="px-3 py-2 text-xs" colSpan={2}>
                               {(() => {
+                                const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
                                 const sc = block.sellerIds.map((sid) => { const s = sellers.find((x) => x.id === sid); return s ? s.id.replace(/^sankhya-/, '') : sid.replace(/^sankhya-/, '') })
-                                const totalTarget = (block.weightTargets ?? []).reduce((sum, w) => {
+                                const resolveKg = (w: typeof block.weightTargets[0]) => {
                                   const sankhyaKg = w.brand ? sc.reduce<number | null>((acc, c) => { const sd = sankhyaTargets.find((t) => t.sellerCode === c); const sw = sd?.weightTargets.find((ww) => ww.brand.toUpperCase() === w.brand.toUpperCase()); if (sw) return (acc ?? 0) + sw.targetKg; return acc }, null) : null
-                                  return sum + (sankhyaKg ?? w.targetKg)
-                                }, 0)
+                                  if (sankhyaKg !== null) return sankhyaKg
+                                  return sankhyaConnected ? (w.manualKgByPeriod?.[periodKey] ?? 0) : w.targetKg
+                                }
+                                const totalTarget = (block.weightTargets ?? []).reduce((sum, w) => sum + resolveKg(w), 0)
                                 const totalActual = (block.weightTargets ?? []).reduce((sum, wt) => sum + brandWeightRows.filter((r) => wt.brand && r.brand === wt.brand.toUpperCase() && (sc.length === 0 || sc.some((c) => r.sellerCode === c))).reduce((s2, r) => s2 + r.totalKg, 0), 0)
                                 if (totalTarget <= 0) return <span className="text-surface-400">—</span>
                                 const pct = totalActual / totalTarget * 100
-                                if (pct >= 100) {
-                                  return <span className="font-semibold text-emerald-600">+{num(pct - 100, 1)}% acima da meta ↑</span>
-                                }
+                                if (pct >= 100) return <span className="font-semibold text-emerald-600">+{num(pct - 100, 1)}% acima da meta ↑</span>
                                 const color = pct >= 80 ? 'text-cyan-700' : pct >= 60 ? 'text-amber-600' : 'text-rose-600'
                                 return <span className={`font-semibold ${color}`}>{num(pct, 1)}% da meta total atingida</span>
                               })()}
