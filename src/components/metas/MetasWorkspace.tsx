@@ -32,6 +32,7 @@ type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
 type PrizeType = 'CASH' | 'BENEFIT'
 type CashCalcMode = 'PERCENT' | 'FIXED'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
+type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
 
 interface GoalRule {
   id: string
@@ -216,6 +217,8 @@ interface RuleBlock {
   weightTargets: WeightTarget[]
   focusProductCode?: string
   focusTargetKg?: number
+  focusTargetMode?: FocusTargetMode
+  focusTargetBasePct?: number
 }
 
 interface CycleWeek {
@@ -260,7 +263,7 @@ const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: str
   { type: 'DISTRIBUICAO', label: 'Distribuição de itens', defaultDescription: 'Positivação de itens na base de clientes.' },
   { type: 'DEVOLUCAO', label: 'Devolução', defaultDescription: 'Racional sobre os valores devolvidos x valores faturados.' },
   { type: 'INADIMPLENCIA', label: 'Inadimplência acumulativa', defaultDescription: 'Racional sobre o percentual x valores faturados.' },
-  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do volume do item foco com positivação mínima da base de clientes.' },
+  { type: 'ITEM_FOCO', label: 'Item foco do mês', defaultDescription: 'Entrega do item foco conforme o critério definido no bloco (kg ou base de clientes).' },
   { type: 'RENTABILIDADE', label: 'Rentabilidade', defaultDescription: 'Margem de contribuição dentro do percentual parametrizado.' },
   { type: 'CUSTOM', label: 'Personalizado', defaultDescription: '' },
 ]
@@ -305,13 +308,24 @@ const DEFAULT_RULES: GoalRule[] = [
   { id: 'closing-dist', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DISTRIBUICAO', kpi: 'Distribuição de itens', description: 'Ter 80% dos itens positivados em 40% da base de clientes.', targetText: '80%|40', rewardValue: 241.87, points: 0.04 },
   { id: 'closing-devol', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'DEVOLUCAO', kpi: 'Devolução', description: 'Racional sobre os valores devolvidos x valores faturados no mês.', targetText: 'Até 0,5%', rewardValue: 241.87, points: 0.05 },
   { id: 'closing-inadimp', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'INADIMPLENCIA', kpi: 'Inadimplência acumulativa', description: 'Racional sobre o percentual x valores faturados no mês.', targetText: '3|45', rewardValue: 241.87, points: 0.05 },
-  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do volume do item foco com positivação mínima da base de clientes.', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
+  { id: 'closing-foco', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'ITEM_FOCO', kpi: 'Item foco do mês', description: 'Entrega do item foco conforme o critério definido no bloco (kg ou base de clientes).', targetText: '100|40', rewardValue: 483.73, points: 0.1 },
   { id: 'closing-fin', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'META_FINANCEIRA', kpi: 'Meta financeira', description: 'Atingir a meta financeira no fechamento do mês (faturado) — bônus de superação.', targetText: '120%', rewardValue: 96.75, points: 0 },
   { id: 'closing-rentab', stage: 'CLOSING', frequency: 'MONTHLY', kpiType: 'RENTABILIDADE', kpi: 'Rentabilidade', description: 'Apresentar margem de contribuição dentro do percentual parametrizado.', targetText: '33%', rewardValue: 967.46, points: 0.2 },
 ]
 
 const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
-  { id: 'default', title: 'Bloco padrão', monthlyTarget: 0, sellerIds: [], rules: DEFAULT_RULES, weightTargets: [], focusProductCode: '', focusTargetKg: 0 },
+  {
+    id: 'default',
+    title: 'Bloco padrão',
+    monthlyTarget: 0,
+    sellerIds: [],
+    rules: DEFAULT_RULES,
+    weightTargets: [],
+    focusProductCode: '',
+    focusTargetKg: 0,
+    focusTargetMode: 'KG',
+    focusTargetBasePct: 0,
+  },
 ]
 
 function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
@@ -636,6 +650,10 @@ function formatItemFocoTarget(volumePct: number, basePct: number) {
   return `${v}|${b}`
 }
 
+function resolveFocusTargetMode(block: RuleBlock): FocusTargetMode {
+  return block.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG'
+}
+
 function parseInadimplenciaTarget(targetText: string) {
   if (targetText.includes('|')) {
     const [pctRaw, daysRaw] = targetText.split('|')
@@ -955,6 +973,8 @@ export default function MetasWorkspace() {
         weightTargets: b.weightTargets ?? [],
         focusProductCode: b.focusProductCode ?? '',
         focusTargetKg: b.focusTargetKg ?? 0,
+        focusTargetMode: b.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG',
+        focusTargetBasePct: Math.max(Number(b.focusTargetBasePct ?? 0) || 0, 0),
         rules: (b.rules ?? []).map((r: GoalRule) => ({ ...r, kpiType: r.kpiType ?? inferKpiType(r.kpi) })),
       }))
       return DEFAULT_RULE_BLOCKS
@@ -2123,22 +2143,30 @@ export default function MetasWorkspace() {
               break
             case 'ITEM_FOCO':
               {
-                const { volumePct, basePct } = parseItemFocoTarget(rule.targetText)
+                const mode = resolveFocusTargetMode(block)
+                const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
+                if (!focusCode) {
+                  progress = 0
+                  break
+                }
+                if (mode === 'BASE_CLIENTS') {
+                  const targetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
+                  const requiredBaseClients = targetBasePct > 0
+                    ? Math.ceil(baseTotalClients * (targetBasePct / 100))
+                    : 0
+                  progress = requiredBaseClients > 0
+                    ? focusSoldClients / Math.max(requiredBaseClients, 1)
+                    : 0
+                  break
+                }
+                const { volumePct } = parseItemFocoTarget(rule.targetText)
                 const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
-                if (!focusCode || focusTargetKg <= 0 || volumePct <= 0) {
+                if (focusTargetKg <= 0 || volumePct <= 0) {
                   progress = 0
                   break
                 }
                 const requiredKg = focusTargetKg * (volumePct / 100)
-                const volumeProgress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
-                const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
-                const requiredBaseClients = basePct > 0
-                  ? Math.ceil(baseTotalClients * (basePct / 100))
-                  : 0
-                const baseProgress = requiredBaseClients > 0
-                  ? focusSoldClients / Math.max(requiredBaseClients, 1)
-                  : 1
-                progress = volumeProgress * baseProgress
+                progress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
               }
               break
             default:
@@ -3016,6 +3044,10 @@ export default function MetasWorkspace() {
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
             const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
             const otherSellerBlocksCount = ruleBlocks.filter((b) => b.id !== block.id && b.sellerIds.length > 0).length
+            const focusTargetMode = resolveFocusTargetMode(block)
+            const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
+            const focusTargetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
+            const hasFocusTarget = focusTargetMode === 'BASE_CLIENTS' ? focusTargetBasePct > 0 : focusTargetKg > 0
             const monthStartIso = `${year}-${String(month + 1).padStart(2, '0')}-01`
             const stageLabelMap = Object.fromEntries(STAGES.map((s) => [s.key, s.label])) as Record<StageKey, string>
 
@@ -3269,7 +3301,7 @@ export default function MetasWorkspace() {
                                   ok = resolvedItems > 0 && requiredClients > 0 && soldItemsStage >= resolvedItems && clientsWithAnyItems >= requiredClients
                                 }
                               } else if (kpiType === 'ITEM_FOCO') {
-                                const { volumePct, basePct } = parseItemFocoTarget(rule.targetText)
+                                const { volumePct } = parseItemFocoTarget(rule.targetText)
                                 const focusCode = (block.focusProductCode ?? '').trim()
                                 const focusRow = focusCode
                                   ? (focusProductRows[focusCode] ?? []).find((row) => row.sellerCode === sellerCode)
@@ -3277,25 +3309,45 @@ export default function MetasWorkspace() {
                                 const soldKg = focusRow?.soldKg ?? 0
                                 const soldClients = Number(focusRow?.soldClients ?? 0)
                                 const baseTotalClients = resolvedBaseClients
-                                const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
-                                const requiredKg = focusTargetKg * (Math.max(volumePct, 0) / 100)
-                                const requiredBaseClients = basePct > 0
-                                  ? Math.ceil(baseTotalClients * (basePct / 100))
-                                  : 0
-                                const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
-                                const baseGoalOk = requiredBaseClients > 0 ? soldClients >= requiredBaseClients : true
-                                title = 'Item foco (volume + base de clientes)'
-                                lines = [
-                                  { label: 'Meta do item foco (kg)', value: `${num(focusTargetKg, 2)} kg` },
-                                  { label: 'Volume mínimo exigido', value: `${num(requiredKg, 2)} kg` },
-                                  { label: 'Vendido do item foco', value: `${num(soldKg, 2)} kg` },
-                                  { label: 'Base total de clientes do vendedor', value: `${baseTotalClients}` },
-                                  { label: 'Clientes com item foco', value: `${soldClients}` },
-                                  { label: 'Meta de base (clientes)', value: requiredBaseClients > 0 ? `${requiredBaseClients} (${num(basePct, 2)}%)` : `${num(basePct, 2)}%` },
-                                ]
-                                resultLabel = 'Resultado apurado'
-                                resultValue = `${num(baseCoveragePct, 2)}% base`
-                                ok = requiredKg > 0 && soldKg >= requiredKg && baseGoalOk
+                                const focusMode = resolveFocusTargetMode(block)
+                                if (focusMode === 'BASE_CLIENTS') {
+                                  const targetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
+                                  const requiredBaseClients = targetBasePct > 0
+                                    ? Math.ceil(baseTotalClients * (targetBasePct / 100))
+                                    : 0
+                                  const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
+                                  title = 'Item foco por base de clientes'
+                                  lines = [
+                                    { label: 'Critério da meta', value: 'Positivação da base de clientes' },
+                                    { label: 'Base total de clientes do vendedor', value: `${baseTotalClients}` },
+                                    { label: 'Meta parametrizada', value: `${num(targetBasePct, 2)}%` },
+                                    { label: 'Meta de clientes', value: `${requiredBaseClients} cliente(s)` },
+                                    { label: 'Clientes com item foco', value: `${soldClients}` },
+                                    { label: 'Vendido do item foco (informativo)', value: `${num(soldKg, 2)} kg` },
+                                  ]
+                                  resultLabel = 'Resultado apurado'
+                                  resultValue = requiredBaseClients > 0
+                                    ? `${num(soldClients, 0)}/${num(requiredBaseClients, 0)} clientes (${num(baseCoveragePct, 2)}%)`
+                                    : `${num(baseCoveragePct, 2)}% base`
+                                  ok = requiredBaseClients > 0 && soldClients >= requiredBaseClients
+                                } else {
+                                  const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                                  const requiredKg = focusTargetKg * (Math.max(volumePct, 0) / 100)
+                                  title = 'Item foco por volume (kg)'
+                                  lines = [
+                                    { label: 'Critério da meta', value: 'Volume do item foco em kg' },
+                                    { label: 'Meta do item foco (kg)', value: `${num(focusTargetKg, 2)} kg` },
+                                    { label: 'Percentual mínimo aplicado', value: `${num(Math.max(volumePct, 0), 2)}%` },
+                                    { label: 'Volume mínimo exigido', value: `${num(requiredKg, 2)} kg` },
+                                    { label: 'Vendido do item foco', value: `${num(soldKg, 2)} kg` },
+                                    { label: 'Clientes com item foco (informativo)', value: `${soldClients}` },
+                                  ]
+                                  resultLabel = 'Resultado apurado'
+                                  resultValue = requiredKg > 0
+                                    ? `${num(soldKg, 2)}/${num(requiredKg, 2)} kg`
+                                    : `${num(soldKg, 2)} kg`
+                                  ok = requiredKg > 0 && soldKg >= requiredKg
+                                }
                               } else if (kpiType === 'RENTABILIDADE') {
                                 const targetPct = Math.max(parameterNumber, 0)
                                 const threshold = targetPct > 0 ? teamAverageTicket * (targetPct / 100) : 0
@@ -3680,6 +3732,17 @@ export default function MetasWorkspace() {
 
                             if (kpiType === 'ITEM_FOCO') {
                               const parsed = parseItemFocoTarget(rule.targetText)
+                              const itemFocoMode = resolveFocusTargetMode(block)
+                              if (itemFocoMode === 'BASE_CLIENTS') {
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <span className="rounded bg-primary-50 px-2 py-1 text-[10px] font-semibold text-primary-700">
+                                      Meta no card: {num(Math.max(block.focusTargetBasePct ?? 0, 0), 1)}% da base
+                                    </span>
+                                    {renderKpiInspector(rule, kpiType)}
+                                  </div>
+                                )
+                              }
                               return (
                                 <div className="flex items-center gap-1">
                                   <input
@@ -3688,22 +3751,11 @@ export default function MetasWorkspace() {
                                     min={0}
                                     step="0.1"
                                     placeholder="0"
-                                    title="% mínimo do volume para item foco"
+                                    title="% mínimo aplicado sobre a meta em kg do item foco"
                                     value={parsed.volumePct || ''}
                                     onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parseDecimal(e.target.value, 0), parsed.basePct) })}
                                   />
-                                  <span className="text-[10px] text-surface-400">% vol.</span>
-                                  <input
-                                    className="w-14 rounded border border-surface-200 px-1.5 py-1.5 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                    type="number"
-                                    min={0}
-                                    step="0.1"
-                                    placeholder="0"
-                                    title="% da base total de clientes do vendedor para positivação do item foco"
-                                    value={parsed.basePct || ''}
-                                    onChange={(e) => updateBlockRule(rule.id, { targetText: formatItemFocoTarget(parsed.volumePct, parseDecimal(e.target.value, 0)) })}
-                                  />
-                                  <span className="text-[10px] text-surface-400">% base</span>
+                                  <span className="text-[10px] text-surface-400">% meta kg</span>
                                   {renderKpiInspector(rule, kpiType)}
                                 </div>
                               )
@@ -4007,7 +4059,7 @@ export default function MetasWorkspace() {
                         setConfirmModal({
                           open: true,
                           title: 'Aplicar item foco a todos',
-                          message: `Aplicar o item foco e a meta (kg) do bloco "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve o item foco atual dos demais blocos no mês selecionado.`,
+                          message: `Aplicar o item foco e o critério da meta (${focusTargetMode === 'BASE_CLIENTS' ? `${num(focusTargetBasePct, 2)}% da base de clientes` : `${num(focusTargetKg, 2)} kg`}) do bloco "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve o item foco atual dos demais blocos no mês selecionado.`,
                           confirmLabel: 'Aplicar a todos',
                           variant: 'primary',
                           onConfirm: () =>
@@ -4018,6 +4070,8 @@ export default function MetasWorkspace() {
                                   ...candidate,
                                   focusProductCode: block.focusProductCode ?? '',
                                   focusTargetKg: block.focusTargetKg ?? 0,
+                                  focusTargetMode,
+                                  focusTargetBasePct,
                                 }
                               })
                             ),
@@ -4029,7 +4083,7 @@ export default function MetasWorkspace() {
                     </button>
                   </div>
 
-                  <div className="grid gap-3 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-[1.6fr_0.7fr] md:items-end">
+                  <div className="grid gap-3 rounded-xl border border-surface-200 bg-surface-50 p-3 md:grid-cols-[1.4fr_0.8fr_0.8fr] md:items-end">
                     <label className={label}>
                       Produto foco
                       <select
@@ -4049,23 +4103,42 @@ export default function MetasWorkspace() {
                       </select>
                     </label>
                     <label className={label}>
-                      Meta do item (kg)
+                      Critério da meta
+                      <select
+                        className={input}
+                        value={focusTargetMode}
+                        onChange={(e) => updateBlock({ focusTargetMode: e.target.value as FocusTargetMode })}
+                      >
+                        <option value="KG">Meta do item (kg)</option>
+                        <option value="BASE_CLIENTS">% da base de clientes</option>
+                      </select>
+                    </label>
+                    <label className={label}>
+                      {focusTargetMode === 'BASE_CLIENTS' ? 'Meta da base de clientes (%)' : 'Meta do item (kg)'}
                       <input
                         className={input}
                         type="number"
                         step="0.01"
                         min="0"
                         placeholder="0"
-                        value={block.focusTargetKg ?? ''}
-                        onChange={(e) => updateBlock({ focusTargetKg: parseDecimal(e.target.value, 0) })}
+                        value={focusTargetMode === 'BASE_CLIENTS' ? (block.focusTargetBasePct ?? '') : (block.focusTargetKg ?? '')}
+                        onChange={(e) =>
+                          updateBlock(
+                            focusTargetMode === 'BASE_CLIENTS'
+                              ? { focusTargetBasePct: parseDecimal(e.target.value, 0) }
+                              : { focusTargetKg: parseDecimal(e.target.value, 0) }
+                          )
+                        }
                       />
                     </label>
                   </div>
 
                   <div className="mt-3">
-                    {(!block.focusProductCode || !block.focusTargetKg) ? (
+                    {(!block.focusProductCode || !hasFocusTarget) ? (
                       <p className="rounded-lg border border-dashed border-surface-200 bg-white px-3 py-4 text-center text-xs text-surface-400">
-                        Selecione um produto da lista e defina a meta (kg) para acompanhar o item foco por vendedor.
+                        {focusTargetMode === 'BASE_CLIENTS'
+                          ? 'Selecione um produto da lista e defina a meta de base (%) para acompanhar o item foco por vendedor.'
+                          : 'Selecione um produto da lista e defina a meta (kg) para acompanhar o item foco por vendedor.'}
                       </p>
                     ) : (
                       <div className="overflow-x-auto">
@@ -4074,10 +4147,10 @@ export default function MetasWorkspace() {
                             <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                               <th className="px-3 py-2">SKU</th>
                               <th className="px-3 py-2">Item foco</th>
-                              <th className="px-3 py-2">Meta (kg)</th>
-                              <th className="px-3 py-2">Vendido (kg)</th>
+                              <th className="px-3 py-2">{focusTargetMode === 'BASE_CLIENTS' ? 'Meta da base' : 'Meta (kg)'}</th>
+                              <th className="px-3 py-2">{focusTargetMode === 'BASE_CLIENTS' ? 'Clientes com item foco' : 'Vendido (kg)'}</th>
                               <th className="px-3 py-2">Base total (clientes)</th>
-                              <th className="px-3 py-2">Positivação da base</th>
+                              <th className="px-3 py-2">{focusTargetMode === 'BASE_CLIENTS' ? 'Status da meta' : 'Positivação da base'}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-surface-100">
@@ -4116,6 +4189,7 @@ export default function MetasWorkspace() {
                               const soldKg = blockRows.reduce((sum, row) => sum + (row.soldKg ?? 0), 0)
                               const soldClients = blockRows.reduce((sum, row) => sum + Number(row.soldClients ?? 0), 0)
                               const targetKg = Math.max(block.focusTargetKg ?? 0, 0)
+                              const targetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
                               const itemFocoRule = block.rules.find((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'ITEM_FOCO')
                               const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, basePct: 0 }
                               const volumeRequiredKg = targetKg > 0 ? targetKg * (Math.max(itemFocoParams.volumePct, 0) / 100) : 0
@@ -4130,11 +4204,12 @@ export default function MetasWorkspace() {
                                 }
                                 return sum + clientSet.size
                               }, 0)
-                              const basePct = Math.max(itemFocoParams.basePct, 0)
-                              const requiredBaseClients = basePct > 0 ? Math.ceil(baseTotalClients * (basePct / 100)) : 0
+                              const requiredBaseClients = targetBasePct > 0 ? Math.ceil(baseTotalClients * (targetBasePct / 100)) : 0
                               const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
-                              const baseOk = requiredBaseClients > 0 ? soldClients >= requiredBaseClients : true
-                              const baseColor = baseOk ? 'text-emerald-700' : 'text-rose-700'
+                              const baseOk = requiredBaseClients > 0 ? soldClients >= requiredBaseClients : false
+                              const statusColor = focusTargetMode === 'BASE_CLIENTS'
+                                ? (baseOk ? 'text-emerald-700' : 'text-rose-700')
+                                : 'text-surface-700'
                               const sku = focusProduct?.code ?? focusCode
                               const itemNome = focusProduct?.description ?? 'Item não encontrado na lista'
 
@@ -4142,23 +4217,53 @@ export default function MetasWorkspace() {
                                 <tr key={`focus-item-${focusCode}`} className="hover:bg-surface-50/50">
                                   <td className="px-3 py-2 text-xs font-semibold text-surface-800">{sku || '—'}</td>
                                   <td className="px-3 py-2 text-xs text-surface-700">{itemNome}</td>
-                                  <td className="px-3 py-2 text-xs text-surface-700">{num(targetKg, 2)} kg</td>
-                                  <td className="px-3 py-2 text-xs text-surface-700">
-                                    <div className="font-medium">{num(soldKg, 2)} kg</div>
-                                    {itemFocoParams.volumePct > 0 ? (
-                                      <div className={`text-[10px] ${volumeOk ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                        mínimo {num(itemFocoParams.volumePct, 0)}% = {num(volumeRequiredKg, 2)} kg
-                                      </div>
-                                    ) : null}
-                                  </td>
+                                  {focusTargetMode === 'BASE_CLIENTS' ? (
+                                    <>
+                                      <td className="px-3 py-2 text-xs text-surface-700">
+                                        {num(targetBasePct, 2)}%
+                                        <div className="text-[10px] text-surface-500">
+                                          meta: {requiredBaseClients} cliente(s)
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2 text-xs text-surface-700">
+                                        <div className="font-medium">{num(soldClients, 0)} cliente(s)</div>
+                                        <div className="text-[10px] text-surface-500">
+                                          vendido: {num(soldKg, 2)} kg (informativo)
+                                        </div>
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="px-3 py-2 text-xs text-surface-700">{num(targetKg, 2)} kg</td>
+                                      <td className="px-3 py-2 text-xs text-surface-700">
+                                        <div className="font-medium">{num(soldKg, 2)} kg</div>
+                                        {itemFocoParams.volumePct > 0 ? (
+                                          <div className={`text-[10px] ${volumeOk ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                            mínimo {num(itemFocoParams.volumePct, 0)}% = {num(volumeRequiredKg, 2)} kg
+                                          </div>
+                                        ) : null}
+                                      </td>
+                                    </>
+                                  )}
                                   <td className="px-3 py-2 text-xs text-surface-700">{baseTotalClients}</td>
-                                  <td className={`px-3 py-2 text-xs font-semibold ${baseColor}`}>
-                                    {num(baseCoveragePct, 1)}%
-                                    {basePct > 0 ? (
-                                      <span className="ml-1 text-[10px] font-medium text-surface-500">
-                                        (meta {num(basePct, 0)}% = {requiredBaseClients} clientes)
-                                      </span>
-                                    ) : null}
+                                  <td className={`px-3 py-2 text-xs font-semibold ${statusColor}`}>
+                                    {focusTargetMode === 'BASE_CLIENTS' ? (
+                                      <>
+                                        {baseOk ? 'Conquistado' : 'Ainda não atingiu'}
+                                        <span className="ml-1 text-[10px] font-medium text-surface-500">
+                                          ({num(baseCoveragePct, 1)}% da base)
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {num(baseCoveragePct, 1)}%
+                                        {requiredBaseClients > 0 ? (
+                                          <span className="ml-1 text-[10px] font-medium text-surface-500">
+                                            ({num(soldClients, 0)}/{requiredBaseClients} clientes)
+                                          </span>
+                                        ) : null}
+                                      </>
+                                    )}
                                   </td>
                                 </tr>
                               )
