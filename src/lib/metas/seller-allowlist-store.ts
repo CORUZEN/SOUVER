@@ -35,6 +35,17 @@ async function readLegacyAllowlistFile(): Promise<AllowedSeller[]> {
   }
 }
 
+function isProfileTypeUnsupportedError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const message = String((error as { message?: unknown }).message ?? '')
+  return (
+    message.includes('Unknown argument `profileType`') ||
+    message.includes('Unknown arg `profileType`') ||
+    message.toLowerCase().includes('profile_type') ||
+    message.toLowerCase().includes('cannot convert undefined or null to object')
+  )
+}
+
 export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
   try {
     const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
@@ -66,18 +77,42 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
 
 export async function writeSellerAllowlist(input: AllowedSeller[]) {
   const normalized = normalizeList(input)
-  await prisma.$transaction([
-    prisma.metasSeller.deleteMany(),
-    prisma.metasSeller.createMany({
-      data: normalized.map((s) => ({
-        code: s.code ?? null,
-        partnerCode: s.partnerCode ?? null,
-        name: s.name,
-        active: s.active,
-        profileType: normalizeSellerProfileType(s.profileType),
-      })),
-      skipDuplicates: true,
-    }),
-  ])
+
+  const withProfileType = () =>
+    prisma.$transaction([
+      prisma.metasSeller.deleteMany(),
+      prisma.metasSeller.createMany({
+        data: normalized.map((s) => ({
+          code: s.code ?? null,
+          partnerCode: s.partnerCode ?? null,
+          name: s.name,
+          active: s.active,
+          profileType: normalizeSellerProfileType(s.profileType),
+        })),
+        skipDuplicates: true,
+      }),
+    ])
+
+  const withoutProfileType = () =>
+    prisma.$transaction([
+      prisma.metasSeller.deleteMany(),
+      prisma.metasSeller.createMany({
+        data: normalized.map((s) => ({
+          code: s.code ?? null,
+          partnerCode: s.partnerCode ?? null,
+          name: s.name,
+          active: s.active,
+        })),
+        skipDuplicates: true,
+      }),
+    ])
+
+  try {
+    await withProfileType()
+  } catch (error) {
+    if (!isProfileTypeUnsupportedError(error)) throw error
+    await withoutProfileType()
+  }
+
   return normalized
 }
