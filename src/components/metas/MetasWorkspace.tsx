@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Boxes,
   Building2,
   CalendarDays,
@@ -140,6 +143,9 @@ interface ProductAllowlistEntry {
   mobility: 'SIM' | 'NAO'
   active: boolean
 }
+
+type ProductSortKey = 'code' | 'description' | 'brand' | 'unit' | 'mobility' | 'active'
+type SortDirection = 'asc' | 'desc'
 
 interface SellerDistributionRow {
   sellerCode: string
@@ -964,6 +970,10 @@ export default function MetasWorkspace() {
   const [productDescriptionFilter, setProductDescriptionFilter] = useState('')
   const [productBrandFilter, setProductBrandFilter] = useState('')
   const [productShowOnlyInactive, setProductShowOnlyInactive] = useState(false)
+  const [productSort, setProductSort] = useState<{ key: ProductSortKey; direction: SortDirection }>({
+    key: 'brand',
+    direction: 'asc',
+  })
   const [companyScopeFilter, setCompanyScopeFilter] = useState<CompanyScopeFilter>('all')
   const [showPeriodPicker, setShowPeriodPicker] = useState(false)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
@@ -2866,6 +2876,50 @@ export default function MetasWorkspace() {
       return codeOk && descriptionOk && brandOk && statusOk
     })
   }, [productAllowlist, productCodeFilter, productDescriptionFilter, productBrandFilter, productShowOnlyInactive])
+
+  const sortedProductAllowlist = useMemo(() => {
+    const collator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true })
+    return filteredProductAllowlist
+      .map((product, index) => ({ product, index }))
+      .sort((a, b) => {
+        const left = a.product
+        const right = b.product
+        let compare = 0
+        switch (productSort.key) {
+          case 'active':
+            compare = Number(left.active) - Number(right.active)
+            break
+          case 'code':
+            compare = collator.compare(left.code ?? '', right.code ?? '')
+            break
+          case 'description':
+            compare = collator.compare(left.description ?? '', right.description ?? '')
+            break
+          case 'brand':
+            compare = collator.compare(left.brand ?? '', right.brand ?? '')
+            break
+          case 'unit':
+            compare = collator.compare(left.unit ?? '', right.unit ?? '')
+            break
+          case 'mobility':
+            compare = collator.compare(left.mobility ?? '', right.mobility ?? '')
+            break
+          default:
+            compare = 0
+            break
+        }
+        if (compare === 0) compare = a.index - b.index
+        return productSort.direction === 'asc' ? compare : -compare
+      })
+      .map((entry) => entry.product)
+  }, [filteredProductAllowlist, productSort.direction, productSort.key])
+
+  function toggleProductSort(key: ProductSortKey) {
+    setProductSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
 
   const productAllowlistStats = useMemo(() => {
     const total = productAllowlist.length
@@ -5529,7 +5583,7 @@ export default function MetasWorkspace() {
                     />
                   </label>
                   <label className={label}>
-                    Filtro por marca/categoria
+                    Filtro por grupo/categoria
                     <input
                       className={input}
                       value={productBrandFilter}
@@ -5569,17 +5623,95 @@ export default function MetasWorkspace() {
                   <table className="min-w-full divide-y divide-surface-200 text-sm">
                     <thead>
                       <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                        <th className="px-3 py-2">Ativo</th>
-                        <th className="px-3 py-2">Código</th>
-                        <th className="px-3 py-2">Descrição</th>
-                        <th className="px-3 py-2">Marca</th>
-                        <th className="px-3 py-2">Unidade padrão</th>
-                        <th className="px-3 py-2">Mobilidade</th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('active')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Ativo
+                            {productSort.key === 'active' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('code')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Código
+                            {productSort.key === 'code' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('description')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Descrição
+                            {productSort.key === 'description' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('brand')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Grupo
+                            {productSort.key === 'brand' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('unit')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Unidade padrão
+                            {productSort.key === 'unit' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSort('mobility')}
+                            className="inline-flex items-center gap-1.5 hover:text-surface-700"
+                          >
+                            Mobilidade
+                            {productSort.key === 'mobility' ? (
+                              productSort.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                            ) : (
+                              <ArrowUpDown size={12} className="text-surface-400" />
+                            )}
+                          </button>
+                        </th>
                         <th className="px-3 py-2">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                      {filteredProductAllowlist.length === 0 ? (
+                      {sortedProductAllowlist.length === 0 ? (
                         <tr>
                           <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={7}>
                             {productShowOnlyInactive
@@ -5588,7 +5720,7 @@ export default function MetasWorkspace() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProductAllowlist.map((product, index) => (
+                        sortedProductAllowlist.map((product, index) => (
                           <tr key={`product-allow-${product.code}-${index}`}>
                             <td className="px-3 py-2">
                               <input
@@ -5629,7 +5761,7 @@ export default function MetasWorkspace() {
                 </div>
 
                 <p className="text-xs text-surface-500">
-                  Filtros corporativos aplicados na sincronização: Mobilidade = SIM, e marcas permitidas: CAFÉS, COLORÍFICOS/TEMPEROS, GRÃOS, RAÇÃO PASSAROS, RAÇÃO PET - CACHORRO e RAÇÃO PET - GATO.
+                  Filtros corporativos aplicados na sincronização: Mobilidade = SIM, e grupos permitidos: CAFÉS, COLORÍFICOS/TEMPEROS, GRÃOS, RAÇÃO PASSAROS, RAÇÃO PET - CACHORRO e RAÇÃO PET - GATO.
                 </p>
               </div>
             )}
