@@ -915,6 +915,11 @@ export default function MetasWorkspace() {
     variant: 'danger' | 'primary'
     onConfirm: () => void
   }>({ open: false, title: '', message: '', confirmLabel: 'Confirmar', variant: 'primary', onConfirm: () => {} })
+  const [applyKpiModal, setApplyKpiModal] = useState<{
+    open: boolean
+    sourceBlockId: string
+    selectedSellerIds: string[]
+  }>({ open: false, sourceBlockId: '', selectedSellerIds: [] })
   const [sellerPickerBlockId, setSellerPickerBlockId] = useState<string | null>(null)
   const [sellerPickerSearch, setSellerPickerSearch] = useState('')
   const [addGroupModal, setAddGroupModal] = useState<{ open: boolean; search: string; selectedSellerId: string }>({ open: false, search: '', selectedSellerId: '' })
@@ -984,6 +989,71 @@ export default function MetasWorkspace() {
   const canSaveProducts = metasPermissions?.products.save ?? false
   const canRemoveProducts = metasPermissions?.products.remove ?? false
   const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
+  const closeApplyKpiModal = () => setApplyKpiModal({ open: false, sourceBlockId: '', selectedSellerIds: [] })
+  const kpiApplyTargetOptions = useMemo(() => {
+    if (!applyKpiModal.sourceBlockId) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
+    const bySeller = new Map<string, { sellerId: string; sellerName: string; blockId: string; blockTitle: string }>()
+    for (const candidate of ruleBlocks) {
+      if (candidate.id === applyKpiModal.sourceBlockId || candidate.sellerIds.length === 0) continue
+      for (const sellerId of candidate.sellerIds) {
+        if (bySeller.has(sellerId)) continue
+        const sellerName = sellers.find((seller) => seller.id === sellerId)?.name ?? sellerId.replace(/^sankhya-/, '')
+        bySeller.set(sellerId, {
+          sellerId,
+          sellerName,
+          blockId: candidate.id,
+          blockTitle: candidate.title,
+        })
+      }
+    }
+    return Array.from(bySeller.values()).sort((a, b) => a.sellerName.localeCompare(b.sellerName))
+  }, [applyKpiModal.sourceBlockId, ruleBlocks, sellers])
+  const selectedKpiApplySellerIds = useMemo(
+    () => new Set(applyKpiModal.selectedSellerIds),
+    [applyKpiModal.selectedSellerIds]
+  )
+  const allKpiApplyTargetsSelected =
+    kpiApplyTargetOptions.length > 0 && kpiApplyTargetOptions.every((option) => selectedKpiApplySellerIds.has(option.sellerId))
+
+  useEffect(() => {
+    if (!applyKpiModal.open) return
+    setApplyKpiModal((prev) => {
+      const validIds = new Set(kpiApplyTargetOptions.map((option) => option.sellerId))
+      const filteredSelection = prev.selectedSellerIds.filter((sellerId) => validIds.has(sellerId))
+      if (
+        filteredSelection.length === prev.selectedSellerIds.length &&
+        filteredSelection.every((sellerId, index) => sellerId === prev.selectedSellerIds[index])
+      ) {
+        return prev
+      }
+      return { ...prev, selectedSellerIds: filteredSelection }
+    })
+  }, [applyKpiModal.open, kpiApplyTargetOptions])
+
+  const applyKpiRulesToSelectedSellers = () => {
+    const selectedIds = new Set(applyKpiModal.selectedSellerIds)
+    if (selectedIds.size === 0) return
+    setRuleBlocks((prev) => {
+      const sourceBlock = prev.find((block) => block.id === applyKpiModal.sourceBlockId)
+      if (!sourceBlock) return prev
+      const targetBlockIds = new Set(
+        prev
+          .filter((candidate) => candidate.id !== sourceBlock.id && candidate.sellerIds.some((sellerId) => selectedIds.has(sellerId)))
+          .map((candidate) => candidate.id)
+      )
+      if (targetBlockIds.size === 0) return prev
+      const stamp = Date.now()
+      return prev.map((candidate) => {
+        if (!targetBlockIds.has(candidate.id)) return candidate
+        const clonedRules = sourceBlock.rules.map((rule, index) => ({
+          ...rule,
+          id: `rule-${stamp}-${candidate.id}-${index}`,
+        }))
+        return { ...candidate, rules: clonedRules }
+      })
+    })
+    closeApplyKpiModal()
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -3379,6 +3449,13 @@ export default function MetasWorkspace() {
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
             const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
             const otherSellerBlocksCount = ruleBlocks.filter((b) => b.id !== block.id && b.sellerIds.length > 0).length
+            const otherSellerIdsForKpiApply = Array.from(
+              new Set(
+                ruleBlocks
+                  .filter((candidate) => candidate.id !== block.id && candidate.sellerIds.length > 0)
+                  .flatMap((candidate) => candidate.sellerIds)
+              )
+            )
             const focusTargetMode = resolveFocusTargetMode(block)
             const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
             const focusTargetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
@@ -3909,25 +3986,12 @@ export default function MetasWorkspace() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={otherSellerBlocksCount === 0}
+                      disabled={otherSellerIdsForKpiApply.length === 0}
                       onClick={() =>
-                        setConfirmModal({
+                        setApplyKpiModal({
                           open: true,
-                          title: 'Aplicar parâmetros de KPI a todos',
-                          message: `Aplicar os parâmetros de KPI do grupo "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve os KPIs atuais desses blocos no mês selecionado.`,
-                          confirmLabel: 'Aplicar a todos',
-                          variant: 'primary',
-                          onConfirm: () =>
-                            setRuleBlocks((prev) =>
-                              prev.map((candidate) => {
-                                if (candidate.id === block.id || candidate.sellerIds.length === 0) return candidate
-                                const clonedRules = block.rules.map((rule, index) => ({
-                                  ...rule,
-                                  id: `rule-${Date.now()}-${candidate.id}-${index}`,
-                                }))
-                                return { ...candidate, rules: clonedRules }
-                              })
-                            ),
+                          sourceBlockId: block.id,
+                          selectedSellerIds: otherSellerIdsForKpiApply,
                         })
                       }
                       className="inline-flex items-center gap-1 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -6002,6 +6066,94 @@ export default function MetasWorkspace() {
           </Card>
         </>
       )}
+
+      {/* ── KPI apply modal (targeted sellers) ───────────────────── */}
+      <Modal
+        open={applyKpiModal.open}
+        onClose={closeApplyKpiModal}
+        title="Aplicar parâmetros de KPI"
+        description={(() => {
+          const sourceTitle = ruleBlocks.find((block) => block.id === applyKpiModal.sourceBlockId)?.title ?? 'grupo selecionado'
+          return `Selecione os vendedores que receberão os parâmetros de KPI do bloco "${sourceTitle}".`
+        })()}
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={closeApplyKpiModal}
+              className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={applyKpiModal.selectedSellerIds.length === 0}
+              onClick={applyKpiRulesToSelectedSellers}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Aplicar para selecionados
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+            <label className="flex items-center gap-2 text-sm font-semibold text-surface-800">
+              <input
+                type="checkbox"
+                checked={allKpiApplyTargetsSelected}
+                onChange={(event) =>
+                  setApplyKpiModal((prev) => ({
+                    ...prev,
+                    selectedSellerIds: event.target.checked ? kpiApplyTargetOptions.map((option) => option.sellerId) : [],
+                  }))
+                }
+                className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500/40"
+              />
+              Selecionar todos os vendedores
+            </label>
+            <p className="mt-1 text-xs text-surface-500">
+              {applyKpiModal.selectedSellerIds.length} de {kpiApplyTargetOptions.length} selecionado(s).
+            </p>
+          </div>
+
+          {kpiApplyTargetOptions.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
+              Não há vendedores em outros blocos para receber os parâmetros.
+            </p>
+          ) : (
+            <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-surface-200 bg-white p-2">
+              {kpiApplyTargetOptions.map((option) => (
+                <label
+                  key={option.sellerId}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-transparent px-2 py-2 hover:border-surface-200 hover:bg-surface-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedKpiApplySellerIds.has(option.sellerId)}
+                      onChange={(event) =>
+                        setApplyKpiModal((prev) => ({
+                          ...prev,
+                          selectedSellerIds: event.target.checked
+                            ? [...prev.selectedSellerIds, option.sellerId]
+                            : prev.selectedSellerIds.filter((sellerId) => sellerId !== option.sellerId),
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500/40"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-surface-800">{option.sellerName}</p>
+                      <p className="text-[11px] text-surface-500">Bloco atual: {option.blockTitle}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {/* ── Confirm modal ──────────────────────────────────────── */}
       <Modal
