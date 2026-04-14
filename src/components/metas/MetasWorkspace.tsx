@@ -6194,6 +6194,8 @@ export default function MetasWorkspace() {
                         pointsAchieved: snapshot.pointsAchieved,
                         pointsTarget: snapshot.pointsTarget,
                         uniqueClients: snapshot.uniqueClients,
+                        baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
+                        rewardAchieved: snapshot.rewardAchieved,
                         pointsRatio,
                         avgRatio,
                         snapshot,
@@ -6257,7 +6259,7 @@ export default function MetasWorkspace() {
                         <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
                           <span>Vendedor</span>
-                          <span className="text-center">Pontuação</span>
+                          <span className="text-center">Premiação atual</span>
                           <span className="text-center">Clientes atendidos</span>
                           {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
                             <span key={`head-compact-${stage.key}`} className="text-center">{stage.label}</span>
@@ -6289,8 +6291,10 @@ export default function MetasWorkspace() {
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.pointsAchieved, 2)} pts</span>
-                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{num(row.uniqueClients, 0)}</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">{currency(row.rewardAchieved)}</span>
+                                  <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
+                                    {num(row.uniqueClients, 0)}/{num(row.baseClients, 0)}
+                                  </span>
                                   {row.cells.map((cell) => (
                                     <span
                                       key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
