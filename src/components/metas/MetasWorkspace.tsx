@@ -2742,7 +2742,7 @@ export default function MetasWorkspace() {
             <Card className="border-surface-200">
               <div className="mb-3 flex items-center gap-2">
                 <CalendarDays size={16} className="text-primary-600" />
-                <h2 className="text-base font-semibold text-surface-900">Calendário operacional mensal</h2>
+                <h2 className="text-base font-semibold text-surface-900">Calendário comercial</h2>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -2758,7 +2758,7 @@ export default function MetasWorkspace() {
               <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3">
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Desconsiderar data</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Desconsiderar data (Feriados, etc.)</p>
                     <div className="mt-2 flex gap-2">
                       <input type="date" className="w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
                       <button
@@ -2943,7 +2943,7 @@ export default function MetasWorkspace() {
             <Card className="border-surface-200">
               <div className="mb-3 flex items-center gap-2">
                 <Building2 size={14} className="text-indigo-600" />
-                <h2 className="text-base font-semibold text-surface-900">Escopo de empresas (Sankhya)</h2>
+                <h2 className="text-base font-semibold text-surface-900">Escopo de empresas</h2>
               </div>
               <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
                 <div className="grid grid-cols-3 gap-2">
