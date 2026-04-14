@@ -2910,8 +2910,106 @@ export default function MetasWorkspace() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <label className={label}>Mês<select className={input} value={month} onChange={(event) => handleMonthChange(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
-                <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => handleYearChange(Number(event.target.value))} /></label>
+                {canMutateConfig ? (
+                  <>
+                    <label className={label}>
+                      Mês
+                      <select className={input} value={month} onChange={(event) => handleMonthChange(Number(event.target.value))}>
+                        {MONTHS.map((monthName, index) => (
+                          <option key={monthName} value={index}>
+                            {monthName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={label}>
+                      Ano
+                      <input
+                        className={input}
+                        type="number"
+                        min={2024}
+                        max={2100}
+                        value={year}
+                        onChange={(event) => handleYearChange(Number(event.target.value))}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <div className={label}>
+                      Mês
+                      <div className={`${input} flex items-center justify-between`}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Mês anterior"
+                          onClick={() => handleMonthChange(month === 0 ? 11 : month - 1)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleMonthChange(month === 0 ? 11 : month - 1)
+                            }
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-surface-200 text-surface-600 hover:bg-surface-50"
+                        >
+                          <ChevronLeft size={14} />
+                        </div>
+                        <span className="text-sm font-semibold normal-case text-surface-900">{MONTHS[month]}</span>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Próximo mês"
+                          onClick={() => handleMonthChange(month === 11 ? 0 : month + 1)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleMonthChange(month === 11 ? 0 : month + 1)
+                            }
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-surface-200 text-surface-600 hover:bg-surface-50"
+                        >
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className={label}>
+                      Ano
+                      <div className={`${input} flex items-center justify-between`}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Ano anterior"
+                          onClick={() => handleYearChange(Math.max(2024, year - 1))}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleYearChange(Math.max(2024, year - 1))
+                            }
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-surface-200 text-surface-600 hover:bg-surface-50"
+                        >
+                          <ChevronLeft size={14} />
+                        </div>
+                        <span className="text-sm font-semibold normal-case text-surface-900">{year}</span>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Próximo ano"
+                          onClick={() => handleYearChange(Math.min(2100, year + 1))}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleYearChange(Math.min(2100, year + 1))
+                            }
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-surface-200 text-surface-600 hover:bg-surface-50"
+                        >
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
