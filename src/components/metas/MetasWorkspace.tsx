@@ -858,6 +858,7 @@ export default function MetasWorkspace() {
   const [allowlistSyncing, setAllowlistSyncing] = useState(false)
   const [allowlistError, setAllowlistError] = useState('')
   const [allowlistSuccess, setAllowlistSuccess] = useState('')
+  const [allowlistShowOnlyInactive, setAllowlistShowOnlyInactive] = useState(false)
   const [productAllowlist, setProductAllowlist] = useState<ProductAllowlistEntry[]>([])
   const [productAllowlistLoading, setProductAllowlistLoading] = useState(false)
   const [productAllowlistSaving, setProductAllowlistSaving] = useState(false)
@@ -2296,6 +2297,19 @@ export default function MetasWorkspace() {
     !sellersError &&
     corporateTotalOrders === 0 &&
     sellers.length > 0
+  const filteredSellerAllowlist = useMemo(() => {
+    return allowlist
+      .map((seller, index) => ({ seller, index }))
+      .filter((entry) => !allowlistShowOnlyInactive || !entry.seller.active)
+  }, [allowlist, allowlistShowOnlyInactive])
+
+  const sellerAllowlistStats = useMemo(() => {
+    const total = allowlist.length
+    const active = allowlist.filter((seller) => seller.active).length
+    const inactive = Math.max(total - active, 0)
+    return { total, active, inactive }
+  }, [allowlist])
+
   const filteredProductAllowlist = useMemo(() => {
     const codeFilter = productCodeFilter.trim().toUpperCase()
     const descriptionFilter = productDescriptionFilter.trim().toUpperCase()
@@ -4278,6 +4292,32 @@ export default function MetasWorkspace() {
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{allowlistSuccess}</div>
                 ) : null}
 
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-surface-200 bg-surface-50 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                      Liberados: {sellerAllowlistStats.active}
+                    </span>
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700">
+                      Não liberados: {sellerAllowlistStats.inactive}
+                    </span>
+                    <span className="rounded-full border border-surface-200 bg-white px-2.5 py-1 font-medium text-surface-600">
+                      Exibindo: {filteredSellerAllowlist.length} de {sellerAllowlistStats.total}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={sellerAllowlistStats.inactive === 0 && !allowlistShowOnlyInactive}
+                    onClick={() => setAllowlistShowOnlyInactive((prev) => !prev)}
+                    className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      allowlistShowOnlyInactive
+                        ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'border-surface-300 bg-white text-surface-700 hover:bg-surface-100'
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {allowlistShowOnlyInactive ? 'Mostrar todos' : 'Ver somente não liberados'}
+                  </button>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-surface-200 text-sm">
                     <thead>
@@ -4290,42 +4330,52 @@ export default function MetasWorkspace() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                      {allowlist.map((seller, index) => (
-                        <tr key={`seller-allow-${index}`}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-primary-600"
-                              checked={seller.active}
-                              onChange={(event) =>
-                                setAllowlist((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, active: event.target.checked } : item
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="text-xs text-surface-700">{seller.name}</span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="text-xs text-surface-700">{seller.code ?? '—'}</span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="text-xs text-surface-700">{seller.partnerCode ?? '—'}</span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() => removeSellerAndSave(index)}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                            >
-                              Remover
-                            </button>
+                      {filteredSellerAllowlist.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={5}>
+                            {allowlistShowOnlyInactive
+                              ? 'Nenhum vendedor não liberado encontrado.'
+                              : 'Nenhum vendedor encontrado.'}
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredSellerAllowlist.map(({ seller, index }) => (
+                          <tr key={`seller-allow-${index}`}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-primary-600"
+                                checked={seller.active}
+                                onChange={(event) =>
+                                  setAllowlist((prev) =>
+                                    prev.map((item, itemIndex) =>
+                                      itemIndex === index ? { ...item, active: event.target.checked } : item
+                                    )
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="text-xs text-surface-700">{seller.name}</span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="text-xs text-surface-700">{seller.code ?? '—'}</span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="text-xs text-surface-700">{seller.partnerCode ?? '—'}</span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => removeSellerAndSave(index)}
+                                className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                              >
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
