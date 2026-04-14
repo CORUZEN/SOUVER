@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { type AllowedProduct, getActiveAllowedProductsFromList } from '@/lib/metas/product-allowlist'
 import { readProductAllowlist, writeProductAllowlist } from '@/lib/metas/product-allowlist-store'
 
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+
+  const canView = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.PRODUCTS_VIEW)
+  if (!canView) {
+    return NextResponse.json({ message: 'Sem permissao para visualizar produtos da meta.' }, { status: 403 })
+  }
 
   const products = await readProductAllowlist()
   return NextResponse.json({
@@ -18,6 +23,11 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+
+  const canSave = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.PRODUCTS_SAVE)
+  if (!canSave) {
+    return NextResponse.json({ message: 'Sem permissao para salvar produtos da meta.' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => null)
   const products = body?.products
@@ -45,3 +55,4 @@ export async function PUT(req: NextRequest) {
     products: saved,
   })
 }
+

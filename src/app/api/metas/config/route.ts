@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -9,6 +9,11 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
+
+  const canView = await hasPermission(user.roleId, METAS_PERMISSION_CODES.CONFIG_VIEW)
+  if (!canView) {
+    return NextResponse.json({ message: 'Sem permissão para visualizar configurações de metas.' }, { status: 403 })
+  }
 
   const scope = req.nextUrl.searchParams.get('scope') ?? 'all'
   if (scope !== '1' && scope !== '2' && scope !== 'all') {
@@ -37,6 +42,11 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
+
+  const canSave = await hasPermission(user.roleId, METAS_PERMISSION_CODES.CONFIG_SAVE)
+  if (!canSave) {
+    return NextResponse.json({ message: 'Sem permissão para salvar configurações de metas.' }, { status: 403 })
+  }
 
   let body: unknown
   try {
@@ -80,3 +90,4 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({ ok: true, updatedAt: row.updatedAt })
 }
+

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import type { Prisma } from '@prisma/client'
 
@@ -31,6 +31,8 @@ export async function PUT(
   if (!parsed.success) {
     return NextResponse.json({ message: 'Dados inválidos.' }, { status: 400 })
   }
+
+  await ensureMetasPermissionCatalog()
 
   const validPermissions = await prisma.permission.findMany({
     where: { code: { in: parsed.data.permissionCodes } },

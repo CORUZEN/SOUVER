@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
   if (!user || response) return response
 
   await ensureRoleCatalog(prisma)
+  await ensureMetasPermissionCatalog()
 
   const [rolesRaw, permissions, users, administrationGroup] = await Promise.all([
     prisma.role.findMany({
@@ -76,6 +77,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { user, response } = await requireDeveloper(req)
   if (!user || response) return response
+  await ensureMetasPermissionCatalog()
 
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   const userAgent = req.headers.get('user-agent') ?? 'unknown'

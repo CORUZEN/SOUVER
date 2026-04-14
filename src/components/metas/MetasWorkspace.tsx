@@ -185,6 +185,19 @@ interface DistributionDiagnostics {
   companyScope?: string
 }
 
+interface MetasUiPermissionSection {
+  view: boolean
+  edit: boolean
+  save: boolean
+  remove: boolean
+}
+
+interface MetasUiPermissions {
+  config: MetasUiPermissionSection
+  sellers: MetasUiPermissionSection
+  products: MetasUiPermissionSection
+}
+
 interface RuleProgress {
   ruleId: string
   progress: number
@@ -848,6 +861,7 @@ function hasMonthEnded(year: number, month: number, closingEndIso: string) {
 export default function MetasWorkspace() {
   const now = new Date()
   const [view, setView] = useState<'dashboard' | 'config' | 'sellers' | 'products'>('dashboard')
+  const [metasPermissions, setMetasPermissions] = useState<MetasUiPermissions | null>(null)
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
   const [includeNational, setIncludeNational] = useState(true)
@@ -934,6 +948,23 @@ export default function MetasWorkspace() {
   const [isRebaseliningConfig, setIsRebaseliningConfig] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
+  const canViewConfig = metasPermissions?.config.view ?? false
+  const canEditConfig = metasPermissions?.config.edit ?? false
+  const canSaveConfig = metasPermissions?.config.save ?? false
+  const canRemoveConfig = metasPermissions?.config.remove ?? false
+  const canMutateConfig = canEditConfig || canSaveConfig || canRemoveConfig
+
+  const canViewSellers = metasPermissions?.sellers.view ?? false
+  const canEditSellers = metasPermissions?.sellers.edit ?? false
+  const canSaveSellers = metasPermissions?.sellers.save ?? false
+  const canRemoveSellers = metasPermissions?.sellers.remove ?? false
+  const canMutateSellers = canEditSellers || canSaveSellers || canRemoveSellers
+
+  const canViewProducts = metasPermissions?.products.view ?? false
+  const canEditProducts = metasPermissions?.products.edit ?? false
+  const canSaveProducts = metasPermissions?.products.save ?? false
+  const canRemoveProducts = metasPermissions?.products.remove ?? false
+  const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -944,6 +975,49 @@ export default function MetasWorkspace() {
     if (showPeriodPicker) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showPeriodPicker])
+
+  useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        const perms = data?.user?.metasPermissions as MetasUiPermissions | undefined
+        if (!perms) {
+          setMetasPermissions({
+            config: { view: false, edit: false, save: false, remove: false },
+            sellers: { view: false, edit: false, save: false, remove: false },
+            products: { view: false, edit: false, save: false, remove: false },
+          })
+          return
+        }
+        setMetasPermissions({
+          config: {
+            view: Boolean(perms.config?.view),
+            edit: Boolean(perms.config?.edit),
+            save: Boolean(perms.config?.save),
+            remove: Boolean(perms.config?.remove),
+          },
+          sellers: {
+            view: Boolean(perms.sellers?.view),
+            edit: Boolean(perms.sellers?.edit),
+            save: Boolean(perms.sellers?.save),
+            remove: Boolean(perms.sellers?.remove),
+          },
+          products: {
+            view: Boolean(perms.products?.view),
+            edit: Boolean(perms.products?.edit),
+            save: Boolean(perms.products?.save),
+            remove: Boolean(perms.products?.remove),
+          },
+        })
+      })
+      .catch(() => {
+        setMetasPermissions({
+          config: { view: false, edit: false, save: false, remove: false },
+          sellers: { view: false, edit: false, save: false, remove: false },
+          products: { view: false, edit: false, save: false, remove: false },
+        })
+      })
+  }, [])
 
   useEffect(() => {
     function handleViewportChange() {
@@ -1198,6 +1272,10 @@ export default function MetasWorkspace() {
   }, [configSaveSuccess, hasPendingConfigChanges])
 
   async function handleSaveConfigEdits() {
+    if (!canSaveConfig) {
+      setConfigSaveError('Seu cargo não possui permissão para salvar configurações do painel de metas.')
+      return
+    }
     if (isSavingConfig || !hasPendingConfigChanges) return
     setIsSavingConfig(true)
     setConfigSaveError('')
@@ -1430,22 +1508,37 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     if (view !== 'sellers') return
+    if (!canViewSellers) {
+      setAllowlist([])
+      setAllowlistError('Seu cargo não possui permissão para visualizar vendedores da meta.')
+      return
+    }
     void loadAllowlist()
-  }, [view])
+  }, [canViewSellers, view])
 
   useEffect(() => {
     if (view !== 'products') return
+    if (!canViewProducts) {
+      setProductAllowlist([])
+      setProductAllowlistError('Seu cargo não possui permissão para visualizar produtos da meta.')
+      return
+    }
     void loadProductAllowlist()
-  }, [view])
+  }, [canViewProducts, view])
 
   useEffect(() => {
     if (view !== 'config') return
+    if (!canViewConfig) return
     if (productAllowlistLoading) return
     if (productAllowlist.length > 0) return
     void loadProductAllowlist()
-  }, [productAllowlist.length, productAllowlistLoading, view])
+  }, [canViewConfig, productAllowlist.length, productAllowlistLoading, view])
 
   async function saveAllowlist() {
+    if (!canSaveSellers) {
+      setAllowlistError('Seu cargo não possui permissão para salvar vendedores da meta.')
+      return
+    }
     setAllowlistSaving(true)
     setAllowlistError('')
     setAllowlistSuccess('')
@@ -1554,6 +1647,10 @@ export default function MetasWorkspace() {
   }
 
   async function removeSellerAndSave(removeIndex: number) {
+    if (!canRemoveSellers) {
+      setAllowlistError('Seu cargo não possui permissão para remover vendedores da meta.')
+      return
+    }
     const updated = allowlist.filter((_, i) => i !== removeIndex)
     setAllowlist(updated)
     setAllowlistError('')
@@ -1588,6 +1685,10 @@ export default function MetasWorkspace() {
   }
 
   async function syncAllowlistFromSankhya() {
+    if (!canSaveSellers) {
+      setAllowlistError('Seu cargo não possui permissão para sincronizar vendedores da meta.')
+      return
+    }
     setAllowlistSyncing(true)
     setAllowlistError('')
     setAllowlistSuccess('')
@@ -1655,6 +1756,10 @@ export default function MetasWorkspace() {
   }
 
   async function saveProductAllowlist() {
+    if (!canSaveProducts) {
+      setProductAllowlistError('Seu cargo não possui permissão para salvar produtos da meta.')
+      return
+    }
     setProductAllowlistSaving(true)
     setProductAllowlistError('')
     setProductAllowlistSuccess('')
@@ -1701,6 +1806,10 @@ export default function MetasWorkspace() {
   }
 
   async function removeProductAndSave(code: string, description: string) {
+    if (!canRemoveProducts) {
+      setProductAllowlistError('Seu cargo não possui permissão para remover produtos da meta.')
+      return
+    }
     const updated = productAllowlist.filter(
       (item) => !(item.code === code && item.description === description)
     )
@@ -1742,6 +1851,10 @@ export default function MetasWorkspace() {
   }
 
   async function syncProductAllowlistFromSankhya() {
+    if (!canSaveProducts) {
+      setProductAllowlistError('Seu cargo não possui permissão para sincronizar produtos da meta.')
+      return
+    }
     setProductAllowlistSyncing(true)
     setProductAllowlistError('')
     setProductAllowlistSuccess('')
@@ -2717,7 +2830,8 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={() => setView('config')}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500"
+                  disabled={!canViewConfig}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500 disabled:cursor-not-allowed disabled:bg-surface-500"
                 >
                   <Settings2 size={14} />
                   Configurações
@@ -2725,7 +2839,8 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={() => setView('sellers')}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                  disabled={!canViewSellers}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Users size={14} />
                   Vendedores
@@ -2733,7 +2848,8 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={() => setView('products')}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                  disabled={!canViewProducts}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Boxes size={14} />
                   Produtos
@@ -2745,7 +2861,27 @@ export default function MetasWorkspace() {
       </Card>
 
       {view === 'config' ? (
+        !canViewConfig ? (
+          <Card className="border-amber-200 bg-amber-50">
+            <p className="text-sm font-semibold text-amber-800">Sem permissão para acessar Configurações de Metas.</p>
+            <p className="mt-1 text-xs text-amber-700">Solicite ao Desenvolvedor a liberação em Permissões por cargo.</p>
+          </Card>
+        ) : (
         <>
+          {!canMutateConfig ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Modo somente leitura: sua permissão pode visualizar as configurações, mas não pode editar/salvar/remover dados.
+            </div>
+          ) : null}
+
+          <fieldset
+            disabled={!canMutateConfig}
+            className={
+              !canMutateConfig
+                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                : undefined
+            }
+          >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200 bg-white px-4 py-3">
             <div className="flex items-center gap-2 text-sm">
               <span className={`inline-flex h-2.5 w-2.5 rounded-full ${hasPendingConfigChanges ? 'bg-amber-500' : 'bg-emerald-500'}`} />
@@ -2756,7 +2892,7 @@ export default function MetasWorkspace() {
             <button
               type="button"
               onClick={handleSaveConfigEdits}
-              disabled={!hasPendingConfigChanges || isSavingConfig}
+              disabled={!canSaveConfig || !hasPendingConfigChanges || isSavingConfig}
               className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-surface-300"
             >
               {isSavingConfig ? 'Salvando...' : 'Salvar edições'}
@@ -4350,9 +4486,30 @@ export default function MetasWorkspace() {
               ))}
             </div>
           </Card>
+          </fieldset>
         </>
+        )
       ) : view === 'sellers' ? (
+        !canViewSellers ? (
+          <Card className="border-amber-200 bg-amber-50">
+            <p className="text-sm font-semibold text-amber-800">Sem permissão para acessar Vendedores de Metas.</p>
+            <p className="mt-1 text-xs text-amber-700">Solicite ao Desenvolvedor a liberação em Permissões por cargo.</p>
+          </Card>
+        ) : (
         <>
+          {!canMutateSellers ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Modo somente leitura: sua permissão pode visualizar a tela de vendedores, mas não pode editar/salvar/remover.
+            </div>
+          ) : null}
+          <fieldset
+            disabled={!canMutateSellers}
+            className={
+              !canMutateSellers
+                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                : undefined
+            }
+          >
           <Card className="border-surface-200">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
@@ -4363,7 +4520,7 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={syncAllowlistFromSankhya}
-                  disabled={allowlistSyncing}
+                  disabled={!canSaveSellers || allowlistSyncing}
                   className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
                 >
                   {allowlistSyncing ? 'Sincronizando...' : 'Sincronizar Sankhya'}
@@ -4371,6 +4528,7 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={() => setAllowlist((prev) => [...prev, { code: null, partnerCode: null, name: '', active: true }])}
+                  disabled={!canEditSellers}
                   className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
                 >
                   <Plus size={12} /> Adicionar vendedor
@@ -4378,7 +4536,7 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={saveAllowlist}
-                  disabled={allowlistSaving}
+                  disabled={!canSaveSellers || allowlistSaving}
                   className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
                 >
                   {allowlistSaving ? 'Salvando...' : 'Salvar lista'}
@@ -4473,6 +4631,7 @@ export default function MetasWorkspace() {
                               <button
                                 type="button"
                                 onClick={() => removeSellerAndSave(index)}
+                                disabled={!canRemoveSellers}
                                 className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                               >
                                 Remover
@@ -4491,9 +4650,30 @@ export default function MetasWorkspace() {
               </div>
             )}
           </Card>
+          </fieldset>
         </>
+        )
       ) : view === 'products' ? (
+        !canViewProducts ? (
+          <Card className="border-amber-200 bg-amber-50">
+            <p className="text-sm font-semibold text-amber-800">Sem permissão para acessar Produtos de Metas.</p>
+            <p className="mt-1 text-xs text-amber-700">Solicite ao Desenvolvedor a liberação em Permissões por cargo.</p>
+          </Card>
+        ) : (
         <>
+          {!canMutateProducts ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Modo somente leitura: sua permissão pode visualizar a tela de produtos, mas não pode editar/salvar/remover.
+            </div>
+          ) : null}
+          <fieldset
+            disabled={!canMutateProducts}
+            className={
+              !canMutateProducts
+                ? 'opacity-85 [&_button:disabled]:!cursor-not-allowed [&_button:disabled]:!border-surface-300 [&_button:disabled]:!bg-surface-100 [&_button:disabled]:!text-surface-500 [&_button:disabled]:!shadow-none'
+                : undefined
+            }
+          >
           <Card className="border-surface-200">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
@@ -4504,7 +4684,7 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={syncProductAllowlistFromSankhya}
-                  disabled={productAllowlistSyncing}
+                  disabled={!canSaveProducts || productAllowlistSyncing}
                   className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
                 >
                   {productAllowlistSyncing ? 'Sincronizando...' : 'Sincronizar Sankhya'}
@@ -4517,6 +4697,7 @@ export default function MetasWorkspace() {
                       { code: '', description: '', brand: 'CAFES', unit: 'UN', mobility: 'SIM', active: true },
                     ])
                   }
+                  disabled={!canEditProducts}
                   className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
                 >
                   <Plus size={12} /> Adicionar produto
@@ -4524,7 +4705,7 @@ export default function MetasWorkspace() {
                 <button
                   type="button"
                   onClick={saveProductAllowlist}
-                  disabled={productAllowlistSaving}
+                  disabled={!canSaveProducts || productAllowlistSaving}
                   className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
                 >
                   {productAllowlistSaving ? 'Salvando...' : 'Salvar lista'}
@@ -4649,6 +4830,7 @@ export default function MetasWorkspace() {
                               <button
                                 type="button"
                                 onClick={() => removeProductAndSave(product.code, product.description)}
+                                disabled={!canRemoveProducts}
                                 className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                               >
                                 Remover
@@ -4667,7 +4849,9 @@ export default function MetasWorkspace() {
               </div>
             )}
           </Card>
+          </fieldset>
         </>
+        )
       ) : (
         <>
           {/* ── Period selector ────────────────────────────────────── */}

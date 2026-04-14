@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { getActiveAllowedSellersFromList, type AllowedSeller } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist, writeSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+
+  const canView = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.SELLERS_VIEW)
+  if (!canView) {
+    return NextResponse.json({ message: 'Sem permissao para visualizar vendedores da meta.' }, { status: 403 })
+  }
 
   const sellers = await readSellerAllowlist()
   return NextResponse.json({
@@ -18,6 +23,11 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+
+  const canSave = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.SELLERS_SAVE)
+  if (!canSave) {
+    return NextResponse.json({ message: 'Sem permissao para salvar vendedores da meta.' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => null)
   const sellers = body?.sellers
@@ -43,3 +53,4 @@ export async function PUT(req: NextRequest) {
     sellers: saved,
   })
 }
+

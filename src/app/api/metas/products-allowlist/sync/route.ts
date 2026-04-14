@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import {
@@ -495,6 +495,10 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
 export async function POST(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  const canSave = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.PRODUCTS_SAVE)
+  if (!canSave) {
+    return NextResponse.json({ message: 'Sem permissao para sincronizar produtos da meta.' }, { status: 403 })
+  }
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },

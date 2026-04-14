@@ -31,6 +31,93 @@ interface CurrentUser {
   roleCode?: string | null
 }
 
+interface MetasPermissionItem {
+  code: string
+  label: string
+  description: string
+}
+
+const METAS_PERMISSION_SECTIONS: Array<{ key: string; title: string; items: MetasPermissionItem[] }> = [
+  {
+    key: 'config',
+    title: 'Tela: Configurações do Painel de Metas',
+    items: [
+      {
+        code: 'metas_config:read',
+        label: 'Acessar e visualizar configurações',
+        description: 'Capacidade de acessar e ver a tela de configurações.',
+      },
+      {
+        code: 'metas_config:edit',
+        label: 'Editar configurações',
+        description: 'Capacidade de editar dados na tela de configurações.',
+      },
+      {
+        code: 'metas_config:save',
+        label: 'Salvar configurações',
+        description: 'Capacidade de salvar alterações na tela de configurações.',
+      },
+      {
+        code: 'metas_config:delete',
+        label: 'Excluir/remover dados da configuração',
+        description: 'Capacidade de excluir ou remover dados na tela de configurações.',
+      },
+    ],
+  },
+  {
+    key: 'sellers',
+    title: 'Tela: Lista de Vendedores',
+    items: [
+      {
+        code: 'metas_sellers:read',
+        label: 'Acessar e visualizar vendedores',
+        description: 'Capacidade de acessar e ver a tela de vendedores.',
+      },
+      {
+        code: 'metas_sellers:edit',
+        label: 'Editar vendedores',
+        description: 'Capacidade de editar dados na tela de vendedores.',
+      },
+      {
+        code: 'metas_sellers:save',
+        label: 'Salvar vendedores',
+        description: 'Capacidade de salvar alterações na tela de vendedores.',
+      },
+      {
+        code: 'metas_sellers:delete',
+        label: 'Excluir/remover vendedor',
+        description: 'Capacidade de excluir ou remover dados na tela de vendedores.',
+      },
+    ],
+  },
+  {
+    key: 'products',
+    title: 'Tela: Lista de Produtos',
+    items: [
+      {
+        code: 'metas_products:read',
+        label: 'Acessar e visualizar produtos',
+        description: 'Capacidade de acessar e ver a tela de produtos.',
+      },
+      {
+        code: 'metas_products:edit',
+        label: 'Editar produtos',
+        description: 'Capacidade de editar dados na tela de produtos.',
+      },
+      {
+        code: 'metas_products:save',
+        label: 'Salvar produtos',
+        description: 'Capacidade de salvar alterações na tela de produtos.',
+      },
+      {
+        code: 'metas_products:delete',
+        label: 'Excluir/remover produto',
+        description: 'Capacidade de excluir ou remover dados na tela de produtos.',
+      },
+    ],
+  },
+]
+
 export default function GestaoPermissoesPage() {
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -90,14 +177,7 @@ export default function GestaoPermissoesPage() {
 
   const selectedRoleData = useMemo(() => devRoles.find((r) => r.id === selectedRoleId) ?? null, [devRoles, selectedRoleId])
 
-  const groupedPermissions = useMemo(() => {
-    const map: Record<string, PermissionOption[]> = {}
-    permissions.forEach((p) => {
-      if (!map[p.module]) map[p.module] = []
-      map[p.module].push(p)
-    })
-    return map
-  }, [permissions])
+  const permissionCodeSet = useMemo(() => new Set(permissions.map((permission) => permission.code)), [permissions])
 
   useEffect(() => {
     if (selectedRoleData) setSelectedRolePermissionCodes(selectedRoleData.permissionCodes ?? [])
@@ -107,6 +187,12 @@ export default function GestaoPermissoesPage() {
     const user = devUsers.find((it) => it.id === selectedUserId)
     setSelectedUserRoleId(user?.roleId ?? '')
   }, [devUsers, selectedUserId])
+
+  function toggleRolePermission(code: string) {
+    setSelectedRolePermissionCodes((prev) =>
+      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
+    )
+  }
 
   async function createAdministrationGroup() {
     setCreatingAdminGroup(true)
@@ -202,8 +288,8 @@ export default function GestaoPermissoesPage() {
           {!hasAdministrationGroup && <Button variant="outline" onClick={createAdministrationGroup} loading={creatingAdminGroup}>Criar cargo Administração</Button>}
         </div>
 
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Cargo Administração não acessa esta página Dev. Esta página é exclusiva do Desenvolvedor.
+        <div className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-xs text-primary-800">
+          Permissões de Metas: controle por cargo com ações separadas de visualizar, editar, salvar e remover.
         </div>
 
         {permMessage && <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm">{permMessage}</div>}
@@ -214,23 +300,34 @@ export default function GestaoPermissoesPage() {
               <h3 className="text-sm font-semibold">Permissões por cargo</h3>
               <Select options={devRoles.map((r) => ({ value: r.id, label: r.name }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
             </div>
+            <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-surface-600">
+              Abaixo, cada permissão representa uma função específica dos botões/campos do módulo Metas.
+            </div>
             <div className="max-h-90 space-y-3 overflow-y-auto rounded-lg border border-surface-200 p-3">
-              {Object.entries(groupedPermissions).map(([module, list]) => (
-                <div key={module} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">{module}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {list.map((p) => (
-                      <label key={p.code} className="flex items-start gap-2 rounded border border-surface-200 px-2 py-2 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={selectedRolePermissionCodes.includes(p.code)}
-                          onChange={() => setSelectedRolePermissionCodes((prev) => prev.includes(p.code) ? prev.filter((x) => x !== p.code) : [...prev, p.code])}
-                          disabled={selectedRoleData?.code === 'DEVELOPER'}
-                          className="mt-0.5 h-4 w-4"
-                        />
-                        <span><strong>{p.code}</strong><span className="block text-surface-500">{p.description ?? 'Sem descrição'}</span></span>
-                      </label>
-                    ))}
+              {METAS_PERMISSION_SECTIONS.map((section) => (
+                <div key={section.key} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">{section.title}</p>
+                  <div className="grid gap-2">
+                    {section.items.map((item) => {
+                      const permissionExists = permissionCodeSet.has(item.code)
+                      const disabled = selectedRoleData?.code === 'DEVELOPER' || !permissionExists
+                      return (
+                        <label key={item.code} className={`flex items-start gap-2 rounded border px-2 py-2 text-xs ${disabled ? 'border-surface-200 bg-surface-100 opacity-70' : 'border-surface-200 bg-white'}`}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRolePermissionCodes.includes(item.code)}
+                            onChange={() => toggleRolePermission(item.code)}
+                            disabled={disabled}
+                            className="mt-0.5 h-4 w-4"
+                          />
+                          <span>
+                            <strong>{item.label}</strong>
+                            <span className="block text-surface-500">{item.description}</span>
+                            {!permissionExists ? <span className="block text-[11px] text-amber-700">Permissão ainda não cadastrada no banco.</span> : null}
+                          </span>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
