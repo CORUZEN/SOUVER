@@ -3909,6 +3909,33 @@ export default function MetasWorkspace() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      disabled={otherSellerBlocksCount === 0}
+                      onClick={() =>
+                        setConfirmModal({
+                          open: true,
+                          title: 'Aplicar parâmetros de KPI a todos',
+                          message: `Aplicar os parâmetros de KPI do grupo "${block.title}" para os outros ${otherSellerBlocksCount} bloco(s) de vendedores em ${MONTHS[month]} ${year}? Essa ação sobrescreve os KPIs atuais desses blocos no mês selecionado.`,
+                          confirmLabel: 'Aplicar a todos',
+                          variant: 'primary',
+                          onConfirm: () =>
+                            setRuleBlocks((prev) =>
+                              prev.map((candidate) => {
+                                if (candidate.id === block.id || candidate.sellerIds.length === 0) return candidate
+                                const clonedRules = block.rules.map((rule, index) => ({
+                                  ...rule,
+                                  id: `rule-${Date.now()}-${candidate.id}-${index}`,
+                                }))
+                                return { ...candidate, rules: clonedRules }
+                              })
+                            ),
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Users size={12} /> Aplicar a todos os vendedores
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setConfirmModal({
                         open: true,
                         title: 'Restaurar padrões',
