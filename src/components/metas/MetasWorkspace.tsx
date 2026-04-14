@@ -227,7 +227,8 @@ interface SellerSnapshot {
 interface RuleBlock {
   id: string
   title: string
-  monthlyTarget: number
+  monthlyTarget: number  // legacy — kept for backward compat when Sankhya not connected
+  manualFinancialByPeriod?: Record<string, number> // manual values keyed by 'YYYY-MM'
   sellerIds: string[]
   rules: GoalRule[]
   weightTargets: WeightTarget[]
@@ -2244,11 +2245,27 @@ export default function MetasWorkspace() {
         const totalValueSafe = Math.max(seller.totalValue, 0.00001)
         const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
         const teamAverageTicketSafe = Math.max(teamAverageTicket, 0.00001)
-        // Meta financeira: usa valor do Sankhya quando disponível, senão usa o configurado manualmente no bloco
+        // Meta financeira: resolve with period-specific logic
+        // Priority: 1) Sankhya live data, 2) manual for this exact period,
+        // 3) for future periods — most recent manual value as fallback, 4) legacy monthlyTarget
         const sankhyaFinancialTarget = sankhyaSellerData?.financialTarget ?? null
-        const resolvedMonthlyTarget = (sankhyaFinancialTarget ?? 0) > 0
-          ? sankhyaFinancialTarget!
-          : (block.monthlyTarget > 0 ? block.monthlyTarget : 0)
+        const resolvedMonthlyTarget = (() => {
+          if ((sankhyaFinancialTarget ?? 0) > 0) return sankhyaFinancialTarget!
+          if (!sankhyaConnected) return block.monthlyTarget > 0 ? block.monthlyTarget : 0
+          // Sankhya connected but no data for this period
+          const manualMap = block.manualFinancialByPeriod ?? {}
+          const exactVal = manualMap[periodKey]
+          if (exactVal && exactVal > 0) return exactVal
+          // For future/current periods: use most recent past manual value as fallback
+          const now = new Date()
+          const currentPeriodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+          if (periodKey >= currentPeriodKey) {
+            const sortedKeys = Object.keys(manualMap).sort()
+            const fallbackKey = [...sortedKeys].reverse().find((k) => manualMap[k] > 0)
+            if (fallbackKey) return manualMap[fallbackKey]
+          }
+          return 0
+        })()
         const monthlyTargetSafe = resolvedMonthlyTarget > 0 ? resolvedMonthlyTarget : teamAverageValueSafe
 
         const ruleProgress = blockRules.map((rule) => {
@@ -3982,6 +3999,7 @@ export default function MetasWorkspace() {
                       </button>
                     </div>
                     {(() => {
+                      const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
                       const blockSellerCodes = block.sellerIds.map((sid) => {
                         const s = sellers.find((x) => x.id === sid)
                         return (s ? s.id : sid).replace(/^sankhya-/, '')
@@ -3991,6 +4009,23 @@ export default function MetasWorkspace() {
                         const sd = sankhyaTargets.find((t) => t.sellerCode === sc)
                         if (sd && sd.financialTarget > 0) sankhyaTotal = (sankhyaTotal ?? 0) + sd.financialTarget
                       }
+
+                      // Helper: get current manual value for this period + determine if it has a future fallback
+                      const manualMap = block.manualFinancialByPeriod ?? {}
+                      const exactManualVal = manualMap[periodKey] ?? 0
+                      const now = new Date()
+                      const currentPeriodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                      const isFutureOrCurrent = periodKey >= currentPeriodKey
+                      const sortedKeys = Object.keys(manualMap).sort()
+                      const fallbackKey = isFutureOrCurrent
+                        ? [...sortedKeys].reverse().find((k) => manualMap[k] > 0 && k < periodKey)
+                        : undefined
+                      const displayVal = exactManualVal > 0 ? exactManualVal : (fallbackKey ? manualMap[fallbackKey] : 0)
+
+                      const saveManual = (val: number) => {
+                        updateBlock({ manualFinancialByPeriod: { ...manualMap, [periodKey]: val } })
+                      }
+
                       if (sankhyaTargetsLoading) {
                         return (
                           <div className="mt-1 flex h-10 items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 text-xs text-surface-400">
@@ -3998,6 +4033,8 @@ export default function MetasWorkspace() {
                           </div>
                         )
                       }
+
+                      // Case 1: Sankhya has live data for this period
                       if (sankhyaTotal !== null && sankhyaTotal > 0) {
                         return (
                           <>
@@ -4011,8 +4048,9 @@ export default function MetasWorkspace() {
                           </>
                         )
                       }
-                      // Sankhya carregou e tem dados, mas nenhum para os vendedores deste bloco
-                      if (sankhyaTargets.length > 0) {
+
+                      // Case 2: Sankhya not connected — use legacy monthlyTarget
+                      if (!sankhyaConnected) {
                         return (
                           <label className={label}>
                             <input
@@ -4020,31 +4058,36 @@ export default function MetasWorkspace() {
                               type="number"
                               step="0.01"
                               min="0"
-                              value={block.monthlyTarget}
+                              value={block.monthlyTarget || ''}
                               onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
                             />
-                            <p className="mt-1 text-[10px] text-surface-400">Vendedor sem meta configurada no Sankhya para este período — inserção manual.</p>
+                            <p className="mt-1 text-[10px] text-surface-400">
+                              {block.monthlyTarget > 0
+                                ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
+                                : 'Sem meta financeira configurada — usa a média da equipe como referência.'}
+                            </p>
                           </label>
                         )
                       }
-                      // Sankhya conectado mas sem dados para este período (normal para meses antigos) — input manual
-                      // Também cobre o caso de SQL ainda não funcionar após probe positivo
+
+                      // Case 3: Sankhya connected but no data for this period — period-specific manual input
                       return (
                         <label className={label}>
                           <input
-                            className={input}
+                            className={`${input}${fallbackKey && exactManualVal === 0 ? ' border-surface-300 bg-surface-50 text-surface-500' : ''}`}
                             type="number"
                             step="0.01"
                             min="0"
-                            value={block.monthlyTarget}
-                            onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
+                            placeholder="0"
+                            value={exactManualVal || ''}
+                            onChange={(e) => saveManual(parseDecimal(e.target.value, 0))}
                           />
                           <p className="mt-1 text-[10px] text-surface-400">
-                            {sankhyaNoDataForPeriod
-                              ? `Período sem metas configuradas no Sankhya — inserção manual.`
-                              : block.monthlyTarget > 0
-                                ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
-                                : 'Sem meta financeira configurada — usa a média da equipe como referência.'}
+                            {fallbackKey && exactManualVal === 0
+                              ? `Usando ${currency(manualMap[fallbackKey])} de ${fallbackKey} como referência — sem meta definida para este período.`
+                              : displayVal > 0
+                                ? `Manual para ${periodKey}.`
+                                : 'Período sem meta no Sankhya — insira manualmente.'}
                           </p>
                         </label>
                       )
