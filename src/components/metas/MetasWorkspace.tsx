@@ -14,7 +14,6 @@ import {
   Pencil,
   RefreshCw,
   RotateCcw,
-  Stethoscope,
   Search,
   Settings2,
   Target,
@@ -938,22 +937,6 @@ export default function MetasWorkspace() {
   const [sankhyaDiagnostics, setSankhyaDiagnostics] = useState<{
     financialSqlIndex: number; weightSqlIndex: number; financialErrors?: string[]; weightErrors?: string[]
   } | null>(null)
-  // Debug modal — raw table data from /api/metas/sankhya-targets/debug
-  const [debugModalOpen, setDebugModalOpen] = useState(false)
-  const [debugLoading, setDebugLoading] = useState(false)
-  const [debugData, setDebugData] = useState<{
-    period: { year: number; month: number; startDate: string; endDate: string }
-    authMethod: string
-    columnsByTable: Record<string, Array<{ name: string; type: string }>>
-    columnsError: string | null
-    tables: Array<{
-      table: string; description: string; sql: string
-      rows: Record<string, unknown>[]; rowCount: number
-      error: string | null; columns: string[]
-    }>
-  } | null>(null)
-  const [debugError, setDebugError] = useState('')
-  const [debugActiveTable, setDebugActiveTable] = useState(0)
   const [focusProductRows, setFocusProductRows] = useState<Record<string, Array<{ sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>>>({})
   const [focusProductLoading, setFocusProductLoading] = useState<Record<string, boolean>>({})
   const [focusProductError, setFocusProductError] = useState<Record<string, string>>({})
@@ -1470,22 +1453,6 @@ export default function MetasWorkspace() {
 
   // ── Sankhya configured targets (financial + weight per brand) ─────────
 
-  function openDebugModal() {
-    setDebugModalOpen(true)
-    setDebugActiveTable(0)
-    if (debugData) return
-    setDebugLoading(true)
-    setDebugError('')
-    fetch(`/api/metas/sankhya-targets/debug?year=${year}&month=${month + 1}`)
-      .then(async (res) => {
-        const payload = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(payload?.message ?? 'Falha no diagnóstico.')
-        setDebugData(payload)
-      })
-      .catch((err: unknown) => setDebugError(err instanceof Error ? err.message : 'Erro desconhecido.'))
-      .finally(() => setDebugLoading(false))
-  }
-
   useEffect(() => {
     const controller = new AbortController()
     setSankhyaTargetsLoading(true)
@@ -1493,7 +1460,6 @@ export default function MetasWorkspace() {
     setSankhyaConnected(false)
     setSankhyaNoDataForPeriod(false)
     setSankhyaDiagnostics(null)
-    setDebugData(null) // reset debug when period changes
     fetch(
       `/api/metas/sankhya-targets?year=${year}&month=${month + 1}`,
       { signal: controller.signal }
@@ -3987,17 +3953,7 @@ export default function MetasWorkspace() {
                 {/* Meta em dinheiro + seller assignment */}
                 <div className="mb-3 grid gap-3 md:grid-cols-2">
                   <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className={label}>Meta financeira do mês (R$)</label>
-                      <button
-                        type="button"
-                        onClick={openDebugModal}
-                        title="Diagnosticar tabelas Sankhya"
-                        className="flex items-center gap-1 rounded-md border border-surface-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-surface-500 hover:border-primary-300 hover:text-primary-600 transition-colors"
-                      >
-                        <Stethoscope size={11} /> diagnóstico
-                      </button>
-                    </div>
+                    <label className={label}>Meta financeira do mês (R$)</label>
                     {(() => {
                       const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
                       const blockSellerCodes = block.sellerIds.map((sid) => {
@@ -6024,135 +5980,6 @@ export default function MetasWorkspace() {
           </Card>
         </>
       )}
-
-      {/* ── Sankhya Debug Modal ────────────────────────────────── */}
-      <Modal
-        open={debugModalOpen}
-        onClose={() => setDebugModalOpen(false)}
-        title="Diagnóstico Sankhya — Tabelas de Meta"
-        size="xl"
-      >
-        <div className="flex flex-col gap-0 min-h-0" style={{ height: '75vh' }}>
-          <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-surface-100 bg-surface-50 shrink-0">
-            <div className="flex items-center gap-2 text-xs text-surface-600">
-              <Stethoscope size={13} className="text-primary-500" />
-              <span>Período: <strong>{String(month + 1).padStart(2, '0')}/{year}</strong></span>
-              {debugData && (<><span className="text-surface-300">•</span><span>Auth: <strong>{debugData.authMethod}</strong></span><span className="text-surface-300">•</span><span>{debugData.tables.length} tabelas</span></>)}
-            </div>
-            <button
-              onClick={() => { setDebugData(null); setDebugLoading(true); setDebugError(''); fetch(`/api/metas/sankhya-targets/debug?year=${year}&month=${month + 1}`).then(async (r) => { const p = await r.json().catch(() => ({})); if (!r.ok) throw new Error(p?.message ?? 'Erro'); setDebugData(p) }).catch((e: unknown) => setDebugError(e instanceof Error ? e.message : 'Erro')).finally(() => setDebugLoading(false)) }}
-              className="flex items-center gap-1.5 rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-100"
-            >
-              <RefreshCw size={11} className={debugLoading ? 'animate-spin' : ''} /> Recarregar
-            </button>
-          </div>
-          {debugLoading && (
-            <div className="flex flex-1 items-center justify-center gap-3 text-sm text-surface-500">
-              <RefreshCw size={16} className="animate-spin text-primary-500" />
-              Consultando tabelas no Sankhya...
-            </div>
-          )}
-          {debugError && !debugLoading && (
-            <div className="m-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              <strong>Erro:</strong> {debugError}
-            </div>
-          )}
-          {debugData && !debugLoading && (
-            <div className="flex flex-1 min-h-0 overflow-hidden">
-              <div className="w-52 shrink-0 border-r border-surface-100 overflow-y-auto bg-surface-50 py-1">
-                {debugData.tables.map((t, i) => (
-                  <button key={i} onClick={() => setDebugActiveTable(i)}
-                    className={`w-full text-left px-3 py-2.5 border-b border-surface-100 transition-colors ${debugActiveTable === i ? 'bg-primary-50 border-l-2 border-l-primary-500' : 'hover:bg-surface-100'}`}>
-                    <p className={`text-[11px] font-mono font-semibold truncate ${debugActiveTable === i ? 'text-primary-700' : 'text-surface-700'}`}>{t.table}</p>
-                    <p className="text-[10px] text-surface-400 mt-0.5">{t.error ? '⚠ erro' : `${t.rowCount} linha${t.rowCount !== 1 ? 's' : ''}`}</p>
-                  </button>
-                ))}
-                {Object.keys(debugData.columnsByTable).length > 0 && (
-                  <button onClick={() => setDebugActiveTable(debugData.tables.length)}
-                    className={`w-full text-left px-3 py-2.5 transition-colors ${debugActiveTable === debugData.tables.length ? 'bg-primary-50 border-l-2 border-l-primary-500' : 'hover:bg-surface-100'}`}>
-                    <p className={`text-[11px] font-mono font-semibold ${debugActiveTable === debugData.tables.length ? 'text-primary-700' : 'text-surface-700'}`}>SCHEMA</p>
-                    <p className="text-[10px] text-surface-400 mt-0.5">ALL_TAB_COLUMNS</p>
-                  </button>
-                )}
-              </div>
-              <div className="flex-1 overflow-auto p-4">
-                {debugActiveTable < debugData.tables.length ? (() => {
-                  const t = debugData.tables[debugActiveTable]
-                  return (
-                    <div className="flex flex-col gap-3">
-                      <div>
-                        <h3 className="font-mono text-sm font-bold text-surface-800">{t.table}</h3>
-                        <p className="text-xs text-surface-500 mt-0.5">{t.description}</p>
-                      </div>
-                      <details className="group">
-                        <summary className="cursor-pointer text-xs font-medium text-surface-600 hover:text-surface-800 select-none">SQL executado ▾</summary>
-                        <pre className="mt-1.5 overflow-x-auto rounded-lg bg-surface-900 p-3 text-[10px] text-emerald-300 whitespace-pre-wrap">{t.sql}</pre>
-                      </details>
-                      {t.error && (
-                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                          <strong>Erro Oracle:</strong> {t.error}
-                        </div>
-                      )}
-                      {t.columns.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {t.columns.map((c) => (
-                            <span key={c} className="rounded-full bg-surface-100 border border-surface-200 px-2 py-0.5 font-mono text-[10px] text-surface-700">{c}</span>
-                          ))}
-                        </div>
-                      )}
-                      {t.rows.length > 0 ? (
-                        <div className="overflow-x-auto rounded-lg border border-surface-200">
-                          <table className="w-full text-[11px]">
-                            <thead>
-                              <tr className="bg-surface-50 border-b border-surface-200">
-                                {t.columns.map((c) => (
-                                  <th key={c} className="px-3 py-2 text-left font-mono font-semibold text-surface-600 whitespace-nowrap">{c}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {t.rows.map((row, ri) => (
-                                <tr key={ri} className={`border-b border-surface-100 ${ri % 2 === 0 ? 'bg-white' : 'bg-surface-50'}`}>
-                                  {t.columns.map((c) => (
-                                    <td key={c} className="px-3 py-1.5 font-mono text-surface-700 whitespace-nowrap max-w-[180px] truncate" title={String(row[c] ?? '')}>
-                                      {String(row[c] ?? '—')}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : !t.error ? (
-                        <p className="text-xs text-surface-400 italic">Nenhuma linha retornada.</p>
-                      ) : null}
-                    </div>
-                  )
-                })() : (
-                  <div className="flex flex-col gap-4">
-                    <h3 className="font-mono text-sm font-bold text-surface-800">Schema — ALL_TAB_COLUMNS</h3>
-                    {debugData.columnsError && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{debugData.columnsError}</div>
-                    )}
-                    {Object.entries(debugData.columnsByTable).map(([tbl, cols]) => (
-                      <div key={tbl}>
-                        <p className="font-mono text-xs font-bold text-surface-700 mb-1.5">{tbl}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {cols.map((c) => (
-                            <span key={c.name} className="rounded-full bg-surface-100 border border-surface-200 px-2 py-0.5 font-mono text-[10px] text-surface-700">
-                              {c.name} <span className="text-surface-400">({c.type})</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
 
       {/* ── Confirm modal ──────────────────────────────────────── */}
       <Modal
