@@ -27,6 +27,7 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
+type OperationalStageKey = Exclude<StageKey, 'FULL'>
 type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'
 type PrizeType = 'CASH' | 'BENEFIT'
 type CashCalcMode = 'PERCENT' | 'FIXED'
@@ -65,6 +66,7 @@ interface CampaignPrize {
 interface MonthConfig {
   week1StartDate: string
   closingWeekEndDate?: string
+  weekPeriods: Record<OperationalStageKey, { start: string; end: string }>
   customOffDates: string[]
   sellerIncludedDates: Array<{
     sellerId: string
@@ -249,6 +251,8 @@ const STAGES: Array<{ key: StageKey; label: string }> = [
   { key: 'FULL', label: 'Todo o período' },
 ]
 
+const OPERATIONAL_STAGE_KEYS: OperationalStageKey[] = ['W1', 'W2', 'W3', 'CLOSING']
+
 const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: string }> = [
   { type: 'BASE_CLIENTES', label: 'Base de clientes', defaultDescription: 'Cobertura da base de clientes no período.' },
   { type: 'VOLUME', label: 'Volume', defaultDescription: 'Quantidade mínima de grupos de produto com meta de peso (kg) atingida no período.' },
@@ -385,7 +389,63 @@ function normalizeEntityCode(value: string) {
   return trimmed
 }
 
-function normalizeMonthConfig(input: Partial<MonthConfig> | undefined): MonthConfig {
+function parseMonthKeyToYearMonth(key: string) {
+  const match = key.match(/^(\d{4})-(\d{2})$/)
+  if (!match) return null
+  const parsedYear = Number(match[1])
+  const parsedMonthIndex = Number(match[2]) - 1
+  if (!Number.isFinite(parsedYear) || !Number.isFinite(parsedMonthIndex) || parsedMonthIndex < 0 || parsedMonthIndex > 11) {
+    return null
+  }
+  return { year: parsedYear, month: parsedMonthIndex }
+}
+
+function clampIsoToMonth(raw: string, year: number, month: number): string {
+  const parsed = parseIsoDate(raw)
+  if (!parsed) return ''
+  const monthStart = new Date(year, month, 1)
+  const monthEnd = new Date(year, month + 1, 0)
+  if (parsed < monthStart || parsed > monthEnd) return ''
+  return toIsoDate(parsed)
+}
+
+function buildDefaultWeekPeriods(week1StartDateRaw: string, closingWeekEndDateRaw: string, year: number, month: number) {
+  const weekPeriods: Record<OperationalStageKey, { start: string; end: string }> = {
+    W1: { start: '', end: '' },
+    W2: { start: '', end: '' },
+    W3: { start: '', end: '' },
+    CLOSING: { start: '', end: '' },
+  }
+
+  const monthStart = new Date(year, month, 1)
+  const monthEnd = new Date(year, month + 1, 0)
+  const configuredStart = parseIsoDate(week1StartDateRaw)
+  if (!configuredStart) return weekPeriods
+
+  const baseStart = configuredStart < monthStart ? monthStart : configuredStart
+  const configuredEnd = resolveClosingEndDate(closingWeekEndDateRaw, year, month)
+  const cycleEndBase = configuredEnd ? parseIsoDate(configuredEnd) ?? monthEnd : monthEnd
+  const cycleEnd = cycleEndBase < baseStart ? baseStart : cycleEndBase
+
+  OPERATIONAL_STAGE_KEYS.forEach((stageKey, index) => {
+    const stageStartDate = addDays(baseStart, index * 7)
+    if (stageStartDate > cycleEnd) return
+    const rawStageEnd = stageKey === 'CLOSING' ? cycleEnd : addDays(stageStartDate, 4)
+    const stageEndDate = rawStageEnd > cycleEnd ? cycleEnd : rawStageEnd
+    weekPeriods[stageKey] = {
+      start: toIsoDate(stageStartDate),
+      end: toIsoDate(stageEndDate),
+    }
+  })
+
+  return weekPeriods
+}
+
+function normalizeMonthConfig(
+  input: Partial<MonthConfig> | undefined,
+  year: number,
+  month: number
+): MonthConfig {
   const customOffDates = Array.isArray(input?.customOffDates)
     ? Array.from(new Set(input.customOffDates.filter((date): date is string => typeof date === 'string' && Boolean(parseIsoDate(date))))).sort()
     : []
@@ -401,9 +461,38 @@ function normalizeMonthConfig(input: Partial<MonthConfig> | undefined): MonthCon
   const sellerIncludedDates = Array.from(sellerIncludedDatesMap.values())
     .sort((a, b) => (a.date === b.date ? a.sellerName.localeCompare(b.sellerName, 'pt-BR') : a.date.localeCompare(b.date)))
 
+  const week1StartDateRaw = typeof input?.week1StartDate === 'string' ? input.week1StartDate : ''
+  const closingWeekEndDateRaw = typeof input?.closingWeekEndDate === 'string' ? input.closingWeekEndDate : ''
+  const defaultWeekPeriods = buildDefaultWeekPeriods(week1StartDateRaw, closingWeekEndDateRaw, year, month)
+  const inputWeekPeriods = input?.weekPeriods && typeof input.weekPeriods === 'object'
+    ? input.weekPeriods
+    : {}
+
+  const normalizedWeekPeriods = OPERATIONAL_STAGE_KEYS.reduce<Record<OperationalStageKey, { start: string; end: string }>>((acc, stageKey) => {
+    const fallback = defaultWeekPeriods[stageKey]
+    const rawPeriod = (inputWeekPeriods as Partial<Record<OperationalStageKey, { start?: string; end?: string }>>)[stageKey]
+    const start = clampIsoToMonth(String(rawPeriod?.start ?? fallback.start ?? ''), year, month)
+    const end = clampIsoToMonth(String(rawPeriod?.end ?? fallback.end ?? ''), year, month)
+    if (!start || !end || start > end) {
+      acc[stageKey] = { start: '', end: '' }
+    } else {
+      acc[stageKey] = { start, end }
+    }
+    return acc
+  }, {
+    W1: { start: '', end: '' },
+    W2: { start: '', end: '' },
+    W3: { start: '', end: '' },
+    CLOSING: { start: '', end: '' },
+  })
+
+  const derivedWeek1StartDate = normalizedWeekPeriods.W1.start
+  const derivedClosingWeekEndDate = normalizedWeekPeriods.CLOSING.end
+
   return {
-    week1StartDate: typeof input?.week1StartDate === 'string' ? input.week1StartDate : '',
-    closingWeekEndDate: typeof input?.closingWeekEndDate === 'string' ? input.closingWeekEndDate : '',
+    week1StartDate: derivedWeek1StartDate || clampIsoToMonth(week1StartDateRaw, year, month),
+    closingWeekEndDate: derivedClosingWeekEndDate || clampIsoToMonth(closingWeekEndDateRaw, year, month),
+    weekPeriods: normalizedWeekPeriods,
     customOffDates,
     sellerIncludedDates,
   }
@@ -645,85 +734,85 @@ function nationalHolidays(year: number) {
   return [...fixed.map(([m, d]) => toIsoDate(new Date(year, m - 1, d))), ...movable.map((date) => toIsoDate(date))]
 }
 
-function buildCycle(startIso: string, closingEndIso: string, year: number, month: number, blocked: Set<string>) {
-  const start = parseIsoDate(startIso)
-  const monthStart = new Date(year, month, 1)
-  const monthEnd = new Date(year, month + 1, 0)
-  const weeks: CycleWeek[] = []
+function buildCycle(
+  startIso: string,
+  closingEndIso: string,
+  year: number,
+  month: number,
+  blocked: Set<string>,
+  weekPeriods?: Partial<Record<OperationalStageKey, { start?: string; end?: string }>>
+) {
+  const monthStartIso = toIsoDate(new Date(year, month, 1))
+  const monthEndIso = toIsoDate(new Date(year, month + 1, 0))
+  const normalized = normalizeMonthConfig({
+    week1StartDate: startIso,
+    closingWeekEndDate: closingEndIso,
+    weekPeriods: weekPeriods as MonthConfig['weekPeriods'],
+    customOffDates: [],
+    sellerIncludedDates: [],
+  }, year, month)
 
-  if (!start) {
-    return {
-      weeks,
-      totalBusinessDays: 0,
-      lastBusinessDate: null as string | null,
-    }
-  }
-
-  const baseStart = start < monthStart ? monthStart : start
-  const configuredEnd = resolveClosingEndDate(closingEndIso, year, month)
-  const cycleEndBase = configuredEnd ? parseIsoDate(configuredEnd) ?? monthEnd : monthEnd
-  const cycleEnd = cycleEndBase < baseStart ? baseStart : cycleEndBase
-  const weekStages = STAGES.filter((s) => s.key !== 'FULL')
-
-  weekStages.forEach((stage, index) => {
-    const stageStart = addDays(baseStart, index * 7)
-    if (stageStart > cycleEnd) {
-      weeks.push({
-        key: stage.key,
+  const weeks: CycleWeek[] = OPERATIONAL_STAGE_KEYS.map((stageKey) => {
+    const stage = STAGES.find((item) => item.key === stageKey)!
+    const period = normalized.weekPeriods[stageKey]
+    if (!period.start || !period.end) {
+      return {
+        key: stageKey,
         label: stage.label,
         start: null,
         end: null,
         businessDays: [],
-      })
-      return
+      }
     }
 
-    const rawStageEnd = stage.key === 'CLOSING' ? cycleEnd : addDays(stageStart, 4)
-    const stageEnd = rawStageEnd > cycleEnd ? cycleEnd : rawStageEnd
-    const visibleStart = stageStart < monthStart ? monthStart : stageStart
-
     const business: string[] = []
-    for (let cursor = new Date(visibleStart); cursor <= stageEnd; cursor = addDays(cursor, 1)) {
+    let cursor = parseIsoDate(period.start)
+    const end = parseIsoDate(period.end)
+    if (!cursor || !end) {
+      return {
+        key: stageKey,
+        label: stage.label,
+        start: null,
+        end: null,
+        businessDays: [],
+      }
+    }
+
+    while (cursor <= end) {
       const weekday = cursor.getDay()
       const iso = toIsoDate(cursor)
       if (weekday >= 1 && weekday <= 5 && !blocked.has(iso)) business.push(iso)
+      cursor = addDays(cursor, 1)
     }
 
-    weeks.push({
-      key: stage.key,
+    return {
+      key: stageKey,
       label: stage.label,
-      start: toIsoDate(visibleStart),
-      end: toIsoDate(stageEnd),
+      start: period.start,
+      end: period.end,
       businessDays: business,
-    })
+    }
   })
 
-  // FULL stage: entire month
-  const fullBusiness: string[] = []
-  for (let cursor = new Date(baseStart); cursor <= cycleEnd; cursor = addDays(cursor, 1)) {
-    const weekday = cursor.getDay()
-    const iso = toIsoDate(cursor)
-    if (weekday >= 1 && weekday <= 5 && !blocked.has(iso)) fullBusiness.push(iso)
-  }
+  const fullBusinessSet = new Set<string>(weeks.flatMap((week) => week.businessDays))
+  const fullBusiness = [...fullBusinessSet].sort()
+  const firstStart = weeks.map((week) => week.start).filter((value): value is string => Boolean(value)).sort()[0] ?? null
+  const lastEnd = [...weeks]
+    .map((week) => week.end)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .slice(-1)[0] ?? null
+
   weeks.push({
     key: 'FULL',
     label: 'Todo o período',
-    start: toIsoDate(baseStart),
-    end: toIsoDate(cycleEnd),
+    start: firstStart ?? monthStartIso,
+    end: lastEnd ?? monthEndIso,
     businessDays: fullBusiness,
   })
 
-  let lastBusinessDate: string | null = null
-  for (let d = new Date(cycleEnd); d >= baseStart; d = addDays(d, -1)) {
-    const wd = d.getDay()
-    const iso = toIsoDate(d)
-    if (wd >= 1 && wd <= 5 && !blocked.has(iso)) {
-      lastBusinessDate = iso
-      break
-    }
-  }
-
-  const totalBusinessDays = weeks.filter((w) => w.key !== 'FULL').reduce((sum, week) => sum + week.businessDays.length, 0)
+  const lastBusinessDate = fullBusiness.length > 0 ? fullBusiness[fullBusiness.length - 1] : null
+  const totalBusinessDays = weeks.filter((week) => week.key !== 'FULL').reduce((sum, week) => sum + week.businessDays.length, 0)
   return { weeks, totalBusinessDays, lastBusinessDate }
 }
 
@@ -871,7 +960,15 @@ export default function MetasWorkspace() {
         if (data.monthConfigs && typeof data.monthConfigs === 'object' && !Array.isArray(data.monthConfigs)) {
           const rawMonthConfigs = data.monthConfigs as Record<string, Partial<MonthConfig>>
           const normalizedMonthConfigs = Object.fromEntries(
-            Object.entries(rawMonthConfigs).map(([key, value]) => [key, normalizeMonthConfig(value)])
+            Object.entries(rawMonthConfigs).map(([key, value]) => {
+              const parsed = parseMonthKeyToYearMonth(key)
+              const normalized = normalizeMonthConfig(
+                value,
+                parsed?.year ?? year,
+                parsed?.month ?? month
+              )
+              return [key, normalized]
+            })
           )
           setMonthConfigs(normalizedMonthConfigs)
         }
@@ -954,6 +1051,33 @@ export default function MetasWorkspace() {
     setMonth(nextMonth)
   }
 
+  function updateActiveMonthConfig(
+    patch:
+      | Partial<MonthConfig>
+      | ((current: MonthConfig) => Partial<MonthConfig>)
+  ) {
+    setMonthConfigs((prev) => {
+      const current = normalizeMonthConfig(prev[activeKey], year, month)
+      const nextPatch = typeof patch === 'function' ? patch(current) : patch
+      return {
+        ...prev,
+        [activeKey]: normalizeMonthConfig({ ...current, ...nextPatch }, year, month),
+      }
+    })
+  }
+
+  function updateStagePeriod(stage: OperationalStageKey, field: 'start' | 'end', value: string) {
+    updateActiveMonthConfig((current) => ({
+      weekPeriods: {
+        ...current.weekPeriods,
+        [stage]: {
+          ...current.weekPeriods[stage],
+          [field]: value,
+        },
+      },
+    }))
+  }
+
   useEffect(() => {
     if (activeMonth) return
     setMonthConfigs((prev) => ({
@@ -963,7 +1087,7 @@ export default function MetasWorkspace() {
         closingWeekEndDate: '',
         customOffDates: [],
         sellerIncludedDates: [],
-      }),
+      }, year, month),
     }))
     if (shouldRebaselineAfterAutoMonthInitRef.current) {
       setIsRebaseliningConfig(true)
@@ -1654,8 +1778,15 @@ export default function MetasWorkspace() {
   }, [sellerIncludedDateEntries])
 
   const cycle = useMemo(
-    () => buildCycle(activeMonth?.week1StartDate ?? '', activeMonth?.closingWeekEndDate ?? '', year, month, blockedSet),
-    [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, blockedSet, month, year]
+    () => buildCycle(
+      activeMonth?.week1StartDate ?? '',
+      activeMonth?.closingWeekEndDate ?? '',
+      year,
+      month,
+      blockedSet,
+      activeMonth?.weekPeriods
+    ),
+    [activeMonth?.closingWeekEndDate, activeMonth?.week1StartDate, activeMonth?.weekPeriods, blockedSet, month, year]
   )
   const stageEnds = useMemo(() => ({
     w1: cycle.weeks.find((w) => w.key === 'W1')?.end ?? '',
@@ -2585,11 +2716,9 @@ export default function MetasWorkspace() {
                 <h2 className="text-base font-semibold text-surface-900">Calendário operacional mensal</h2>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2">
                 <label className={label}>Mês<select className={input} value={month} onChange={(event) => handleMonthChange(Number(event.target.value))}>{MONTHS.map((monthName, index) => <option key={monthName} value={index}>{monthName}</option>)}</select></label>
                 <label className={label}>Ano<input className={input} type="number" min={2024} max={2100} value={year} onChange={(event) => handleYearChange(Number(event.target.value))} /></label>
-                <label className={label}>Início da 1ª semana<input className={input} type="date" min={`${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.week1StartDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: event.target.value, closingWeekEndDate: (activeMonth?.closingWeekEndDate && activeMonth.closingWeekEndDate >= event.target.value) ? activeMonth.closingWeekEndDate : '', customOffDates: activeMonth?.customOffDates ?? [], sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [] } }))} /></label>
-                <label className={label}>Fim do fechamento<input className={input} type="date" min={activeMonth?.week1StartDate || `${year}-${String(month + 1).padStart(2, '0')}-01`} max={toIsoDate(new Date(year, month + 1, 0))} value={activeMonth?.closingWeekEndDate ?? ''} onChange={(event) => setMonthConfigs((prev) => ({ ...prev, [activeKey]: { week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month), closingWeekEndDate: event.target.value, customOffDates: activeMonth?.customOffDates ?? [], sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [] } }))} /></label>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2609,15 +2738,9 @@ export default function MetasWorkspace() {
                           if (!customDate) return
                           const list = activeMonth?.customOffDates ?? []
                           if (list.includes(customDate)) return
-                          setMonthConfigs((prev) => ({
-                            ...prev,
-                            [activeKey]: {
-                              week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                              closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                              customOffDates: [...list, customDate].sort(),
-                              sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
-                            },
-                          }))
+                          updateActiveMonthConfig({
+                            customOffDates: [...list, customDate].sort(),
+                          })
                           setCustomDate('')
                         }}
                         className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
@@ -2640,15 +2763,9 @@ export default function MetasWorkspace() {
                                 confirmLabel: 'Excluir',
                                 variant: 'danger',
                                 onConfirm: () =>
-                                  setMonthConfigs((prev) => ({
-                                    ...prev,
-                                    [activeKey]: {
-                                      week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                                      closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                                      customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date),
-                                      sellerIncludedDates: activeMonth?.sellerIncludedDates ?? [],
-                                    },
-                                  })),
+                                  updateActiveMonthConfig({
+                                    customOffDates: (activeMonth?.customOffDates ?? []).filter((item) => item !== date),
+                                  }),
                               })
                             }
                           >
@@ -2697,15 +2814,7 @@ export default function MetasWorkspace() {
                             ...list,
                             { sellerId: seller.id, sellerName: seller.name, date: sellerIncludeDate },
                           ].sort((a, b) => (a.date === b.date ? a.sellerName.localeCompare(b.sellerName, 'pt-BR') : a.date.localeCompare(b.date)))
-                          setMonthConfigs((prev) => ({
-                            ...prev,
-                            [activeKey]: {
-                              week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                              closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                              customOffDates: activeMonth?.customOffDates ?? [],
-                              sellerIncludedDates: next,
-                            },
-                          }))
+                          updateActiveMonthConfig({ sellerIncludedDates: next })
                           setSellerIncludeDate('')
                         }}
                         className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
@@ -2729,17 +2838,11 @@ export default function MetasWorkspace() {
                                 confirmLabel: 'Excluir',
                                 variant: 'danger',
                                 onConfirm: () =>
-                                  setMonthConfigs((prev) => ({
-                                    ...prev,
-                                    [activeKey]: {
-                                      week1StartDate: activeMonth?.week1StartDate ?? firstMonday(year, month),
-                                      closingWeekEndDate: activeMonth?.closingWeekEndDate ?? '',
-                                      customOffDates: activeMonth?.customOffDates ?? [],
-                                      sellerIncludedDates: (activeMonth?.sellerIncludedDates ?? []).filter(
-                                        (item) => !(item.sellerId === entry.sellerId && item.date === entry.date)
-                                      ),
-                                    },
-                                  })),
+                                  updateActiveMonthConfig({
+                                    sellerIncludedDates: (activeMonth?.sellerIncludedDates ?? []).filter(
+                                      (item) => !(item.sellerId === entry.sellerId && item.date === entry.date)
+                                    ),
+                                  }),
                               })
                             }
                           >
@@ -2756,7 +2859,57 @@ export default function MetasWorkspace() {
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-4">{cycle.weeks.filter((w) => w.key !== 'FULL').map((week) => <div key={week.key} className="rounded-lg border border-surface-200 bg-white p-2.5 text-xs"><p className="font-semibold text-surface-700">{week.label}</p><p className="mt-1 text-surface-600">{formatDateBr(week.start)} - {formatDateBr(week.end)}</p><p className="text-surface-500">Dias úteis: {week.businessDays.length}</p></div>)}</div>
+              <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Períodos por etapa</p>
+                  <p className="text-[11px] text-surface-500">Defina início e fim individualmente para cada semana.</p>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  {OPERATIONAL_STAGE_KEYS.map((stageKey) => {
+                    const week = cycle.weeks.find((item) => item.key === stageKey)
+                    const period = activeMonth?.weekPeriods?.[stageKey] ?? { start: '', end: '' }
+                    const monthStartIso = `${year}-${String(month + 1).padStart(2, '0')}-01`
+                    const monthEndIso = toIsoDate(new Date(year, month + 1, 0))
+                    const isConfigured = Boolean(period.start && period.end)
+                    return (
+                      <div key={stageKey} className={`rounded-lg border p-2.5 text-xs ${isConfigured ? 'border-surface-200 bg-white' : 'border-dashed border-surface-300 bg-white/70'}`}>
+                        <div className="mb-2 flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${stageColorMap[stageKey]}`} />
+                          <p className="font-semibold text-surface-800">{week?.label ?? stageKey}</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                            Início
+                            <input
+                              type="date"
+                              className="mt-1 w-full rounded-md border border-surface-200 bg-white px-2 py-1.5 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-primary-500/35"
+                              min={monthStartIso}
+                              max={monthEndIso}
+                              value={period.start}
+                              onChange={(event) => updateStagePeriod(stageKey, 'start', event.target.value)}
+                            />
+                          </label>
+                          <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                            Fim
+                            <input
+                              type="date"
+                              className="mt-1 w-full rounded-md border border-surface-200 bg-white px-2 py-1.5 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-primary-500/35"
+                              min={period.start || monthStartIso}
+                              max={monthEndIso}
+                              value={period.end}
+                              onChange={(event) => updateStagePeriod(stageKey, 'end', event.target.value)}
+                            />
+                          </label>
+                        </div>
+                        <p className="mt-2 text-surface-600">
+                          {week?.start && week?.end ? `${formatDateBr(week.start)} - ${formatDateBr(week.end)}` : 'Período não definido'}
+                        </p>
+                        <p className="text-surface-500">Dias úteis: {week?.businessDays.length ?? 0}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
 
               {standby ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{!activeMonth?.week1StartDate ? 'Mês em standby: defina a data de início da 1ª semana para ativar o ciclo.' : `Período selecionado encerrou em ${formatDateBr(cycle.lastBusinessDate)}. O sistema permanece em standby até configurar o início do próximo ciclo.`}</div> : null}
             </Card>
@@ -4995,7 +5148,7 @@ export default function MetasWorkspace() {
           </Card>
 
           <Card className="border-surface-200">
-            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis no intervalo configurado (início da 1ª semana até o fim do fechamento, quando informado) e semanas fixas por janela de segunda a sexta. Após o último dia útil, entra em standby aguardando a definição do próximo ciclo.{sellerSpecificDatesFooterSummary}</p>
+            <p className="text-xs text-surface-600">Período monitorado: {MONTHS[month]}/{year}. O ciclo considera somente dias úteis dentro dos períodos configurados para cada etapa (1ª, 2ª, 3ª semana e fechamento). Após o último dia útil configurado, entra em standby aguardando a definição do próximo ciclo.{sellerSpecificDatesFooterSummary}</p>
           </Card>
         </>
       )}
