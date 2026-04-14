@@ -932,6 +932,7 @@ export default function MetasWorkspace() {
   const [sankhyaTargetsLoading, setSankhyaTargetsLoading] = useState(false)
   const [sankhyaTargetsError, setSankhyaTargetsError] = useState('')
   const [sankhyaConnected, setSankhyaConnected] = useState(false)
+  const [sankhyaNoDataForPeriod, setSankhyaNoDataForPeriod] = useState(false)
   const [sankhyaDiagnostics, setSankhyaDiagnostics] = useState<{
     financialSqlIndex: number; weightSqlIndex: number; financialErrors?: string[]; weightErrors?: string[]
   } | null>(null)
@@ -1488,6 +1489,7 @@ export default function MetasWorkspace() {
     setSankhyaTargetsLoading(true)
     setSankhyaTargetsError('')
     setSankhyaConnected(false)
+    setSankhyaNoDataForPeriod(false)
     setSankhyaDiagnostics(null)
     setDebugData(null) // reset debug when period changes
     fetch(
@@ -1499,6 +1501,7 @@ export default function MetasWorkspace() {
         if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar metas configuradas do Sankhya.')
         setSankhyaTargets(payload.sellers ?? [])
         setSankhyaConnected(true)
+        if (payload.noDataForPeriod) setSankhyaNoDataForPeriod(true)
         if (payload.diagnostics) setSankhyaDiagnostics(payload.diagnostics)
       })
       .catch((err: unknown) => {
@@ -3992,26 +3995,24 @@ export default function MetasWorkspace() {
                           </>
                         )
                       }
-                      // Sankhya carregou mas não encontrou meta para os vendedores deste bloco
+                      // Sankhya carregou e tem dados, mas nenhum para os vendedores deste bloco
                       if (sankhyaTargets.length > 0) {
                         return (
-                          <div className="mt-1 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <span className="text-xs text-amber-700">Sem meta financeira configurada no Sankhya para este vendedor.</span>
-                          </div>
+                          <label className={label}>
+                            <input
+                              className={input}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={block.monthlyTarget}
+                              onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
+                            />
+                            <p className="mt-1 text-[10px] text-surface-400">Vendedor sem meta configurada no Sankhya para este período — inserção manual.</p>
+                          </label>
                         )
                       }
-                      // API conectou mas retornou 0 vendedores (todas variantes de SQL falharam)
-                      if (sankhyaConnected && sankhyaTargets.length === 0) {
-                        return (
-                          <div className="mt-1 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
-                            <p className="text-xs text-orange-700 font-medium">Nenhuma meta encontrada no Sankhya para {`${String(month + 1).padStart(2, '0')}/${year}`}.</p>
-                            {sankhyaDiagnostics && sankhyaDiagnostics.financialSqlIndex === -1 && (
-                              <p className="text-[10px] text-orange-600 mt-0.5">Sankhya conectado, mas nenhuma query funcionou. Verifique os nomes das colunas nas tabelas AD_TVDYCFGPFM / AD_TVDYDRTIPT.</p>
-                            )}
-                          </div>
-                        )
-                      }
-                      // Sankhya ainda não conectado — input manual como fallback
+                      // Sankhya conectado mas sem dados para este período (normal para meses antigos) — input manual
+                      // Também cobre o caso de SQL ainda não funcionar após probe positivo
                       return (
                         <label className={label}>
                           <input
@@ -4023,9 +4024,11 @@ export default function MetasWorkspace() {
                             onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
                           />
                           <p className="mt-1 text-[10px] text-surface-400">
-                            {block.monthlyTarget > 0
-                              ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
-                              : 'Sem meta financeira configurada — usa a média da equipe como referência.'}
+                            {sankhyaNoDataForPeriod
+                              ? `Período sem metas configuradas no Sankhya — inserção manual.`
+                              : block.monthlyTarget > 0
+                                ? `Cada vendedor neste bloco tem como referência ${currency(block.monthlyTarget)} no mês.`
+                                : 'Sem meta financeira configurada — usa a média da equipe como referência.'}
                           </p>
                         </label>
                       )
@@ -4465,10 +4468,21 @@ export default function MetasWorkspace() {
                                       <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600 border border-emerald-200">Sankhya</span>
                                     </div>
                                   ) : sankhyaTargets.length > 0 ? (
-                                    // Sankhya carregou mas não tem meta para este vendedor/marca
-                                    <span className="text-[11px] text-amber-600" title="Sem meta configurada no Sankhya para este grupo">— sem meta no Sankhya</span>
+                                    // Sankhya tem dados do período mas não para este vendedor/marca — input manual
+                                    <input
+                                      className="w-32 rounded border border-surface-200 px-2 py-1.5 text-xs"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0"
+                                      value={wt.targetKg || ''}
+                                      onChange={(e) => {
+                                        const updated = (block.weightTargets ?? []).map((x) => x.id === wt.id ? { ...x, targetKg: parseDecimal(e.target.value, 0) } : x)
+                                        updateBlock({ weightTargets: updated })
+                                      }}
+                                    />
                                   ) : sankhyaConnected ? (
-                                    // API conectou mas retornou 0 vendedores (SQL falhou)
+                                    // Período sem dados no Sankhya — input manual
                                     <span className="text-[11px] text-orange-500" title="Sankhya conectado mas sem dados neste período">— sem dados</span>
                                   ) : (
                                     // Sankhya ainda não conectado — mantém input manual como fallback

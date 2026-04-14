@@ -475,6 +475,20 @@ export async function GET(req: NextRequest) {
     // Discover FK/PK column names (queries ALL_TAB_COLUMNS, falls back to Sankhya defaults)
     const { childFk, parentPk } = await discoverFkColumns(baseUrl, headers, appKey)
 
+    // Fast probe: check if the period has ANY config rows before running expensive JOINs.
+    // This avoids iterating through all SQL variants for months with no data.
+    const probeSql = `SELECT COUNT(*) AS CNT FROM AD_TVDYCFGPFM WHERE DTINI >= TO_DATE('${startDate}', 'YYYY-MM-DD') AND DTINI < TO_DATE('${endDate}', 'YYYY-MM-DD')`
+    let periodHasData = true
+    try {
+      const probeRows = await queryRows(baseUrl, headers, probeSql, appKey)
+      const cnt = probeRows[0] ? parseNumber(probeRows[0].CNT ?? probeRows[0].cnt ?? 0) : 0
+      if (cnt === 0) periodHasData = false
+    } catch { /* probe failed — proceed with full query anyway */ }
+
+    if (!periodHasData) {
+      return NextResponse.json({ sellers: [], year, month, noDataForPeriod: true })
+    }
+
     // Build cascades of SQL variants and run both in parallel
     const financialVariants = buildSqlVariants('financial', year, month, startDate, endDate, childFk, parentPk)
     const weightVariants = buildSqlVariants('weight', year, month, startDate, endDate, childFk, parentPk)
