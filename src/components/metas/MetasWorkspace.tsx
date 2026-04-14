@@ -34,6 +34,7 @@ type PrizeType = 'CASH' | 'BENEFIT'
 type CashCalcMode = 'PERCENT' | 'FIXED'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
 type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
+type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
 
 interface GoalRule {
   id: string
@@ -128,6 +129,7 @@ interface SellerAllowlistEntry {
   partnerCode: string | null
   name: string
   active: boolean
+  profileType: SellerProfileType
 }
 
 interface ProductAllowlistEntry {
@@ -226,6 +228,7 @@ interface SellerSnapshot {
 interface RuleBlock {
   id: string
   title: string
+  sellerProfileType?: SellerProfileType
   monthlyTarget: number  // legacy — kept for backward compat when Sankhya not connected
   manualFinancialByPeriod?: Record<string, number> // manual values keyed by 'YYYY-MM'
   sellerIds: string[]
@@ -284,6 +287,36 @@ const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: str
   { type: 'CUSTOM', label: 'Personalizado', defaultDescription: '' },
 ]
 
+const SELLER_PROFILE_OPTIONS: Array<{ value: SellerProfileType; label: string; description: string }> = [
+  { value: 'NOVATO', label: 'Vendedor novato', description: 'Perfil inicial para vendedores em rampa.' },
+  { value: 'ANTIGO_1', label: 'Vendedor antigo (1%)', description: 'Perfil antigo com política de 1%.' },
+  { value: 'ANTIGO_15', label: 'Vendedor antigo (1,5%)', description: 'Perfil antigo com política de 1,5%.' },
+  { value: 'SUPERVISOR', label: 'Supervisor', description: 'Perfil de liderança comercial.' },
+]
+
+const SELLER_PROFILE_LABEL: Record<SellerProfileType, string> = {
+  NOVATO: 'Novato',
+  ANTIGO_1: 'Antigo (1%)',
+  ANTIGO_15: 'Antigo (1,5%)',
+  SUPERVISOR: 'Supervisor',
+}
+
+function normalizeSellerProfileType(value: unknown): SellerProfileType {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  if (normalized === 'ANTIGO_1') return 'ANTIGO_1'
+  if (normalized === 'ANTIGO_15') return 'ANTIGO_15'
+  if (normalized === 'SUPERVISOR') return 'SUPERVISOR'
+  return 'NOVATO'
+}
+
+function cloneRulesWithFreshIds(rules: GoalRule[], keyPrefix: string) {
+  const stamp = Date.now()
+  return rules.map((rule, index) => ({
+    ...rule,
+    id: `${keyPrefix}-${stamp}-${index}`,
+  }))
+}
+
 function inferKpiType(kpi: string): KpiType {
   const lower = kpi.toLowerCase()
   if (lower.includes('base de clientes')) return 'BASE_CLIENTES'
@@ -333,6 +366,7 @@ const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
   {
     id: 'default',
     title: 'Bloco padrão',
+    sellerProfileType: 'NOVATO',
     monthlyTarget: 0,
     sellerIds: [],
     rules: DEFAULT_RULES,
@@ -417,6 +451,18 @@ function normalizeEntityCode(value: string) {
     return normalized === 'NaN' ? trimmed : normalized
   }
   return trimmed
+}
+
+function toSellerCodeFromId(sellerId: string) {
+  return normalizeEntityCode(sellerId.replace(/^sankhya-/, ''))
+}
+
+function normalizeSellerNameForLookup(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function parseMonthKeyToYearMonth(key: string) {
@@ -922,7 +968,18 @@ export default function MetasWorkspace() {
   }>({ open: false, sourceBlockId: '', selectedSellerIds: [] })
   const [sellerPickerBlockId, setSellerPickerBlockId] = useState<string | null>(null)
   const [sellerPickerSearch, setSellerPickerSearch] = useState('')
-  const [addGroupModal, setAddGroupModal] = useState<{ open: boolean; search: string; selectedSellerId: string }>({ open: false, search: '', selectedSellerId: '' })
+  const [addGroupModal, setAddGroupModal] = useState<{
+    open: boolean
+    search: string
+    selectedSellerId: string
+    profileType: SellerProfileType
+  }>({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
+  const [addAllowlistModal, setAddAllowlistModal] = useState<{
+    open: boolean
+    search: string
+    selectedSellerId: string
+    profileType: SellerProfileType
+  }>({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
   // Brand weight data fetched from Sankhya (seller × brand → total kg for the selected month)
   const [brandWeightRows, setBrandWeightRows] = useState<Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>>([])
   const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
@@ -989,6 +1046,17 @@ export default function MetasWorkspace() {
   const canSaveProducts = metasPermissions?.products.save ?? false
   const canRemoveProducts = metasPermissions?.products.remove ?? false
   const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
+  const sellerProfileByCode = useMemo(() => {
+    const map = new Map<string, SellerProfileType>()
+    for (const seller of allowlist) {
+      const normalizedCode = normalizeEntityCode(String(seller.code ?? ''))
+      if (!normalizedCode) continue
+      map.set(normalizedCode, normalizeSellerProfileType(seller.profileType))
+    }
+    return map
+  }, [allowlist])
+  const closeAddAllowlistModal = () =>
+    setAddAllowlistModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
   const closeApplyKpiModal = () => setApplyKpiModal({ open: false, sourceBlockId: '', selectedSellerIds: [] })
   const kpiApplyTargetOptions = useMemo(() => {
     if (!applyKpiModal.sourceBlockId) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
@@ -1141,6 +1209,7 @@ export default function MetasWorkspace() {
     const migrateBlocks = (raw: unknown): RuleBlock[] => {
       if (Array.isArray(raw)) return (raw as RuleBlock[]).map((b) => ({
         ...b,
+        sellerProfileType: normalizeSellerProfileType(b.sellerProfileType),
         monthlyTarget: b.monthlyTarget ?? 0,
         sellerIds: b.sellerIds ?? [],
         weightTargets: b.weightTargets ?? [],
@@ -1624,6 +1693,7 @@ export default function MetasWorkspace() {
           partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
           name: String(item.name ?? ''),
           active: Boolean(item.active),
+          profileType: normalizeSellerProfileType(item.profileType),
         }))
       )
     } catch (error) {
@@ -1662,6 +1732,52 @@ export default function MetasWorkspace() {
     void loadProductAllowlist()
   }, [canViewConfig, productAllowlist.length, productAllowlistLoading, view])
 
+  function addSellerToAllowlistFromModal() {
+    const selectedSeller = sellers.find((seller) => seller.id === addAllowlistModal.selectedSellerId)
+    if (!selectedSeller) return
+
+    const nextProfileType = normalizeSellerProfileType(addAllowlistModal.profileType)
+    const nextCode = toSellerCodeFromId(selectedSeller.id)
+    const normalizedName = normalizeSellerNameForLookup(selectedSeller.name)
+
+    setAllowlist((prev) => {
+      const existingIndex = prev.findIndex((item) => {
+        const itemCode = normalizeEntityCode(String(item.code ?? ''))
+        const itemName = normalizeSellerNameForLookup(item.name)
+        return (nextCode && itemCode === nextCode) || itemName === normalizedName
+      })
+
+      if (existingIndex >= 0) {
+        return prev.map((item, index) =>
+          index === existingIndex
+            ? {
+              ...item,
+              code: nextCode || item.code || null,
+              name: selectedSeller.name,
+              active: true,
+              profileType: nextProfileType,
+            }
+            : item
+        )
+      }
+
+      return [
+        ...prev,
+        {
+          code: nextCode || null,
+          partnerCode: null,
+          name: selectedSeller.name,
+          active: true,
+          profileType: nextProfileType,
+        },
+      ]
+    })
+
+    setAllowlistError('')
+    setAllowlistSuccess('Vendedor adicionado/atualizado na lista. Clique em "Salvar lista" para persistir.')
+    closeAddAllowlistModal()
+  }
+
   async function saveAllowlist() {
     if (!canSaveSellers) {
       setAllowlistError('Seu cargo não possui permissão para salvar vendedores da meta.')
@@ -1677,6 +1793,7 @@ export default function MetasWorkspace() {
         partnerCode: seller.partnerCode && seller.partnerCode.trim().length > 0 ? seller.partnerCode.trim() : null,
         name: seller.name.trim(),
         active: seller.active,
+        profileType: normalizeSellerProfileType(seller.profileType),
       })),
     }
 
@@ -1696,6 +1813,7 @@ export default function MetasWorkspace() {
           partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
           name: String(item.name ?? ''),
           active: Boolean(item.active),
+          profileType: normalizeSellerProfileType(item.profileType),
         }))
       )
       setAllowlistSuccess('Lista de vendedores da meta atualizada.')
@@ -1793,6 +1911,7 @@ export default function MetasWorkspace() {
             partnerCode: s.partnerCode && s.partnerCode.trim().length > 0 ? s.partnerCode.trim() : null,
             name: s.name.trim(),
             active: s.active,
+            profileType: normalizeSellerProfileType(s.profileType),
           })),
         }),
       })
@@ -1804,6 +1923,7 @@ export default function MetasWorkspace() {
           partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
           name: String(item.name ?? ''),
           active: Boolean(item.active),
+          profileType: normalizeSellerProfileType(item.profileType),
         }))
       )
     } catch (error) {
@@ -1836,6 +1956,7 @@ export default function MetasWorkspace() {
           partnerCode: item.partnerCode == null ? null : String(item.partnerCode),
           name: String(item.name ?? ''),
           active: Boolean(item.active),
+          profileType: normalizeSellerProfileType(item.profileType),
         }))
       )
       const imported = Number(data?.imported ?? 0)
@@ -3434,7 +3555,7 @@ export default function MetasWorkspace() {
             </div>
             <button
               type="button"
-              onClick={() => setAddGroupModal({ open: true, search: '', selectedSellerId: '' })}
+              onClick={() => setAddGroupModal({ open: true, search: '', selectedSellerId: '', profileType: 'NOVATO' })}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"
             >
               <UserPlus size={12} /> Adicionar vendedor
@@ -3901,6 +4022,7 @@ export default function MetasWorkspace() {
                                     <option key={optionBlock.id} value={optionBlock.id}>
                                       {optionBlock.title}
                                       {optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}
+                                      {` · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(optionBlock.sellerProfileType)]}`}
                                     </option>
                                   ))}
                                 </select>
@@ -3922,7 +4044,7 @@ export default function MetasWorkspace() {
                                 >
                                   {(() => {
                                     const selectedOption = ruleBlocks.find((optionBlock) => optionBlock.id === selectedBlockId) ?? block
-                                    return `${selectedOption.title}${selectedOption.sellerIds.length > 0 ? ` (${selectedOption.sellerIds.length})` : ''}`
+                                    return `${selectedOption.title}${selectedOption.sellerIds.length > 0 ? ` (${selectedOption.sellerIds.length})` : ''} · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(selectedOption.sellerProfileType)]}`
                                   })()}
                                 </div>
                                 <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" />
@@ -3932,7 +4054,7 @@ export default function MetasWorkspace() {
                                       <ul className="max-h-64 overflow-y-auto py-1">
                                         {ruleBlocks.map((optionBlock) => {
                                           const active = selectedBlockId === optionBlock.id
-                                          const label = `${optionBlock.title}${optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''}`
+                                          const label = `${optionBlock.title}${optionBlock.sellerIds.length > 0 ? ` (${optionBlock.sellerIds.length})` : ''} · ${SELLER_PROFILE_LABEL[normalizeSellerProfileType(optionBlock.sellerProfileType)]}`
                                           return (
                                             <li key={optionBlock.id}>
                                               <div
@@ -3965,6 +4087,9 @@ export default function MetasWorkspace() {
                               </>
                             )}
                           </div>
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-600">
+                            Perfil de KPIs: {SELLER_PROFILE_LABEL[normalizeSellerProfileType(block.sellerProfileType)]}
+                          </p>
                         </label>
                         <button
                           type="button"
@@ -5054,7 +5179,7 @@ export default function MetasWorkspace() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAllowlist((prev) => [...prev, { code: null, partnerCode: null, name: '', active: true }])}
+                  onClick={() => setAddAllowlistModal({ open: true, search: '', selectedSellerId: '', profileType: 'NOVATO' })}
                   disabled={!canEditSellers}
                   className="inline-flex items-center gap-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-50"
                 >
@@ -5114,6 +5239,7 @@ export default function MetasWorkspace() {
                       <tr className="bg-surface-50 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                         <th className="px-3 py-2">Ativo</th>
                         <th className="px-3 py-2">Nome do vendedor</th>
+                        <th className="px-3 py-2">Tipo</th>
                         <th className="px-3 py-2">Código vendedor</th>
                         <th className="px-3 py-2">Código parceiro</th>
                         <th className="px-3 py-2">Ações</th>
@@ -5122,7 +5248,7 @@ export default function MetasWorkspace() {
                     <tbody className="divide-y divide-surface-100">
                       {filteredSellerAllowlist.length === 0 ? (
                         <tr>
-                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={5}>
+                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={6}>
                             {allowlistShowOnlyInactive
                               ? 'Nenhum vendedor não liberado encontrado.'
                               : 'Nenhum vendedor encontrado.'}
@@ -5147,6 +5273,25 @@ export default function MetasWorkspace() {
                             </td>
                             <td className="px-3 py-2">
                               <span className="text-xs text-surface-700">{seller.name}</span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                className="rounded-lg border border-surface-200 bg-white px-2 py-1 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                                value={normalizeSellerProfileType(seller.profileType)}
+                                onChange={(event) =>
+                                  setAllowlist((prev) =>
+                                    prev.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, profileType: normalizeSellerProfileType(event.target.value) }
+                                        : item
+                                    )
+                                  )
+                                }
+                              >
+                                {SELLER_PROFILE_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
                             </td>
                             <td className="px-3 py-2">
                               <span className="text-xs text-surface-700">{seller.code ?? '—'}</span>
@@ -6155,6 +6300,143 @@ export default function MetasWorkspace() {
         </div>
       </Modal>
 
+      {/* ── Add seller to allowlist modal ───────────────────────── */}
+      <Modal
+        open={addAllowlistModal.open}
+        onClose={closeAddAllowlistModal}
+        title="Adicionar vendedor à lista"
+        description="Selecione o vendedor e classifique o tipo para usar métricas e KPIs específicos."
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={closeAddAllowlistModal}
+              className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!addAllowlistModal.selectedSellerId}
+              onClick={addSellerToAllowlistFromModal}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Adicionar / Atualizar
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all">
+            <Search size={14} className="text-surface-400 shrink-0" />
+            <input
+              autoFocus
+              placeholder="Buscar vendedor..."
+              className="flex-1 bg-transparent text-sm text-surface-800 placeholder-surface-400 outline-none"
+              value={addAllowlistModal.search}
+              onChange={(event) => setAddAllowlistModal((prev) => ({ ...prev, search: event.target.value }))}
+            />
+            {addAllowlistModal.search && (
+              <button
+                type="button"
+                onClick={() => setAddAllowlistModal((prev) => ({ ...prev, search: '' }))}
+                className="text-surface-400 hover:text-surface-600"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div>
+            <p className={label}>Tipo de vendedor</p>
+            <div className="mt-1 grid gap-2 md:grid-cols-2">
+              {SELLER_PROFILE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                    addAllowlistModal.profileType === option.value
+                      ? 'border-primary-300 bg-primary-50 text-primary-700'
+                      : 'border-surface-200 bg-white text-surface-700 hover:bg-surface-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="allowlist-seller-profile"
+                      className="mt-0.5 h-3.5 w-3.5 accent-primary-600"
+                      checked={addAllowlistModal.profileType === option.value}
+                      onChange={() => setAddAllowlistModal((prev) => ({ ...prev, profileType: option.value }))}
+                    />
+                    <div>
+                      <p className="font-semibold">{option.label}</p>
+                      <p className="text-[10px] text-surface-500">{option.description}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {sellers.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
+              Nenhum vendedor carregado no período atual para seleção.
+            </p>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto rounded-xl border border-surface-200 divide-y divide-surface-100">
+              {sellers
+                .filter((seller) => !addAllowlistModal.search || seller.name.toLowerCase().includes(addAllowlistModal.search.toLowerCase()))
+                .map((seller) => {
+                  const initials = seller.name.split(' ').slice(0, 2).map((word) => word[0]).join('').toUpperCase()
+                  const sellerCode = toSellerCodeFromId(seller.id)
+                  const normalizedName = normalizeSellerNameForLookup(seller.name)
+                  const existing = allowlist.find((item) => {
+                    const itemCode = normalizeEntityCode(String(item.code ?? ''))
+                    const itemName = normalizeSellerNameForLookup(item.name)
+                    return (sellerCode && itemCode === sellerCode) || itemName === normalizedName
+                  })
+                  const suggestedProfile = normalizeSellerProfileType(existing?.profileType ?? sellerProfileByCode.get(sellerCode) ?? 'NOVATO')
+                  const isSelected = addAllowlistModal.selectedSellerId === seller.id
+                  return (
+                    <li key={seller.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAddAllowlistModal((prev) => ({
+                            ...prev,
+                            selectedSellerId: seller.id,
+                            profileType: suggestedProfile,
+                          }))
+                        }
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                          isSelected ? 'bg-primary-50' : 'hover:bg-surface-50'
+                        }`}
+                      >
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
+                          isSelected ? 'bg-primary-600 text-white' : 'bg-surface-200 text-surface-600'
+                        }`}>
+                          {initials}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-xs font-semibold ${isSelected ? 'text-primary-700' : 'text-surface-800'}`}>{seller.name}</p>
+                          <p className="text-[10px] text-surface-500">
+                            {sellerCode ? `Código ${sellerCode}` : 'Sem código'} · Tipo sugerido: {SELLER_PROFILE_LABEL[suggestedProfile]}
+                          </p>
+                        </div>
+                        {existing ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            Já está na lista
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  )
+                })}
+            </ul>
+          )}
+        </div>
+      </Modal>
+
       {/* ── Confirm modal ──────────────────────────────────────── */}
       <Modal
         open={confirmModal.open}
@@ -6195,15 +6477,15 @@ export default function MetasWorkspace() {
       {/* ── Add seller group modal ──────────────────────────────── */}
       <Modal
         open={addGroupModal.open}
-        onClose={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '' })}
+        onClose={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })}
         title="Adicionar grupo de parâmetros"
-        description="Selecione um vendedor para criar um novo grupo de regras e meta financeira individual."
-        size="sm"
+        description="Selecione um vendedor e o tipo de perfil para criar um grupo com KPIs/parametrizações específicas."
+        size="md"
         footer={
           <div className="flex justify-end gap-2 px-6 py-4 border-t border-surface-100">
             <button
               type="button"
-              onClick={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '' })}
+              onClick={() => setAddGroupModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })}
               className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
             >
               Cancelar
@@ -6215,17 +6497,21 @@ export default function MetasWorkspace() {
                 const seller = sellers.find((s) => s.id === addGroupModal.selectedSellerId)
                 if (!seller) return
                 const newId = `block-${Date.now()}`
-                const source = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
+                const selectedProfileType = normalizeSellerProfileType(addGroupModal.profileType)
+                const source =
+                  ruleBlocks.find((b) => b.sellerProfileType === selectedProfileType && b.sellerIds.length > 0)
+                  ?? (ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0])
                 const cloned: RuleBlock = {
                   ...source,
                   id: newId,
                   title: seller.name.split(' ').slice(0, 2).join(' '),
+                  sellerProfileType: selectedProfileType,
                   sellerIds: [seller.id],
-                  rules: source.rules.map((r) => ({ ...r, id: `${r.id}-${Date.now()}` })),
+                  rules: cloneRulesWithFreshIds(source.rules, `rule-${selectedProfileType}-${newId}`),
                 }
                 setRuleBlocks((prev) => [...prev, cloned])
                 setSelectedBlockId(newId)
-                setAddGroupModal({ open: false, search: '', selectedSellerId: '' })
+                setAddGroupModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
               }}
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -6262,12 +6548,14 @@ export default function MetasWorkspace() {
                   const initials = s.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
                   const alreadyInBlock = ruleBlocks.some((b) => b.sellerIds.includes(s.id))
                   const isSelected = addGroupModal.selectedSellerId === s.id
+                  const sellerCode = toSellerCodeFromId(s.id)
+                  const sellerProfile = sellerProfileByCode.get(sellerCode) ?? 'NOVATO'
                   return (
                     <li key={s.id}>
                       <button
                         type="button"
                         disabled={alreadyInBlock}
-                        onClick={() => setAddGroupModal((prev) => ({ ...prev, selectedSellerId: s.id }))}
+                        onClick={() => setAddGroupModal((prev) => ({ ...prev, selectedSellerId: s.id, profileType: sellerProfile }))}
                         className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
                           isSelected
                             ? 'bg-primary-50'
@@ -6281,6 +6569,7 @@ export default function MetasWorkspace() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className={`truncate text-xs font-semibold ${isSelected ? 'text-primary-700' : 'text-surface-800'}`}>{s.name}</div>
+                          <div className="text-[10px] text-surface-500">Tipo: {SELLER_PROFILE_LABEL[sellerProfile]}</div>
                           {alreadyInBlock && <div className="text-[10px] text-surface-400">Já possui grupo definido</div>}
                         </div>
                         {isSelected && <span className="text-primary-500 font-bold text-sm">✓</span>}
@@ -6293,6 +6582,38 @@ export default function MetasWorkspace() {
               )}
             </ul>
           )}
+          <div>
+            <p className={label}>Tipo de vendedor para este grupo</p>
+            <div className="mt-1 grid gap-2 md:grid-cols-2">
+              {SELLER_PROFILE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                    addGroupModal.profileType === option.value
+                      ? 'border-primary-300 bg-primary-50 text-primary-700'
+                      : 'border-surface-200 bg-white text-surface-700 hover:bg-surface-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="group-seller-profile"
+                      className="mt-0.5 h-3.5 w-3.5 accent-primary-600"
+                      checked={addGroupModal.profileType === option.value}
+                      onChange={() => setAddGroupModal((prev) => ({ ...prev, profileType: option.value }))}
+                    />
+                    <div>
+                      <p className="font-semibold">{option.label}</p>
+                      <p className="text-[10px] text-surface-500">{option.description}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-surface-400">
+              Se já existir um grupo desse tipo, os KPIs/parâmetros serão herdados automaticamente desse perfil.
+            </p>
+          </div>
           {sellers.length > 0 && (
             <p className="text-[10px] text-surface-400">
               {sellers.filter((s) => !ruleBlocks.some((b) => b.sellerIds.includes(s.id))).length} de {sellers.length} vendedores sem grupo definido

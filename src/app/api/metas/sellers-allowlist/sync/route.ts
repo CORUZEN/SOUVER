@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { normalizeSellerProfileType, type SellerProfileType } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist, writeSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 type RawRecord = Record<string, unknown>
@@ -10,6 +11,7 @@ type SellerRow = {
   code: string
   name: string
   partnerCode: string | null
+  profileTypeHint: SellerProfileType
 }
 
 function getSankhyaAuthOrigins(baseUrl: string) {
@@ -259,6 +261,7 @@ function parseSellerRecords(records: RawRecord[]): SellerRow[] {
     const code = String(record.CODVEND ?? record.COL_1 ?? '').trim()
     const name = String(record.APELIDO ?? record.NOMEVEND ?? record.COL_2 ?? '').trim()
     const partnerCodeRaw = String(record.CODPARC ?? record.COL_3 ?? '').trim()
+    const tipVendRaw = String(record.TIPVEND ?? record.COL_4 ?? '').trim().toUpperCase()
     if (!code || !name) continue
 
     const key = `${code}|${name.toUpperCase()}`
@@ -267,6 +270,7 @@ function parseSellerRecords(records: RawRecord[]): SellerRow[] {
         code,
         name,
         partnerCode: partnerCodeRaw.length > 0 ? partnerCodeRaw : null,
+        profileTypeHint: tipVendRaw === 'S' || tipVendRaw === 'SUPERVISOR' ? 'SUPERVISOR' : 'NOVATO',
       })
     }
   }
@@ -291,7 +295,8 @@ async function querySellers(baseUrl: string, headers: Record<string, string>, ap
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  TO_CHAR(MAX(CAB.CODPARC)) AS CODPARC
+  TO_CHAR(MAX(CAB.CODPARC)) AS CODPARC,
+  UPPER(TRIM(V.TIPVEND)) AS TIPVEND
 FROM TGFVEN V
 LEFT JOIN TGFCAB CAB
   ON CAB.CODVEND = V.CODVEND
@@ -300,7 +305,7 @@ LEFT JOIN TGFCAB CAB
 WHERE TRIM(V.APELIDO) IS NOT NULL
   AND UPPER(TRIM(V.TIPVEND)) IN ('V', 'S', 'VENDEDOR', 'SUPERVISOR')
   AND V.ATIVO = 'S'
-GROUP BY V.CODVEND, TRIM(V.APELIDO)
+GROUP BY V.CODVEND, TRIM(V.APELIDO), UPPER(TRIM(V.TIPVEND))
 ORDER BY TRIM(V.APELIDO)`.trim()
 
   try {
@@ -315,7 +320,8 @@ ORDER BY TRIM(V.APELIDO)`.trim()
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  CAST(NULL AS VARCHAR2(20)) AS CODPARC
+  CAST(NULL AS VARCHAR2(20)) AS CODPARC,
+  UPPER(TRIM(V.TIPVEND)) AS TIPVEND
 FROM TGFVEN V
 WHERE TRIM(V.APELIDO) IS NOT NULL
   AND UPPER(TRIM(V.TIPVEND)) IN ('V', 'S', 'VENDEDOR', 'SUPERVISOR')
@@ -334,7 +340,8 @@ ORDER BY TRIM(V.APELIDO)`.trim()
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  CAST(NULL AS VARCHAR2(20)) AS CODPARC
+  CAST(NULL AS VARCHAR2(20)) AS CODPARC,
+  CAST(NULL AS VARCHAR2(20)) AS TIPVEND
 FROM TGFVEN V
 WHERE TRIM(V.APELIDO) IS NOT NULL
   AND V.ATIVO = 'S'
@@ -409,6 +416,7 @@ export async function POST(req: NextRequest) {
           partnerCode: seller.partnerCode ?? prev.partnerCode ?? null,
           name: seller.name || prev.name,
           active: prev.active,
+          profileType: normalizeSellerProfileType(prev.profileType),
         }
         if (seller.code) indexByCode.set(seller.code, foundIndex)
         indexByName.set(normalizedName, foundIndex)
@@ -419,6 +427,7 @@ export async function POST(req: NextRequest) {
           partnerCode: seller.partnerCode ?? null,
           name: seller.name,
           active: true,
+          profileType: normalizeSellerProfileType(seller.profileTypeHint),
         })
         indexByCode.set(seller.code, nextIndex)
         indexByName.set(normalizedName, nextIndex)

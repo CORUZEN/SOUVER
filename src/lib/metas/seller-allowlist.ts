@@ -1,8 +1,20 @@
+export const SELLER_PROFILE_TYPES = ['NOVATO', 'ANTIGO_1', 'ANTIGO_15', 'SUPERVISOR'] as const
+export type SellerProfileType = (typeof SELLER_PROFILE_TYPES)[number]
+
+export function normalizeSellerProfileType(value: unknown): SellerProfileType {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  if (normalized === 'ANTIGO_1') return 'ANTIGO_1'
+  if (normalized === 'ANTIGO_15') return 'ANTIGO_15'
+  if (normalized === 'SUPERVISOR') return 'SUPERVISOR'
+  return 'NOVATO'
+}
+
 export interface AllowedSeller {
   code?: string | null
   partnerCode?: string | null
   name: string
   active: boolean
+  profileType: SellerProfileType
 }
 
 // Lista corporativa de vendedores considerados no painel de metas.
@@ -13,6 +25,7 @@ export const METAS_ALLOWED_SELLERS: AllowedSeller[] = [
     partnerCode: '230',
     name: 'ROSILAINE FERREIRA',
     active: true,
+    profileType: 'NOVATO',
   },
 ]
 

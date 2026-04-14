@@ -1,5 +1,6 @@
 import { parseStoredConfig, normalizeBaseUrl, type SankhyaConfig } from '@/lib/integrations/config'
 import { prisma } from '@/lib/prisma'
+import { normalizeSellerProfileType } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist, writeSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 type RawRecord = Record<string, unknown>
@@ -227,6 +228,7 @@ async function main() {
       partnerCode: seller.partnerCode ?? prev?.partnerCode ?? null,
       name: seller.name,
       active: prev?.active ?? true,
+      profileType: normalizeSellerProfileType(prev?.profileType),
     }
   })
 

@@ -634,6 +634,7 @@ model MetasSeller {
   partnerCode String?  @map("partner_code")
   name        String   @unique
   active      Boolean  @default(true)
+  profileType String   @default("NOVATO") @map("profile_type")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

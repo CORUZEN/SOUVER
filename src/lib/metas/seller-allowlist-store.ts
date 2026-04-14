@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
-import { METAS_ALLOWED_SELLERS, type AllowedSeller } from './seller-allowlist'
+import { METAS_ALLOWED_SELLERS, normalizeSellerProfileType, type AllowedSeller } from './seller-allowlist'
 
 const LEGACY_ALLOWLIST_FILE = join(process.cwd(), 'src', 'generated', 'metas-sellers-allowlist.json')
 
@@ -12,6 +12,7 @@ function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
       partnerCode: item.partnerCode == null ? null : String(item.partnerCode).trim() || null,
       name: String(item.name ?? '').trim(),
       active: Boolean(item.active),
+      profileType: normalizeSellerProfileType(item.profileType),
     }))
     .filter((item) => item.name.length > 0)
 
@@ -38,11 +39,12 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
   try {
     const rows = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
     if (rows.length > 0) {
-      return rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean }) => ({
+      return rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean; profileType: string | null }) => ({
         code: r.code,
         partnerCode: r.partnerCode,
         name: r.name,
         active: r.active,
+        profileType: normalizeSellerProfileType(r.profileType),
       }))
     }
   } catch {
@@ -72,6 +74,7 @@ export async function writeSellerAllowlist(input: AllowedSeller[]) {
         partnerCode: s.partnerCode ?? null,
         name: s.name,
         active: s.active,
+        profileType: normalizeSellerProfileType(s.profileType),
       })),
       skipDuplicates: true,
     }),

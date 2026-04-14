@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
-import { getActiveAllowedSellersFromList, type AllowedSeller } from '@/lib/metas/seller-allowlist'
+import {
+  getActiveAllowedSellersFromList,
+  normalizeSellerProfileType,
+  type AllowedSeller,
+} from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist, writeSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 export async function GET(req: NextRequest) {
@@ -42,6 +46,7 @@ export async function PUT(req: NextRequest) {
       partnerCode: seller.partnerCode == null ? null : String(seller.partnerCode),
       name: String(seller.name ?? ''),
       active: Boolean(seller.active),
+      profileType: normalizeSellerProfileType(seller.profileType),
     }
   })
 
@@ -53,4 +58,3 @@ export async function PUT(req: NextRequest) {
     sellers: saved,
   })
 }
-
