@@ -971,6 +971,8 @@ export default function MetasWorkspace() {
   const [sellerIncludeSellerId, setSellerIncludeSellerId] = useState('')
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
+  const [weightPanelView, setWeightPanelView] = useState<'GENERAL' | 'SELLER'>('GENERAL')
+  const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
   const [performanceDiagnostics, setPerformanceDiagnostics] = useState<PerformanceDiagnostics | null>(null)
@@ -3028,24 +3030,159 @@ export default function MetasWorkspace() {
     return { radius, circumference, segments, legendItems, totalEarned, totalTarget, pctCommitted, totalKpiHit, totalKpiTarget, kpiCommittedPct }
   }, [ruleBlocks, snapshots])
 
-  const sellerRewardRows = useMemo(() => {
+  const sellerWeightPerformanceRows = useMemo(() => {
+    const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
+    const soldBySellerBrand = new Map<string, number>()
+    for (const row of brandWeightRows) {
+      const sellerCode = normalizeEntityCode(String(row.sellerCode ?? ''))
+      const brand = String(row.brand ?? '').trim().toUpperCase()
+      const totalKg = Number(row.totalKg ?? 0)
+      if (!sellerCode || !brand || !Number.isFinite(totalKg) || totalKg <= 0) continue
+      const key = `${sellerCode}::${brand}`
+      soldBySellerBrand.set(key, (soldBySellerBrand.get(key) ?? 0) + totalKg)
+    }
+
+    const sankhyaBySellerBrand = new Map<string, Map<string, number>>()
+    for (const sellerTarget of sankhyaTargets) {
+      const sellerCode = normalizeEntityCode(String(sellerTarget.sellerCode ?? ''))
+      if (!sellerCode) continue
+      const byBrand = new Map<string, number>()
+      for (const target of sellerTarget.weightTargets ?? []) {
+        const brand = String(target.brand ?? '').trim().toUpperCase()
+        const targetKg = Number(target.targetKg ?? 0)
+        if (!brand || !Number.isFinite(targetKg) || targetKg <= 0) continue
+        byBrand.set(brand, targetKg)
+      }
+      sankhyaBySellerBrand.set(sellerCode, byBrand)
+    }
+
     return snapshots
-      .filter((s) => s.rewardAchieved > 0 || s.rewardTarget > 0)
-      .map((s) => ({
-        name: getSellerShortName(s.seller.name),
-        earned: s.rewardAchieved,
-        target: s.rewardTarget,
-        mode: s.rewardMode,
-        status: s.status,
+      .map((snapshot) => {
+        const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+        const block =
+          ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+          findBlockForSeller(snapshot.seller.id, ruleBlocks) ??
+          DEFAULT_RULE_BLOCKS[0]
+        const sankhyaByBrand = sankhyaBySellerBrand.get(sellerCode)
+
+        const groups = (block.weightTargets ?? [])
+          .map((target) => {
+            const brand = String(target.brand ?? '').trim().toUpperCase()
+            if (!brand) return null
+            const sankhyaTarget = sankhyaByBrand?.get(brand)
+            const fallbackTarget = sankhyaConnected
+              ? Number(target.manualKgByPeriod?.[periodKey] ?? 0)
+              : Number(target.targetKg ?? 0)
+            const rawTargetKg = sankhyaTarget ?? fallbackTarget
+            const targetKg = Number.isFinite(rawTargetKg) && rawTargetKg > 0 ? rawTargetKg : 0
+            const soldKg = Math.max(soldBySellerBrand.get(`${sellerCode}::${brand}`) ?? 0, 0)
+            const ratio = targetKg > 0 ? soldKg / targetKg : 0
+            return { brand, targetKg, soldKg, ratio }
+          })
+          .filter((group): group is { brand: string; targetKg: number; soldKg: number; ratio: number } => Boolean(group))
+
+        const groupsWithTarget = groups.filter((group) => group.targetKg > 0)
+        const totalTargetKg = groupsWithTarget.reduce((sum, group) => sum + group.targetKg, 0)
+        const totalSoldKg = groupsWithTarget.reduce((sum, group) => sum + group.soldKg, 0)
+        const overallRatio = totalTargetKg > 0 ? totalSoldKg / totalTargetKg : 0
+        const groupsHit = groupsWithTarget.filter((group) => group.ratio >= 1).length
+
+        return {
+          sellerId: snapshot.seller.id,
+          sellerCode,
+          sellerName: snapshot.seller.name,
+          sellerShortName: getSellerShortName(snapshot.seller.name),
+          blockTitle: block.title,
+          groupsWithTarget,
+          groupsConfigured: groupsWithTarget.length,
+          groupsHit,
+          totalTargetKg,
+          totalSoldKg,
+          overallRatio,
+        }
+      })
+      .sort((a, b) => {
+        if (b.overallRatio !== a.overallRatio) return b.overallRatio - a.overallRatio
+        if (b.totalSoldKg !== a.totalSoldKg) return b.totalSoldKg - a.totalSoldKg
+        return a.sellerShortName.localeCompare(b.sellerShortName, 'pt-BR')
+      })
+  }, [brandWeightRows, month, ruleBlocks, sankhyaConnected, sankhyaTargets, snapshots, year])
+
+  const weightOverviewByBrand = useMemo(() => {
+    const byBrand = new Map<string, { brand: string; targetKg: number; soldKg: number; sellerCount: number; hitSellers: number }>()
+    for (const seller of sellerWeightPerformanceRows) {
+      for (const group of seller.groupsWithTarget) {
+        const current = byBrand.get(group.brand) ?? {
+          brand: group.brand,
+          targetKg: 0,
+          soldKg: 0,
+          sellerCount: 0,
+          hitSellers: 0,
+        }
+        current.targetKg += group.targetKg
+        current.soldKg += group.soldKg
+        current.sellerCount += 1
+        if (group.ratio >= 1) current.hitSellers += 1
+        byBrand.set(group.brand, current)
+      }
+    }
+    return Array.from(byBrand.values())
+      .map((entry) => ({
+        ...entry,
+        ratio: entry.targetKg > 0 ? entry.soldKg / entry.targetKg : 0,
       }))
       .sort((a, b) => {
-        const ratioA = a.target > 0 ? a.earned / a.target : 0
-        const ratioB = b.target > 0 ? b.earned / b.target : 0
-        if (ratioB !== ratioA) return ratioB - ratioA
-        if (b.earned !== a.earned) return b.earned - a.earned
-        return a.name.localeCompare(b.name)
+        if (a.ratio !== b.ratio) return a.ratio - b.ratio
+        if (b.targetKg !== a.targetKg) return b.targetKg - a.targetKg
+        return a.brand.localeCompare(b.brand, 'pt-BR')
       })
-  }, [snapshots])
+  }, [sellerWeightPerformanceRows])
+
+  const weightExecutiveSummary = useMemo(() => {
+    const sellersTracked = sellerWeightPerformanceRows.length
+    const sellersWithGoals = sellerWeightPerformanceRows.filter((row) => row.groupsConfigured > 0).length
+    const totalTargetKg = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.totalTargetKg, 0)
+    const totalSoldKg = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.totalSoldKg, 0)
+    const overallRatio = totalTargetKg > 0 ? totalSoldKg / totalTargetKg : 0
+    const totalGroups = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.groupsConfigured, 0)
+    const hitGroups = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.groupsHit, 0)
+    return {
+      sellersTracked,
+      sellersWithGoals,
+      totalTargetKg,
+      totalSoldKg,
+      overallRatio,
+      totalGroups,
+      hitGroups,
+      brandsTracked: weightOverviewByBrand.length,
+    }
+  }, [sellerWeightPerformanceRows, weightOverviewByBrand.length])
+
+  useEffect(() => {
+    if (sellerWeightPerformanceRows.length === 0) {
+      if (weightPanelSellerId !== '') setWeightPanelSellerId('')
+      return
+    }
+    const exists = sellerWeightPerformanceRows.some((row) => row.sellerId === weightPanelSellerId)
+    if (!exists) setWeightPanelSellerId(sellerWeightPerformanceRows[0].sellerId)
+  }, [sellerWeightPerformanceRows, weightPanelSellerId])
+
+  const selectedWeightSellerDetails = useMemo(
+    () =>
+      sellerWeightPerformanceRows.find((row) => row.sellerId === weightPanelSellerId) ??
+      sellerWeightPerformanceRows[0] ??
+      null,
+    [sellerWeightPerformanceRows, weightPanelSellerId]
+  )
+
+  const selectedWeightSellerGroupRows = useMemo(() => {
+    if (!selectedWeightSellerDetails) return []
+    return [...selectedWeightSellerDetails.groupsWithTarget].sort((a, b) => {
+      if (a.ratio !== b.ratio) return a.ratio - b.ratio
+      if (b.targetKg !== a.targetKg) return b.targetKg - a.targetKg
+      return a.brand.localeCompare(b.brand, 'pt-BR')
+    })
+  }, [selectedWeightSellerDetails])
 
   const stageSeries = useMemo(
     () =>
@@ -6118,117 +6255,247 @@ export default function MetasWorkspace() {
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 via-teal-500 to-cyan-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                Premiação por Desempenho
-              </p>
-              <p className="mt-0.5 text-[10px] text-surface-400">KPIs conquistados no período selecionado — {MONTHS[month]} {year}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                    Metas de peso por grupo de produto
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-surface-400">Visão geral e por vendedor — {MONTHS[month]} {year}</p>
+                </div>
+                <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                  <button
+                    type="button"
+                    className={`px-3 py-1.5 transition-colors ${weightPanelView === 'GENERAL' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                    onClick={() => setWeightPanelView('GENERAL')}
+                  >
+                    Visão geral
+                  </button>
+                  <button
+                    type="button"
+                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SELLER' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                    onClick={() => setWeightPanelView('SELLER')}
+                  >
+                    Por vendedor
+                  </button>
+                </div>
+              </div>
+
+              {(brandWeightLoading || sankhyaTargetsLoading) && (
+                <p className="mt-3 text-[10px] text-surface-400">Atualizando metas de peso e vendidos por grupo…</p>
+              )}
+
+              {(brandWeightError || sankhyaTargetsError) && (
+                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">
+                  {brandWeightError || sankhyaTargetsError}
+                </div>
+              )}
+
               {snapshots.length === 0 ? (
                 <p className="py-8 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
+              ) : weightExecutiveSummary.sellersWithGoals === 0 ? (
+                <p className="py-8 text-center text-xs text-surface-400">Nenhuma meta de peso configurada para o período.</p>
               ) : (
-                <div className="mt-4 grid gap-6 xl:grid-cols-[1.5fr_3.5fr]">
-                  {/* ── Donut grande ──────────────────────────── */}
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <svg className="w-full max-w-56 h-auto" viewBox="0 0 200 200">
-                      {/* Track */}
-                      <circle cx="100" cy="100" r="76" fill="none" stroke="#f1f5f9" strokeWidth="22" />
-                      {/* Single KPI progress segment */}
-                      {rewardDonut.totalKpiTarget > 0 && (
-                        <circle
-                          cx="100" cy="100" r="76"
-                          fill="none"
-                          stroke="#06b6d4"
-                          strokeWidth="22"
-                          strokeDasharray={`${(rewardDonut.kpiCommittedPct / 100) * (2 * Math.PI * 76)} ${2 * Math.PI * 76}`}
-                          strokeDashoffset={0}
-                          strokeLinecap="round"
-                          style={{ transform: 'rotate(-90deg)', transformOrigin: '100px 100px' }}
-                        />
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta total (kg)</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(weightExecutiveSummary.totalTargetKg, 2)} kg</p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Vendido (kg)</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(weightExecutiveSummary.totalSoldKg, 2)} kg</p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Atingimento geral</p>
+                      <p className={`mt-1 text-lg font-semibold tabular-nums ${
+                        weightExecutiveSummary.overallRatio >= 1
+                          ? 'text-emerald-600'
+                          : weightExecutiveSummary.overallRatio >= 0.8
+                            ? 'text-cyan-600'
+                            : weightExecutiveSummary.overallRatio >= 0.6
+                              ? 'text-amber-500'
+                              : 'text-rose-600'
+                      }`}>{num(weightExecutiveSummary.overallRatio * 100, 1)}%</p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Grupos no alvo</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">
+                        {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
+                    <div className="space-y-3">
+                      {weightPanelView === 'SELLER' && (
+                        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
+                          <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Vendedor</label>
+                          <select
+                            className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
+                            value={weightPanelSellerId}
+                            onChange={(event) => setWeightPanelSellerId(event.target.value)}
+                          >
+                            {sellerWeightPerformanceRows.map((row) => (
+                              <option key={row.sellerId} value={row.sellerId}>
+                                {row.sellerShortName} · {num(row.overallRatio * 100, 1)}%
+                              </option>
+                            ))}
+                          </select>
+                          {selectedWeightSellerDetails && (
+                            <span className="text-[10px] text-cyan-700">
+                              {selectedWeightSellerDetails.groupsHit}/{selectedWeightSellerDetails.groupsConfigured} grupos no alvo
+                            </span>
+                          )}
+                        </div>
                       )}
-                      {/* Center text */}
-                      <text x="100" y="95" textAnchor="middle" className="fill-surface-400" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Premiação atual</text>
-                      <text x="100" y="113" textAnchor="middle" className="fill-surface-900" style={{ fontSize: 13, fontWeight: 700 }}>{currency(rewardDonut.totalEarned)}</text>
-                    </svg>
-                    {/* KPI summary */}
-                    <div className="mt-2 w-full max-w-56 rounded-xl border border-surface-100 bg-surface-50/60 px-3 py-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-2 text-xs font-medium text-surface-700">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-500" />
-                          KPIs alcançados
-                        </span>
-                        <span className="text-xs font-semibold tabular-nums text-surface-900">
-                          {rewardDonut.totalKpiHit}/{rewardDonut.totalKpiTarget}
-                        </span>
+
+                      <div className="overflow-hidden rounded-xl border border-surface-200">
+                        <div className="overflow-x-auto">
+                          {weightPanelView === 'GENERAL' ? (
+                            <table className="min-w-full text-xs">
+                              <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                                <tr>
+                                  <th className="px-3 py-2 text-left">Grupo</th>
+                                  <th className="px-3 py-2 text-right">Meta (kg)</th>
+                                  <th className="px-3 py-2 text-right">Vendido (kg)</th>
+                                  <th className="px-3 py-2 text-left">Progresso</th>
+                                  <th className="px-3 py-2 text-right">No alvo</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {weightOverviewByBrand.length === 0 ? (
+                                  <tr className="border-t border-surface-100">
+                                    <td colSpan={5} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                      Nenhum grupo de produto com meta de peso ativa neste período.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  weightOverviewByBrand.map((row) => {
+                                    const progressPct = row.ratio * 100
+                                    const barPct = Math.min(progressPct, 100)
+                                    const progressClass =
+                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                                    const textClass =
+                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                    return (
+                                      <tr key={row.brand} className="border-t border-surface-100">
+                                        <td className="px-3 py-2.5 font-semibold text-surface-700">{row.brand}</td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.targetKg, 2)}</td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(row.soldKg, 2)}</td>
+                                        <td className="px-3 py-2.5">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-1.5 w-full max-w-44 overflow-hidden rounded-full bg-surface-100">
+                                              <div className={`h-full transition-[width] duration-700 ${progressClass}`} style={{ width: `${barPct}%` }} />
+                                            </div>
+                                            <span className={`text-[11px] font-semibold tabular-nums ${textClass}`}>
+                                              {num(progressPct, 1)}%
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right text-[11px] tabular-nums text-surface-600">
+                                          {row.hitSellers}/{row.sellerCount}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <table className="min-w-full text-xs">
+                              <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                                <tr>
+                                  <th className="px-3 py-2 text-left">Grupo</th>
+                                  <th className="px-3 py-2 text-right">Meta (kg)</th>
+                                  <th className="px-3 py-2 text-right">Vendido (kg)</th>
+                                  <th className="px-3 py-2 text-left">Progresso</th>
+                                  <th className="px-3 py-2 text-right">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedWeightSellerGroupRows.length === 0 ? (
+                                  <tr className="border-t border-surface-100">
+                                    <td colSpan={5} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                      Vendedor sem grupos de meta de peso configurados neste período.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  selectedWeightSellerGroupRows.map((row) => {
+                                    const progressPct = row.ratio * 100
+                                    const barPct = Math.min(progressPct, 100)
+                                    const progressClass =
+                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                                    const textClass =
+                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                    return (
+                                      <tr key={row.brand} className="border-t border-surface-100">
+                                        <td className="px-3 py-2.5 font-semibold text-surface-700">{row.brand}</td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.targetKg, 2)}</td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(row.soldKg, 2)}</td>
+                                        <td className="px-3 py-2.5">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-1.5 w-full max-w-44 overflow-hidden rounded-full bg-surface-100">
+                                              <div className={`h-full transition-[width] duration-700 ${progressClass}`} style={{ width: `${barPct}%` }} />
+                                            </div>
+                                            <span className={`text-[11px] font-semibold tabular-nums ${textClass}`}>
+                                              {num(progressPct, 1)}%
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className={`px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide ${
+                                          row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                        }`}>
+                                          {row.ratio >= 1 ? 'No alvo' : row.ratio >= 0.8 ? 'Atenção' : 'Crítico'}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {/* Previsão máxima — ao final da coluna do donut */}
-                    {rewardDonut.totalTarget > 0 && (
-                      <div className="mt-3 w-full max-w-56 rounded-xl border border-surface-200 bg-surface-50/80 px-3 py-2.5">
-                        <div className="flex items-center justify-between gap-2 text-[10px] text-surface-500">
-                          <span className="font-semibold uppercase tracking-[0.08em] leading-tight">Previsão máxima</span>
-                          <span className="font-bold text-surface-800 tabular-nums">{currency(rewardDonut.totalTarget)}</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
-                          <div
-                            className="h-full rounded-full bg-linear-to-r from-emerald-400 to-teal-500 transition-[width] duration-700"
-                            style={{ width: `${rewardDonut.pctCommitted}%` }}
-                          />
-                        </div>
-                        <p className="mt-1 text-right text-[9px] text-surface-400">
-                          {num(rewardDonut.pctCommitted, 1)}% comprometida
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-col justify-between gap-4">
-                    {/* Grid vendedores — sem rodapé de orçamento aqui */}
-                    <div className="flex-1">
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-surface-400">Premiação por vendedor</p>
-                      {sellerRewardRows.length === 0 ? (
-                        <p className="text-[10px] text-surface-400">Nenhuma premiação acumulada ainda.</p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                          {sellerRewardRows.map((row, i) => {
-                            const rankRatio = sellerRewardRows.length > 1
-                              ? 1 - i / (sellerRewardRows.length - 1)
-                              : 1
-                            const rankColor =
-                              rankRatio >= 0.8 ? '#0ea5e9' :
-                              rankRatio >= 0.55 ? '#3b82f6' :
-                              rankRatio >= 0.3 ? '#f59e0b' : '#f43f5e'
-                            const pct = row.target > 0 ? Math.min(row.earned / row.target * 100, 100) : 0
-                            const isZero = row.earned === 0
-                            return (
-                              <div
-                                key={i}
-                                className="relative flex flex-col justify-between overflow-hidden rounded-lg bg-white px-3 pt-2.5 pb-2 shadow-sm ring-1 ring-surface-200 transition-all duration-150 hover:ring-surface-300 hover:shadow-md"
-                              >
-                                {/* rank badge */}
-                                <span className="absolute right-2 top-1.5 text-[9px] font-semibold tabular-nums text-surface-300">#{i + 1}</span>
-                                {/* colored left rule */}
-                                <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-lg" style={{ backgroundColor: rankColor }} />
-                                {/* name */}
-                                <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-surface-500 leading-none mb-1.5">{row.name}</p>
-                                {/* value */}
-                                <p className={`text-[13px] font-extrabold tabular-nums leading-none ${isZero ? 'text-surface-300' : 'text-surface-900'}`}>
-                                  {formatRewardValue(row.earned, row.mode)}
-                                </p>
-                                {/* progress + max */}
-                                <div className="mt-2 space-y-1">
-                                  <div className="h-0.75 w-full overflow-hidden rounded-full bg-surface-100">
-                                    <div
-                                      className="h-full rounded-full transition-[width] duration-700"
-                                      style={{ width: `${pct}%`, backgroundColor: rankColor }}
-                                    />
-                                  </div>
-                                  {row.target > 0 && (
-                                    <p className="text-[9px] tabular-nums text-surface-400 leading-none">máx. {formatRewardValue(row.target, row.mode)}</p>
-                                  )}
-                                </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Ranking de atingimento por vendedor</p>
+                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                        {sellerWeightPerformanceRows.map((row, index) => {
+                          const progressPct = row.overallRatio * 100
+                          const barPct = Math.min(progressPct, 100)
+                          const isSelected = selectedWeightSellerDetails?.sellerId === row.sellerId
+                          const barClass =
+                            row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                          return (
+                            <button
+                              key={row.sellerId}
+                              type="button"
+                              className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                                isSelected
+                                  ? 'border-cyan-300 bg-cyan-50 shadow-sm'
+                                  : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
+                              }`}
+                              onClick={() => {
+                                setWeightPanelSellerId(row.sellerId)
+                                setWeightPanelView('SELLER')
+                              }}
+                            >
+                              <div className="mb-1.5 flex items-center justify-between gap-2">
+                                <span className="truncate text-[11px] font-semibold text-surface-700">{row.sellerShortName}</span>
+                                <span className="text-[10px] text-surface-400">#{index + 1}</span>
                               </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                                <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
+                              </div>
+                              <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
+                                <span>{row.groupsHit}/{row.groupsConfigured} grupos</span>
+                                <span className="font-semibold tabular-nums text-surface-700">{num(progressPct, 1)}%</span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
