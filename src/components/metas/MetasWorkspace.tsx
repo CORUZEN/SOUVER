@@ -986,6 +986,7 @@ export default function MetasWorkspace() {
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellerPerformanceScope, setSellerPerformanceScope] = useState<SellerPerformanceScope>('ALL')
+  const [performanceSupervisorKey, setPerformanceSupervisorKey] = useState('')
   const [weightPanelView, setWeightPanelView] = useState<WeightPanelView>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
   const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
@@ -3286,6 +3287,16 @@ export default function MetasWorkspace() {
     }
     return order
   }, [ruleBlocks])
+
+  const performanceSupervisorOptions = useMemo(() => {
+    const map = new Map<string, { key: string; name: string }>()
+    for (const seller of sellers) {
+      if (!seller.supervisorCode || !seller.supervisorName) continue
+      const key = seller.supervisorCode
+      if (!map.has(key)) map.set(key, { key, name: seller.supervisorName })
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [sellers])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
@@ -7145,7 +7156,13 @@ export default function MetasWorkspace() {
 
                     const filteredRows = sellerPerformanceScope === 'ALL'
                       ? rows
-                      : rows.filter((row) => row.profileType === sellerPerformanceScope)
+                      : sellerPerformanceScope === 'SUPERVISOR'
+                        ? rows.filter((row) => {
+                            const sellerData = sellers.find((s) => s.id === row.id)
+                            if (!sellerData?.supervisorCode) return false
+                            return performanceSupervisorKey ? sellerData.supervisorCode === performanceSupervisorKey : true
+                          })
+                        : rows.filter((row) => row.profileType === sellerPerformanceScope)
                     const filteredSellerIds = new Set(filteredRows.map((row) => row.id))
                     const filteredUniqueClientsSet = new Set<string>()
                     for (const seller of sellers) {
@@ -7177,10 +7194,31 @@ export default function MetasWorkspace() {
                     )
                     const scopeLabel = sellerPerformanceScope === 'ALL'
                       ? 'Visão geral'
-                      : SELLER_PROFILE_LABEL[sellerPerformanceScope]
+                      : sellerPerformanceScope === 'SUPERVISOR'
+                        ? (performanceSupervisorOptions.find((o) => o.key === performanceSupervisorKey)?.name ?? 'Supervisor')
+                        : SELLER_PROFILE_LABEL[sellerPerformanceScope]
 
                     return (
                       <>
+                        {sellerPerformanceScope === 'SUPERVISOR' && (
+                          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
+                            <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Supervisor</label>
+                            {performanceSupervisorOptions.length === 0 ? (
+                              <span className="text-xs text-surface-500">Nenhum supervisor vinculado na lista de vendedores.</span>
+                            ) : (
+                              <select
+                                className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
+                                value={performanceSupervisorKey}
+                                onChange={(e) => setPerformanceSupervisorKey(e.target.value)}
+                              >
+                                <option value="">Todos os supervisores</option>
+                                {performanceSupervisorOptions.map((opt) => (
+                                  <option key={opt.key} value={opt.key}>{opt.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        )}
                         <div className="mt-3 grid gap-2 sm:grid-cols-4">
                           <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />

@@ -5,8 +5,8 @@
     "name": "ALEX SOUSA",
     "active": true,
     "profileType": "NOVATO",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "17",
+    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
   {
     "code": "32",
@@ -14,8 +14,8 @@
     "name": "ANDREA DUARTE COSTA",
     "active": true,
     "profileType": "NOVATO",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "18",
+    "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
   {
     "code": "6",
@@ -23,8 +23,8 @@
     "name": "CAIO CESAR DE JESUS DE BRITO L",
     "active": true,
     "profileType": "ANTIGO_1",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "17",
+    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
   {
     "code": "28",
@@ -32,8 +32,8 @@
     "name": "CRISLAINE DA SILVA LIMA",
     "active": true,
     "profileType": "ANTIGO_1",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "16",
+    "supervisorName": "JOSE CLAUDIO FEITOSA"
   },
   {
     "code": "7",
@@ -41,8 +41,8 @@
     "name": "EDER CRUZ DE LIMA",
     "active": true,
     "profileType": "ANTIGO_15",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "15",
+    "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "15",
@@ -68,8 +68,8 @@
     "name": "EVANDSON DOS SANTOS FERRO",
     "active": true,
     "profileType": "ANTIGO_15",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "18",
+    "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
   {
     "code": "10",
@@ -77,8 +77,8 @@
     "name": "IZABEL CRISTINA BAHIA DOS SANT",
     "active": true,
     "profileType": "ANTIGO_15",
-    "supervisorCode": "17",
-    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
+    "supervisorCode": "15",
+    "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "29",
@@ -112,9 +112,9 @@
     "partnerCode": "16737",
     "name": "JOSE PAULO DA SILVA",
     "active": true,
-    "profileType": "ANTIGO_1",
-    "supervisorCode": null,
-    "supervisorName": null
+    "profileType": "NOVATO",
+    "supervisorCode": "17",
+    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
   {
     "code": "17",
@@ -131,8 +131,8 @@
     "name": "MARIA JAILMA GALDINO DE MOURA",
     "active": true,
     "profileType": "NOVATO",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "16",
+    "supervisorName": "JOSE CLAUDIO FEITOSA"
   },
   {
     "code": "20",
@@ -140,8 +140,8 @@
     "name": "MARIA JOSE",
     "active": true,
     "profileType": "ANTIGO_1",
-    "supervisorCode": "17",
-    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
+    "supervisorCode": "18",
+    "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
   {
     "code": "23",
@@ -158,8 +158,8 @@
     "name": "RICARDO HENRIQUE VIEIRA",
     "active": true,
     "profileType": "ANTIGO_1",
-    "supervisorCode": null,
-    "supervisorName": null
+    "supervisorCode": "15",
+    "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "18",
@@ -175,8 +175,8 @@
     "partnerCode": "16931",
     "name": "ROSILAINE FERREIRA",
     "active": true,
-    "profileType": "NOVATO",
-    "supervisorCode": null,
-    "supervisorName": null
+    "profileType": "ANTIGO_1",
+    "supervisorCode": "17",
+    "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   }
 ]
