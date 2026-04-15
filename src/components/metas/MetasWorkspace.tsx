@@ -3318,11 +3318,6 @@ export default function MetasWorkspace() {
     }
   }, [weightPanelSupervisorKey, weightPanelView, weightSupervisorOptions])
 
-  const selectedWeightSupervisorOption = useMemo(
-    () => weightSupervisorOptions.find((option) => option.key === weightPanelSupervisorKey) ?? null,
-    [weightPanelSupervisorKey, weightSupervisorOptions]
-  )
-
   const weightScopedSellerRows = useMemo(() => {
     if (weightPanelView !== 'SUPERVISOR') return sellerWeightPerformanceRows
     if (!weightPanelSupervisorKey) return []
@@ -3402,15 +3397,26 @@ export default function MetasWorkspace() {
     [sellerWeightPerformanceRows, weightPanelSellerId]
   )
 
-  const selectedWeightSellerGroupRows = useMemo(() => {
-    if (!selectedWeightSellerDetails) return []
-    return [...selectedWeightSellerDetails.groupsWithTarget].sort((a, b) => {
+  const selectedWeightSupervisorSellerDetails = useMemo(() => {
+    if (weightPanelView !== 'SUPERVISOR' || !weightPanelSellerId) return null
+    return weightScopedSellerRows.find((row) => row.sellerId === weightPanelSellerId) ?? null
+  }, [weightPanelSellerId, weightPanelView, weightScopedSellerRows])
+
+  const weightPanelDrilledSellerDetails = useMemo(() => {
+    if (weightPanelView === 'SELLER') return selectedWeightSellerDetails
+    if (weightPanelView === 'SUPERVISOR') return selectedWeightSupervisorSellerDetails
+    return null
+  }, [selectedWeightSellerDetails, selectedWeightSupervisorSellerDetails, weightPanelView])
+
+  const weightPanelDrilledSellerGroupRows = useMemo(() => {
+    if (!weightPanelDrilledSellerDetails) return []
+    return [...weightPanelDrilledSellerDetails.groupsWithTarget].sort((a, b) => {
       const aOrder = weightBrandOrderIndex.get(a.brand) ?? Number.POSITIVE_INFINITY
       const bOrder = weightBrandOrderIndex.get(b.brand) ?? Number.POSITIVE_INFINITY
       if (aOrder !== bOrder) return aOrder - bOrder
       return a.brand.localeCompare(b.brand, 'pt-BR')
     })
-  }, [selectedWeightSellerDetails, weightBrandOrderIndex])
+  }, [weightBrandOrderIndex, weightPanelDrilledSellerDetails])
 
   const weightFocusProgressRows = useMemo(() => {
     const sellerRankById = new Map<string, number>()
@@ -3419,8 +3425,8 @@ export default function MetasWorkspace() {
     })
 
     const scopedSellerIds = new Set(
-      weightPanelView === 'SELLER' && selectedWeightSellerDetails
-        ? [selectedWeightSellerDetails.sellerId]
+      weightPanelDrilledSellerDetails
+        ? [weightPanelDrilledSellerDetails.sellerId]
         : snapshots.map((snapshot) => snapshot.seller.id)
     )
 
@@ -3511,10 +3517,9 @@ export default function MetasWorkspace() {
     focusProductRows,
     productAllowlist,
     ruleBlocks,
-    selectedWeightSellerDetails,
+    weightPanelDrilledSellerDetails,
     sellerWeightPerformanceRows,
     snapshots,
-    weightPanelView,
   ])
 
   const weightFocusCodesInScope = useMemo(
@@ -3598,7 +3603,7 @@ export default function MetasWorkspace() {
       observer?.disconnect()
       window.removeEventListener('resize', syncHeights)
     }
-  }, [selectedWeightSellerGroupRows.length, snapshots.length, view, weightOverviewByBrand.length, weightPanelView, weightScopedSellerRows.length])
+  }, [snapshots.length, view, weightOverviewByBrand.length, weightPanelDrilledSellerGroupRows.length, weightPanelView, weightScopedSellerRows.length])
 
   const stageSeries = useMemo(
     () =>
@@ -6746,7 +6751,10 @@ export default function MetasWorkspace() {
                   <button
                     type="button"
                     className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SUPERVISOR' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                    onClick={() => setWeightPanelView('SUPERVISOR')}
+                    onClick={() => {
+                      setWeightPanelView('SUPERVISOR')
+                      setWeightPanelSellerId('')
+                    }}
                   >
                     Por supervisor
                   </button>
@@ -6817,6 +6825,7 @@ export default function MetasWorkspace() {
                             const nextValue = event.target.value
                             if (weightPanelView === 'SUPERVISOR') {
                               setWeightPanelSupervisorKey(nextValue)
+                              setWeightPanelSellerId('')
                               return
                             }
                             if (nextValue === '__ALL__') {
@@ -6834,7 +6843,7 @@ export default function MetasWorkspace() {
                               ) : (
                                 weightSupervisorOptions.map((option) => (
                                   <option key={option.key} value={option.key}>
-                                    {option.name} · {option.sellersWithGoals}/{option.sellers} com meta
+                                    {option.name}
                                   </option>
                                 ))
                               )}
@@ -6854,23 +6863,18 @@ export default function MetasWorkspace() {
                           <span className="text-[10px] text-cyan-700">
                             {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups} grupos no alvo
                           </span>
-                        ) : weightPanelView === 'SUPERVISOR' ? (
-                          <span className="text-[10px] text-cyan-700">
-                            {selectedWeightSupervisorOption ? `${selectedWeightSupervisorOption.name} · ` : ''}
-                            {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups} grupos no alvo
-                          </span>
-                        ) : (
+                        ) : weightPanelView === 'SELLER' ? (
                           selectedWeightSellerDetails && (
                             <span className="text-[10px] text-cyan-700">
                               {selectedWeightSellerDetails.groupsHit}/{selectedWeightSellerDetails.groupsConfigured} grupos no alvo
                             </span>
                           )
-                        )}
+                        ) : null}
                       </div>
 
                       <div className="overflow-hidden rounded-xl border border-surface-200">
                         <div className="overflow-x-auto">
-                          {weightPanelView !== 'SELLER' ? (
+                          {!weightPanelDrilledSellerDetails ? (
                             <table className="min-w-full text-xs">
                               <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
                                 <tr>
@@ -6932,14 +6936,14 @@ export default function MetasWorkspace() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {selectedWeightSellerGroupRows.length === 0 ? (
+                                {weightPanelDrilledSellerGroupRows.length === 0 ? (
                                   <tr className="border-t border-surface-100">
                                     <td colSpan={5} className="px-3 py-6 text-center text-[11px] text-surface-400">
                                       Vendedor sem grupos de meta de peso configurados neste período.
                                     </td>
                                   </tr>
                                 ) : (
-                                  selectedWeightSellerGroupRows.map((row) => {
+                                  weightPanelDrilledSellerGroupRows.map((row) => {
                                     const progressPct = row.ratio * 100
                                     const barPct = Math.min(progressPct, 100)
                                     const progressClass =
@@ -6997,8 +7001,8 @@ export default function MetasWorkspace() {
                             const progressPct = row.overallRatio * 100
                             const barPct = Math.min(progressPct, 100)
                             const isSelected =
-                              weightPanelView === 'SELLER' &&
-                              selectedWeightSellerDetails?.sellerId === row.sellerId
+                              (weightPanelView === 'SELLER' && selectedWeightSellerDetails?.sellerId === row.sellerId) ||
+                              (weightPanelView === 'SUPERVISOR' && selectedWeightSupervisorSellerDetails?.sellerId === row.sellerId)
                             const barClass =
                               row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
                             return (
@@ -7012,7 +7016,7 @@ export default function MetasWorkspace() {
                                 }`}
                                 onClick={() => {
                                   setWeightPanelSellerId(row.sellerId)
-                                  setWeightPanelView('SELLER')
+                                  if (weightPanelView !== 'SUPERVISOR') setWeightPanelView('SELLER')
                                 }}
                               >
                                 <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -7034,7 +7038,7 @@ export default function MetasWorkspace() {
                     </div>
                   </div>
 
-                  {weightPanelView === 'SELLER' && (
+                  {(weightPanelView === 'SELLER' || (weightPanelView === 'SUPERVISOR' && Boolean(selectedWeightSupervisorSellerDetails))) && (
                     <>
                       {weightFocusSectionLoading ? (
                         <p className="px-1 py-1 text-[11px] text-surface-500">Carregando progresso de item foco...</p>
