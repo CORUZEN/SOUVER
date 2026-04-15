@@ -54,11 +54,11 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Navigation requests: network-first, fall back to cached /pwa
+  // Navigation requests: network-first, fall back to cached /app
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() =>
-        caches.match('/pwa').then((cached) => cached ?? fetch(request))
+        caches.match('/app').then((cached) => cached ?? fetch(request))
       )
     )
     return

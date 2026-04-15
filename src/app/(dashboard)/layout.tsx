@@ -3,6 +3,7 @@ import Header from '@/components/layout/Header'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import { ToastProvider } from '@/components/ui/Toast'
 import { APP_VERSION } from '@/generated/app-version'
+import MobilePwaRedirect from '@/components/layout/MobilePwaRedirect'
 import { Suspense } from 'react'
 
 export default function DashboardLayout({
@@ -12,6 +13,7 @@ export default function DashboardLayout({
 }) {
   return (
     <ToastProvider>
+      <MobilePwaRedirect />
       <div className="flex h-screen overflow-hidden bg-gradient-to-br from-surface-100 via-slate-100 to-cyan-50/60">
         <Suspense fallback={<div className="w-64 shrink-0 bg-surface-900" />}>
           <Sidebar appVersion={APP_VERSION} />
