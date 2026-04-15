@@ -1,0 +1,37 @@
+{
+  "name": "Ouro Verde | Sistema Empresarial",
+  "short_name": "Ouro Verde",
+  "description": "Plataforma corporativa integrada — Fábrica Café Ouro Verde",
+  "start_url": "/pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/branding/ouroverde-badge.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/branding/ouroverde-badge.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Painel de Metas",
+      "short_name": "Metas",
+      "description": "Acompanhe as metas dos vendedores",
+      "url": "/pwa/supervisor",
+      "icons": [{ "src": "/branding/ouroverde-badge.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -14,6 +14,12 @@ export const metadata: Metadata = {
     template: '%s | OURO VERDE | Café pra vida inteira!',
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Ouro Verde',
+  },
   icons: {
     icon: [
       { url: '/branding/ouroverde-badge.png', type: 'image/png' },
@@ -30,7 +36,28 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
-      <body>{children}</body>
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#10b981" />
+        <link rel="manifest" href="/manifest.json" />
+      </head>
+      <body>
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
+      </body>
     </html>
   )
 }
+
