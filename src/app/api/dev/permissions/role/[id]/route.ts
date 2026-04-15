@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { ensureMetasPermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import type { Prisma } from '@prisma/client'
 
@@ -33,6 +33,7 @@ export async function PUT(
   }
 
   await ensureMetasPermissionCatalog()
+  await ensureModulePermissionCatalog()
 
   const validPermissions = await prisma.permission.findMany({
     where: { code: { in: parsed.data.permissionCodes } },

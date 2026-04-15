@@ -77,7 +77,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
-  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean> | null>(null)
+  const [modulePermissionsLoaded, setModulePermissionsLoaded] = useState(false)
+  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean>>({})
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
@@ -111,8 +112,12 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         if (data?.user?.modulePermissions && typeof data.user.modulePermissions === 'object') {
           setModulePermissions(data.user.modulePermissions)
         }
+        setModulePermissionsLoaded(true)
       })
-      .catch(() => setCanAccessIntegrations(false))
+      .catch(() => {
+        setCanAccessIntegrations(false)
+        setModulePermissionsLoaded(true)
+      })
   }, [])
 
   function openDevelopmentModal(moduleLabel: string) {
@@ -330,7 +335,16 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         </div>
 
         <nav className={cn('flex-1 overflow-y-auto py-4', isCollapsed ? 'px-2' : 'px-3', 'space-y-4')}>
-          {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => (
+          {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => {
+            // Hide entire section if no items are visible
+            const hasVisibleItem = modulePermissionsLoaded && itemKeys.some((key) => {
+              const mk = key as ModuleKey
+              if (mk === 'integracoes' && !canAccessIntegrations) return false
+              return modulePermissions[mk] !== false
+            })
+            if (!hasVisibleItem) return null
+
+            return (
             <div key={label}>
               {!isCollapsed ? (
                 <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">{label}</p>
@@ -343,8 +357,9 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                   const moduleKey = itemKey as ModuleKey
                   if (moduleKey === 'integracoes' && !canAccessIntegrations) return null
 
-                  // Hide modules disabled by module permissions (null = still loading, show all)
-                  if (modulePermissions && modulePermissions[moduleKey] === false) return null
+                  // Hide modules until permissions are loaded, then hide disabled ones
+                  if (!modulePermissionsLoaded) return null
+                  if (modulePermissions[moduleKey] === false) return null
 
                   if (moduleKey === 'rh') {
                     return (
@@ -403,7 +418,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                 })}
               </div>
             </div>
-          ))}
+            )
+          })}
         </nav>
 
         <div className={cn('border-t border-surface-700/50', isCollapsed ? 'p-2' : 'p-3')}>
