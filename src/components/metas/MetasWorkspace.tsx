@@ -40,6 +40,7 @@ type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
 type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
 type SellerPerformanceScope = 'ALL' | SellerProfileType
 type RewardMode = 'CURRENCY' | 'PERCENT'
+type WeightPanelView = 'GENERAL' | 'SELLER' | 'SUPERVISOR'
 
 interface GoalRule {
   id: string
@@ -983,8 +984,9 @@ export default function MetasWorkspace() {
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellerPerformanceScope, setSellerPerformanceScope] = useState<SellerPerformanceScope>('ALL')
-  const [weightPanelView, setWeightPanelView] = useState<'GENERAL' | 'SELLER'>('GENERAL')
+  const [weightPanelView, setWeightPanelView] = useState<WeightPanelView>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
+  const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
@@ -1138,6 +1140,54 @@ export default function MetasWorkspace() {
     }
     return map
   }, [allowlist])
+  const sellerAllowlistByCode = useMemo(() => {
+    const map = new Map<string, SellerAllowlistEntry>()
+    for (const seller of allowlist) {
+      const normalizedCode = normalizeEntityCode(String(seller.code ?? ''))
+      if (!normalizedCode) continue
+      map.set(normalizedCode, seller)
+    }
+    return map
+  }, [allowlist])
+  const sellerAllowlistByName = useMemo(() => {
+    const map = new Map<string, SellerAllowlistEntry>()
+    for (const seller of allowlist) {
+      const normalizedName = normalizeSellerNameForLookup(String(seller.name ?? ''))
+      if (!normalizedName) continue
+      map.set(normalizedName, seller)
+    }
+    return map
+  }, [allowlist])
+  const sellerAllowlistByShortName = useMemo(() => {
+    const map = new Map<string, SellerAllowlistEntry>()
+    for (const seller of allowlist) {
+      const shortName = getSellerShortName(String(seller.name ?? ''))
+      const normalizedShortName = normalizeSellerNameForLookup(shortName)
+      if (!normalizedShortName) continue
+      map.set(normalizedShortName, seller)
+    }
+    return map
+  }, [allowlist])
+  const resolveAllowlistSellerEntry = useCallback((sellerCode: string, sellerName: string, sellerShortName: string): SellerAllowlistEntry | null => {
+    const byCode = sellerCode ? sellerAllowlistByCode.get(sellerCode) : undefined
+    if (byCode) return byCode
+
+    const normalizedName = normalizeSellerNameForLookup(sellerName)
+    const byName = sellerAllowlistByName.get(normalizedName)
+    if (byName) return byName
+
+    const normalizedShortName = normalizeSellerNameForLookup(sellerShortName)
+    const byShortName = sellerAllowlistByShortName.get(normalizedShortName)
+    if (byShortName) return byShortName
+
+    const prefixed = Array.from(sellerAllowlistByName.entries()).find(([allowlistName]) => allowlistName.startsWith(normalizedName))
+    if (prefixed) return prefixed[1]
+
+    const contained = Array.from(sellerAllowlistByName.entries()).find(([allowlistName]) => normalizedName.includes(allowlistName))
+    if (contained) return contained[1]
+
+    return null
+  }, [sellerAllowlistByCode, sellerAllowlistByName, sellerAllowlistByShortName])
   const sellerNameById = useMemo(() => {
     const map = new Map<string, string>()
     for (const seller of sellers) map.set(seller.id, seller.name)
@@ -3111,15 +3161,47 @@ export default function MetasWorkspace() {
       }
       sankhyaBySellerBrand.set(sellerCode, byBrand)
     }
+    const supervisorByCode = new Map<string, { key: string; name: string }>()
+    const supervisorByName = new Map<string, { key: string; name: string }>()
+    for (const supervisor of supervisorAllowlistOptions) {
+      const normalizedSupervisorCode = normalizeEntityCode(String(supervisor.code ?? ''))
+      const normalizedSupervisorName = normalizeSellerNameForLookup(String(supervisor.name ?? ''))
+      const entry = { key: supervisor.key, name: supervisor.name }
+      if (normalizedSupervisorCode) supervisorByCode.set(normalizedSupervisorCode, entry)
+      if (normalizedSupervisorName) supervisorByName.set(normalizedSupervisorName, entry)
+    }
 
     return snapshots
       .map((snapshot) => {
         const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+        const sellerName = snapshot.seller.name
+        const sellerShortName = getSellerShortName(sellerName)
         const block =
           ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
           findBlockForSeller(snapshot.seller.id, ruleBlocks) ??
           DEFAULT_RULE_BLOCKS[0]
         const sankhyaByBrand = sankhyaBySellerBrand.get(sellerCode)
+        const allowlistEntry = resolveAllowlistSellerEntry(sellerCode, sellerName, sellerShortName)
+        const sellerSupervisorCode = normalizeEntityCode(String(allowlistEntry?.supervisorCode ?? ''))
+        const sellerSupervisorName = String(allowlistEntry?.supervisorName ?? '').trim()
+        const sellerSupervisorNameNormalized = normalizeSellerNameForLookup(sellerSupervisorName)
+        const resolvedSupervisor =
+          (sellerSupervisorCode ? supervisorByCode.get(sellerSupervisorCode) : undefined) ??
+          (sellerSupervisorNameNormalized ? supervisorByName.get(sellerSupervisorNameNormalized) : undefined)
+        const supervisorKey =
+          resolvedSupervisor?.key ??
+          (sellerSupervisorCode
+            ? `code:${sellerSupervisorCode}`
+            : sellerSupervisorNameNormalized
+              ? `name:${sellerSupervisorNameNormalized}`
+              : null)
+        const supervisorName =
+          resolvedSupervisor?.name ??
+          (sellerSupervisorName.length > 0
+            ? sellerSupervisorName
+            : sellerSupervisorCode
+              ? `Supervisor ${sellerSupervisorCode}`
+              : null)
 
         const groups = (block.weightTargets ?? [])
           .map((target) => {
@@ -3146,8 +3228,11 @@ export default function MetasWorkspace() {
         return {
           sellerId: snapshot.seller.id,
           sellerCode,
-          sellerName: snapshot.seller.name,
-          sellerShortName: getSellerShortName(snapshot.seller.name),
+          sellerName,
+          sellerShortName,
+          supervisorKey,
+          supervisorCode: sellerSupervisorCode || null,
+          supervisorName,
           blockTitle: block.title,
           groupsWithTarget,
           groupsConfigured: groupsWithTarget.length,
@@ -3162,7 +3247,17 @@ export default function MetasWorkspace() {
         if (b.totalSoldKg !== a.totalSoldKg) return b.totalSoldKg - a.totalSoldKg
         return a.sellerShortName.localeCompare(b.sellerShortName, 'pt-BR')
       })
-  }, [brandWeightRows, month, ruleBlocks, sankhyaConnected, sankhyaTargets, snapshots, year])
+  }, [
+    brandWeightRows,
+    month,
+    resolveAllowlistSellerEntry,
+    ruleBlocks,
+    sankhyaConnected,
+    sankhyaTargets,
+    snapshots,
+    supervisorAllowlistOptions,
+    year,
+  ])
 
   const weightBrandOrderIndex = useMemo(() => {
     const order = new Map<string, number>()
@@ -3178,9 +3273,46 @@ export default function MetasWorkspace() {
     return order
   }, [ruleBlocks])
 
+  const weightSupervisorOptions = useMemo(() => {
+    const map = new Map<string, { key: string; code: string | null; name: string; sellers: number }>()
+    for (const row of sellerWeightPerformanceRows) {
+      if (!row.supervisorKey || !row.supervisorName) continue
+      const current = map.get(row.supervisorKey) ?? {
+        key: row.supervisorKey,
+        code: row.supervisorCode ?? null,
+        name: row.supervisorName,
+        sellers: 0,
+      }
+      current.sellers += 1
+      map.set(row.supervisorKey, current)
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [sellerWeightPerformanceRows])
+
+  useEffect(() => {
+    if (weightPanelView !== 'SUPERVISOR') return
+    if (weightSupervisorOptions.length === 0) {
+      if (weightPanelSupervisorKey !== '') setWeightPanelSupervisorKey('')
+      return
+    }
+    const exists = weightSupervisorOptions.some((option) => option.key === weightPanelSupervisorKey)
+    if (!exists) setWeightPanelSupervisorKey(weightSupervisorOptions[0].key)
+  }, [weightPanelSupervisorKey, weightPanelView, weightSupervisorOptions])
+
+  const selectedWeightSupervisorOption = useMemo(
+    () => weightSupervisorOptions.find((option) => option.key === weightPanelSupervisorKey) ?? null,
+    [weightPanelSupervisorKey, weightSupervisorOptions]
+  )
+
+  const weightScopedSellerRows = useMemo(() => {
+    if (weightPanelView !== 'SUPERVISOR') return sellerWeightPerformanceRows
+    if (!weightPanelSupervisorKey) return []
+    return sellerWeightPerformanceRows.filter((row) => row.supervisorKey === weightPanelSupervisorKey)
+  }, [sellerWeightPerformanceRows, weightPanelSupervisorKey, weightPanelView])
+
   const weightOverviewByBrand = useMemo(() => {
     const byBrand = new Map<string, { brand: string; targetKg: number; soldKg: number; sellerCount: number; hitSellers: number }>()
-    for (const seller of sellerWeightPerformanceRows) {
+    for (const seller of weightScopedSellerRows) {
       for (const group of seller.groupsWithTarget) {
         const current = byBrand.get(group.brand) ?? {
           brand: group.brand,
@@ -3207,16 +3339,16 @@ export default function MetasWorkspace() {
         if (aOrder !== bOrder) return aOrder - bOrder
         return a.brand.localeCompare(b.brand, 'pt-BR')
       })
-  }, [sellerWeightPerformanceRows, weightBrandOrderIndex])
+  }, [weightBrandOrderIndex, weightScopedSellerRows])
 
   const weightExecutiveSummary = useMemo(() => {
-    const sellersTracked = sellerWeightPerformanceRows.length
-    const sellersWithGoals = sellerWeightPerformanceRows.filter((row) => row.groupsConfigured > 0).length
-    const totalTargetKg = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.totalTargetKg, 0)
-    const totalSoldKg = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.totalSoldKg, 0)
+    const sellersTracked = weightScopedSellerRows.length
+    const sellersWithGoals = weightScopedSellerRows.filter((row) => row.groupsConfigured > 0).length
+    const totalTargetKg = weightScopedSellerRows.reduce((sum, row) => sum + row.totalTargetKg, 0)
+    const totalSoldKg = weightScopedSellerRows.reduce((sum, row) => sum + row.totalSoldKg, 0)
     const overallRatio = totalTargetKg > 0 ? totalSoldKg / totalTargetKg : 0
-    const totalGroups = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.groupsConfigured, 0)
-    const hitGroups = sellerWeightPerformanceRows.reduce((sum, row) => sum + row.groupsHit, 0)
+    const totalGroups = weightScopedSellerRows.reduce((sum, row) => sum + row.groupsConfigured, 0)
+    const hitGroups = weightScopedSellerRows.reduce((sum, row) => sum + row.groupsHit, 0)
     return {
       sellersTracked,
       sellersWithGoals,
@@ -3227,7 +3359,7 @@ export default function MetasWorkspace() {
       hitGroups,
       brandsTracked: weightOverviewByBrand.length,
     }
-  }, [sellerWeightPerformanceRows, weightOverviewByBrand.length])
+  }, [weightOverviewByBrand.length, weightScopedSellerRows])
 
   useEffect(() => {
     if (sellerWeightPerformanceRows.length === 0) {
@@ -3442,7 +3574,7 @@ export default function MetasWorkspace() {
       observer?.disconnect()
       window.removeEventListener('resize', syncHeights)
     }
-  }, [selectedWeightSellerGroupRows.length, sellerWeightPerformanceRows.length, snapshots.length, view, weightPanelView, weightOverviewByBrand.length])
+  }, [selectedWeightSellerGroupRows.length, snapshots.length, view, weightOverviewByBrand.length, weightPanelView, weightScopedSellerRows.length])
 
   const stageSeries = useMemo(
     () =>
@@ -6570,7 +6702,7 @@ export default function MetasWorkspace() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                     Metas de peso por grupo de produto
                   </p>
-                  <p className="mt-0.5 text-[10px] text-surface-400">Visão geral e por vendedor — {MONTHS[month]} {year}</p>
+                  <p className="mt-0.5 text-[10px] text-surface-400">Visão geral, por vendedor e por supervisor — {MONTHS[month]} {year}</p>
                 </div>
                 <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
                   <button
@@ -6586,6 +6718,13 @@ export default function MetasWorkspace() {
                     onClick={() => setWeightPanelView('SELLER')}
                   >
                     Por vendedor
+                  </button>
+                  <button
+                    type="button"
+                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SUPERVISOR' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                    onClick={() => setWeightPanelView('SUPERVISOR')}
+                  >
+                    Por supervisor
                   </button>
                 </div>
               </div>
@@ -6638,12 +6777,24 @@ export default function MetasWorkspace() {
                   <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
                     <div ref={weightPanelLeftColumnRef} className="space-y-3">
                       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Vendedor</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">
+                          {weightPanelView === 'SUPERVISOR' ? 'Supervisor' : 'Vendedor'}
+                        </label>
                         <select
                           className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
-                          value={weightPanelView === 'GENERAL' ? '__ALL__' : weightPanelSellerId}
+                          value={
+                            weightPanelView === 'GENERAL'
+                              ? '__ALL__'
+                              : weightPanelView === 'SUPERVISOR'
+                                ? weightPanelSupervisorKey
+                                : weightPanelSellerId
+                          }
                           onChange={(event) => {
                             const nextValue = event.target.value
+                            if (weightPanelView === 'SUPERVISOR') {
+                              setWeightPanelSupervisorKey(nextValue)
+                              return
+                            }
                             if (nextValue === '__ALL__') {
                               setWeightPanelView('GENERAL')
                               return
@@ -6652,15 +6803,36 @@ export default function MetasWorkspace() {
                             setWeightPanelView('SELLER')
                           }}
                         >
-                          <option value="__ALL__">Todos</option>
-                          {sellerWeightPerformanceRows.map((row) => (
-                            <option key={row.sellerId} value={row.sellerId}>
-                              {row.sellerShortName} · {num(row.overallRatio * 100, 1)}%
-                            </option>
-                          ))}
+                          {weightPanelView === 'SUPERVISOR' ? (
+                            <>
+                              {weightSupervisorOptions.length === 0 ? (
+                                <option value="">Nenhum supervisor com vendedores vinculados</option>
+                              ) : (
+                                weightSupervisorOptions.map((option) => (
+                                  <option key={option.key} value={option.key}>
+                                    {option.name} · {option.sellers} vendedor{option.sellers === 1 ? '' : 'es'}
+                                  </option>
+                                ))
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <option value="__ALL__">Todos</option>
+                              {sellerWeightPerformanceRows.map((row) => (
+                                <option key={row.sellerId} value={row.sellerId}>
+                                  {row.sellerShortName} · {num(row.overallRatio * 100, 1)}%
+                                </option>
+                              ))}
+                            </>
+                          )}
                         </select>
                         {weightPanelView === 'GENERAL' ? (
                           <span className="text-[10px] text-cyan-700">
+                            {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups} grupos no alvo
+                          </span>
+                        ) : weightPanelView === 'SUPERVISOR' ? (
+                          <span className="text-[10px] text-cyan-700">
+                            {selectedWeightSupervisorOption ? `${selectedWeightSupervisorOption.name} · ` : ''}
                             {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups} grupos no alvo
                           </span>
                         ) : (
@@ -6674,7 +6846,7 @@ export default function MetasWorkspace() {
 
                       <div className="overflow-hidden rounded-xl border border-surface-200">
                         <div className="overflow-x-auto">
-                          {weightPanelView === 'GENERAL' ? (
+                          {weightPanelView !== 'SELLER' ? (
                             <table className="min-w-full text-xs">
                               <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
                                 <tr>
@@ -6790,42 +6962,50 @@ export default function MetasWorkspace() {
                         className="flex flex-col gap-2 overflow-y-auto pr-1"
                         style={{ maxHeight: `${Math.max(weightRankingListMaxHeight ?? 304, 180)}px` }}
                       >
-                        {sellerWeightPerformanceRows.map((row, index) => {
-                          const progressPct = row.overallRatio * 100
-                          const barPct = Math.min(progressPct, 100)
-                          const isSelected =
-                            weightPanelView === 'SELLER' &&
-                            selectedWeightSellerDetails?.sellerId === row.sellerId
-                          const barClass =
-                            row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
-                          return (
-                            <button
-                              key={row.sellerId}
-                              type="button"
-                              className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
-                                isSelected
-                                  ? 'border-cyan-300 bg-cyan-50 shadow-sm'
-                                  : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
-                              }`}
-                              onClick={() => {
-                                setWeightPanelSellerId(row.sellerId)
-                                setWeightPanelView('SELLER')
-                              }}
-                            >
-                              <div className="mb-1.5 flex items-center justify-between gap-2">
-                                <span className="truncate text-[11px] font-semibold text-surface-700">{row.sellerShortName}</span>
-                                <span className="text-[10px] text-surface-400">#{index + 1}</span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
-                                <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
-                              </div>
-                              <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
-                                <span>{row.groupsHit}/{row.groupsConfigured} grupos</span>
-                                <span className="font-semibold tabular-nums text-surface-700">{num(progressPct, 1)}%</span>
-                              </div>
-                            </button>
-                          )
-                        })}
+                        {weightScopedSellerRows.length === 0 ? (
+                          <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-center text-[11px] text-surface-500">
+                            {weightPanelView === 'SUPERVISOR'
+                              ? 'Nenhum vendedor ativo encontrado para o supervisor selecionado.'
+                              : 'Nenhum vendedor encontrado no período.'}
+                          </div>
+                        ) : (
+                          weightScopedSellerRows.map((row, index) => {
+                            const progressPct = row.overallRatio * 100
+                            const barPct = Math.min(progressPct, 100)
+                            const isSelected =
+                              weightPanelView === 'SELLER' &&
+                              selectedWeightSellerDetails?.sellerId === row.sellerId
+                            const barClass =
+                              row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
+                            return (
+                              <button
+                                key={row.sellerId}
+                                type="button"
+                                className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                                  isSelected
+                                    ? 'border-cyan-300 bg-cyan-50 shadow-sm'
+                                    : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
+                                }`}
+                                onClick={() => {
+                                  setWeightPanelSellerId(row.sellerId)
+                                  setWeightPanelView('SELLER')
+                                }}
+                              >
+                                <div className="mb-1.5 flex items-center justify-between gap-2">
+                                  <span className="truncate text-[11px] font-semibold text-surface-700">{row.sellerShortName}</span>
+                                  <span className="text-[10px] text-surface-400">#{index + 1}</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                                  <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
+                                </div>
+                                <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
+                                  <span>{row.groupsHit}/{row.groupsConfigured} grupos</span>
+                                  <span className="font-semibold tabular-nums text-surface-700">{num(progressPct, 1)}%</span>
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
                       </div>
                     </div>
                   </div>
