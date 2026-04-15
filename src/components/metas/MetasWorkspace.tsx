@@ -3370,13 +3370,19 @@ export default function MetasWorkspace() {
   }, [weightBrandOrderIndex, weightScopedSellerRows])
 
   const weightExecutiveSummary = useMemo(() => {
-    const sellersTracked = weightScopedSellerRows.length
-    const sellersWithGoals = weightScopedSellerRows.filter((row) => row.groupsConfigured > 0).length
-    const totalTargetKg = weightScopedSellerRows.reduce((sum, row) => sum + row.totalTargetKg, 0)
-    const totalSoldKg = weightScopedSellerRows.reduce((sum, row) => sum + row.totalSoldKg, 0)
+    // In SELLER mode, scope the summary to the selected seller only
+    const sourceRows =
+      weightPanelView === 'SELLER' && weightPanelSellerId
+        ? weightScopedSellerRows.filter((row) => row.sellerId === weightPanelSellerId)
+        : weightScopedSellerRows
+
+    const sellersTracked = sourceRows.length
+    const sellersWithGoals = sourceRows.filter((row) => row.groupsConfigured > 0).length
+    const totalTargetKg = sourceRows.reduce((sum, row) => sum + row.totalTargetKg, 0)
+    const totalSoldKg = sourceRows.reduce((sum, row) => sum + row.totalSoldKg, 0)
     const overallRatio = totalTargetKg > 0 ? totalSoldKg / totalTargetKg : 0
-    const totalGroups = weightScopedSellerRows.reduce((sum, row) => sum + row.groupsConfigured, 0)
-    const hitGroups = weightScopedSellerRows.reduce((sum, row) => sum + row.groupsHit, 0)
+    const totalGroups = sourceRows.reduce((sum, row) => sum + row.groupsConfigured, 0)
+    const hitGroups = sourceRows.reduce((sum, row) => sum + row.groupsHit, 0)
     return {
       sellersTracked,
       sellersWithGoals,
@@ -3387,10 +3393,16 @@ export default function MetasWorkspace() {
       hitGroups,
       brandsTracked: weightOverviewByBrand.length,
     }
-  }, [weightOverviewByBrand.length, weightScopedSellerRows])
+  }, [weightOverviewByBrand.length, weightPanelView, weightPanelSellerId, weightScopedSellerRows])
 
   const hasAnyWeightGoals = useMemo(
     () => sellerWeightPerformanceRows.some((row) => row.groupsConfigured > 0),
+    [sellerWeightPerformanceRows]
+  )
+
+  // Sum of individual seller weight targets (not block-level, avoids duplication)
+  const corporateWeightTargetPerSeller = useMemo(
+    () => sellerWeightPerformanceRows.reduce((sum, row) => sum + row.totalTargetKg, 0),
     [sellerWeightPerformanceRows]
   )
 
@@ -6517,10 +6529,10 @@ export default function MetasWorkspace() {
               <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta de peso consolidada</p>
-                  {corporateTotalWeightTarget > 0 ? (
+                  {corporateWeightTargetPerSeller > 0 ? (
                     <>
-                      <p className="mt-1 text-2xl font-semibold text-surface-700">{num(corporateTotalWeightTarget, 2)} kg</p>
-                      <p className="mt-1 text-[10px] text-surface-400">Soma das metas de peso por grupo de produto</p>
+                      <p className="mt-1 text-2xl font-semibold text-surface-700">{num(corporateWeightTargetPerSeller, 2)} kg</p>
+                      <p className="mt-1 text-[10px] text-surface-400">Soma das metas individuais dos vendedores</p>
                     </>
                   ) : (
                     <>
@@ -6532,13 +6544,13 @@ export default function MetasWorkspace() {
                 <div className="pl-4">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Peso total dos pedidos</p>
                   <p className={`mt-1 text-2xl font-semibold ${
-                    corporateTotalWeightTarget > 0 && corporateTotalGrossWeight >= corporateTotalWeightTarget
+                    corporateWeightTargetPerSeller > 0 && corporateTotalGrossWeight >= corporateWeightTargetPerSeller
                       ? 'text-emerald-600'
                       : 'text-surface-900'
                   }`}>{num(corporateTotalGrossWeight, 2)} kg</p>
-                  {corporateTotalWeightTarget > 0 ? (
+                  {corporateWeightTargetPerSeller > 0 ? (
                     <p className="mt-1 text-[10px] text-surface-400">
-                      {num(Math.min(corporateTotalGrossWeight / corporateTotalWeightTarget * 100, 999), 1)}% da meta de peso
+                      {num(Math.min(corporateTotalGrossWeight / corporateWeightTargetPerSeller * 100, 999), 1)}% da meta de peso
                     </p>
                   ) : (
                     <p className="mt-1 text-[10px] text-surface-400">Soma do peso bruto dos pedidos no período</p>
