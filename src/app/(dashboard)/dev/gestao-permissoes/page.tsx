@@ -118,6 +118,20 @@ const METAS_PERMISSION_SECTIONS: Array<{ key: string; title: string; items: Meta
   },
 ]
 
+const MODULE_PERMISSION_ITEMS: MetasPermissionItem[] = [
+  { code: 'module_painel-executivo:access', label: 'Painel Executivo', description: 'Visão executiva consolidada da operação.' },
+  { code: 'module_metas:access', label: 'Metas', description: 'Painel de metas e performance comercial.' },
+  { code: 'module_producao:access', label: 'Produção', description: 'Gestão de produção e lotes.' },
+  { code: 'module_logistica:access', label: 'Logística', description: 'Gestão de logística e faturamento.' },
+  { code: 'module_qualidade:access', label: 'Qualidade', description: 'Controle de qualidade e conformidade.' },
+  { code: 'module_rh:access', label: 'RH', description: 'Recursos humanos e gestão de pessoas.' },
+  { code: 'module_relatorios:access', label: 'Relatórios', description: 'Relatórios e auditoria.' },
+  { code: 'module_contabilidade:access', label: 'Contabilidade', description: 'Gestão contábil e fiscal.' },
+  { code: 'module_comunicacao:access', label: 'Comunicação', description: 'Comunicação interna.' },
+  { code: 'module_configuracoes:access', label: 'Configurações', description: 'Configurações do sistema.' },
+  { code: 'module_integracoes:access', label: 'Integrações', description: 'Painel de integrações com sistemas externos.' },
+]
+
 export default function GestaoPermissoesPage() {
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -289,7 +303,7 @@ export default function GestaoPermissoesPage() {
         </div>
 
         <div className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-xs text-primary-800">
-          Permissões de Metas: controle por cargo com ações separadas de visualizar, editar, salvar e remover.
+          Permissões por cargo: controle de módulos do menu lateral e ações do módulo Metas (visualizar, editar, salvar e remover).
         </div>
 
         {permMessage && <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm">{permMessage}</div>}
@@ -301,9 +315,36 @@ export default function GestaoPermissoesPage() {
               <Select options={devRoles.map((r) => ({ value: r.id, label: r.name }))} value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-72" />
             </div>
             <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-surface-600">
-              Abaixo, cada permissão representa uma função específica dos botões/campos do módulo Metas.
+              Abaixo, controle o acesso aos módulos do menu lateral e as permissões específicas do módulo Metas.
             </div>
-            <div className="max-h-90 space-y-3 overflow-y-auto rounded-lg border border-surface-200 p-3">
+            <div className="max-h-[32rem] space-y-3 overflow-y-auto rounded-lg border border-surface-200 p-3">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">Módulos do Menu Lateral</p>
+                <p className="text-[11px] text-surface-500">Controle quais módulos aparecem no menu lateral para este cargo.</p>
+                <div className="grid gap-2">
+                  {MODULE_PERMISSION_ITEMS.map((item) => {
+                    const permissionExists = permissionCodeSet.has(item.code)
+                    const disabled = selectedRoleData?.code === 'DEVELOPER' || !permissionExists
+                    return (
+                      <label key={item.code} className={`flex items-start gap-2 rounded border px-2 py-2 text-xs ${disabled ? 'border-surface-200 bg-surface-100 opacity-70' : 'border-surface-200 bg-white'}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRolePermissionCodes.includes(item.code)}
+                          onChange={() => toggleRolePermission(item.code)}
+                          disabled={disabled}
+                          className="mt-0.5 h-4 w-4"
+                        />
+                        <span>
+                          <strong>{item.label}</strong>
+                          <span className="block text-surface-500">{item.description}</span>
+                          {!permissionExists ? <span className="block text-[11px] text-amber-700">Permissão ainda não cadastrada no banco.</span> : null}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
               {METAS_PERMISSION_SECTIONS.map((section) => (
                 <div key={section.key} className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">{section.title}</p>

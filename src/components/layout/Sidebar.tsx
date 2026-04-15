@@ -77,6 +77,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
+  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean> | null>(null)
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
@@ -107,6 +108,9 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations))
+        if (data?.user?.modulePermissions && typeof data.user.modulePermissions === 'object') {
+          setModulePermissions(data.user.modulePermissions)
+        }
       })
       .catch(() => setCanAccessIntegrations(false))
   }, [])
@@ -338,6 +342,9 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                 {itemKeys.map((itemKey) => {
                   const moduleKey = itemKey as ModuleKey
                   if (moduleKey === 'integracoes' && !canAccessIntegrations) return null
+
+                  // Hide modules disabled by module permissions (null = still loading, show all)
+                  if (modulePermissions && modulePermissions[moduleKey] === false) return null
 
                   if (moduleKey === 'rh') {
                     return (

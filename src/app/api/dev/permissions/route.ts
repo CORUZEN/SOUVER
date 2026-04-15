@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureMetasPermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
 
   await ensureRoleCatalog(prisma)
   await ensureMetasPermissionCatalog()
+  await ensureModulePermissionCatalog()
 
   const [rolesRaw, permissions, users, administrationGroup] = await Promise.all([
     prisma.role.findMany({

@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/session'
-import { canAccessIntegrations, getMetasPermissions } from '@/lib/auth/permissions'
+import { canAccessIntegrations, getMetasPermissions, getModulePermissions } from '@/lib/auth/permissions'
 
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -40,9 +40,10 @@ export async function GET(req: NextRequest) {
       shouldClearImpersonatorCookie = true
     }
 
-    const [integrationsAccess, metasPermissions] = await Promise.all([
+    const [integrationsAccess, metasPermissions, modulePermissions] = await Promise.all([
       canAccessIntegrations(user),
       getMetasPermissions(user),
+      getModulePermissions(user),
     ])
 
     const response = NextResponse.json({
@@ -57,6 +58,7 @@ export async function GET(req: NextRequest) {
         roleCode: user.role?.code,
         canAccessIntegrations: integrationsAccess,
         metasPermissions,
+        modulePermissions,
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
         impersonation,
