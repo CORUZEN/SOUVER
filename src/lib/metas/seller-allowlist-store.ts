@@ -57,6 +57,19 @@ function isProfileTypeUnsupportedError(error: unknown) {
   )
 }
 
+function isSupervisionFieldUnsupportedError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const message = String((error as { message?: unknown }).message ?? '')
+  return (
+    message.includes('Unknown argument `supervisorCode`') ||
+    message.includes('Unknown arg `supervisorCode`') ||
+    message.includes('Unknown argument `supervisorName`') ||
+    message.includes('Unknown arg `supervisorName`') ||
+    message.toLowerCase().includes('supervisor_code') ||
+    message.toLowerCase().includes('supervisor_name')
+  )
+}
+
 export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
   try {
     const rows: Array<{
@@ -140,7 +153,24 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
 export async function writeSellerAllowlist(input: AllowedSeller[]) {
   const normalized = normalizeList(input)
 
-  const withProfileType = () =>
+  const withProfileAndSupervision = () =>
+    prisma.$transaction([
+      prisma.metasSeller.deleteMany(),
+      prisma.metasSeller.createMany({
+        data: normalized.map((s) => ({
+          code: s.code ?? null,
+          partnerCode: s.partnerCode ?? null,
+          name: s.name,
+          active: s.active,
+          profileType: normalizeSellerProfileType(s.profileType),
+          supervisorCode: s.supervisorCode ?? null,
+          supervisorName: s.supervisorName ?? null,
+        })),
+        skipDuplicates: true,
+      }),
+    ])
+
+  const withProfileWithoutSupervision = () =>
     prisma.$transaction([
       prisma.metasSeller.deleteMany(),
       prisma.metasSeller.createMany({
@@ -155,7 +185,7 @@ export async function writeSellerAllowlist(input: AllowedSeller[]) {
       }),
     ])
 
-  const withoutProfileType = () =>
+  const withoutProfileAndSupervision = () =>
     prisma.$transaction([
       prisma.metasSeller.deleteMany(),
       prisma.metasSeller.createMany({
@@ -170,11 +200,24 @@ export async function writeSellerAllowlist(input: AllowedSeller[]) {
     ])
 
   try {
-    await withProfileType()
+    await withProfileAndSupervision()
     await writeLegacyAllowlistFile(normalized)
   } catch (error) {
+    if (isSupervisionFieldUnsupportedError(error)) {
+      try {
+        await withProfileWithoutSupervision()
+        await writeLegacyAllowlistFile(normalized)
+        return normalized
+      } catch (fallbackError) {
+        if (!isProfileTypeUnsupportedError(fallbackError)) throw fallbackError
+        await withoutProfileAndSupervision()
+        await writeLegacyAllowlistFile(normalized)
+        return normalized
+      }
+    }
+
     if (!isProfileTypeUnsupportedError(error)) throw error
-    await withoutProfileType()
+    await withoutProfileAndSupervision()
     await writeLegacyAllowlistFile(normalized)
   }
 
