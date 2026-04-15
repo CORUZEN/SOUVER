@@ -3368,18 +3368,29 @@ export default function MetasWorkspace() {
 
         const listEl = weightRankingListRef.current
         if (listEl && measured > 0) {
-          const firstCard = listEl.querySelector('button')
-          const firstCardHeight = firstCard?.getBoundingClientRect().height ?? 0
           const computedStyles = window.getComputedStyle(listEl)
           const gap = Number.parseFloat(computedStyles.rowGap || computedStyles.gap || '0') || 0
-          const cardStep = firstCardHeight > 0 ? firstCardHeight + gap : 0
+          const cards = Array.from(listEl.querySelectorAll<HTMLButtonElement>('button'))
 
-          if (cardStep > 0) {
-            const cardsThatFit = Math.floor((measured + gap) / cardStep)
-            if (cardsThatFit > 0) {
-              const fullCardsHeight = (cardsThatFit * cardStep) - gap
-              // +1 evita corte visual na borda inferior do último card visível.
-              next = Math.max(Math.ceil(fullCardsHeight) + 1, 180)
+          if (cards.length > 0) {
+            let consumedHeight = 0
+            let fitCount = 0
+
+            for (const card of cards) {
+              const cardHeight = card.getBoundingClientRect().height
+              if (cardHeight <= 0) continue
+              const candidateHeight = fitCount === 0 ? cardHeight : consumedHeight + gap + cardHeight
+              if (candidateHeight <= measured + 1) {
+                consumedHeight = candidateHeight
+                fitCount += 1
+              } else {
+                break
+              }
+            }
+
+            if (fitCount > 0) {
+              // Mantém cards inteiros e evita clipping por subpixel/borda.
+              next = Math.max(Math.min(Math.ceil(consumedHeight) + 1, Math.ceil(measured) + 1), 180)
             }
           }
         }
@@ -6697,7 +6708,7 @@ export default function MetasWorkspace() {
                       </div>
                       <div
                         ref={weightRankingListRef}
-                        className="space-y-2 overflow-y-auto pr-1"
+                        className="flex flex-col gap-2 overflow-y-auto pr-1"
                         style={{ maxHeight: `${Math.max(weightRankingListMaxHeight ?? 304, 180)}px` }}
                       >
                         {sellerWeightPerformanceRows.map((row, index) => {
@@ -6769,17 +6780,17 @@ export default function MetasWorkspace() {
                               : `${num(row.soldKg, 2)} kg`
                             return (
                               <div key={`focus-compact-${row.sellerId}`} className="rounded-lg border border-surface-200 bg-surface-50/50 px-4 py-2.5">
-                                <div className="grid grid-cols-[1.35fr_1fr_1fr_1.5fr_0.7fr] items-center gap-x-5 text-[10px] font-semibold uppercase tracking-widest text-surface-400">
+                                <div className="grid gap-y-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400 md:grid-cols-[minmax(240px,2.1fr)_minmax(210px,1.35fr)_minmax(210px,1.35fr)_minmax(250px,1.7fr)_minmax(120px,0.95fr)] md:items-center md:gap-x-2.5">
                                   <span>Item foco</span>
                                   <span>Meta</span>
                                   <span>Realizado</span>
                                   <span>Progresso</span>
                                   <span className="text-right">Status</span>
                                 </div>
-                                <div className="mt-1.5 grid grid-cols-[1.35fr_1fr_1fr_1.5fr_0.7fr] items-center gap-x-5">
-                                  <p className="truncate text-sm font-semibold text-surface-800">{row.focusProductLabel}</p>
-                                  <p className="text-sm font-semibold tabular-nums text-surface-700">{metaLabel}</p>
-                                  <p className="text-sm font-semibold tabular-nums text-surface-700">{realizedLabel}</p>
+                                <div className="mt-1.5 grid gap-y-2 md:grid-cols-[minmax(240px,2.1fr)_minmax(210px,1.35fr)_minmax(210px,1.35fr)_minmax(250px,1.7fr)_minmax(120px,0.95fr)] md:items-center md:gap-x-2.5">
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold leading-snug text-surface-800">{row.focusProductLabel}</p>
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold tabular-nums leading-snug text-surface-700">{metaLabel}</p>
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold tabular-nums leading-snug text-surface-700">{realizedLabel}</p>
                                   <div className="flex min-w-0 items-center gap-2">
                                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-100">
                                       <div className={`h-full transition-[width] duration-700 ${progressClass}`} style={{ width: `${barPct}%` }} />
