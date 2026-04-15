@@ -3274,7 +3274,7 @@ export default function MetasWorkspace() {
   }, [ruleBlocks])
 
   const weightSupervisorOptions = useMemo(() => {
-    const map = new Map<string, { key: string; code: string | null; name: string; sellers: number }>()
+    const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
     for (const row of sellerWeightPerformanceRows) {
       if (!row.supervisorKey || !row.supervisorName) continue
       const current = map.get(row.supervisorKey) ?? {
@@ -3282,8 +3282,10 @@ export default function MetasWorkspace() {
         code: row.supervisorCode ?? null,
         name: row.supervisorName,
         sellers: 0,
+        sellersWithGoals: 0,
       }
       current.sellers += 1
+      if (row.groupsConfigured > 0) current.sellersWithGoals += 1
       map.set(row.supervisorKey, current)
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
@@ -3296,7 +3298,10 @@ export default function MetasWorkspace() {
       return
     }
     const exists = weightSupervisorOptions.some((option) => option.key === weightPanelSupervisorKey)
-    if (!exists) setWeightPanelSupervisorKey(weightSupervisorOptions[0].key)
+    if (!exists) {
+      const preferred = weightSupervisorOptions.find((option) => option.sellersWithGoals > 0) ?? weightSupervisorOptions[0]
+      setWeightPanelSupervisorKey(preferred.key)
+    }
   }, [weightPanelSupervisorKey, weightPanelView, weightSupervisorOptions])
 
   const selectedWeightSupervisorOption = useMemo(
@@ -3360,6 +3365,11 @@ export default function MetasWorkspace() {
       brandsTracked: weightOverviewByBrand.length,
     }
   }, [weightOverviewByBrand.length, weightScopedSellerRows])
+
+  const hasAnyWeightGoals = useMemo(
+    () => sellerWeightPerformanceRows.some((row) => row.groupsConfigured > 0),
+    [sellerWeightPerformanceRows]
+  )
 
   useEffect(() => {
     if (sellerWeightPerformanceRows.length === 0) {
@@ -6741,7 +6751,7 @@ export default function MetasWorkspace() {
 
               {snapshots.length === 0 ? (
                 <p className="py-8 text-center text-xs text-surface-400">Aguardando dados de vendedores…</p>
-              ) : weightExecutiveSummary.sellersWithGoals === 0 ? (
+              ) : !hasAnyWeightGoals ? (
                 <p className="py-8 text-center text-xs text-surface-400">Nenhuma meta de peso configurada para o período.</p>
               ) : (
                 <div className="mt-4 space-y-4">
@@ -6810,7 +6820,7 @@ export default function MetasWorkspace() {
                               ) : (
                                 weightSupervisorOptions.map((option) => (
                                   <option key={option.key} value={option.key}>
-                                    {option.name} · {option.sellers} vendedor{option.sellers === 1 ? '' : 'es'}
+                                    {option.name} · {option.sellersWithGoals}/{option.sellers} com meta
                                   </option>
                                 ))
                               )}
