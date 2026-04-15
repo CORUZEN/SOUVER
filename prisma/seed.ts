@@ -28,6 +28,7 @@ async function main() {
     { name: 'Depósito', code: 'DEP', description: 'Depósito e Armazenamento' },
     { name: 'Qualidade', code: 'QUAL', description: 'Controle de Qualidade' },
     { name: 'Recursos Humanos', code: 'RH', description: 'Gestão de Pessoas' },
+    { name: 'Comercial', code: 'COM', description: 'Área Comercial e Vendas' },
     { name: 'Contabilidade', code: 'CONT', description: 'Financeiro e Contabilidade' },
     { name: 'Administração', code: 'ADM', description: 'Administração Geral' },
     { name: 'TI', code: 'TI', description: 'Tecnologia da Informação' },

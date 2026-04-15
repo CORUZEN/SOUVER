@@ -76,6 +76,8 @@ export default function GestaoUsuariosPage() {
   const [confirmUser, setConfirmUser] = useState<UserRow | null>(null)
   const [confirming, setConfirming] = useState(false)
 
+  const [supervisorSellers, setSupervisorSellers] = useState<{ code: string; name: string }[]>([])
+
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
 
   const fetchUsers = useCallback(async () => {
@@ -124,6 +126,21 @@ export default function GestaoUsuariosPage() {
   }, [isDeveloper])
 
   useEffect(() => {
+    if (!isDeveloper) return
+    fetch('/api/metas/sellers-allowlist')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const list: Array<{ code?: string | null; name: string; profileType?: string }> = d?.sellers ?? d?.list ?? []
+        const supervisors = list
+          .filter((s) => s.profileType === 'SUPERVISOR' && s.code)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((s) => ({ code: String(s.code!), name: s.name }))
+        setSupervisorSellers(supervisors)
+      })
+      .catch(() => null)
+  }, [isDeveloper])
+
+  useEffect(() => {
     if (isDeveloper) fetchUsers()
   }, [fetchUsers, isDeveloper])
 
@@ -132,6 +149,19 @@ export default function GestaoUsuariosPage() {
   }, [search, filterRole, filterDept, filterStatus])
 
   const selectedRole = useMemo(() => roles.find((r) => r.id === form.roleId) ?? null, [roles, form.roleId])
+  const isCommercialSupervisor = selectedRole?.code === 'COMMERCIAL_SUPERVISOR'
+  const comercialDept = useMemo(() => departments.find((d) => d.name.toLowerCase().includes('comercial') || d.code?.toLowerCase().includes('comercial')) ?? null, [departments])
+
+  function handleRoleChange(roleId: string) {
+    const role = roles.find((r) => r.id === roleId) ?? null
+    const updates: Partial<UserFormData> = { roleId }
+    if (role?.code === 'COMMERCIAL_SUPERVISOR') {
+      if (comercialDept) updates.departmentId = comercialDept.id
+      // clear sellerCode so user picks from selector
+      updates.sellerCode = ''
+    }
+    setForm((p) => ({ ...p, ...updates }))
+  }
 
   function openCreate() {
     setEditingUser(null)
@@ -330,17 +360,38 @@ export default function GestaoUsuariosPage() {
             <Input label={editingUser ? 'Nova senha (opcional)' : 'Senha'} type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="Mínimo 8 caracteres" required={!editingUser} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Select label="Cargo" value={form.roleId} onChange={(e) => setForm((p) => ({ ...p, roleId: e.target.value }))} options={roleFormOptions} />
+            <Select label="Cargo" value={form.roleId} onChange={(e) => handleRoleChange(e.target.value)} options={roleFormOptions} />
             <Select label="Departamento" value={form.departmentId} onChange={(e) => setForm((p) => ({ ...p, departmentId: e.target.value }))} options={[{ value: '', label: 'Sem departamento' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
-          {selectedRole?.code === 'COMMERCIAL_SUPERVISOR' && (
-            <Input
-              label="Código do vendedor (supervisor)"
-              value={form.sellerCode}
-              onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
-              placeholder="Ex.: 15 (código do supervisor na allowlist)"
-              hint="Informe o código Sankhya deste supervisor. Define quais vendedores ele poderá ver no painel de Metas."
-            />
+          {isCommercialSupervisor && (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-surface-700">
+                Supervisor comercial <span className="text-error-500">*</span>
+              </label>
+              {supervisorSellers.length > 0 ? (
+                <select
+                  value={form.sellerCode}
+                  onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
+                  className="h-10 w-full rounded-lg border border-surface-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">Selecione o supervisor...</option>
+                  {supervisorSellers.map((s) => (
+                    <option key={s.code} value={s.code}>{s.name} — código {s.code}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.sellerCode}
+                  onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
+                  placeholder="Código do supervisor na allowlist (ex.: 15)"
+                  className="h-10 w-full rounded-lg border border-surface-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              )}
+              <p className="text-xs text-surface-500">
+                Define quais vendedores este usuário poderá ver no Painel de Metas.
+              </p>
+            </div>
           )}
           <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Cargo selecionado: ${selectedRole.name}` : 'Sem cargo definido.'}</div>
           {editingUser && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />Usuário ativo</label>}
