@@ -254,7 +254,7 @@ function buildSql(
   const productFilter = productCodes.length > 0 ? `AND TO_CHAR(PRO.CODPROD) IN (${productCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
-    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+    ? "AND CAB.CODTIPOPER = 1001\n  "
     : mode === 'FALLBACK_TIPMOV'
       ? "AND CAB.TIPMOV = 'V'\n  "
       : ''
@@ -293,7 +293,7 @@ function buildSellerItemsSql(
   const productFilter = productCodes.length > 0 ? `AND TO_CHAR(PRO.CODPROD) IN (${productCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
-    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+    ? "AND CAB.CODTIPOPER = 1001\n  "
     : mode === 'FALLBACK_TIPMOV'
       ? "AND CAB.TIPMOV = 'V'\n  "
       : ''

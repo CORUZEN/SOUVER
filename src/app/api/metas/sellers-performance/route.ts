@@ -393,7 +393,7 @@ function parseYearMonth(req: NextRequest) {
 
 /**
  * Build SQL that filters directly by seller codes, date range, and
- * operation type aligned with Portal de Vendas ("Nota de venda").
+ * operation type aligned with Portal de Vendas ("Pedido de venda").
  * Keeps the result well under the 5000-row API limit and avoids
  * transferring thousands of irrelevant orders over the network.
  */
@@ -401,15 +401,15 @@ function buildOrdersSql(
   startDate: string,
   endDateExclusive: string,
   sellerCodes: string[],
-  mode: 'TOP_1101' | 'TIPMOV_V' | 'ANY_MOVEMENT' = 'TOP_1101',
+  mode: 'TOP_1001' | 'TIPMOV_V' | 'ANY_MOVEMENT' = 'TOP_1001',
   companyScope: '1' | '2' | 'all' = '1'
 ) {
   // Regra principal para espelhar o Portal de Vendas:
-  // Tipo de movimento "Nota de venda" + Tipo Operação 1101
+  // "Pedido de venda" + Tipo Operação 1001
   // Fallback 1: apenas TIPMOV = 'V'
   // Fallback 2: sem filtro de tipo (último recurso)
-  const typeFilter = mode === 'TOP_1101'
-    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+  const typeFilter = mode === 'TOP_1001'
+    ? "AND CAB.CODTIPOPER = 1001\n  "
     : mode === 'TIPMOV_V'
       ? "AND CAB.TIPMOV = 'V'\n  "
       : ''
@@ -752,18 +752,18 @@ export async function GET(req: NextRequest) {
       .filter((c) => c.length > 0)
 
     // --- Query orders filtered by seller codes in SQL ---
-    // Cascade: TIPMOV='V' + CODTIPOPER=1101 -> TIPMOV='V' -> any movement
+    // Cascade: CODTIPOPER=1001 -> TIPMOV='V' -> any movement
     let orders: SankhyaOrder[] = []
-    let queryMode: 'TIPMOV_V_TOP1101' | 'TIPMOV_V' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
+    let queryMode: 'TOP_1001' | 'TIPMOV_V' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
 
-    // 1) Primary: TIPMOV = 'V' + CODTIPOPER = 1101
-    const sqlTop1101 = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'TOP_1101', companyScope)
+    // 1) Primary: CODTIPOPER = 1001 (Pedido de venda — Portal de Vendas)
+    const sqlTop1001 = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'TOP_1001', companyScope)
     try {
-      const records = await queryRows(baseUrl, headers, sqlTop1101, appKey, { allowEmpty: true })
+      const records = await queryRows(baseUrl, headers, sqlTop1001, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
-      queryMode = 'TIPMOV_V_TOP1101'
+      queryMode = 'TOP_1001'
     } catch {
-      // Top/Tipo de operacao pode divergir no ambiente — tenta apenas TIPMOV='V'
+      // CODTIPOPER pode divergir no ambiente — tenta apenas TIPMOV='V'
     }
 
     // 2) Fallback: TIPMOV = 'V'

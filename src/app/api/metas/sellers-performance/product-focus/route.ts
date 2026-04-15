@@ -201,7 +201,7 @@ function buildSql(startDate: string, endDateExclusive: string, sellerCodes: stri
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
-    ? "AND CAB.TIPMOV = 'V'\n  AND CAB.CODTIPOPER = 1101\n  "
+    ? "AND CAB.CODTIPOPER = 1001\n  "
     : "AND CAB.TIPMOV = 'V'\n  "
 
   return `
