@@ -973,6 +973,7 @@ export default function MetasWorkspace() {
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [weightPanelView, setWeightPanelView] = useState<'GENERAL' | 'SELLER'>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
+  const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
   const [performanceDiagnostics, setPerformanceDiagnostics] = useState<PerformanceDiagnostics | null>(null)
@@ -1062,6 +1063,8 @@ export default function MetasWorkspace() {
   const [blockTitleDraft, setBlockTitleDraft] = useState('')
   const periodPickerRef = useRef<HTMLDivElement>(null)
   const readOnlyBlockPickerRef = useRef<HTMLDivElement>(null)
+  const weightPanelLeftColumnRef = useRef<HTMLDivElement>(null)
+  const weightRankingHeaderRef = useRef<HTMLDivElement>(null)
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -3183,6 +3186,44 @@ export default function MetasWorkspace() {
       return a.brand.localeCompare(b.brand, 'pt-BR')
     })
   }, [selectedWeightSellerDetails])
+
+  useEffect(() => {
+    const leftEl = weightPanelLeftColumnRef.current
+    const headerEl = weightRankingHeaderRef.current
+    const fallbackHeight = 304
+    if (!leftEl || !headerEl) {
+      setWeightRankingListMaxHeight((prev) => (prev === fallbackHeight ? prev : fallbackHeight))
+      return
+    }
+
+    let frameId = 0
+    const syncHeights = () => {
+      if (frameId) cancelAnimationFrame(frameId)
+      frameId = requestAnimationFrame(() => {
+        const leftHeight = leftEl.getBoundingClientRect().height
+        const rightHeaderHeight = headerEl.getBoundingClientRect().height
+        const verticalGap = 8 // space-y-2 between header and list
+        const measured = Math.floor(leftHeight - rightHeaderHeight - verticalGap)
+        const next = Number.isFinite(measured) ? Math.max(measured, 180) : fallbackHeight
+        setWeightRankingListMaxHeight((prev) => (prev === next ? prev : next))
+      })
+    }
+
+    syncHeights()
+    let observer: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(syncHeights)
+      observer.observe(leftEl)
+      observer.observe(headerEl)
+    }
+    window.addEventListener('resize', syncHeights)
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId)
+      observer?.disconnect()
+      window.removeEventListener('resize', syncHeights)
+    }
+  }, [selectedWeightSellerGroupRows.length, sellerWeightPerformanceRows.length, snapshots.length, view, weightPanelView, weightOverviewByBrand.length])
 
   const stageSeries = useMemo(
     () =>
@@ -6312,7 +6353,7 @@ export default function MetasWorkspace() {
                           ? 'text-emerald-600'
                           : weightExecutiveSummary.overallRatio >= 0.8
                             ? 'text-cyan-600'
-                            : weightExecutiveSummary.overallRatio >= 0.6
+                            : weightExecutiveSummary.overallRatio >= 0.5
                               ? 'text-amber-500'
                               : 'text-rose-600'
                       }`}>{num(weightExecutiveSummary.overallRatio * 100, 1)}%</p>
@@ -6326,28 +6367,41 @@ export default function MetasWorkspace() {
                   </div>
 
                   <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
-                    <div className="space-y-3">
-                      {weightPanelView === 'SELLER' && (
-                        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
-                          <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Vendedor</label>
-                          <select
-                            className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
-                            value={weightPanelSellerId}
-                            onChange={(event) => setWeightPanelSellerId(event.target.value)}
-                          >
-                            {sellerWeightPerformanceRows.map((row) => (
-                              <option key={row.sellerId} value={row.sellerId}>
-                                {row.sellerShortName} · {num(row.overallRatio * 100, 1)}%
-                              </option>
-                            ))}
-                          </select>
-                          {selectedWeightSellerDetails && (
+                    <div ref={weightPanelLeftColumnRef} className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
+                        <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Vendedor</label>
+                        <select
+                          className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
+                          value={weightPanelView === 'GENERAL' ? '__ALL__' : weightPanelSellerId}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (nextValue === '__ALL__') {
+                              setWeightPanelView('GENERAL')
+                              return
+                            }
+                            setWeightPanelSellerId(nextValue)
+                            setWeightPanelView('SELLER')
+                          }}
+                        >
+                          <option value="__ALL__">Todos</option>
+                          {sellerWeightPerformanceRows.map((row) => (
+                            <option key={row.sellerId} value={row.sellerId}>
+                              {row.sellerShortName} · {num(row.overallRatio * 100, 1)}%
+                            </option>
+                          ))}
+                        </select>
+                        {weightPanelView === 'GENERAL' ? (
+                          <span className="text-[10px] text-cyan-700">
+                            {weightExecutiveSummary.hitGroups}/{weightExecutiveSummary.totalGroups} grupos no alvo
+                          </span>
+                        ) : (
+                          selectedWeightSellerDetails && (
                             <span className="text-[10px] text-cyan-700">
                               {selectedWeightSellerDetails.groupsHit}/{selectedWeightSellerDetails.groupsConfigured} grupos no alvo
                             </span>
-                          )}
-                        </div>
-                      )}
+                          )
+                        )}
+                      </div>
 
                       <div className="overflow-hidden rounded-xl border border-surface-200">
                         <div className="overflow-x-auto">
@@ -6374,9 +6428,9 @@ export default function MetasWorkspace() {
                                     const progressPct = row.ratio * 100
                                     const barPct = Math.min(progressPct, 100)
                                     const progressClass =
-                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
                                     const textClass =
-                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.5 ? 'text-amber-500' : 'text-rose-600'
                                     return (
                                       <tr key={row.brand} className="border-t border-surface-100">
                                         <td className="px-3 py-2.5 font-semibold text-surface-700">{row.brand}</td>
@@ -6424,9 +6478,9 @@ export default function MetasWorkspace() {
                                     const progressPct = row.ratio * 100
                                     const barPct = Math.min(progressPct, 100)
                                     const progressClass =
-                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                                      row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
                                     const textClass =
-                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                      row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.5 ? 'text-amber-500' : 'text-rose-600'
                                     return (
                                       <tr key={row.brand} className="border-t border-surface-100">
                                         <td className="px-3 py-2.5 font-semibold text-surface-700">{row.brand}</td>
@@ -6443,9 +6497,9 @@ export default function MetasWorkspace() {
                                           </div>
                                         </td>
                                         <td className={`px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide ${
-                                          row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.6 ? 'text-amber-500' : 'text-rose-600'
+                                          row.ratio >= 1 ? 'text-emerald-600' : row.ratio >= 0.8 ? 'text-cyan-600' : row.ratio >= 0.5 ? 'text-amber-500' : 'text-rose-600'
                                         }`}>
-                                          {row.ratio >= 1 ? 'No alvo' : row.ratio >= 0.8 ? 'Atenção' : 'Crítico'}
+                                          {row.ratio >= 1 ? 'No alvo' : row.ratio >= 0.8 ? 'Quase lá' : row.ratio >= 0.5 ? 'Em progresso' : 'Atenção'}
                                         </td>
                                       </tr>
                                     )
@@ -6459,14 +6513,21 @@ export default function MetasWorkspace() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Ranking de atingimento por vendedor</p>
-                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      <div ref={weightRankingHeaderRef}>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Progresso por vendedor</p>
+                      </div>
+                      <div
+                        className="space-y-2 overflow-y-auto pr-1"
+                        style={{ maxHeight: `${Math.max(weightRankingListMaxHeight ?? 304, 180)}px` }}
+                      >
                         {sellerWeightPerformanceRows.map((row, index) => {
                           const progressPct = row.overallRatio * 100
                           const barPct = Math.min(progressPct, 100)
-                          const isSelected = selectedWeightSellerDetails?.sellerId === row.sellerId
+                          const isSelected =
+                            weightPanelView === 'SELLER' &&
+                            selectedWeightSellerDetails?.sellerId === row.sellerId
                           const barClass =
-                            row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.6 ? 'bg-amber-400' : 'bg-rose-500'
+                            row.overallRatio >= 1 ? 'bg-emerald-500' : row.overallRatio >= 0.8 ? 'bg-cyan-500' : row.overallRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
                           return (
                             <button
                               key={row.sellerId}
