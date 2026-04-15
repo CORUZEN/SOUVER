@@ -3111,6 +3111,20 @@ export default function MetasWorkspace() {
       })
   }, [brandWeightRows, month, ruleBlocks, sankhyaConnected, sankhyaTargets, snapshots, year])
 
+  const weightBrandOrderIndex = useMemo(() => {
+    const order = new Map<string, number>()
+    let index = 0
+    for (const block of ruleBlocks) {
+      for (const target of block.weightTargets ?? []) {
+        const brand = String(target.brand ?? '').trim().toUpperCase()
+        if (!brand || order.has(brand)) continue
+        order.set(brand, index)
+        index += 1
+      }
+    }
+    return order
+  }, [ruleBlocks])
+
   const weightOverviewByBrand = useMemo(() => {
     const byBrand = new Map<string, { brand: string; targetKg: number; soldKg: number; sellerCount: number; hitSellers: number }>()
     for (const seller of sellerWeightPerformanceRows) {
@@ -3135,11 +3149,12 @@ export default function MetasWorkspace() {
         ratio: entry.targetKg > 0 ? entry.soldKg / entry.targetKg : 0,
       }))
       .sort((a, b) => {
-        if (a.ratio !== b.ratio) return a.ratio - b.ratio
-        if (b.targetKg !== a.targetKg) return b.targetKg - a.targetKg
+        const aOrder = weightBrandOrderIndex.get(a.brand) ?? Number.POSITIVE_INFINITY
+        const bOrder = weightBrandOrderIndex.get(b.brand) ?? Number.POSITIVE_INFINITY
+        if (aOrder !== bOrder) return aOrder - bOrder
         return a.brand.localeCompare(b.brand, 'pt-BR')
       })
-  }, [sellerWeightPerformanceRows])
+  }, [sellerWeightPerformanceRows, weightBrandOrderIndex])
 
   const weightExecutiveSummary = useMemo(() => {
     const sellersTracked = sellerWeightPerformanceRows.length
@@ -3181,11 +3196,12 @@ export default function MetasWorkspace() {
   const selectedWeightSellerGroupRows = useMemo(() => {
     if (!selectedWeightSellerDetails) return []
     return [...selectedWeightSellerDetails.groupsWithTarget].sort((a, b) => {
-      if (a.ratio !== b.ratio) return a.ratio - b.ratio
-      if (b.targetKg !== a.targetKg) return b.targetKg - a.targetKg
+      const aOrder = weightBrandOrderIndex.get(a.brand) ?? Number.POSITIVE_INFINITY
+      const bOrder = weightBrandOrderIndex.get(b.brand) ?? Number.POSITIVE_INFINITY
+      if (aOrder !== bOrder) return aOrder - bOrder
       return a.brand.localeCompare(b.brand, 'pt-BR')
     })
-  }, [selectedWeightSellerDetails])
+  }, [selectedWeightSellerDetails, weightBrandOrderIndex])
 
   useEffect(() => {
     const leftEl = weightPanelLeftColumnRef.current
