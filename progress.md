@@ -225,5 +225,89 @@ Porta de saida para fechamento completo:
 
 ---
 
-**Ultima atualizacao:** 19/03/2026  
+---
+
+## 11) Log de sessoes de desenvolvimento
+
+### Sessao 15/04/2026 — Correcoes de dados Sankhya + PWA completo
+
+#### Correcoes de precisao de dados (Modulo Metas)
+
+**Bug: CODTIPOPER incorreto nos relatorios de performance**
+- Arquivos corrigidos: `sellers-performance/route.ts`, `item-distribution/route.ts`, `product-focus/route.ts`
+- Problema: as consultas usavam `CODTIPOPER = 1101` (Nota Fiscal de venda) em vez de `CODTIPOPER = 1001` (Pedido de venda), que e o tipo utilizado pelo Portal de Vendas da Sankhya
+- Impacto: contagem de pedidos, faturamento e peso bruto estava divergindo do Portal de Vendas (ex.: sistema mostrava 150 pedidos, Sankhya mostrava 243)
+- Solucao: substituicao global de `1101` por `1001` nos tres arquivos de rota
+
+**Bug: Contagem de clientes atendidos subestimada**
+- Arquivo corrigido: `MetasWorkspace.tsx`
+- Problema: `totalDistinctClients` usava `stageMetrics.FULL.clientCodes.size`, que excluia pedidos feitos fora das datas de ciclo (finais de semana, feriados, dias sem etapa configurada), pois o loop continha `if (!stage) continue`
+- Impacto: sistema mostrava 119 clientes atendidos, Sankhya mostrava 138
+- Solucao: adicao de `allMonthClientCodes` — um `Set<string>` construido antes do filtro de ciclo iterando todos os pedidos do mes sem restricao de etapa
+
+**Bug: Permissoes de modulo nao salvas corretamente**
+- Arquivo corrigido: `api/dev/permissions/role/[id]/route.ts`
+- Problema: o handler PUT chamava `ensureMetasPermissionCatalog()` mas nao `ensureModulePermissionCatalog()`, fazendo com que os registros de permissao de modulo nao existissem no banco. O `deleteMany` limpava tudo e o `createMany` nao criava nada
+- Solucao: adicao de `await ensureModulePermissionCatalog()` no handler PUT
+
+**Bug: Flash de seguranca na sidebar (todos os itens visiveis durante carregamento)**
+- Arquivo corrigido: `Sidebar.tsx`
+- Problema: estado `modulePermissions` inicializado como `null` fazia com que todos os itens do menu aparecessem antes da API responder, depois sumissem — risco de seguranca visual
+- Solucao: introducao de flag `modulePermissionsLoaded: boolean`; todos os itens ocultados com `if (!modulePermissionsLoaded) return null` ate confirmacao da API; secoes de cabecalho ocultadas quando sem itens visiveis; handler `.catch()` agora define `setModulePermissionsLoaded(true)` para nao travar o estado em erro de rede
+
+---
+
+#### Feature: PWA (Progressive Web App) completo
+
+**Infraestrutura base**
+- `public/manifest.json` — manifest PWA com `name`, `short_name`, `start_url: /app`, `display: standalone`, `theme_color: #10b981`, `background_color: #0f172a`, icones e atalho para `/app/supervisor`
+- `public/sw.js` — service worker completo com:
+  - estrategia cache-first para assets estaticos (`/branding/`, `/_next/static/`, `/manifest.json`)
+  - estrategia network-first com TTL de 2 min para `/api/pwa/summary`
+  - fallback offline para `/app`
+  - limpeza automatica de versoes antigas de cache no `activate`
+- `src/app/layout.tsx` — adicionados: link `rel=manifest`, metas `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `theme-color`, e script inline de registro do service worker
+
+**Rotas PWA (grupo `(pwa)` — layout sem sidebar)**
+- `src/app/(pwa)/layout.tsx` — layout standalone minimal (sem sidebar, sem header de desktop)
+- `src/app/(pwa)/app/page.tsx` — roteador de cargo: `COMMERCIAL_SUPERVISOR` → `/app/supervisor`, `SELLER` → `/app/vendedor`, demais cargos → `/metas`
+- `src/app/(pwa)/app/supervisor/page.tsx` — painel mobile do Supervisor Comercial:
+  - barra superior com nome, cargo, botoes de atualizar/voltar/sair, indicador online/offline
+  - seletor de periodo (mes/ano) com navegacao por chevrons
+  - cartao de meta consolidada com barra de progresso colorida (emerald/amber/rose)
+  - grid de metricas: pedidos, peso bruto, faturamento total
+  - lista ranqueada de vendedores com badge de status (Superou / Meta Batida / Em Andamento / Critico)
+  - expansao por vendedor com metricas detalhadas: valor, meta, pedidos, clientes, peso, ticket medio, gap para meta
+  - estado de loading com skeleton, estado de erro com retry
+- `src/app/(pwa)/app/vendedor/page.tsx` — painel mobile do Vendedor:
+  - mesmo padrao de barra superior e seletor de periodo
+  - cartao principal de progresso vs meta com porcentagem e barra colorida
+  - grid de metricas: pedidos, clientes atendidos vs base, peso bruto, ticket medio
+  - lista colapsavel de pedidos do mes (ordenada por data decrescente, codigo, cliente, valor, peso)
+
+**API leve para PWA**
+- `src/app/api/pwa/summary/route.ts` — endpoint GET sem chamadas ao Sankhya; le `metasConfig` do banco; retorna: `year`, `month`, `roleCode`, `isSupervisor`, `cycle`, `sellers[]` (com `monthlyTarget`), `totalMonthlyTarget`, `sellerCount`, `configuredAt`
+
+**Banner de instalacao**
+- `src/components/ui/PwaInstallBanner.tsx` — bottom sheet de instalacao visivel apenas em dispositivos moveis (< 768px):
+  - detecta se ja esta instalado via `display-mode: standalone` (nao exibe se sim)
+  - Android/Chrome: captura evento `beforeinstallprompt`, exibe botao "Instalar App" com animacao de loading
+  - iOS/Safari: exibe instrucoes passo a passo (Safari nao suporta o evento nativo)
+  - chips de beneficio: "Funciona offline", "Acesso rapido", "Sem navegador"
+  - animacao `slideUp` ao aparecer, descarte por sessao via `sessionStorage`
+- `src/app/(auth)/layout.tsx` — banner adicionado ao layout de autenticacao (aparece nas paginas de login e recuperacao de senha)
+
+**Redirecionamento automatico mobile**
+- `src/components/layout/MobilePwaRedirect.tsx` — componente client sem UI; injetado no layout do dashboard; redireciona `COMMERCIAL_SUPERVISOR` e `SELLER` mobile (< 768px) automaticamente para `/app` quando acessam qualquer pagina desktop
+
+---
+
+#### Resultado final da sessao
+- Build produtivo (`npx next build`) passou sem erros em todas as entregas
+- Rotas ativas apos build: `/app`, `/app/supervisor`, `/app/vendedor`
+- Nenhuma regressao identificada nos modulos existentes
+
+---
+
+**Ultima atualizacao:** 15/04/2026  
 **Responsavel pelo controle:** Time de Desenvolvimento SOUVER
