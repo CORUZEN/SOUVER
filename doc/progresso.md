@@ -81,6 +81,50 @@ Fase atual com foco em fechamento operacional, consistência de regras por perfi
 ### 9) Indicadores de origem Sankhya
 - Remoção dos “cards/tag Sankhya” verdes em pontos onde estava poluindo visualmente a leitura principal.
 
+### 10) Painel “Metas de peso por grupo de produto” (reformulação executiva)
+- Substituição do bloco antigo de premiação por uma visão estratégica de metas de peso por grupo.
+- Alternância entre:
+  - `Visão geral`
+  - `Por vendedor`
+- Inclusão de:
+  - cards executivos (`Meta total`, `Vendido`, `Atingimento geral`, `Grupos no alvo`);
+  - tabela de grupos com progresso e status;
+  - coluna lateral `Progresso por vendedor` com ranking clicável.
+
+### 11) Item foco por vendedor (compacto e operacional)
+- Bloco de item foco exibido somente no modo `Por vendedor`.
+- Layout compacto em duas linhas com colunas:
+  - `Item foco`
+  - `Meta`
+  - `Realizado`
+  - `Progresso`
+  - `Status`
+- Remoção de cabeçalhos/elementos redundantes para reduzir ruído visual.
+- Carregamento de descrição do produto foco com prefetch para melhorar consistência no dashboard.
+
+### 12) Ajustes finos de UX/visual (ranking e tabelas)
+- Correção do limite de altura do ranking para evitar cards cortados pela metade.
+- Sincronização de altura com a coluna da esquerda no bloco de metas de peso.
+- Padronização de labels/status:
+  - `Crítico` -> `Atenção`
+  - `Atenção` -> `Quase lá`
+- Renomeação do título lateral:
+  - `Ranking de atingimento por vendedor` -> `Progresso por vendedor`.
+
+### 13) Supervisão por vendedor (novo recurso)
+- Inclusão de coluna `Supervisão` na tela `Lista de vendedores liberados`.
+- Definição do supervisor responsável por vendedor via seletor por linha.
+- Regras de consistência:
+  - vendedor do tipo `SUPERVISOR` não recebe supervisor (campo não aplicável);
+  - mudança de tipo para `SUPERVISOR` limpa vínculo de supervisão.
+- Persistência ponta a ponta implementada:
+  - frontend -> API -> store -> banco.
+- Campos adicionados:
+  - `supervisor_code`
+  - `supervisor_name`
+- Migration aplicada com sucesso no ambiente alvo:
+  - `20260415100000_metas_sellers_supervision_fields`.
+
 ---
 
 ## Correções técnicas críticas já tratadas
@@ -114,6 +158,8 @@ Fase atual com foco em fechamento operacional, consistência de regras por perfi
 - `src/lib/metas/seller-allowlist.ts`
 - `src/app/api/metas/sellers-allowlist/route.ts`
 - `src/app/api/metas/sellers-allowlist/sync/route.ts`
+- `prisma/schema.prisma`
+- `prisma/migrations/20260415100000_metas_sellers_supervision_fields/migration.sql`
 - `src/app/api/metas/config/route.ts`
 - `src/app/api/metas/sellers-performance/route.ts`
 - `src/app/api/metas/sellers-performance/product-focus/route.ts`
@@ -155,9 +201,14 @@ Fase atual com foco em fechamento operacional, consistência de regras por perfi
 1. Formalizar regra definitiva de `INADIMPLENCIA` com operação/negócio.
 2. Cobrir com testes automatizados os fluxos críticos:
 - persistência de `profileType`;
+- persistência de `supervisorCode/supervisorName`;
 - aplicação em lote por perfil;
 - cálculo de premiação percentual com teto.
-3. Revisar mensagens de ajuda no rodapé dos blocos para reduzir dúvida operacional em cálculos percentuais.
+3. Evoluir visão por supervisão no dashboard:
+- filtro por supervisor;
+- agregados por equipe/supervisão;
+- ranking segmentado por supervisão.
+4. Revisar mensagens de ajuda no rodapé dos blocos para reduzir dúvida operacional em cálculos percentuais.
 
 ---
 
@@ -166,6 +217,7 @@ Fase atual com foco em fechamento operacional, consistência de regras por perfi
 - [ ] `npm.cmd run type-check`
 - [ ] `npm.cmd run build`
 - [ ] salvar/recarregar allowlist de vendedores e conferir perfis
+- [ ] salvar/recarregar allowlist e conferir vínculo de supervisão por vendedor
 - [ ] abrir bloco de cada perfil e validar colunas/formatos de premiação
 - [ ] validar modal de aplicação em lote por perfil
 - [ ] validar tela de produtos com ordenação e filtro por grupo
