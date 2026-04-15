@@ -6269,9 +6269,6 @@ export default function MetasWorkspace() {
               <p className="mt-1.5 text-xs text-surface-500">
                 {num(rewardDonut.pctCommitted, 1)}% comprometido da previsão de {currency(rewardDonut.totalTarget)}
               </p>
-              <p className="mt-1 text-[10px] text-surface-400">
-                Perfis antigos (1%/1,5%) são exibidos em percentual e não entram neste custo em R$.
-              </p>
             </Card>
 
             <Card className={executiveMetricCardClass}>
