@@ -38,6 +38,7 @@ type CashCalcMode = 'PERCENT' | 'FIXED'
 type KpiType = 'BASE_CLIENTES' | 'VOLUME' | 'META_FINANCEIRA' | 'DISTRIBUICAO' | 'DEVOLUCAO' | 'INADIMPLENCIA' | 'ITEM_FOCO' | 'RENTABILIDADE' | 'CUSTOM'
 type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
 type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
+type SellerPerformanceScope = 'ALL' | SellerProfileType
 type RewardMode = 'CURRENCY' | 'PERCENT'
 
 interface GoalRule {
@@ -308,6 +309,14 @@ const SELLER_PROFILE_LABEL: Record<SellerProfileType, string> = {
   ANTIGO_15: 'Antigo (1,5%)',
   SUPERVISOR: 'Supervisor',
 }
+
+const SELLER_PERFORMANCE_SCOPE_OPTIONS: Array<{ value: SellerPerformanceScope; label: string }> = [
+  { value: 'ALL', label: 'Visão geral' },
+  { value: 'NOVATO', label: 'Novato' },
+  { value: 'ANTIGO_1', label: 'Antigo (1%)' },
+  { value: 'ANTIGO_15', label: 'Antigo (1,5%)' },
+  { value: 'SUPERVISOR', label: 'Supervisor' },
+]
 
 function isPercentRewardProfile(profileType: SellerProfileType) {
   return profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15'
@@ -971,6 +980,7 @@ export default function MetasWorkspace() {
   const [sellerIncludeSellerId, setSellerIncludeSellerId] = useState('')
   const [sellers, setSellers] = useState<Salesperson[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState('')
+  const [sellerPerformanceScope, setSellerPerformanceScope] = useState<SellerPerformanceScope>('ALL')
   const [weightPanelView, setWeightPanelView] = useState<'GENERAL' | 'SELLER'>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
@@ -6581,12 +6591,30 @@ export default function MetasWorkspace() {
 
           <Card className={executivePanelCardClass}>
             <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 via-blue-500 to-indigo-500" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-              Desempenho individual de vendedores
-            </p>
-            <p className="mt-0.5 text-[10px] text-surface-400">
-              Clique no card do vendedor para expandir os detalhes completos no próprio bloco.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                  Desempenho individual de vendedores
+                </p>
+                <p className="mt-0.5 text-[10px] text-surface-400">
+                  Clique no card do vendedor para expandir os detalhes completos no próprio bloco.
+                </p>
+              </div>
+              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                {SELLER_PERFORMANCE_SCOPE_OPTIONS.map((option) => (
+                  <button
+                    key={`seller-performance-scope-${option.value}`}
+                    type="button"
+                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors first:border-l-0 ${
+                      sellerPerformanceScope === option.value ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'
+                    }`}
+                    onClick={() => setSellerPerformanceScope(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {sellersLoading ? (
               <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                 Carregando vendedores...
@@ -6606,6 +6634,13 @@ export default function MetasWorkspace() {
                     .map((row) => {
                       const snapshot = snapshots.find((s) => s.seller.id === row.seller.id)
                       if (!snapshot) return null
+                      const snapshotBlock =
+                        ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+                        findBlockForSeller(row.seller.id, ruleBlocks) ??
+                        null
+                      const resolvedProfileType = snapshotBlock
+                        ? resolveBlockProfileType(snapshotBlock)
+                        : (resolveSellerProfileForId(row.seller.id) ?? 'NOVATO')
                       const avgRatio = row.cells.length > 0
                         ? row.cells.reduce((sum, cell) => sum + cell.ratio, 0) / row.cells.length
                         : 0
@@ -6615,7 +6650,7 @@ export default function MetasWorkspace() {
                         nameShort: getSellerShortName(row.seller.name),
                         fullName: row.seller.name,
                         login: row.seller.login,
-                        rank: snapshots.findIndex((s) => s.seller.id === row.seller.id) + 1,
+                        profileType: resolvedProfileType,
                         status: snapshot.status,
                         pointsAchieved: snapshot.pointsAchieved,
                         pointsTarget: snapshot.pointsTarget,
@@ -6630,14 +6665,27 @@ export default function MetasWorkspace() {
                     })
                     .filter((row): row is NonNullable<typeof row> => row !== null)
 
+                    const filteredRows = sellerPerformanceScope === 'ALL'
+                      ? rows
+                      : rows.filter((row) => row.profileType === sellerPerformanceScope)
+                    const filteredSellerIds = new Set(filteredRows.map((row) => row.id))
+                    const filteredUniqueClientsSet = new Set<string>()
+                    for (const seller of sellers) {
+                      if (!filteredSellerIds.has(seller.id)) continue
+                      for (const order of seller.orders) {
+                        const code = (order.clientCode ?? '').trim()
+                        if (code) filteredUniqueClientsSet.add(code)
+                      }
+                    }
+                    const filteredUniqueClients = filteredUniqueClientsSet.size
                     const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
-                    const avgPoints = rows.length > 0
-                      ? rows.reduce((sum, row) => sum + row.pointsAchieved, 0) / rows.length
+                    const avgPoints = filteredRows.length > 0
+                      ? filteredRows.reduce((sum, row) => sum + row.pointsAchieved, 0) / filteredRows.length
                       : 0
-                    const avgGapToFull = rows.length > 0
-                      ? rows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / rows.length
+                    const avgGapToFull = filteredRows.length > 0
+                      ? filteredRows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / filteredRows.length
                       : 0
-                    const kpiSummary = rows.reduce(
+                    const kpiSummary = filteredRows.reduce(
                       (acc, row) => {
                         const block = findBlockForSeller(row.id, ruleBlocks)
                         const total = block.rules.length
@@ -6649,6 +6697,9 @@ export default function MetasWorkspace() {
                       },
                       { hit: 0, total: 0 }
                     )
+                    const scopeLabel = sellerPerformanceScope === 'ALL'
+                      ? 'Visão geral'
+                      : SELLER_PROFILE_LABEL[sellerPerformanceScope]
 
                     return (
                       <>
@@ -6656,14 +6707,14 @@ export default function MetasWorkspace() {
                           <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">Vendedores monitorados</p>
-                            <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{rows.length}</p>
-                            <p className="text-[10px] text-sky-700">Base ativa no período selecionado</p>
+                            <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{filteredRows.length}</p>
+                            <p className="text-[10px] text-sky-700">{scopeLabel} no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Clientes únicos atendidos</p>
-                            <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">{num(corporateUniqueClients, 0)}</p>
-                            <p className="text-[10px] text-indigo-700">Total no período selecionado</p>
+                            <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">{num(filteredUniqueClients, 0)}</p>
+                            <p className="text-[10px] text-indigo-700">Total em {scopeLabel.toLowerCase()}</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
@@ -6692,7 +6743,11 @@ export default function MetasWorkspace() {
                           ))}
                           <span />
                         </div>
-                        {rows.map((row) => {
+                        {filteredRows.length === 0 ? (
+                          <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-center text-xs text-surface-500">
+                            Nenhum vendedor encontrado para o filtro "{scopeLabel}".
+                          </div>
+                        ) : filteredRows.map((row, index) => {
                           const isOpen = selectedSellerId === row.id
                           const sellerBlock = findBlockForSeller(row.id, ruleBlocks)
                           const kpisTotal = sellerBlock.rules.length
@@ -6715,7 +6770,7 @@ export default function MetasWorkspace() {
                                 className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
                               >
                                 <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
-                                  <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{row.rank}</span>
+                                  <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{index + 1}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
                                     {formatRewardValue(row.rewardAchieved, row.snapshot.rewardMode)}
