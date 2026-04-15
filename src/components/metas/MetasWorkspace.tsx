@@ -3554,36 +3554,7 @@ export default function MetasWorkspace() {
         const rightHeaderHeight = headerEl.getBoundingClientRect().height
         const verticalGap = 8 // space-y-2 between header and list
         const measured = leftHeight - rightHeaderHeight - verticalGap
-        let next = Number.isFinite(measured) ? Math.max(Math.floor(measured), 180) : fallbackHeight
-
-        const listEl = weightRankingListRef.current
-        if (listEl && measured > 0) {
-          const computedStyles = window.getComputedStyle(listEl)
-          const gap = Number.parseFloat(computedStyles.rowGap || computedStyles.gap || '0') || 0
-          const cards = Array.from(listEl.querySelectorAll<HTMLButtonElement>('button'))
-
-          if (cards.length > 0) {
-            let consumedHeight = 0
-            let fitCount = 0
-
-            for (const card of cards) {
-              const cardHeight = card.getBoundingClientRect().height
-              if (cardHeight <= 0) continue
-              const candidateHeight = fitCount === 0 ? cardHeight : consumedHeight + gap + cardHeight
-              if (candidateHeight <= measured + 1) {
-                consumedHeight = candidateHeight
-                fitCount += 1
-              } else {
-                break
-              }
-            }
-
-            if (fitCount > 0) {
-              // Mantém cards inteiros e evita clipping por subpixel/borda.
-              next = Math.max(Math.min(Math.ceil(consumedHeight) + 1, Math.ceil(measured) + 1), 180)
-            }
-          }
-        }
+        const next = Number.isFinite(measured) ? Math.max(measured - 1, 180) : fallbackHeight
         setWeightRankingListMaxHeight((prev) => (prev === next ? prev : next))
       })
     }
@@ -3594,7 +3565,6 @@ export default function MetasWorkspace() {
       observer = new ResizeObserver(syncHeights)
       observer.observe(leftEl)
       observer.observe(headerEl)
-      if (weightRankingListRef.current) observer.observe(weightRankingListRef.current)
     }
     window.addEventListener('resize', syncHeights)
 
@@ -6776,7 +6746,7 @@ export default function MetasWorkspace() {
               ) : !hasAnyWeightGoals ? (
                 <p className="py-8 text-center text-xs text-surface-400">Nenhuma meta de peso configurada para o período.</p>
               ) : (
-                <div className="mt-4 space-y-4">
+                <div key={weightPanelView} className="mt-4 space-y-4">
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta total (kg)</p>
