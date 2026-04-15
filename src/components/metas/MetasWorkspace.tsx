@@ -2563,6 +2563,12 @@ export default function MetasWorkspace() {
           {} as Record<StageKey, { orderCount: number; totalValue: number; clientCodes: Set<string> }>
         )
 
+        // Count ALL distinct clients from the month (regardless of cycle dates)
+        const allMonthClientCodes = new Set<string>()
+        for (const order of seller.orders) {
+          if (order.clientCode) allMonthClientCodes.add(order.clientCode)
+        }
+
         for (const order of seller.orders) {
           let stage = findStageForDate(order.negotiatedAt, cycle.weeks)
           if (!stage && sellerIncludedDates.has(order.negotiatedAt)) {
@@ -2596,7 +2602,8 @@ export default function MetasWorkspace() {
           cumulativeMetrics[sk] = { orderCount: cumOrders, totalValue: cumValue, distinctClients: cumClients.size }
         }
 
-        const totalDistinctClients = stageMetrics.FULL.clientCodes.size
+        // totalDistinctClients = all unique clients in the month (not just those within cycle dates)
+        const totalDistinctClients = allMonthClientCodes.size
         const officialBaseClients = Math.max(seller.baseClientCount ?? 0, 0)
 
         // ── Financial accumulation by stage closing date ────────────────────────
