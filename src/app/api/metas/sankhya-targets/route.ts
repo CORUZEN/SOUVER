@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
 type RawRecord = Record<string, unknown>
 
@@ -549,8 +550,25 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const sellers = Array.from(sellerMap.values())
+    const allSellers = Array.from(sellerMap.values())
       .sort((a, b) => Number(a.sellerCode) - Number(b.sellerCode))
+
+    // Supervisor scope: filter to only sellers supervised by this user
+    const isSupervisorScope = authUser.role?.code === 'COMMERCIAL_SUPERVISOR'
+    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+    let sellers = allSellers
+    if (supervisorSellerCode) {
+      const allowlist = await readSellerAllowlist().catch(() => [])
+      const supervisedCodes = new Set(
+        allowlist
+          .filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+          .map((s) => String(s.code ?? '').trim())
+          .filter((c) => c.length > 0)
+      )
+      if (supervisedCodes.size > 0) {
+        sellers = allSellers.filter((s) => supervisedCodes.has(s.sellerCode))
+      }
+    }
 
     return NextResponse.json({
       sellers,

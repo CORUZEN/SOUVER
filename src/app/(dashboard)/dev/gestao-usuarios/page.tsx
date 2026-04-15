@@ -18,6 +18,7 @@ interface UserRow {
   login: string
   isActive: boolean
   lastLoginAt: string | null
+  sellerCode: string | null
   role: { id: string; name: string; code: string } | null
   department: { id: string; name: string; code: string } | null
 }
@@ -32,6 +33,7 @@ interface UserFormData {
   password: string
   departmentId: string
   roleId: string
+  sellerCode: string
   isActive: boolean
 }
 
@@ -43,6 +45,7 @@ const EMPTY_FORM: UserFormData = {
   password: '',
   departmentId: '',
   roleId: '',
+  sellerCode: '',
   isActive: true,
 }
 
@@ -147,6 +150,7 @@ export default function GestaoUsuariosPage() {
       password: '',
       departmentId: user.department?.id ?? '',
       roleId: user.role?.id ?? '',
+      sellerCode: user.sellerCode ?? '',
       isActive: user.isActive,
     })
     setFormError(null)
@@ -165,6 +169,7 @@ export default function GestaoUsuariosPage() {
         phone: form.phone || null,
         roleId: form.roleId || null,
         departmentId: form.departmentId || null,
+        sellerCode: form.sellerCode.trim() || null,
       }
       if (form.password) payload.password = form.password
       if (editingUser) payload.isActive = form.isActive
@@ -328,6 +333,15 @@ export default function GestaoUsuariosPage() {
             <Select label="Cargo" value={form.roleId} onChange={(e) => setForm((p) => ({ ...p, roleId: e.target.value }))} options={roleFormOptions} />
             <Select label="Departamento" value={form.departmentId} onChange={(e) => setForm((p) => ({ ...p, departmentId: e.target.value }))} options={[{ value: '', label: 'Sem departamento' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
+          {selectedRole?.code === 'COMMERCIAL_SUPERVISOR' && (
+            <Input
+              label="Código do vendedor (supervisor)"
+              value={form.sellerCode}
+              onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
+              placeholder="Ex.: 15 (código do supervisor na allowlist)"
+              hint="Informe o código Sankhya deste supervisor. Define quais vendedores ele poderá ver no painel de Metas."
+            />
+          )}
           <div className="rounded-lg border border-surface-200 bg-surface-50 p-3 text-sm">{selectedRole ? `Cargo selecionado: ${selectedRole.name}` : 'Sem cargo definido.'}</div>
           {editingUser && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />Usuário ativo</label>}
         </div>

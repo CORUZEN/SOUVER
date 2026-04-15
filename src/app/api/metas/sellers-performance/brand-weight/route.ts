@@ -340,7 +340,12 @@ export async function GET(req: NextRequest) {
     const appKey = config.appKey ?? config.token ?? null
 
     const allowlist = await readSellerAllowlist()
-    const allowedSellers = getActiveAllowedSellersFromList(allowlist)
+    const isSupervisorScope = authUser.role?.code === 'COMMERCIAL_SUPERVISOR'
+    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+    const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
+    const allowedSellers = supervisorSellerCode
+      ? allActiveSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+      : allActiveSellers
     const sellerCodes = allowedSellers.map((s) => String(s.code ?? '').trim()).filter((c) => c.length > 0)
 
     let records: RawRecord[] = []

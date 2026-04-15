@@ -718,7 +718,12 @@ export async function GET(req: NextRequest) {
 
     // --- Allowlist ---
     const allowlist = await readSellerAllowlist()
-    const allowedSellers = getActiveAllowedSellersFromList(allowlist)
+    const isSupervisorScope = authUser.role?.code === 'COMMERCIAL_SUPERVISOR'
+    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+    const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
+    const allowedSellers = supervisorSellerCode
+      ? allActiveSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+      : allActiveSellers
     const allowedSellerByCode = new Map<string, (typeof allowedSellers)[number]>()
     const allowedSellerByName = new Map<string, (typeof allowedSellers)[number]>()
     for (const seller of allowedSellers) {

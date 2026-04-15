@@ -20,6 +20,7 @@ const updateUserSchema = z.object({
   roleId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
+  sellerCode: z.string().max(20).nullable().optional(),
 })
 
 function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
@@ -53,6 +54,7 @@ export async function GET(
       twoFactorEnabled: true,
       lastLoginAt: true,
       createdAt: true,
+      sellerCode: true,
       role: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
     },

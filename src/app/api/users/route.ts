@@ -17,6 +17,7 @@ const createUserSchema = z.object({
   password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
   departmentId: z.string().optional().nullable(),
   roleId: z.string().optional().nullable(),
+  sellerCode: z.string().max(20).optional().nullable(),
 })
 
 function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
@@ -69,6 +70,7 @@ export async function GET(req: NextRequest) {
         twoFactorEnabled: true,
         lastLoginAt: true,
         createdAt: true,
+        sellerCode: true,
         role: { select: { id: true, name: true, code: true } },
         department: { select: { id: true, name: true, code: true } },
       },
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { fullName, email, login, phone, password, departmentId, roleId } = parsed.data
+  const { fullName, email, login, phone, password, departmentId, roleId, sellerCode } = parsed.data
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { login }] },
@@ -121,6 +123,7 @@ export async function POST(req: NextRequest) {
       passwordHash,
       departmentId: departmentId ?? null,
       roleId: roleId ?? null,
+      sellerCode: sellerCode ?? null,
       passwordChangedAt: new Date(),
     },
     select: { id: true, fullName: true, email: true, login: true },

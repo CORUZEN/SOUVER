@@ -98,6 +98,7 @@ model User {
   isActive           Boolean   @default(true) @map("is_active")
   twoFactorEnabled   Boolean   @default(false) @map("two_factor_enabled")
   twoFactorSecret    String?   @map("two_factor_secret")
+  sellerCode         String?   @map("seller_code")
   lastLoginAt        DateTime? @map("last_login_at")
   passwordChangedAt  DateTime? @map("password_changed_at")
   createdAt          DateTime  @default(now()) @map("created_at")

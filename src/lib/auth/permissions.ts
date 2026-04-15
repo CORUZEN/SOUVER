@@ -156,7 +156,7 @@ async function bootstrapMetasPermissionCatalog() {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const role of roles) {
       const permissionIds =
-        role.code === 'DIRECTORATE'
+        role.code === 'DIRECTORATE' || role.code === 'COMMERCIAL_SUPERVISOR'
           ? readPermissionIds
           : [...readPermissionIds, ...mutatePermissionIds]
 

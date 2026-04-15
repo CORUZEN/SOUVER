@@ -56,6 +56,7 @@ export async function getCurrentUser(token: string) {
           isActive: true,
           twoFactorEnabled: true,
           twoFactorSecret: true,
+          sellerCode: true,
           phone: true,
           avatarUrl: true,
           role: {
