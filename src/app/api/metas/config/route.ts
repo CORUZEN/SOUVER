@@ -10,8 +10,13 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
 
-  const canView = await hasPermission(user.roleId, METAS_PERMISSION_CODES.CONFIG_VIEW)
-  if (!canView) {
+  // Config data is needed by the dashboard to compute targets for all roles that can access Metas.
+  // The metas_config:read permission gates the *Configurações UI button*, not the data read for
+  // rendering kpis/snapshots. Any authenticated user with a metas role is allowed to read config.
+  const roleCode = user.role?.code?.toUpperCase() ?? ''
+  const METAS_VIEWER_ROLES = new Set(['DEVELOPER', 'COMMERCIAL_MANAGER', 'DIRECTORATE', 'COMMERCIAL_SUPERVISOR', 'SELLER'])
+  const canViewRaw = METAS_VIEWER_ROLES.has(roleCode) || await hasPermission(user.roleId, METAS_PERMISSION_CODES.CONFIG_VIEW)
+  if (!canViewRaw) {
     return NextResponse.json({ message: 'Sem permissão para visualizar configurações de metas.' }, { status: 403 })
   }
 

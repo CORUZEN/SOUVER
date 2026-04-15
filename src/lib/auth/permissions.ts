@@ -155,8 +155,12 @@ async function bootstrapMetasPermissionCatalog() {
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const role of roles) {
+      // COMMERCIAL_SUPERVISOR permissions are fully admin-controlled via gestao-permissoes.
+      // Bootstrap must not interfere or re-add permissions that the admin removed.
+      if (role.code === 'COMMERCIAL_SUPERVISOR') continue
+
       const permissionIds =
-        role.code === 'DIRECTORATE' || role.code === 'COMMERCIAL_SUPERVISOR'
+        role.code === 'DIRECTORATE'
           ? readPermissionIds
           : [...readPermissionIds, ...mutatePermissionIds]
 

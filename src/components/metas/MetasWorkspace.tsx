@@ -2970,15 +2970,18 @@ export default function MetasWorkspace() {
       }, 0),
     [ruleBlocks, snapshots]
   )
-  // Sum of all weight targets across all blocks (all brands, all sellers)
+  // Sum of weight targets only for blocks that belong to sellers in this view's scope
   const corporateTotalWeightTarget = useMemo(() => {
     const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
-    return ruleBlocks.reduce((sum, block) => sum + (block.weightTargets ?? []).reduce((s, wt) => {
-      const sk = sankhyaTargets.flatMap((t) => t.weightTargets).find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
-      const val = sk ? sk.targetKg : sankhyaConnected ? (wt.manualKgByPeriod?.[periodKey] ?? 0) : wt.targetKg
-      return s + (val > 0 ? val : 0)
-    }, 0), 0)
-  }, [ruleBlocks, sankhyaTargets, sankhyaConnected, year, month])
+    const blockIdsInScope = new Set(snapshots.map((s) => s.blockId))
+    return ruleBlocks
+      .filter((block) => blockIdsInScope.has(block.id))
+      .reduce((sum, block) => sum + (block.weightTargets ?? []).reduce((s, wt) => {
+        const sk = sankhyaTargets.flatMap((t) => t.weightTargets).find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
+        const val = sk ? sk.targetKg : sankhyaConnected ? (wt.manualKgByPeriod?.[periodKey] ?? 0) : wt.targetKg
+        return s + (val > 0 ? val : 0)
+      }, 0), 0)
+  }, [ruleBlocks, snapshots, sankhyaTargets, sankhyaConnected, year, month])
   // Total actual weight by brand (sum across all fetched rows)
   const corporateTotalWeightActual = useMemo(
     () => brandWeightRows.reduce((sum, r) => sum + r.totalKg, 0),
@@ -3865,35 +3868,40 @@ export default function MetasWorkspace() {
                   )}
                 </div>
 
-                <div className="h-5 w-px bg-white/20" />
+                {(canViewConfig || canViewSellers || canViewProducts) && (
+                  <div className="h-5 w-px bg-white/20" />
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => setView('config')}
-                  disabled={!canViewConfig}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500 disabled:cursor-not-allowed disabled:bg-surface-500"
-                >
-                  <Settings2 size={14} />
-                  Configurações
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('sellers')}
-                  disabled={!canViewSellers}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Users size={14} />
-                  Vendedores
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('products')}
-                  disabled={!canViewProducts}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Boxes size={14} />
-                  Produtos
-                </button>
+                {canViewConfig && (
+                  <button
+                    type="button"
+                    onClick={() => setView('config')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500"
+                  >
+                    <Settings2 size={14} />
+                    Configurações
+                  </button>
+                )}
+                {canViewSellers && (
+                  <button
+                    type="button"
+                    onClick={() => setView('sellers')}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                  >
+                    <Users size={14} />
+                    Vendedores
+                  </button>
+                )}
+                {canViewProducts && (
+                  <button
+                    type="button"
+                    onClick={() => setView('products')}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+                  >
+                    <Boxes size={14} />
+                    Produtos
+                  </button>
+                )}
               </>
             )}
           </div>
