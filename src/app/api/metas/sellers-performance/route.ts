@@ -79,6 +79,14 @@ function makeSellerLogin(name: string, fallbackId: string) {
   return normalized || fallbackId
 }
 
+function normalizeNameLookup(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
 function sellerMapKey(code: string, name: string) {
   const normalizedCode = String(code ?? '').trim()
   if (normalizedCode) return `COD:${normalizedCode}`
@@ -711,6 +719,27 @@ export async function GET(req: NextRequest) {
     // --- Allowlist ---
     const allowlist = await readSellerAllowlist()
     const allowedSellers = getActiveAllowedSellersFromList(allowlist)
+    const allowedSellerByCode = new Map<string, (typeof allowedSellers)[number]>()
+    const allowedSellerByName = new Map<string, (typeof allowedSellers)[number]>()
+    for (const seller of allowedSellers) {
+      const codeKey = String(seller.code ?? '').trim()
+      const nameKey = normalizeNameLookup(String(seller.name ?? ''))
+      if (codeKey) allowedSellerByCode.set(codeKey, seller)
+      if (nameKey) allowedSellerByName.set(nameKey, seller)
+    }
+    const findAllowedSeller = (sellerCode: string, sellerName: string) => {
+      const codeKey = String(sellerCode ?? '').trim()
+      if (codeKey) {
+        const byCode = allowedSellerByCode.get(codeKey)
+        if (byCode) return byCode
+      }
+      const nameKey = normalizeNameLookup(String(sellerName ?? ''))
+      if (nameKey) {
+        const byName = allowedSellerByName.get(nameKey)
+        if (byName) return byName
+      }
+      return null
+    }
 
     // Extract seller codes for SQL-level filtering
     const sellerCodes = allowedSellers
@@ -811,6 +840,8 @@ export async function GET(req: NextRequest) {
       orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
       returns: Array<{ negotiatedAt: string; totalValue: number }>
       openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
+      supervisorCode: string | null
+      supervisorName: string | null
       baseClientCount: number
       totalValue: number
       totalReturnedValue: number
@@ -824,6 +855,7 @@ export async function GET(req: NextRequest) {
       const sellerId = order.sellerCode
         ? `sankhya-${order.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+      const allowlisted = findAllowedSeller(order.sellerCode, normalizedName)
 
       if (!sellersMap.has(sellerKey)) {
         sellersMap.set(sellerKey, {
@@ -833,6 +865,8 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          supervisorCode: allowlisted?.supervisorCode ? String(allowlisted.supervisorCode).trim() : null,
+          supervisorName: allowlisted?.supervisorName ? String(allowlisted.supervisorName).trim() : null,
           baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
@@ -859,6 +893,7 @@ export async function GET(req: NextRequest) {
       const sellerId = ret.sellerCode
         ? `sankhya-${ret.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+      const allowlisted = findAllowedSeller(ret.sellerCode, normalizedName)
 
       if (!sellersMap.has(sellerKey)) {
         sellersMap.set(sellerKey, {
@@ -868,6 +903,8 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          supervisorCode: allowlisted?.supervisorCode ? String(allowlisted.supervisorCode).trim() : null,
+          supervisorName: allowlisted?.supervisorName ? String(allowlisted.supervisorName).trim() : null,
           baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
@@ -891,6 +928,7 @@ export async function GET(req: NextRequest) {
       const sellerId = title.sellerCode
         ? `sankhya-${title.sellerCode}`
         : `sankhya-${normalizedName.toLowerCase().replace(/\s+/g, '-')}`
+      const allowlisted = findAllowedSeller(title.sellerCode, normalizedName)
 
       if (!sellersMap.has(sellerKey)) {
         sellersMap.set(sellerKey, {
@@ -900,6 +938,8 @@ export async function GET(req: NextRequest) {
           orders: [],
           returns: [],
           openTitles: [],
+          supervisorCode: allowlisted?.supervisorCode ? String(allowlisted.supervisorCode).trim() : null,
+          supervisorName: allowlisted?.supervisorName ? String(allowlisted.supervisorName).trim() : null,
           baseClientCount: 0,
           totalValue: 0,
           totalReturnedValue: 0,
@@ -934,6 +974,8 @@ export async function GET(req: NextRequest) {
         orders: [],
         returns: [],
         openTitles: [],
+        supervisorCode: allowed.supervisorCode ? String(allowed.supervisorCode).trim() : null,
+        supervisorName: allowed.supervisorName ? String(allowed.supervisorName).trim() : null,
         baseClientCount: 0,
         totalValue: 0,
         totalReturnedValue: 0,

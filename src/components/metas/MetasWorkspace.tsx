@@ -119,6 +119,8 @@ interface Salesperson {
   id: string
   name: string
   login: string
+  supervisorCode?: string | null
+  supervisorName?: string | null
   orders: SellerOrder[]
   returns: SellerReturnEntry[]
   openTitles: SellerOpenTitleEntry[]
@@ -1672,6 +1674,8 @@ export default function MetasWorkspace() {
           id: string
           name: string
           login: string
+          supervisorCode?: string | null
+          supervisorName?: string | null
           baseClientCount?: number
           totalValue?: number
           totalReturnedValue?: number
@@ -1712,6 +1716,8 @@ export default function MetasWorkspace() {
             id: seller.id,
             name: seller.name,
             login: seller.login,
+            supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
+            supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
             totalValue: Number(seller.totalValue ?? 0),
             totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
             totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
@@ -2058,6 +2064,8 @@ export default function MetasWorkspace() {
           id: string
           name: string
           login: string
+          supervisorCode?: string | null
+          supervisorName?: string | null
           baseClientCount?: number
           totalValue?: number
           totalReturnedValue?: number
@@ -2097,6 +2105,8 @@ export default function MetasWorkspace() {
               id: seller.id,
               name: seller.name,
               login: seller.login,
+              supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
+              supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
               totalValue: Number(seller.totalValue ?? 0),
               totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
               totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
@@ -3182,8 +3192,12 @@ export default function MetasWorkspace() {
           DEFAULT_RULE_BLOCKS[0]
         const sankhyaByBrand = sankhyaBySellerBrand.get(sellerCode)
         const allowlistEntry = resolveAllowlistSellerEntry(sellerCode, sellerName, sellerShortName)
-        const sellerSupervisorCode = normalizeEntityCode(String(allowlistEntry?.supervisorCode ?? ''))
-        const sellerSupervisorName = String(allowlistEntry?.supervisorName ?? '').trim()
+        const sellerSupervisorCode = normalizeEntityCode(
+          String(allowlistEntry?.supervisorCode ?? snapshot.seller.supervisorCode ?? '')
+        )
+        const sellerSupervisorName = String(
+          allowlistEntry?.supervisorName ?? snapshot.seller.supervisorName ?? ''
+        ).trim()
         const sellerSupervisorNameNormalized = normalizeSellerNameForLookup(sellerSupervisorName)
         const resolvedSupervisor =
           (sellerSupervisorCode ? supervisorByCode.get(sellerSupervisorCode) : undefined) ??
