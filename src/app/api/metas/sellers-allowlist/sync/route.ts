@@ -417,6 +417,8 @@ export async function POST(req: NextRequest) {
           name: seller.name || prev.name,
           active: prev.active,
           profileType: normalizeSellerProfileType(prev.profileType),
+          supervisorCode: prev.supervisorCode ?? null,
+          supervisorName: prev.supervisorName ?? null,
         }
         if (seller.code) indexByCode.set(seller.code, foundIndex)
         indexByName.set(normalizedName, foundIndex)
@@ -428,6 +430,8 @@ export async function POST(req: NextRequest) {
           name: seller.name,
           active: true,
           profileType: normalizeSellerProfileType(seller.profileTypeHint),
+          supervisorCode: null,
+          supervisorName: null,
         })
         indexByCode.set(seller.code, nextIndex)
         indexByName.set(normalizedName, nextIndex)

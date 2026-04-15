@@ -47,6 +47,8 @@ export async function PUT(req: NextRequest) {
       name: String(seller.name ?? ''),
       active: Boolean(seller.active),
       profileType: normalizeSellerProfileType(seller.profileType),
+      supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
+      supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
     }
   })
 

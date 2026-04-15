@@ -15,6 +15,8 @@ export interface AllowedSeller {
   name: string
   active: boolean
   profileType: SellerProfileType
+  supervisorCode?: string | null
+  supervisorName?: string | null
 }
 
 // Lista corporativa de vendedores considerados no painel de metas.

@@ -13,6 +13,8 @@ function normalizeList(input: AllowedSeller[]): AllowedSeller[] {
       name: String(item.name ?? '').trim(),
       active: Boolean(item.active),
       profileType: normalizeSellerProfileType(item.profileType),
+      supervisorCode: item.supervisorCode == null ? null : String(item.supervisorCode).trim() || null,
+      supervisorName: item.supervisorName == null ? null : String(item.supervisorName).trim() || null,
     }))
     .filter((item) => item.name.length > 0)
 
@@ -63,14 +65,18 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
       name: string
       active: boolean
       profileType?: string | null
+      supervisorCode?: string | null
+      supervisorName?: string | null
     }> = await prisma.metasSeller.findMany({ orderBy: { name: 'asc' } })
     if (rows.length > 0) {
-      const fromDb = rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean; profileType?: string | null }) => ({
+      const fromDb = rows.map((r: { code: string | null; partnerCode: string | null; name: string; active: boolean; profileType?: string | null; supervisorCode?: string | null; supervisorName?: string | null }) => ({
         code: r.code,
         partnerCode: r.partnerCode,
         name: r.name,
         active: r.active,
         profileType: normalizeSellerProfileType(r.profileType),
+        supervisorCode: r.supervisorCode == null ? null : String(r.supervisorCode),
+        supervisorName: r.supervisorName == null ? null : String(r.supervisorName),
       }))
 
       const legacy = normalizeList(await readLegacyAllowlistFile())
@@ -96,8 +102,12 @@ export async function readSellerAllowlist(): Promise<AllowedSeller[]> {
         const nameKey = seller.name.trim().toUpperCase()
         const matched = (codeKey ? legacyByCode.get(codeKey) : undefined) ?? legacyByName.get(nameKey)
         if (!matched) return seller
-        if (!shouldRecoverProfilesFromLegacy) return seller
-        return { ...seller, profileType: normalizeSellerProfileType(matched.profileType) }
+        return {
+          ...seller,
+          profileType: shouldRecoverProfilesFromLegacy ? normalizeSellerProfileType(matched.profileType) : normalizeSellerProfileType(seller.profileType),
+          supervisorCode: seller.supervisorCode ?? matched.supervisorCode ?? null,
+          supervisorName: seller.supervisorName ?? matched.supervisorName ?? null,
+        }
       })
 
       if (shouldRecoverProfilesFromLegacy) {

@@ -135,6 +135,8 @@ interface SellerAllowlistEntry {
   name: string
   active: boolean
   profileType: SellerProfileType
+  supervisorCode?: string | null
+  supervisorName?: string | null
 }
 
 interface ProductAllowlistEntry {
@@ -1828,6 +1830,8 @@ export default function MetasWorkspace() {
           name: String(item.name ?? ''),
           active: Boolean(item.active),
           profileType: normalizeSellerProfileType(item.profileType),
+          supervisorCode: item.supervisorCode == null ? null : String(item.supervisorCode),
+          supervisorName: item.supervisorName == null ? null : String(item.supervisorName),
         }))
       )
     } catch (error) {
@@ -1925,6 +1929,8 @@ export default function MetasWorkspace() {
               name: selectedSeller.name,
               active: true,
               profileType: nextProfileType,
+              supervisorCode: item.supervisorCode ?? null,
+              supervisorName: item.supervisorName ?? null,
             }
             : item
         )
@@ -1938,6 +1944,8 @@ export default function MetasWorkspace() {
           name: selectedSeller.name,
           active: true,
           profileType: nextProfileType,
+          supervisorCode: null,
+          supervisorName: null,
         },
       ]
     })
@@ -1963,6 +1971,8 @@ export default function MetasWorkspace() {
         name: seller.name.trim(),
         active: seller.active,
         profileType: normalizeSellerProfileType(seller.profileType),
+        supervisorCode: seller.supervisorCode && seller.supervisorCode.trim().length > 0 ? seller.supervisorCode.trim() : null,
+        supervisorName: seller.supervisorName && seller.supervisorName.trim().length > 0 ? seller.supervisorName.trim() : null,
       })),
     }
 
@@ -1983,6 +1993,8 @@ export default function MetasWorkspace() {
           name: String(item.name ?? ''),
           active: Boolean(item.active),
           profileType: normalizeSellerProfileType(item.profileType),
+          supervisorCode: item.supervisorCode == null ? null : String(item.supervisorCode),
+          supervisorName: item.supervisorName == null ? null : String(item.supervisorName),
         }))
       )
       setAllowlistSuccess('Lista de vendedores da meta atualizada.')
@@ -2081,6 +2093,8 @@ export default function MetasWorkspace() {
             name: s.name.trim(),
             active: s.active,
             profileType: normalizeSellerProfileType(s.profileType),
+            supervisorCode: s.supervisorCode && s.supervisorCode.trim().length > 0 ? s.supervisorCode.trim() : null,
+            supervisorName: s.supervisorName && s.supervisorName.trim().length > 0 ? s.supervisorName.trim() : null,
           })),
         }),
       })
@@ -2093,6 +2107,8 @@ export default function MetasWorkspace() {
           name: String(item.name ?? ''),
           active: Boolean(item.active),
           profileType: normalizeSellerProfileType(item.profileType),
+          supervisorCode: item.supervisorCode == null ? null : String(item.supervisorCode),
+          supervisorName: item.supervisorName == null ? null : String(item.supervisorName),
         }))
       )
     } catch (error) {
@@ -2126,6 +2142,8 @@ export default function MetasWorkspace() {
           name: String(item.name ?? ''),
           active: Boolean(item.active),
           profileType: normalizeSellerProfileType(item.profileType),
+          supervisorCode: item.supervisorCode == null ? null : String(item.supervisorCode),
+          supervisorName: item.supervisorName == null ? null : String(item.supervisorName),
         }))
       )
       const imported = Number(data?.imported ?? 0)
@@ -2925,6 +2943,17 @@ export default function MetasWorkspace() {
     const active = allowlist.filter((seller) => seller.active).length
     const inactive = Math.max(total - active, 0)
     return { total, active, inactive }
+  }, [allowlist])
+
+  const supervisorAllowlistOptions = useMemo(() => {
+    return allowlist
+      .filter((seller) => normalizeSellerProfileType(seller.profileType) === 'SUPERVISOR')
+      .map((seller) => ({
+        key: String(seller.code ?? '').trim() || `name:${normalizeSellerNameForLookup(seller.name)}`,
+        code: String(seller.code ?? '').trim() || null,
+        name: seller.name,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
   }, [allowlist])
 
   const filteredProductAllowlist = useMemo(() => {
@@ -5854,6 +5883,7 @@ export default function MetasWorkspace() {
                         <th className="px-3 py-2">Ativo</th>
                         <th className="px-3 py-2">Nome do vendedor</th>
                         <th className="px-3 py-2">Tipo</th>
+                        <th className="px-3 py-2">Supervisão</th>
                         <th className="px-3 py-2">Código vendedor</th>
                         <th className="px-3 py-2">Código parceiro</th>
                         <th className="px-3 py-2">Ações</th>
@@ -5862,7 +5892,7 @@ export default function MetasWorkspace() {
                     <tbody className="divide-y divide-surface-100">
                       {filteredSellerAllowlist.length === 0 ? (
                         <tr>
-                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={6}>
+                          <td className="px-3 py-4 text-center text-xs text-surface-500" colSpan={7}>
                             {allowlistShowOnlyInactive
                               ? 'Nenhum vendedor não liberado encontrado.'
                               : 'Nenhum vendedor encontrado.'}
@@ -5896,7 +5926,15 @@ export default function MetasWorkspace() {
                                   setAllowlist((prev) =>
                                     prev.map((item, itemIndex) =>
                                       itemIndex === index
-                                        ? { ...item, profileType: normalizeSellerProfileType(event.target.value) }
+                                        ? (() => {
+                                          const nextProfile = normalizeSellerProfileType(event.target.value)
+                                          return {
+                                            ...item,
+                                            profileType: nextProfile,
+                                            supervisorCode: nextProfile === 'SUPERVISOR' ? null : item.supervisorCode ?? null,
+                                            supervisorName: nextProfile === 'SUPERVISOR' ? null : item.supervisorName ?? null,
+                                          }
+                                        })()
                                         : item
                                     )
                                   )
@@ -5906,6 +5944,50 @@ export default function MetasWorkspace() {
                                   <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                               </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              {normalizeSellerProfileType(seller.profileType) === 'SUPERVISOR' ? (
+                                <span className="text-xs text-surface-400">—</span>
+                              ) : (
+                                <select
+                                  className="min-w-44 rounded-lg border border-surface-200 bg-white px-2 py-1 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                                  value={
+                                    String(seller.supervisorCode ?? '').trim() ||
+                                    (String(seller.supervisorName ?? '').trim() ? `name:${normalizeSellerNameForLookup(String(seller.supervisorName ?? ''))}` : '')
+                                  }
+                                  onChange={(event) => {
+                                    const selectedKey = event.target.value
+                                    setAllowlist((prev) =>
+                                      prev.map((item, itemIndex) => {
+                                        if (itemIndex !== index) return item
+                                        if (!selectedKey) {
+                                          return { ...item, supervisorCode: null, supervisorName: null }
+                                        }
+                                        const selectedSupervisor = supervisorAllowlistOptions.find((option) => option.key === selectedKey || String(option.code ?? '') === selectedKey)
+                                        return {
+                                          ...item,
+                                          supervisorCode: selectedSupervisor?.code ?? null,
+                                          supervisorName: selectedSupervisor?.name ?? null,
+                                        }
+                                      })
+                                    )
+                                  }}
+                                >
+                                  <option value="">Sem supervisor</option>
+                                  {supervisorAllowlistOptions
+                                    .filter((option) => {
+                                      const thisCode = String(seller.code ?? '').trim()
+                                      const optionCode = String(option.code ?? '').trim()
+                                      if (thisCode && optionCode && thisCode === optionCode) return false
+                                      return normalizeSellerNameForLookup(option.name) !== normalizeSellerNameForLookup(seller.name)
+                                    })
+                                    .map((option) => (
+                                      <option key={`seller-supervisor-${index}-${option.key}`} value={option.code ?? option.key}>
+                                        {option.name}
+                                      </option>
+                                    ))}
+                                </select>
+                              )}
                             </td>
                             <td className="px-3 py-2">
                               <span className="text-xs text-surface-700">{seller.code ?? '—'}</span>
