@@ -1075,6 +1075,7 @@ export default function MetasWorkspace() {
   const readOnlyBlockPickerRef = useRef<HTMLDivElement>(null)
   const weightPanelLeftColumnRef = useRef<HTMLDivElement>(null)
   const weightRankingHeaderRef = useRef<HTMLDivElement>(null)
+  const weightRankingListRef = useRef<HTMLDivElement>(null)
   const dashboardFocusProductsPrefetchAttemptedRef = useRef(false)
 
   const activeKey = monthKey(year, month)
@@ -3362,8 +3363,26 @@ export default function MetasWorkspace() {
         const leftHeight = leftEl.getBoundingClientRect().height
         const rightHeaderHeight = headerEl.getBoundingClientRect().height
         const verticalGap = 8 // space-y-2 between header and list
-        const measured = Math.floor(leftHeight - rightHeaderHeight - verticalGap)
-        const next = Number.isFinite(measured) ? Math.max(measured, 180) : fallbackHeight
+        const measured = leftHeight - rightHeaderHeight - verticalGap
+        let next = Number.isFinite(measured) ? Math.max(Math.floor(measured), 180) : fallbackHeight
+
+        const listEl = weightRankingListRef.current
+        if (listEl && measured > 0) {
+          const firstCard = listEl.querySelector('button')
+          const firstCardHeight = firstCard?.getBoundingClientRect().height ?? 0
+          const computedStyles = window.getComputedStyle(listEl)
+          const gap = Number.parseFloat(computedStyles.rowGap || computedStyles.gap || '0') || 0
+          const cardStep = firstCardHeight > 0 ? firstCardHeight + gap : 0
+
+          if (cardStep > 0) {
+            const cardsThatFit = Math.floor((measured + gap) / cardStep)
+            if (cardsThatFit > 0) {
+              const fullCardsHeight = (cardsThatFit * cardStep) - gap
+              // +1 evita corte visual na borda inferior do último card visível.
+              next = Math.max(Math.ceil(fullCardsHeight) + 1, 180)
+            }
+          }
+        }
         setWeightRankingListMaxHeight((prev) => (prev === next ? prev : next))
       })
     }
@@ -3374,6 +3393,7 @@ export default function MetasWorkspace() {
       observer = new ResizeObserver(syncHeights)
       observer.observe(leftEl)
       observer.observe(headerEl)
+      if (weightRankingListRef.current) observer.observe(weightRankingListRef.current)
     }
     window.addEventListener('resize', syncHeights)
 
@@ -6676,6 +6696,7 @@ export default function MetasWorkspace() {
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Progresso por vendedor</p>
                       </div>
                       <div
+                        ref={weightRankingListRef}
                         className="space-y-2 overflow-y-auto pr-1"
                         style={{ maxHeight: `${Math.max(weightRankingListMaxHeight ?? 304, 180)}px` }}
                       >
