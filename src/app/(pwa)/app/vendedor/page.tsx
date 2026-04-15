@@ -94,7 +94,7 @@ export default function VendedorPwaDashboard() {
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'SELLER') { router.replace('/pwa'); return }
+        if (roleCode !== 'SELLER') { router.replace('/app'); return }
         setUser({ name: data.user.name, roleCode, sellerCode: data.user.sellerCode })
       })
       .catch(() => router.replace('/login'))

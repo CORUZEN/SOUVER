@@ -5,7 +5,7 @@ const API_CACHE = `${CACHE_VERSION}-api`
 
 // Assets to precache on install
 const PRECACHE_URLS = [
-  '/pwa',
+  '/app',
   '/manifest.json',
   '/branding/ouroverde-badge.png',
   '/branding/ouroverde.png',

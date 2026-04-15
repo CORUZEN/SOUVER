@@ -2,7 +2,7 @@
   "name": "Ouro Verde | Sistema Empresarial",
   "short_name": "Ouro Verde",
   "description": "Plataforma corporativa integrada — Fábrica Café Ouro Verde",
-  "start_url": "/pwa",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -30,7 +30,7 @@
       "name": "Painel de Metas",
       "short_name": "Metas",
       "description": "Acompanhe as metas dos vendedores",
-      "url": "/pwa/supervisor",
+      "url": "/app/supervisor",
       "icons": [{ "src": "/branding/ouroverde-badge.png", "sizes": "192x192" }]
     }
   ]

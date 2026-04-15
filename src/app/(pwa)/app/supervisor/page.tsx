@@ -119,7 +119,7 @@ export default function SupervisorPwaDashboard() {
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'COMMERCIAL_SUPERVISOR') { router.replace('/pwa'); return }
+        if (roleCode !== 'COMMERCIAL_SUPERVISOR') { router.replace('/app'); return }
         setUser({
           name: data.user.name,
           role: data.user.role,
