@@ -1075,6 +1075,7 @@ export default function MetasWorkspace() {
   const readOnlyBlockPickerRef = useRef<HTMLDivElement>(null)
   const weightPanelLeftColumnRef = useRef<HTMLDivElement>(null)
   const weightRankingHeaderRef = useRef<HTMLDivElement>(null)
+  const dashboardFocusProductsPrefetchAttemptedRef = useRef(false)
 
   const activeKey = monthKey(year, month)
   const activeMonth = monthConfigs[activeKey]
@@ -1871,6 +1872,18 @@ export default function MetasWorkspace() {
     if (productAllowlist.length > 0) return
     void loadProductAllowlist()
   }, [canViewConfig, productAllowlist.length, productAllowlistLoading, view])
+
+  useEffect(() => {
+    if (view !== 'dashboard') return
+    if (dashboardFocusProductsPrefetchAttemptedRef.current) return
+    if (productAllowlistLoading) return
+    if (productAllowlist.length > 0) return
+    if (!canViewProducts && !canViewConfig) return
+    const hasFocusCodes = ruleBlocks.some((block) => String(block.focusProductCode ?? '').trim().length > 0)
+    if (!hasFocusCodes) return
+    dashboardFocusProductsPrefetchAttemptedRef.current = true
+    void loadProductAllowlist()
+  }, [canViewConfig, canViewProducts, productAllowlist.length, productAllowlistLoading, ruleBlocks, view])
 
   useEffect(() => {
     if (allowlist.length === 0) return
@@ -3212,6 +3225,126 @@ export default function MetasWorkspace() {
       return a.brand.localeCompare(b.brand, 'pt-BR')
     })
   }, [selectedWeightSellerDetails, weightBrandOrderIndex])
+
+  const weightFocusProgressRows = useMemo(() => {
+    const sellerRankById = new Map<string, number>()
+    sellerWeightPerformanceRows.forEach((row, index) => {
+      sellerRankById.set(row.sellerId, index)
+    })
+
+    const scopedSellerIds = new Set(
+      weightPanelView === 'SELLER' && selectedWeightSellerDetails
+        ? [selectedWeightSellerDetails.sellerId]
+        : snapshots.map((snapshot) => snapshot.seller.id)
+    )
+
+    return snapshots
+      .flatMap((snapshot) => {
+        if (!scopedSellerIds.has(snapshot.seller.id)) return []
+        const sellerId = snapshot.seller.id
+        const block =
+          ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+          findBlockForSeller(sellerId, ruleBlocks) ??
+          null
+        if (!block) return []
+
+        const focusCode = (block.focusProductCode ?? '').trim()
+        if (!focusCode) return []
+
+        const focusTargetMode = resolveFocusTargetMode(block)
+        const focusTargetKg = Math.max(block.focusTargetKg ?? 0, 0)
+        const focusTargetBasePct = Math.max(block.focusTargetBasePct ?? 0, 0)
+        const hasTarget = focusTargetMode === 'BASE_CLIENTS' ? focusTargetBasePct > 0 : focusTargetKg > 0
+        if (!hasTarget) return []
+
+        const sellerCode = toSellerCodeFromId(sellerId)
+        const productRows = focusProductRows[focusCode] ?? []
+        const sellerFocusRow = productRows.find((row) => normalizeEntityCode(String(row.sellerCode ?? '')) === sellerCode)
+        const soldKg = Math.max(Number(sellerFocusRow?.soldKg ?? 0), 0)
+        const soldClients = Math.max(Number(sellerFocusRow?.soldClients ?? 0), 0)
+        const officialBaseClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
+        const baseTotalClients = officialBaseClients > 0 ? officialBaseClients : Math.max(snapshot.uniqueClients, 0)
+        const requiredBaseClients = focusTargetBasePct > 0 ? Math.ceil(baseTotalClients * (focusTargetBasePct / 100)) : 0
+        const baseCoveragePct = baseTotalClients > 0 ? (soldClients / baseTotalClients) * 100 : 0
+
+        const itemFocoRule = block.rules.find((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'ITEM_FOCO')
+        const itemFocoParams = itemFocoRule ? parseItemFocoTarget(itemFocoRule.targetText) : { volumePct: 0, basePct: 0 }
+        const volumeRequiredKg = focusTargetKg > 0
+          ? focusTargetKg * (Math.max(itemFocoParams.volumePct, 0) / 100 || 1)
+          : 0
+
+        const progressRatio = focusTargetMode === 'BASE_CLIENTS'
+          ? (requiredBaseClients > 0 ? soldClients / requiredBaseClients : 0)
+          : (volumeRequiredKg > 0 ? soldKg / volumeRequiredKg : 0)
+        const progressPct = progressRatio * 100
+        const status = progressRatio >= 1 ? 'NO_ALVO' : progressRatio >= 0.8 ? 'QUASE_LA' : progressRatio >= 0.5 ? 'EM_PROGRESSO' : 'ATENCAO'
+        const statusLabel =
+          status === 'NO_ALVO'
+            ? 'No alvo'
+            : status === 'QUASE_LA'
+              ? 'Quase lá'
+              : status === 'EM_PROGRESSO'
+                ? 'Em progresso'
+                : 'Atenção'
+        const statusClass =
+          status === 'NO_ALVO'
+            ? 'text-emerald-700'
+            : status === 'QUASE_LA'
+              ? 'text-cyan-700'
+              : status === 'EM_PROGRESSO'
+                ? 'text-amber-600'
+                : 'text-rose-700'
+
+        const focusProduct = productAllowlist.find(
+          (product) => normalizeEntityCode(String(product.code ?? '')) === normalizeEntityCode(focusCode)
+        )
+        const focusProductLabel = String(focusProduct?.description ?? '').trim() || 'Item foco sem descricao'
+
+        return [{
+          sellerId,
+          focusCode,
+          focusProductLabel,
+          focusTargetMode,
+          focusTargetKg,
+          focusTargetBasePct,
+          soldKg,
+          soldClients,
+          requiredBaseClients,
+          baseCoveragePct,
+          progressPct,
+          statusLabel,
+          statusClass,
+          rank: sellerRankById.get(sellerId) ?? Number.MAX_SAFE_INTEGER,
+        }]
+      })
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank
+        return a.focusProductLabel.localeCompare(b.focusProductLabel, 'pt-BR')
+      })
+  }, [
+    focusProductRows,
+    productAllowlist,
+    ruleBlocks,
+    selectedWeightSellerDetails,
+    sellerWeightPerformanceRows,
+    snapshots,
+    weightPanelView,
+  ])
+
+  const weightFocusCodesInScope = useMemo(
+    () => Array.from(new Set(weightFocusProgressRows.map((row) => row.focusCode))),
+    [weightFocusProgressRows]
+  )
+
+  const weightFocusSectionLoading = useMemo(
+    () => weightFocusCodesInScope.some((code) => Boolean(focusProductLoading[code])),
+    [focusProductLoading, weightFocusCodesInScope]
+  )
+
+  const weightFocusSectionErrors = useMemo(
+    () => weightFocusCodesInScope.map((code) => focusProductError[code]).filter((msg): msg is string => Boolean(msg && msg.trim())),
+    [focusProductError, weightFocusCodesInScope]
+  )
 
   useEffect(() => {
     const leftEl = weightPanelLeftColumnRef.current
@@ -6585,6 +6718,62 @@ export default function MetasWorkspace() {
                       </div>
                     </div>
                   </div>
+
+                  {weightPanelView === 'SELLER' && (
+                    <>
+                      {weightFocusSectionLoading ? (
+                        <p className="px-1 py-1 text-[11px] text-surface-500">Carregando progresso de item foco...</p>
+                      ) : weightFocusSectionErrors.length > 0 ? (
+                        <div className="space-y-1 px-1 py-1">
+                          {weightFocusSectionErrors.map((message, index) => (
+                            <p key={`focus-error-${index}`} className="text-[11px] text-rose-700">{message}</p>
+                          ))}
+                        </div>
+                      ) : weightFocusProgressRows.length === 0 ? (
+                        <p className="px-1 py-2 text-center text-xs text-surface-400">
+                          Item foco nao definido para o vendedor selecionado.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {weightFocusProgressRows.map((row) => {
+                            const progressRatio = Math.max(row.progressPct / 100, 0)
+                            const barPct = Math.min(row.progressPct, 100)
+                            const progressClass =
+                              progressRatio >= 1 ? 'bg-emerald-500' : progressRatio >= 0.8 ? 'bg-cyan-500' : progressRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
+                            const metaLabel = row.focusTargetMode === 'BASE_CLIENTS'
+                              ? `${num(row.focusTargetBasePct, 1)}% da base (${row.requiredBaseClients} clientes)`
+                              : `${num(row.focusTargetKg, 2)} kg`
+                            const realizedLabel = row.focusTargetMode === 'BASE_CLIENTS'
+                              ? `${num(row.soldClients, 0)} clientes (${num(row.baseCoveragePct, 1)}%)`
+                              : `${num(row.soldKg, 2)} kg`
+                            return (
+                              <div key={`focus-compact-${row.sellerId}`} className="rounded-lg border border-surface-200 bg-surface-50/50 px-4 py-2.5">
+                                <div className="grid grid-cols-[1.35fr_1fr_1fr_1.5fr_0.7fr] items-center gap-x-5 text-[10px] font-semibold uppercase tracking-widest text-surface-400">
+                                  <span>Item foco</span>
+                                  <span>Meta</span>
+                                  <span>Realizado</span>
+                                  <span>Progresso</span>
+                                  <span className="text-right">Status</span>
+                                </div>
+                                <div className="mt-1.5 grid grid-cols-[1.35fr_1fr_1fr_1.5fr_0.7fr] items-center gap-x-5">
+                                  <p className="truncate text-sm font-semibold text-surface-800">{row.focusProductLabel}</p>
+                                  <p className="text-sm font-semibold tabular-nums text-surface-700">{metaLabel}</p>
+                                  <p className="text-sm font-semibold tabular-nums text-surface-700">{realizedLabel}</p>
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-100">
+                                      <div className={`h-full transition-[width] duration-700 ${progressClass}`} style={{ width: `${barPct}%` }} />
+                                    </div>
+                                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-surface-700">{num(row.progressPct, 1)}%</span>
+                                  </div>
+                                  <span className={`text-right text-[10px] font-semibold uppercase tracking-wide ${row.statusClass}`}>{row.statusLabel}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </Card>
