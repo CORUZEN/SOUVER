@@ -18,6 +18,7 @@ export const ROLE_CATALOG: RoleCatalogItem[] = [
   { name: 'Contabilidade', code: 'ACCOUNTING', description: 'Financeiro e contábil' },
   { name: 'Produção', code: 'PRODUCTION', description: 'Operação e controle de produção' },
   { name: 'Assistente de Logística', code: 'LOGISTICS_ASSISTANT', description: 'Suporte operacional à logística' },
+  { name: 'Vendedores', code: 'SELLER', description: 'Vendedor com acesso ao painel de metas e desempenho próprio' },
 ]
 
 export const ROLE_CATALOG_CODES = ROLE_CATALOG.map((role) => role.code)
