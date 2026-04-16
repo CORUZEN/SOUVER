@@ -119,3 +119,169 @@ body {
     transform: translateY(0);
   }
 }
+
+/* PWA theme: palette aligned with Ouro Verde professional colors */
+.pwa-theme {
+  --pwa-dark-1: #1f3320;
+  --pwa-dark-2: #2d5f2b;
+  --pwa-dark-3: #3f783d;
+  --pwa-accent: #7dba37;
+  --pwa-warn: #c49569;
+  --pwa-critical: #63341f;
+  --pwa-ink: #ededd8;
+  --pwa-muted: #d8dcc4;
+  --pwa-track: rgba(237, 237, 216, 0.2);
+  background:
+    radial-gradient(120% 80% at 0% -10%, rgba(125, 186, 55, 0.18) 0%, transparent 60%),
+    radial-gradient(100% 70% at 100% -20%, rgba(196, 149, 105, 0.16) 0%, transparent 60%),
+    linear-gradient(180deg, var(--pwa-dark-1) 0%, #182a19 100%);
+}
+
+.pwa-theme .bg-surface-950 { background-color: var(--pwa-dark-1) !important; }
+.pwa-theme .bg-surface-950\/95 { background-color: rgba(31, 51, 32, 0.95) !important; }
+.pwa-theme .bg-surface-900 { background-color: var(--pwa-dark-2) !important; }
+.pwa-theme .bg-surface-900\/60 { background-color: rgba(45, 95, 43, 0.6) !important; }
+.pwa-theme .bg-surface-800 { background-color: var(--pwa-dark-3) !important; }
+.pwa-theme .bg-surface-800\/60 { background-color: rgba(63, 120, 61, 0.6) !important; }
+.pwa-theme .bg-surface-800\/50 { background-color: rgba(63, 120, 61, 0.5) !important; }
+.pwa-theme .bg-surface-800\/30 { background-color: rgba(63, 120, 61, 0.3) !important; }
+.pwa-theme .bg-surface-700 { background-color: rgba(196, 149, 105, 0.28) !important; }
+.pwa-theme .bg-surface-700\/60 { background-color: rgba(196, 149, 105, 0.6) !important; }
+.pwa-theme .bg-surface-600 { background-color: rgba(196, 149, 105, 0.38) !important; }
+
+.pwa-theme .text-white { color: var(--pwa-ink) !important; }
+.pwa-theme .text-surface-200 { color: var(--pwa-ink) !important; }
+.pwa-theme .text-surface-300 { color: #dde2cb !important; }
+.pwa-theme .text-surface-400 { color: #ced5bc !important; }
+.pwa-theme .text-surface-500 { color: #b7beaa !important; }
+.pwa-theme .text-surface-600 { color: #a8af97 !important; }
+.pwa-theme .text-surface-700 { color: #95a08a !important; }
+
+.pwa-theme .border-surface-800 { border-color: rgba(196, 149, 105, 0.25) !important; }
+.pwa-theme .border-surface-700\/60 { border-color: rgba(196, 149, 105, 0.38) !important; }
+.pwa-theme .border-surface-700\/50 { border-color: rgba(196, 149, 105, 0.35) !important; }
+.pwa-theme .border-surface-700\/40 { border-color: rgba(196, 149, 105, 0.3) !important; }
+.pwa-theme .divide-surface-800 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(196, 149, 105, 0.25) !important; }
+
+.pwa-theme .bg-emerald-500 { background-color: var(--pwa-accent) !important; }
+.pwa-theme .bg-emerald-500\/20 { background-color: rgba(125, 186, 55, 0.2) !important; }
+.pwa-theme .bg-emerald-500\/15 { background-color: rgba(125, 186, 55, 0.15) !important; }
+.pwa-theme .bg-emerald-500\/10 { background-color: rgba(125, 186, 55, 0.1) !important; }
+.pwa-theme .bg-emerald-500\/5 { background-color: rgba(125, 186, 55, 0.08) !important; }
+.pwa-theme .text-emerald-400 { color: var(--pwa-accent) !important; }
+.pwa-theme .text-emerald-300 { color: #a8d86f !important; }
+.pwa-theme .border-emerald-500\/35 { border-color: rgba(125, 186, 55, 0.38) !important; }
+.pwa-theme .border-emerald-500\/30 { border-color: rgba(125, 186, 55, 0.34) !important; }
+.pwa-theme .border-emerald-500\/25 { border-color: rgba(125, 186, 55, 0.28) !important; }
+
+.pwa-theme .bg-cyan-500,
+.pwa-theme .bg-sky-500 { background-color: var(--pwa-dark-3) !important; }
+.pwa-theme .bg-cyan-500\/10,
+.pwa-theme .bg-sky-500\/10 { background-color: rgba(63, 120, 61, 0.14) !important; }
+.pwa-theme .bg-sky-500\/15 { background-color: rgba(63, 120, 61, 0.18) !important; }
+.pwa-theme .text-cyan-400,
+.pwa-theme .text-sky-400 { color: #8fcd4a !important; }
+.pwa-theme .border-cyan-500\/30,
+.pwa-theme .border-sky-500\/30 { border-color: rgba(125, 186, 55, 0.28) !important; }
+
+.pwa-theme .bg-amber-500 { background-color: var(--pwa-warn) !important; }
+.pwa-theme .bg-amber-500\/20 { background-color: rgba(196, 149, 105, 0.2) !important; }
+.pwa-theme .bg-amber-500\/15 { background-color: rgba(196, 149, 105, 0.15) !important; }
+.pwa-theme .bg-amber-500\/10 { background-color: rgba(196, 149, 105, 0.1) !important; }
+.pwa-theme .text-amber-400 { color: #d9ab82 !important; }
+.pwa-theme .text-amber-300 { color: #e1bb9a !important; }
+.pwa-theme .border-amber-500\/30 { border-color: rgba(196, 149, 105, 0.3) !important; }
+.pwa-theme .border-amber-500\/20 { border-color: rgba(196, 149, 105, 0.2) !important; }
+.pwa-theme .border-amber-500\/25 { border-color: rgba(196, 149, 105, 0.25) !important; }
+
+.pwa-theme .bg-rose-500\/10,
+.pwa-theme .bg-red-500\/15 { background-color: rgba(99, 52, 31, 0.25) !important; }
+.pwa-theme .bg-rose-500 { background-color: #9b5836 !important; }
+.pwa-theme .text-rose-400,
+.pwa-theme .text-red-400 { color: #d09e7b !important; }
+.pwa-theme .border-rose-500\/30 { border-color: rgba(99, 52, 31, 0.5) !important; }
+.pwa-theme .border-red-500\/30 { border-color: rgba(99, 52, 31, 0.5) !important; }
+
+.pwa-theme .hover\:bg-surface-800:hover { background-color: rgba(125, 186, 55, 0.1) !important; }
+.pwa-theme .hover\:text-white:hover { color: var(--pwa-ink) !important; }
+.pwa-theme .hover\:text-rose-400:hover { color: #d09e7b !important; }
+
+.pwa-theme .pwa-shell {
+  position: relative;
+}
+
+.pwa-theme .pwa-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(237, 237, 216, 0.03) 0%, rgba(237, 237, 216, 0) 18%),
+    radial-gradient(100% 60% at 50% 0%, rgba(125, 186, 55, 0.08) 0%, transparent 70%);
+  z-index: 0;
+}
+
+.pwa-theme .pwa-topbar {
+  position: sticky;
+  box-shadow:
+    0 1px 0 rgba(237, 237, 216, 0.08),
+    0 10px 28px rgba(8, 15, 10, 0.42);
+}
+
+.pwa-theme .pwa-monthbar {
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.06),
+    0 10px 24px rgba(8, 15, 10, 0.2);
+}
+
+.pwa-theme .pwa-card {
+  position: relative;
+  backdrop-filter: blur(6px);
+  background-image:
+    linear-gradient(180deg, rgba(237, 237, 216, 0.06) 0%, rgba(237, 237, 216, 0.01) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.14),
+    0 12px 24px rgba(8, 15, 10, 0.28),
+    0 1px 0 rgba(99, 52, 31, 0.22);
+}
+
+.pwa-theme .pwa-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(125, 186, 55, 0.08) 0%, rgba(196, 149, 105, 0.08) 100%);
+  opacity: 0.5;
+}
+
+.pwa-theme .pwa-card-hero {
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.16),
+    0 14px 34px rgba(8, 15, 10, 0.32),
+    0 0 0 1px rgba(125, 186, 55, 0.12);
+}
+
+.pwa-theme .pwa-seller-card {
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.09),
+    0 8px 20px rgba(8, 15, 10, 0.24);
+}
+
+.pwa-theme .pwa-icon-btn {
+  position: relative;
+  border: 1px solid rgba(196, 149, 105, 0.18);
+  background: linear-gradient(180deg, rgba(237, 237, 216, 0.04) 0%, rgba(237, 237, 216, 0.01) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.1),
+    0 4px 12px rgba(8, 15, 10, 0.18);
+}
+
+.pwa-theme .pwa-icon-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(237, 237, 216, 0.14),
+    0 8px 16px rgba(8, 15, 10, 0.22);
+}

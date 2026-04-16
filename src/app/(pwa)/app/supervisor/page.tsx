@@ -840,10 +840,10 @@ export default function SupervisorPwaDashboard() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-950 text-white">
+    <div className="pwa-shell flex min-h-dvh flex-col bg-surface-950 text-white">
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
+      <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="relative h-8 w-8 overflow-hidden rounded-lg">
@@ -871,7 +871,7 @@ export default function SupervisorPwaDashboard() {
               type="button"
               onClick={() => loadData()}
               disabled={loadState === 'loading'}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
               aria-label="Atualizar"
             >
               <RefreshCw className={`h-4 w-4 ${loadState === 'loading' ? 'animate-spin text-emerald-400' : ''}`} />
@@ -879,7 +879,7 @@ export default function SupervisorPwaDashboard() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
               aria-label="Voltar"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -887,7 +887,7 @@ export default function SupervisorPwaDashboard() {
             <button
               type="button"
               onClick={signOut}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
               aria-label="Sair"
             >
               <LogOut className="h-4 w-4" />
@@ -897,11 +897,11 @@ export default function SupervisorPwaDashboard() {
       </header>
 
       {/* ── Month selector ────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-2">
+      <div className="pwa-monthbar flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-2">
         <button
           type="button"
           onClick={prevMonth}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95"
+          className="pwa-icon-btn flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95"
         >
           <ChevronDown className="h-4 w-4 rotate-90" />
         </button>
@@ -917,7 +917,7 @@ export default function SupervisorPwaDashboard() {
           type="button"
           onClick={nextMonth}
           disabled={isCurrentMonth}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-30"
+          className="pwa-icon-btn flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-30"
         >
           <ChevronDown className="h-4 w-4 -rotate-90" />
         </button>
@@ -956,7 +956,7 @@ export default function SupervisorPwaDashboard() {
             {/* ── Summary cards ──────────────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3">
               {/* Meta de Faturamento */}
-              <div className="col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-4 py-3">
+              <div className="pwa-card pwa-card-hero col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-4 py-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Meta Financeira</p>
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-bold ${overallPct >= 100 ? 'text-emerald-400' : overallPct >= 75 ? 'text-cyan-400' : overallPct >= 25 ? 'text-amber-400' : 'text-rose-400'}`}>
@@ -977,7 +977,7 @@ export default function SupervisorPwaDashboard() {
               </div>
 
               {/* Pedidos */}
-              <div className="rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
+              <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
                   <ShoppingCart className="h-3 w-3" />
                   Pedidos
@@ -990,7 +990,7 @@ export default function SupervisorPwaDashboard() {
               </div>
 
               {/* Peso */}
-              <div className="rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
+              <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
                   <Weight className="h-3 w-3" />
                   Peso Total
@@ -1003,7 +1003,7 @@ export default function SupervisorPwaDashboard() {
               </div>
 
               {/* Valor */}
-              <div className="col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
+              <div className="pwa-card col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
                   <DollarSign className="h-3 w-3" />
                   Valor Total dos Pedidos
@@ -1027,7 +1027,7 @@ export default function SupervisorPwaDashboard() {
                 return (
                   <div
                     key={seller.id}
-                    className={`overflow-hidden rounded-2xl border transition-all duration-200 ${cfg.border} ${cfg.bg}`}
+                    className={`pwa-seller-card overflow-hidden rounded-2xl border transition-all duration-200 ${cfg.border} ${cfg.bg}`}
                     style={{ touchAction: 'pan-y' }}
                   >
                     {/* Seller header row */}

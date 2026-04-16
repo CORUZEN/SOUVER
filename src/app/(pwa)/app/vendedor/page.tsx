@@ -188,10 +188,10 @@ export default function VendedorPwaDashboard() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-950 text-white">
+    <div className="pwa-shell flex min-h-dvh flex-col bg-surface-950 text-white">
 
       {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
+      <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="relative h-8 w-8 overflow-hidden rounded-lg">
@@ -218,7 +218,7 @@ export default function VendedorPwaDashboard() {
               type="button"
               onClick={() => loadData()}
               disabled={loadState === 'loading'}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
               aria-label="Atualizar"
             >
               <RefreshCw className={`h-4 w-4 ${loadState === 'loading' ? 'animate-spin text-emerald-400' : ''}`} />
@@ -226,7 +226,7 @@ export default function VendedorPwaDashboard() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
               aria-label="Voltar"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -234,7 +234,7 @@ export default function VendedorPwaDashboard() {
             <button
               type="button"
               onClick={signOut}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
+              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
               aria-label="Sair"
             >
               <LogOut className="h-4 w-4" />
@@ -244,15 +244,15 @@ export default function VendedorPwaDashboard() {
       </header>
 
       {/* Month selector */}
-      <div className="flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-2">
-        <button type="button" onClick={prevMonth} className="flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95">
+      <div className="pwa-monthbar flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-2">
+        <button type="button" onClick={prevMonth} className="pwa-icon-btn flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95">
           <ChevronDown className="h-4 w-4 rotate-90" />
         </button>
         <div className="text-center">
           <p className="text-sm font-semibold capitalize text-white">{monthLabel(year, month)}</p>
           {lastUpdated && <p className="text-[10px] text-surface-500">Atualizado {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>}
         </div>
-        <button type="button" onClick={nextMonth} disabled={isCurrentMonth} className="flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-30">
+        <button type="button" onClick={nextMonth} disabled={isCurrentMonth} className="pwa-icon-btn flex h-7 w-7 items-center justify-center rounded-md text-surface-400 hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-30">
           <ChevronDown className="h-4 w-4 -rotate-90" />
         </button>
       </div>
@@ -284,7 +284,7 @@ export default function VendedorPwaDashboard() {
             </div>
 
             {/* Big progress card */}
-            <div className={`rounded-2xl border px-5 py-4 ${
+            <div className={`pwa-card pwa-card-hero rounded-2xl border px-5 py-4 ${
               pct >= 100 ? 'border-emerald-500/30 bg-emerald-500/5' :
               pct >= 65  ? 'border-amber-500/30 bg-amber-500/5' :
                            'border-rose-500/30 bg-rose-500/5'
@@ -328,7 +328,7 @@ export default function VendedorPwaDashboard() {
 
             {/* Orders list (collapsible) */}
             {seller.orders.length > 0 && (
-              <div className="rounded-2xl border border-surface-700/50 bg-surface-900 overflow-hidden">
+              <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 overflow-hidden">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between px-4 py-3"
@@ -383,7 +383,7 @@ export default function VendedorPwaDashboard() {
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
+    <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
         {icon}
         {label}

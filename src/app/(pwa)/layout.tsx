@@ -18,12 +18,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#10b981',
+  themeColor: '#3f783d',
 }
 
 export default function PwaLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-surface-950 text-white antialiased">
+    <div className="pwa-theme min-h-dvh bg-surface-950 text-white antialiased">
       {children}
     </div>
   )
