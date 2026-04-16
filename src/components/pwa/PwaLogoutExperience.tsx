@@ -12,10 +12,10 @@ export function PwaLogoutConfirmDialog({ open, onCancel, onConfirm, busy = false
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-surface-950/70 p-4 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-surface-950/72 p-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-2xl border border-surface-700/70 bg-surface-900 p-4 shadow-2xl shadow-black/45">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-amber-500/15 p-2 text-amber-300">
+          <div className="mt-0.5 rounded-full bg-red-500/15 p-2 text-red-300 ring-1 ring-red-400/35">
             <AlertTriangle className="h-4 w-4" />
           </div>
           <div>
@@ -39,7 +39,7 @@ export function PwaLogoutConfirmDialog({ open, onCancel, onConfirm, busy = false
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="flex-1 rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
+            className="flex-1 rounded-lg border border-red-400/35 bg-red-500/20 px-3 py-2 text-xs font-semibold text-red-100 shadow-[0_6px_20px_rgba(239,68,68,0.20)] transition hover:bg-red-500/30 hover:text-white disabled:opacity-50"
           >
             Confirmar saída
           </button>
