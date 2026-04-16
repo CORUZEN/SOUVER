@@ -7200,6 +7200,10 @@ export default function MetasWorkspace() {
                       }
                     }
                     const filteredUniqueClients = filteredUniqueClientsSet.size
+                    const filteredTotalBaseClients = filteredRows.reduce((sum, row) => {
+                      const sellerData = sellers.find((s) => s.id === row.id)
+                      return sum + (sellerData?.baseClientCount ?? 0)
+                    }, 0)
                     const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
                     const avgPoints = filteredRows.length > 0
                       ? filteredRows.reduce((sum, row) => sum + row.pointsAchieved, 0) / filteredRows.length
@@ -7256,7 +7260,12 @@ export default function MetasWorkspace() {
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Clientes únicos atendidos</p>
-                            <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">{num(filteredUniqueClients, 0)}</p>
+                            <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">
+                              {num(filteredUniqueClients, 0)}
+                              {filteredTotalBaseClients > 0 && (
+                                <span className="font-bold text-indigo-300"> / {num(filteredTotalBaseClients, 0)}</span>
+                              )}
+                            </p>
                             <p className="text-[10px] text-indigo-700">Total em {scopeLabel.toLowerCase()}</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
