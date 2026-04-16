@@ -106,11 +106,11 @@ type LoadState = 'idle' | 'loading' | 'success' | 'error'
 type SellerStatus = 'SUPEROU' | 'NO_ALVO' | 'QUASE_LA' | 'ATENCAO' | 'CRITICO'
 
 const STATUS_CONFIG: Record<SellerStatus, { label: string; color: string; pctColor: string; bg: string; border: string; barColor: string; Icon: React.ElementType }> = {
-  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     pctColor: 'text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.35)]',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-300 shadow-[0_0_10px_rgba(56,189,248,0.28)]',     Icon: TrendingUp },
-  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', pctColor: 'text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.35)]', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.28)]', Icon: CheckCircle2 },
-  QUASE_LA: { label: 'Quase Lá',   color: 'text-cyan-400',    pctColor: 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30',    barColor: 'bg-gradient-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.26)]',    Icon: TrendingUp },
-  ATENCAO:  { label: 'Atenção',    color: 'text-amber-400',   pctColor: 'text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.30)]',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.24)]',   Icon: Clock },
-  CRITICO:  { label: 'Crítico',    color: 'text-rose-400',    pctColor: 'text-rose-300 drop-shadow-[0_0_8px_rgba(251,113,133,0.30)]',    bg: 'bg-rose-500/10',    border: 'border-rose-500/30',    barColor: 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.26)]',    Icon: AlertCircle },
+  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     pctColor: 'bg-gradient-to-r from-sky-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(56,189,248,0.35)]',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-300 shadow-[0_0_10px_rgba(56,189,248,0.28)]',     Icon: TrendingUp },
+  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', pctColor: 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(52,211,153,0.35)]', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.28)]', Icon: CheckCircle2 },
+  QUASE_LA: { label: 'Quase Lá',   color: 'text-cyan-400',    pctColor: 'bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30',    barColor: 'bg-gradient-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.26)]',    Icon: TrendingUp },
+  ATENCAO:  { label: 'Atenção',    color: 'text-amber-400',   pctColor: 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,191,36,0.30)]',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.24)]',   Icon: Clock },
+  CRITICO:  { label: 'Crítico',    color: 'text-rose-400',    pctColor: 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,113,133,0.30)]',    bg: 'bg-rose-500/10',    border: 'border-rose-500/30',    barColor: 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.26)]',    Icon: AlertCircle },
 }
 
 /* ─────────────────────────────────────────────
@@ -1009,12 +1009,12 @@ export default function SupervisorPwaDashboard() {
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-extrabold tabular-nums tracking-tight ${
                     overallPct >= 100
-                      ? 'text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.35)]'
+                      ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(52,211,153,0.35)]'
                       : overallPct >= 75
-                      ? 'text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.30)]'
+                      ? 'bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,211,238,0.30)]'
                       : overallPct >= 25
-                      ? 'text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.28)]'
-                      : 'text-rose-300 drop-shadow-[0_0_10px_rgba(251,113,133,0.30)]'
+                      ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(251,191,36,0.28)]'
+                      : 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(251,113,133,0.30)]'
                   }`}>
                     {fmtPct(overallPct)}
                   </p>
@@ -1049,19 +1049,29 @@ export default function SupervisorPwaDashboard() {
                 <p className="mt-1 inline-flex items-baseline gap-2 whitespace-nowrap text-base font-bold text-white">
                   <span>{fmt(totalOrders)}</span>
                   <span
-                    className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
-                      ordersComparison.trend === 'up'
-                        ? 'text-emerald-300 drop-shadow-[0_0_7px_rgba(52,211,153,0.30)]'
-                        : ordersComparison.trend === 'down'
-                        ? 'text-amber-300 drop-shadow-[0_0_7px_rgba(251,191,36,0.26)]'
-                        : 'text-surface-300'
-                    }`}
+                    className="inline-flex items-center gap-1 text-xs font-semibold tabular-nums"
                     title={`Comparação no mesmo período do mês anterior: ${fmt(ordersComparison.currentSamePeriodOrders)} vs ${fmt(ordersComparison.previousSamePeriodOrders)}`}
                   >
                     {ordersComparison.hasBaseline ? (
                       <>
-                        {ordersComparison.trend === 'up' ? <TrendingUp className="h-3 w-3" /> : ordersComparison.trend === 'down' ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                        {`${ordersComparison.deltaPct >= 0 ? '+' : ''}${fmt(ordersComparison.deltaPct, 1)}%`}
+                        {ordersComparison.trend === 'up' ? (
+                          <TrendingUp className="h-3 w-3 text-emerald-300" />
+                        ) : ordersComparison.trend === 'down' ? (
+                          <TrendingDown className="h-3 w-3 text-amber-300" />
+                        ) : (
+                          <Minus className="h-3 w-3 text-surface-300" />
+                        )}
+                        <span
+                          className={
+                            ordersComparison.trend === 'up'
+                              ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent drop-shadow-[0_0_7px_rgba(52,211,153,0.30)]'
+                              : ordersComparison.trend === 'down'
+                              ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent drop-shadow-[0_0_7px_rgba(251,191,36,0.26)]'
+                              : 'text-surface-300'
+                          }
+                        >
+                          {`${ordersComparison.deltaPct >= 0 ? '+' : ''}${fmt(ordersComparison.deltaPct, 1)}%`}
+                        </span>
                       </>
                     ) : (
                       <span>sem base</span>
@@ -1407,10 +1417,10 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const pctColor = !kpi.isComputable || isPending
                   ? 'text-surface-500'
                   : isHit
-                  ? 'text-emerald-300 drop-shadow-[0_0_7px_rgba(52,211,153,0.30)]'
+                  ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent drop-shadow-[0_0_7px_rgba(52,211,153,0.30)]'
                   : pctDisplay >= 70
-                  ? 'text-amber-300 drop-shadow-[0_0_7px_rgba(251,191,36,0.26)]'
-                  : 'text-rose-300 drop-shadow-[0_0_7px_rgba(251,113,133,0.26)]'
+                  ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent drop-shadow-[0_0_7px_rgba(251,191,36,0.26)]'
+                  : 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent drop-shadow-[0_0_7px_rgba(251,113,133,0.26)]'
 
                 return (
                   <div key={kpi.ruleId} className={stageStyle.row}>
