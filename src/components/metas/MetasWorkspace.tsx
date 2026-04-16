@@ -29,6 +29,7 @@ import {
 import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type OperationalStageKey = Exclude<StageKey, 'FULL'>
@@ -1332,8 +1333,7 @@ export default function MetasWorkspace() {
   }, [readOnlyBlockPickerOpen])
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
+    fetchAuthMeCached()
       .then((data) => {
         const perms = data?.user?.metasPermissions as MetasUiPermissions | undefined
         if (!perms) {

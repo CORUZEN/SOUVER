@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { MODULE_PLANS } from '@/lib/development-modules'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 interface UserInfo {
   name: string
@@ -71,8 +72,7 @@ function HeaderInner() {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
+    fetchAuthMeCached()
       .then((data) => {
         if (data?.user) {
           const { name, email, role, roleCode, avatarUrl, impersonation } = data.user

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 const MOBILE_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SELLER'])
 
@@ -19,8 +20,7 @@ export default function MobilePwaRedirect() {
     // Skip if already in standalone PWA or if URL is already /app/*
     if (window.location.pathname.startsWith('/app')) return
 
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
+    fetchAuthMeCached()
       .then((data) => {
         const roleCode = (data?.user?.roleCode ?? '').toUpperCase()
         if (MOBILE_ROLES.has(roleCode)) {

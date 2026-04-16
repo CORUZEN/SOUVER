@@ -20,6 +20,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from 'recharts'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 interface KPIData {
   production: {
@@ -138,8 +139,7 @@ export default function DashboardView() {
 
     Promise.all([
       loadKpis(),
-      fetch('/api/auth/me', { cache: 'no-store', signal: ctrl.signal })
-        .then(r => r.ok ? r.json() : null)
+      fetchAuthMeCached()
         .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
         .catch(() => null),
       fetch('/api/dashboard/trend?days=7', { signal: ctrl.signal })

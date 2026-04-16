@@ -3,13 +3,13 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 export default function PwaEntryPage() {
   const router = useRouter()
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
+    fetchAuthMeCached()
       .then((data) => {
         const roleCode = data?.user?.roleCode?.toUpperCase() ?? ''
 

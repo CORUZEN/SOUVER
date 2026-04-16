@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { MODULE_MENU_SECTIONS, MODULE_PLANS } from '@/lib/development-modules'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 import {
   LayoutDashboard,
   Target,
@@ -105,8 +106,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   }, [])
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
+    fetchAuthMeCached()
       .then((data) => {
         setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations))
         if (data?.user?.modulePermissions && typeof data.user.modulePermissions === 'object') {
