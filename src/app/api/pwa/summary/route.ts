@@ -132,6 +132,23 @@ export async function GET(req: NextRequest) {
   const cycleWeeks = (() => {
     if (!monthConfig) return null
     const mc = monthConfig as Record<string, unknown>
+
+    // Prefer explicit weekPeriods saved by MetasWorkspace (same source as the web system)
+    const weekPeriodsRaw = mc.weekPeriods
+    if (weekPeriodsRaw && typeof weekPeriodsRaw === 'object' && !Array.isArray(weekPeriodsRaw)) {
+      const wp = weekPeriodsRaw as Record<string, { start?: string; end?: string }>
+      const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
+      const result: { key: string; start: string; end: string }[] = []
+      for (const key of stages) {
+        const p = wp[key]
+        if (p?.start && p?.end && p.start <= p.end) {
+          result.push({ key, start: p.start, end: p.end })
+        }
+      }
+      if (result.length > 0) return result
+    }
+
+    // Fallback: reconstruct from week1StartDate + closingWeekEndDate
     const w1Raw = String(mc.week1StartDate ?? '')
     const closeRaw = String(mc.closingWeekEndDate ?? '')
     if (!w1Raw) return null

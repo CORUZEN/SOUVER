@@ -87,13 +87,17 @@ function fmtKg(value: number) {
   return `${fmt(value, 2)} kg`
 }
 
-function estimatePremio(profileType: string, pct: number, earnedReward: number, maxReward: number): string {
+function estimatePremioEarned(profileType: string, pct: number, earnedReward: number): string {
   const safePct = Math.min(pct, 100)
-  if (profileType === 'ANTIGO_1')  return `${fmt(safePct / 100 * 1,   2)}% / 1,00%`
-  if (profileType === 'ANTIGO_15') return `${fmt(safePct / 100 * 1.5, 2)}% / 1,50%`
-  // NOVATO / SUPERVISOR: prem. em R$
-  if (maxReward > 0) return `${fmtBrl(earnedReward)} / ${fmtBrl(maxReward)}`
-  return '—'
+  if (profileType === 'ANTIGO_1')  return `${fmt(safePct / 100 * 1,   2)}%`
+  if (profileType === 'ANTIGO_15') return `${fmt(safePct / 100 * 1.5, 2)}%`
+  return fmtBrl(earnedReward)
+}
+function estimatePremioMax(profileType: string, maxReward: number): string {
+  if (profileType === 'ANTIGO_1')  return '/ 1,00%'
+  if (profileType === 'ANTIGO_15') return '/ 1,50%'
+  if (maxReward > 0) return `/ ${fmtBrl(maxReward)}`
+  return ''
 }
 
 /**
@@ -583,11 +587,11 @@ export default function SupervisorPwaDashboard() {
                           <MetricCell icon={<ShoppingCart className="h-3.5 w-3.5" />} label="Pedidos" value={fmt(seller.totalOrders)} />
                           <MetricCell icon={<Users className="h-3.5 w-3.5" />} label="Clientes" value={`${fmt(clients)}/${fmt(seller.baseClientCount)}`} />
                           <MetricCell icon={<Weight className="h-3.5 w-3.5" />} label="Peso Bruto" value={fmtKg(seller.totalGrossWeight)} />
-                          <MetricCell
-                            icon={<TrendingUp className="h-3.5 w-3.5" />}
-                            label="Est. Premiação"
-                            value={estimatePremio(profileType, pct, earnedReward, maxReward)}
-                            highlight={pct >= 100 ? 'success' : pct >= 75 ? 'warn' : 'none'}
+                          <PremioCell
+                            pct={pct}
+                            profileType={profileType}
+                            earnedReward={earnedReward}
+                            maxReward={maxReward}
                           />
                         </div>
 
@@ -650,6 +654,32 @@ function MetricCell({ icon, label, value, highlight = 'none' }: { icon: React.Re
         <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
       </div>
       <p className={`mt-0.5 text-sm font-semibold ${valueColor}`}>{value}</p>
+    </div>
+  )
+}
+
+function PremioCell({ pct, profileType, earnedReward, maxReward }: { pct: number; profileType: string; earnedReward: number; maxReward: number }) {
+  const highlight: MetricHighlight = pct >= 100 ? 'success' : pct >= 75 ? 'warn' : 'none'
+  const valueColor =
+    highlight === 'success' ? 'text-emerald-400' :
+    highlight === 'warn'    ? 'text-amber-400'   :
+    'text-white'
+  const borderAccent =
+    highlight === 'success' ? 'border border-emerald-500/25 bg-emerald-500/5' :
+    highlight === 'warn'    ? 'border border-amber-500/25 bg-amber-500/5'     :
+    'bg-surface-800/60'
+  const earned = estimatePremioEarned(profileType, pct, earnedReward)
+  const max = estimatePremioMax(profileType, maxReward)
+  return (
+    <div className={`rounded-lg px-2.5 py-2 ${borderAccent}`}>
+      <div className="flex items-center gap-1 text-surface-400">
+        <TrendingUp className="h-3.5 w-3.5" />
+        <span className="text-[10px] font-medium uppercase tracking-wider">Est. Premiação</span>
+      </div>
+      <p className={`mt-0.5 text-sm font-semibold ${valueColor}`}>
+        {earned}
+        {max && <span className="ml-1 text-[10px] font-normal text-surface-500">{max}</span>}
+      </p>
     </div>
   )
 }
