@@ -60,6 +60,20 @@ export async function GET(req: NextRequest) {
     ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorCode)
     : activeSellers
 
+  // ── Infer KPI type from label (mirrors MetasWorkspace.inferKpiType) ──────
+  function inferKpiType(kpi: string): string {
+    const lower = (kpi ?? '').toLowerCase()
+    if (lower.includes('base de clientes')) return 'BASE_CLIENTES'
+    if (lower.includes('volume') || lower.includes('categori')) return 'VOLUME'
+    if (lower.includes('meta financeira')) return 'META_FINANCEIRA'
+    if (lower.includes('distribui')) return 'DISTRIBUICAO'
+    if (lower.includes('devolu')) return 'DEVOLUCAO'
+    if (lower.includes('inadimpl')) return 'INADIMPLENCIA'
+    if (lower.includes('foco') || lower.includes('item')) return 'ITEM_FOCO'
+    if (lower.includes('rentabilidade') || lower.includes('ticket')) return 'RENTABILIDADE'
+    return 'VOLUME'
+  }
+
   // ── Extract rule blocks for targets ───────────────────────────────────────
   type RuleBlock = {
     id: string
@@ -86,6 +100,12 @@ export async function GET(req: NextRequest) {
       return b.sellerIds.includes(code) || b.sellerIds.includes(`sankhya-${code}`)
     }) ?? ruleBlocks[0] ?? null
 
+    const profileType = seller.profileType as string
+    const isPercentProfile = profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15'
+    const maxReward: number = isPercentProfile
+      ? 0
+      : (block?.rules ?? []).reduce((sum: number, r: { rewardValue?: number }) => sum + (r.rewardValue ?? 0), 0)
+
     return {
       code,
       name: seller.name,
@@ -95,17 +115,55 @@ export async function GET(req: NextRequest) {
       monthlyTarget: block?.monthlyTarget ?? 0,
       blockId: block?.id ?? null,
       blockName: block?.name ?? null,
+      maxReward,
+      rules: (block?.rules ?? []).map((r) => ({
+        id: r.id,
+        stage: r.stage,
+        kpi: r.kpi ?? '',
+        kpiType: r.kpiType || inferKpiType(r.kpi ?? ''),
+        targetText: r.targetText,
+        rewardValue: r.rewardValue,
+        points: r.points,
+      })),
     }
   })
 
-  // ── Cycle info from monthConfig ────────────────────────────────────────────
-  const cycle = (() => {
+  // ── Cycle week dates (W1–CLOSING) ──────────────────────────────────────────
+  const cycleWeeks = (() => {
     if (!monthConfig) return null
     const mc = monthConfig as Record<string, unknown>
-    return {
-      week1StartDate: mc.week1StartDate ?? null,
-      closingWeekEndDate: mc.closingWeekEndDate ?? null,
+    const w1Raw = String(mc.week1StartDate ?? '')
+    const closeRaw = String(mc.closingWeekEndDate ?? '')
+    if (!w1Raw) return null
+
+    function parseDate(s: string): Date | null {
+      if (!s) return null
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      if (!m) return null
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
     }
+    function addDays(d: Date, n: number) {
+      const r = new Date(d); r.setDate(r.getDate() + n); return r
+    }
+    function iso(d: Date) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+
+    const monthStart = new Date(year, month - 1, 1)
+    const monthEnd = new Date(year, month, 0)
+    const baseStart = parseDate(w1Raw) ?? monthStart
+    const cycleEnd = parseDate(closeRaw) ?? monthEnd
+
+    const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
+    const result: { key: string; start: string; end: string }[] = []
+    stages.forEach((key, i) => {
+      const stageStart = addDays(baseStart, i * 7)
+      if (stageStart > cycleEnd) return
+      const rawEnd = key === 'CLOSING' ? cycleEnd : addDays(stageStart, 4)
+      const stageEnd = rawEnd > cycleEnd ? cycleEnd : rawEnd
+      result.push({ key, start: iso(stageStart), end: iso(stageEnd) })
+    })
+    return result
   })()
 
   return NextResponse.json(
@@ -115,7 +173,7 @@ export async function GET(req: NextRequest) {
       roleCode,
       isSupervisor,
       supervisorCode,
-      cycle,
+      cycleWeeks,
       sellers: sellerSummaries,
       totalMonthlyTarget: sellerSummaries.reduce((sum, s) => sum + s.monthlyTarget, 0),
       sellerCount: sellerSummaries.length,
