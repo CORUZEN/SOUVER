@@ -931,7 +931,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     <div className="mt-3 space-y-3">
       <div className="flex items-center gap-2">
         <div className="h-px flex-1 bg-surface-700/60" />
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">KPIs do Ciclo</span>
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas do Ciclo</span>
         <div className="h-px flex-1 bg-surface-700/60" />
       </div>
 
@@ -939,26 +939,48 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
         const isActive = !!week && week.start <= todayIso && week.end >= todayIso
         const isEnded  = !!week && week.end < todayIso
         const isPending = !!week && week.start > todayIso
+        const stageStyle = isEnded
+          ? {
+              container: 'rounded-xl border border-slate-500/30 bg-slate-500/5 p-2.5',
+              badge: 'bg-slate-500/20 text-slate-200',
+              status: 'text-[10px] font-medium uppercase tracking-wide text-slate-300',
+              row: 'rounded-lg border border-slate-500/20 bg-slate-950/35 px-3 py-2',
+            }
+          : isActive
+          ? {
+              container: 'rounded-xl border border-emerald-500/35 bg-emerald-500/10 p-2.5',
+              badge: 'bg-emerald-500/20 text-emerald-300',
+              status: 'text-[10px] font-medium uppercase tracking-wide text-emerald-300',
+              row: 'rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2',
+            }
+          : isPending
+          ? {
+              container: 'rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5',
+              badge: 'bg-amber-500/20 text-amber-300',
+              status: 'text-[10px] font-medium uppercase tracking-wide text-amber-300',
+              row: 'rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2',
+            }
+          : {
+              container: 'rounded-xl border border-surface-700/60 bg-surface-800/30 p-2.5',
+              badge: 'bg-surface-700 text-surface-400',
+              status: 'text-[10px] font-medium uppercase tracking-wide text-surface-400',
+              row: 'rounded-lg bg-surface-800/50 px-3 py-2',
+            }
 
         const hitCount = items.filter((i) => i.isComputable && i.progress >= 1).length
         const computableCount = items.filter((i) => i.isComputable).length
 
         return (
-          <div key={key}>
+          <div key={key} className={stageStyle.container}>
             {/* Stage header */}
             <div className="mb-1.5 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                  isEnded   ? 'bg-surface-700 text-surface-400' :
-                  isActive  ? 'bg-emerald-500/20 text-emerald-300' :
-                  isPending ? 'bg-surface-800 text-surface-500' :
-                  'bg-surface-700 text-surface-400'
-                }`}>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${stageStyle.badge}`}>
                   {label}
                 </span>
-                {isActive  && <span className="text-[9px] text-emerald-400 font-medium">em andamento</span>}
-                {isEnded   && <span className="text-[9px] text-surface-500">encerrada</span>}
-                {isPending && <span className="text-[9px] text-surface-600">aguardando</span>}
+                {isActive  && <span className={stageStyle.status}>Em andamento</span>}
+                {isEnded   && <span className={stageStyle.status}>Etapa encerrada</span>}
+                {isPending && <span className={stageStyle.status}>Aguardando</span>}
               </div>
               {computableCount > 0 && (
                 <span className={`text-[10px] font-semibold ${hitCount === computableCount ? 'text-emerald-400' : 'text-surface-400'}`}>
@@ -992,7 +1014,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                   : 'text-rose-400'
 
                 return (
-                  <div key={kpi.ruleId} className="rounded-lg bg-surface-800/50 px-3 py-2">
+                  <div key={kpi.ruleId} className={stageStyle.row}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <Icon className="h-3 w-3 shrink-0 text-surface-400" />
@@ -1006,7 +1028,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                             ? isOver
                               ? `${fmt(kpi.progress * 100, 0)}%`
                               : `${fmt(pctDisplay, 0)}%`
-                            : isPending ? '—' : '?'
+                            : isPending ? '-' : '?'
                           }
                         </span>
                       </div>
