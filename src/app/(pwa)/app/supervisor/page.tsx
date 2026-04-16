@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
 import {
-  ArrowLeft,
   RefreshCw,
   TrendingUp,
   TrendingDown,
@@ -21,8 +21,7 @@ import {
   Clock,
   XCircle,
   LogOut,
-  Wifi,
-  WifiOff,
+  CloudOff,
   Package,
   Star,
   RotateCcw,
@@ -747,8 +746,12 @@ export default function SupervisorPwaDashboard() {
 
   // ── Sign out ──────────────────────────────────────────────────────────────
   async function signOut() {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-    router.replace('/login')
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' }).catch(() => {})
+    } finally {
+      await clearPwaClientState()
+      window.location.replace('/login')
+    }
   }
 
   // ── Period navigation ─────────────────────────────────────────────────────
@@ -857,14 +860,8 @@ export default function SupervisorPwaDashboard() {
 
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <div className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1">
-                <WifiOff className="h-3 w-3 text-red-400" />
-                <span className="text-[10px] text-red-400">Offline</span>
-              </div>
-            )}
-            {isOnline && loadState === 'success' && (
-              <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1">
-                <Wifi className="h-3 w-3 text-emerald-400" />
+              <div className="pwa-offline-indicator flex h-8 w-8 items-center justify-center rounded-lg" title="Sem conexão com a internet" aria-label="Sem conexão com a internet">
+                <CloudOff className="h-4 w-4" />
               </div>
             )}
             <button
@@ -875,14 +872,6 @@ export default function SupervisorPwaDashboard() {
               aria-label="Atualizar"
             >
               <RefreshCw className={`h-4 w-4 ${loadState === 'loading' ? 'animate-spin text-emerald-400' : ''}`} />
-            </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
-              aria-label="Voltar"
-            >
-              <ArrowLeft className="h-4 w-4" />
             </button>
             <button
               type="button"

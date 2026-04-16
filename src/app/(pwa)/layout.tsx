@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = {
   title: {
-    default: 'Ouro Verde',
-    template: '%s | Ouro Verde',
+    absolute: 'Ouro Verde',
   },
   description: 'Plataforma corporativa Ouro Verde',
   appleWebApp: {
