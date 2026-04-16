@@ -23,6 +23,12 @@ import {
   LogOut,
   Wifi,
   WifiOff,
+  Package,
+  Star,
+  RotateCcw,
+  Ban,
+  LayoutGrid,
+  BarChart2,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -151,6 +157,64 @@ function computeEarnedReward(
     if (progress >= 1) earned += rule.rewardValue
   }
   return earned
+}
+
+type KpiProgress = {
+  ruleId: string
+  stage: string
+  kpi: string
+  kpiType: string
+  targetText: string
+  rewardValue: number
+  progress: number       // 0–1.4 (capped)
+  isComputable: boolean  // false when we lack data (VOLUME, DISTRIBUICAO etc.)
+  stageStarted: boolean
+  stageEnded: boolean
+}
+
+function computeAllKpiProgress(
+  rules: SellerRule[],
+  cycleWeeks: CycleWeek[],
+  orders: SellerRow['orders'],
+  monthlyTarget: number,
+  baseClientCount: number,
+  todayIso: string,
+): KpiProgress[] {
+  return rules.map((rule) => {
+    const week = cycleWeeks.find((w) => w.key === rule.stage)
+    const stageStarted = !!week && week.start <= todayIso
+    const stageEnded   = !!week && week.end < todayIso
+
+    if (!week) return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType: rule.kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted: false, stageEnded: false }
+
+    const kpiLabel = (rule.kpi ?? '').toLowerCase()
+    const kpiType = rule.kpiType || (
+      kpiLabel.includes('meta financeira') ? 'META_FINANCEIRA' :
+      kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' : ''
+    )
+
+    if (kpiType !== 'META_FINANCEIRA' && kpiType !== 'BASE_CLIENTES') {
+      return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted, stageEnded }
+    }
+
+    const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= week.end)
+    let progress = 0
+
+    if (kpiType === 'META_FINANCEIRA') {
+      const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
+      const threshold = rawNum > 0 ? rawNum / 100 : 1
+      const accumulated = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      progress = monthlyTarget > 0 ? accumulated / (monthlyTarget * threshold) : 0
+    } else if (kpiType === 'BASE_CLIENTES') {
+      const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
+      const threshold = rawNum > 0 ? rawNum / 100 : 1
+      const base = Math.max(baseClientCount, 1)
+      const clients = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
+      progress = clients / (base * threshold)
+    }
+
+    return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: Math.min(progress, 1.4), isComputable: true, stageStarted, stageEnded }
+  })
 }
 function fmtPct(value: number, decimals = 1) {
   return `${fmt(value, decimals)}%`
@@ -331,7 +395,15 @@ export default function SupervisorPwaDashboard() {
       seller.baseClientCount,
       todayIso,
     )
-    return { seller, code, target, pct, status, clients, profileType, maxReward, earnedReward }
+    const kpiProgress = computeAllKpiProgress(
+      sellerRules[code] ?? [],
+      cycleWeeks,
+      seller.orders,
+      target,
+      seller.baseClientCount,
+      todayIso,
+    )
+    return { seller, code, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }
   }).sort((a, b) => b.pct - a.pct)
 
   const metaHit = sellerCards.filter((s) => s.status === 'SUPEROU' || s.status === 'NO_ALVO').length
@@ -526,7 +598,7 @@ export default function SupervisorPwaDashboard() {
                 <span className="ml-auto text-[10px] text-surface-600">{sellers.length} monitorados</span>
               </div>
 
-              {sellerCards.map(({ seller, target, pct, status, clients, profileType, maxReward, earnedReward }, idx) => {
+              {sellerCards.map(({ seller, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }, idx) => {
                 const cfg = STATUS_CONFIG[status]
                 const isExpanded = expandedSeller === seller.id
 
@@ -613,6 +685,11 @@ export default function SupervisorPwaDashboard() {
                             </p>
                           </div>
                         )}
+
+                        {/* ── KPI progress section ──────────────────────── */}
+                        {kpiProgress.length > 0 && (
+                          <KpiStagesPanel kpiProgress={kpiProgress} cycleWeeks={cycleWeeks} todayIso={todayIso} />
+                        )}
                       </div>
                     )}
                   </div>
@@ -680,6 +757,148 @@ function PremioCell({ pct, profileType, earnedReward, maxReward }: { pct: number
         {earned}
         {max && <span className="ml-1 text-[10px] font-normal text-surface-500">{max}</span>}
       </p>
+    </div>
+  )
+}
+
+/* ── KPI Stages Panel ────────────────────────────────────────────────────── */
+
+const STAGE_LABELS: Record<string, string> = {
+  W1: '1ª Semana',
+  W2: '2ª Semana',
+  W3: '3ª Semana',
+  CLOSING: 'Fechamento',
+}
+
+const KPI_TYPE_ICON: Record<string, React.ElementType> = {
+  META_FINANCEIRA: DollarSign,
+  BASE_CLIENTES:  Users,
+  VOLUME:         Package,
+  DISTRIBUICAO:   LayoutGrid,
+  ITEM_FOCO:      Star,
+  DEVOLUCAO:      RotateCcw,
+  INADIMPLENCIA:  Ban,
+  RENTABILIDADE:  BarChart2,
+}
+
+function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
+  kpiProgress: KpiProgress[]
+  cycleWeeks: CycleWeek[]
+  todayIso: string
+}) {
+  const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
+  const grouped = stages
+    .map((key) => ({
+      key,
+      label: STAGE_LABELS[key],
+      week: cycleWeeks.find((w) => w.key === key) ?? null,
+      items: kpiProgress.filter((k) => k.stage === key),
+    }))
+    .filter((s) => s.items.length > 0)
+
+  if (grouped.length === 0) return null
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-surface-700/60" />
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">KPIs do Ciclo</span>
+        <div className="h-px flex-1 bg-surface-700/60" />
+      </div>
+
+      {grouped.map(({ key, label, week, items }) => {
+        const isActive = !!week && week.start <= todayIso && week.end >= todayIso
+        const isEnded  = !!week && week.end < todayIso
+        const isPending = !!week && week.start > todayIso
+
+        const hitCount = items.filter((i) => i.isComputable && i.progress >= 1).length
+        const computableCount = items.filter((i) => i.isComputable).length
+
+        return (
+          <div key={key}>
+            {/* Stage header */}
+            <div className="mb-1.5 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                  isEnded   ? 'bg-surface-700 text-surface-400' :
+                  isActive  ? 'bg-emerald-500/20 text-emerald-300' :
+                  isPending ? 'bg-surface-800 text-surface-500' :
+                  'bg-surface-700 text-surface-400'
+                }`}>
+                  {label}
+                </span>
+                {isActive  && <span className="text-[9px] text-emerald-400 font-medium">em andamento</span>}
+                {isEnded   && <span className="text-[9px] text-surface-500">encerrada</span>}
+                {isPending && <span className="text-[9px] text-surface-600">aguardando</span>}
+              </div>
+              {computableCount > 0 && (
+                <span className={`text-[10px] font-semibold ${hitCount === computableCount ? 'text-emerald-400' : 'text-surface-400'}`}>
+                  {hitCount}/{computableCount}
+                </span>
+              )}
+            </div>
+
+            {/* KPI rows */}
+            <div className="space-y-1.5">
+              {items.map((kpi) => {
+                const Icon = KPI_TYPE_ICON[kpi.kpiType] ?? Target
+                const pctDisplay = Math.min(kpi.progress * 100, 100)
+                const isHit = kpi.isComputable && kpi.progress >= 1
+                const isOver = kpi.isComputable && kpi.progress > 1
+
+                const barColor = !kpi.isComputable || isPending
+                  ? 'bg-surface-600'
+                  : isHit
+                  ? 'bg-emerald-500'
+                  : pctDisplay >= 70
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500'
+
+                const pctColor = !kpi.isComputable || isPending
+                  ? 'text-surface-500'
+                  : isHit
+                  ? 'text-emerald-400'
+                  : pctDisplay >= 70
+                  ? 'text-amber-400'
+                  : 'text-rose-400'
+
+                return (
+                  <div key={kpi.ruleId} className="rounded-lg bg-surface-800/50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <Icon className="h-3 w-3 shrink-0 text-surface-400" />
+                        <span className="truncate text-[11px] font-medium text-surface-200">{kpi.kpi}</span>
+                        <span className="shrink-0 text-[10px] text-surface-500">({kpi.targetText})</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {isHit && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                        <span className={`text-[11px] font-bold ${pctColor}`}>
+                          {kpi.isComputable && !isPending
+                            ? isOver
+                              ? `${fmt(kpi.progress * 100, 0)}%`
+                              : `${fmt(pctDisplay, 0)}%`
+                            : isPending ? '—' : '?'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-700">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                        style={{ width: kpi.isComputable && !isPending ? `${pctDisplay}%` : '0%' }}
+                      />
+                    </div>
+                    {!kpi.isComputable && !isPending && (
+                      <p className="mt-0.5 text-[9px] text-surface-600">Requer dados adicionais</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
