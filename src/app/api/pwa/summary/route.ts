@@ -82,6 +82,10 @@ export async function GET(req: NextRequest) {
     profileType?: string
     sellerIds?: string[]
     weightTargets?: Array<{ brand: string; targetKg: number }>
+    focusProductCode?: string
+    focusTargetKg?: number
+    focusTargetMode?: 'KG' | 'BASE_CLIENTS'
+    focusTargetBasePct?: number
     rules?: Array<{ id: string; kpi: string; kpiType?: string; points: number; rewardValue: number; stage: string; targetText: string }>
   }
 
@@ -114,6 +118,10 @@ export async function GET(req: NextRequest) {
       monthlyTarget: block?.monthlyTarget ?? 0,
       blockId: block?.id ?? null,
       blockName: block?.name ?? null,
+      focusProductCode: String(block?.focusProductCode ?? '').trim(),
+      focusTargetKg: Number(block?.focusTargetKg ?? 0),
+      focusTargetMode: block?.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG',
+      focusTargetBasePct: Number(block?.focusTargetBasePct ?? 0),
       maxReward,
       weightTargets: (block?.weightTargets ?? []).map((wt: { brand?: unknown; targetKg?: unknown }) => ({
         brand: String(wt.brand ?? '').toUpperCase(),

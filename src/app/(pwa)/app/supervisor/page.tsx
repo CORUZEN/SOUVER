@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
@@ -50,6 +50,35 @@ interface SellerRow {
 
 type BrandWeightRow = { sellerCode: string; brand: string; totalKg: number }
 type WeightTarget    = { brand: string; targetKg: number }
+type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
+type SellerDistributionRow = {
+  sellerCode: string
+  clientCode: string
+  productsW1: number
+  productsW2: number
+  productsW3: number
+  productsClosing: number
+  productsMonth: number
+}
+type SellerDistributionItemsRow = {
+  sellerCode: string
+  itemsW1: number
+  itemsW2: number
+  itemsW3: number
+  itemsClosing: number
+  itemsMonth: number
+}
+type FocusProductRow = {
+  sellerCode: string
+  soldKg: number
+  soldClients: number
+}
+type FocusConfig = {
+  focusProductCode: string
+  focusTargetKg: number
+  focusTargetMode: FocusTargetMode
+  focusTargetBasePct: number
+}
 
 interface SellerRule {
   id: string
@@ -97,6 +126,75 @@ function fmtBrl(value: number) {
 function fmtKg(value: number) {
   return `${fmt(value, 2)} kg`
 }
+function parseDecimal(value: string, fallback = 0) {
+  if (!value) return fallback
+  const normalized = value.trim().replace(/\s+/g, '').replace(/\./g, '').replace(',', '.')
+  const n = Number(normalized)
+  return Number.isFinite(n) ? n : fallback
+}
+function normalizeCode(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d+$/.test(trimmed)) {
+    const normalized = String(Number(trimmed))
+    return normalized === 'NaN' ? trimmed : normalized
+  }
+  return trimmed
+}
+function parseInadimplenciaTarget(targetText: string) {
+  if (targetText.includes('|')) {
+    const [pctRaw, daysRaw] = targetText.split('|')
+    return {
+      pct: Math.max(parseDecimal((pctRaw ?? '').replace('%', ''), 0), 0),
+      days: Math.max(Math.floor(parseDecimal(daysRaw ?? '45', 45)), 1),
+    }
+  }
+  const numbers = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
+  return {
+    pct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
+    days: Math.max(Math.floor(parseDecimal(numbers[1] ?? '45', 45)), 1),
+  }
+}
+function parseDistribuicaoTarget(targetText: string, totalActiveProducts: number) {
+  const parts = targetText.split('|').map((s) => s.trim())
+  const itemsPart = parts[0] ?? '0'
+  const itemsIsPercent = itemsPart.includes('%')
+  const itemsNum = Math.max(parseDecimal(itemsPart.replace('%', ''), 0), 0)
+  const resolvedItems = itemsIsPercent && totalActiveProducts > 0
+    ? Math.ceil((totalActiveProducts * itemsNum) / 100)
+    : Math.max(Math.floor(itemsNum), 0)
+  const clientsPct = Math.max(parseDecimal((parts[1] ?? '0').replace('%', ''), 0), 0)
+  return { resolvedItems, clientsPct }
+}
+function parseItemFocoTarget(targetText: string) {
+  if (targetText.includes('|')) {
+    const [volRaw, baseRaw] = targetText.split('|')
+    return {
+      volumePct: Math.max(parseDecimal((volRaw ?? '').replace('%', ''), 0), 0),
+      basePct: Math.max(parseDecimal((baseRaw ?? '').replace('%', ''), 0), 0),
+    }
+  }
+  const numbers = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
+  return {
+    volumePct: Math.max(parseDecimal(numbers[0] ?? '0', 0), 0),
+    basePct: Math.max(parseDecimal(numbers[1] ?? '0', 0), 0),
+  }
+}
+function getDistribuicaoProductsByStage(row: SellerDistributionRow, stage: string) {
+  if (stage === 'W1') return row.productsW1
+  if (stage === 'W2') return row.productsW2
+  if (stage === 'W3') return row.productsW3
+  if (stage === 'CLOSING') return row.productsClosing
+  return row.productsMonth
+}
+function getDistribuicaoItemsByStage(row: SellerDistributionItemsRow | undefined, stage: string) {
+  if (!row) return 0
+  if (stage === 'W1') return row.itemsW1
+  if (stage === 'W2') return row.itemsW2
+  if (stage === 'W3') return row.itemsW3
+  if (stage === 'CLOSING') return row.itemsClosing
+  return row.itemsMonth
+}
 
 function estimatePremioEarned(profileType: string, _pct: number, earnedReward: number): string {
   if (profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15') {
@@ -128,13 +226,17 @@ function computeEarnedReward(
   baseClientCount: number,
   weightTargets: WeightTarget[],
   brandWeightRows: BrandWeightRow[],
+  distributionBySellerProduct: Map<string, SellerDistributionRow[]>,
+  distributionItemsBySeller: Map<string, SellerDistributionItemsRow>,
+  totalActiveProducts: number,
+  focusConfig: FocusConfig | null,
+  focusRowsByProduct: Record<string, FocusProductRow[]>,
   sellerCode: string,
   todayIso: string,
 ): number {
   const startedWeeks = cycleWeeks.filter((w) => w.start <= todayIso)
   if (startedWeeks.length === 0 || monthlyTarget <= 0) return 0
 
-  // Pre-compute brand weight map for VOLUME
   const brandWeightMap = new Map<string, number>()
   for (const row of brandWeightRows) {
     if (row.sellerCode === sellerCode) {
@@ -159,7 +261,9 @@ function computeEarnedReward(
       kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' :
       kpiLabel.includes('volume') || kpiLabel.includes('categori') ? 'VOLUME' :
       kpiLabel.includes('devolu') ? 'DEVOLUCAO' :
-      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' : ''
+      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' :
+      kpiLabel.includes('distribui') ? 'DISTRIBUICAO' :
+      (kpiLabel.includes('item foco') || kpiLabel.includes('foco')) ? 'ITEM_FOCO' : ''
     )
 
     const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= stageEnd)
@@ -193,9 +297,7 @@ function computeEarnedReward(
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
       }
     } else if (kpiType === 'INADIMPLENCIA') {
-      const parts = rule.targetText.split('|')
-      const inadPct = parseFloat(parts[0] ?? '0') || 0
-      const atrasoDias = parseFloat(parts[1] ?? '0') || 0
+      const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
       const targetPct = inadPct > 0 ? inadPct / 100 : 0
       const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
       const overdueValue = openTitles
@@ -205,8 +307,53 @@ function computeEarnedReward(
         const actualPct = overdueValue / financial
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
       }
+    } else if (kpiType === 'DISTRIBUICAO') {
+      const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
+      const requiredClients = clientsPct > 0 && baseClientCount > 0
+        ? Math.ceil(baseClientCount * (clientsPct / 100))
+        : 0
+      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+      const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+      const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
+      const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+        const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
+        return sum + (productsByStage >= 1 ? 1 : 0)
+      }, 0)
+      if (resolvedItems > 0 && requiredClients > 0) {
+        const itemsProgress = soldItemsStage / Math.max(resolvedItems, 1)
+        const clientsProgress = clientsWithAnyItems / Math.max(requiredClients, 1)
+        progress = Math.min(itemsProgress, clientsProgress)
+      } else if (clientsPct > 0 && baseClientCount > 0) {
+        const fallbackRequiredClients = Math.ceil(baseClientCount * (clientsPct / 100))
+        const clientsAchieved = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
+        progress = clientsAchieved / Math.max(fallbackRequiredClients, 1)
+      } else {
+        progress = ordersUpToStage.length > 0 ? 1 : 0
+      }
+    } else if (kpiType === 'ITEM_FOCO') {
+      if (!focusConfig?.focusProductCode) {
+        progress = 0
+      } else {
+        const focusRows = focusRowsByProduct[focusConfig.focusProductCode] ?? []
+        const focusRow = focusRows.find((row) => normalizeCode(row.sellerCode) === sellerCode)
+        const soldKg = focusRow?.soldKg ?? 0
+        const soldClients = focusRow?.soldClients ?? 0
+        if (focusConfig.focusTargetMode === 'BASE_CLIENTS') {
+          const requiredBaseClients = focusConfig.focusTargetBasePct > 0
+            ? Math.ceil(baseClientCount * (focusConfig.focusTargetBasePct / 100))
+            : 0
+          progress = requiredBaseClients > 0 ? soldClients / Math.max(requiredBaseClients, 1) : 0
+        } else {
+          const { volumePct } = parseItemFocoTarget(rule.targetText)
+          const focusTargetKg = Math.max(focusConfig.focusTargetKg ?? 0, 0)
+          if (focusTargetKg > 0 && volumePct > 0) {
+            const requiredKg = focusTargetKg * (volumePct / 100)
+            progress = requiredKg > 0 ? soldKg / requiredKg : 0
+          }
+        }
+      }
     } else {
-      continue // DISTRIBUICAO, ITEM_FOCO, RENTABILIDADE — not computable from orders alone
+      continue
     }
 
     if (progress >= 1) earned += rule.rewardValue
@@ -221,8 +368,8 @@ type KpiProgress = {
   kpiType: string
   targetText: string
   rewardValue: number
-  progress: number       // 0–1.4 (capped)
-  isComputable: boolean  // false when we lack data (VOLUME, DISTRIBUICAO etc.)
+  progress: number
+  isComputable: boolean
   stageStarted: boolean
   stageEnded: boolean
 }
@@ -237,10 +384,14 @@ function computeAllKpiProgress(
   baseClientCount: number,
   weightTargets: WeightTarget[],
   brandWeightRows: BrandWeightRow[],
+  distributionBySellerProduct: Map<string, SellerDistributionRow[]>,
+  distributionItemsBySeller: Map<string, SellerDistributionItemsRow>,
+  totalActiveProducts: number,
+  focusConfig: FocusConfig | null,
+  focusRowsByProduct: Record<string, FocusProductRow[]>,
   sellerCode: string,
   todayIso: string,
 ): KpiProgress[] {
-  // Pre-compute brand weight map for VOLUME
   const brandWeightMap = new Map<string, number>()
   for (const row of brandWeightRows) {
     if (row.sellerCode === sellerCode) {
@@ -256,7 +407,7 @@ function computeAllKpiProgress(
   return rules.map((rule) => {
     const week = cycleWeeks.find((w) => w.key === rule.stage)
     const stageStarted = !!week && week.start <= todayIso
-    const stageEnded   = !!week && week.end < todayIso
+    const stageEnded = !!week && week.end < todayIso
 
     if (!week) return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType: rule.kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted: false, stageEnded: false }
 
@@ -266,10 +417,12 @@ function computeAllKpiProgress(
       kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' :
       kpiLabel.includes('volume') || kpiLabel.includes('categori') ? 'VOLUME' :
       kpiLabel.includes('devolu') ? 'DEVOLUCAO' :
-      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' : ''
+      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' :
+      kpiLabel.includes('distribui') ? 'DISTRIBUICAO' :
+      (kpiLabel.includes('item foco') || kpiLabel.includes('foco')) ? 'ITEM_FOCO' : ''
     )
 
-    const COMPUTABLE = new Set(['META_FINANCEIRA', 'BASE_CLIENTES', 'VOLUME', 'DEVOLUCAO', 'INADIMPLENCIA'])
+    const COMPUTABLE = new Set(['META_FINANCEIRA', 'BASE_CLIENTES', 'VOLUME', 'DEVOLUCAO', 'INADIMPLENCIA', 'DISTRIBUICAO', 'ITEM_FOCO'])
     if (!COMPUTABLE.has(kpiType)) {
       return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted, stageEnded }
     }
@@ -310,9 +463,7 @@ function computeAllKpiProgress(
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
       }
     } else if (kpiType === 'INADIMPLENCIA') {
-      const parts = rule.targetText.split('|')
-      const inadPct = parseFloat(parts[0] ?? '0') || 0
-      const atrasoDias = parseFloat(parts[1] ?? '0') || 0
+      const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
       const targetPct = inadPct > 0 ? inadPct / 100 : 0
       const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
       const overdueValue = openTitles
@@ -322,11 +473,57 @@ function computeAllKpiProgress(
         const actualPct = overdueValue / financial
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
       }
+    } else if (kpiType === 'DISTRIBUICAO') {
+      const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
+      const requiredClients = clientsPct > 0 && baseClientCount > 0
+        ? Math.ceil(baseClientCount * (clientsPct / 100))
+        : 0
+      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+      const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+      const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
+      const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+        const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
+        return sum + (productsByStage >= 1 ? 1 : 0)
+      }, 0)
+      if (resolvedItems > 0 && requiredClients > 0) {
+        const itemsProgress = soldItemsStage / Math.max(resolvedItems, 1)
+        const clientsProgress = clientsWithAnyItems / Math.max(requiredClients, 1)
+        progress = Math.min(itemsProgress, clientsProgress)
+      } else if (clientsPct > 0 && baseClientCount > 0) {
+        const fallbackRequiredClients = Math.ceil(baseClientCount * (clientsPct / 100))
+        const clientsAchieved = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
+        progress = clientsAchieved / Math.max(fallbackRequiredClients, 1)
+      } else {
+        progress = ordersUpToStage.length > 0 ? 1 : 0
+      }
+    } else if (kpiType === 'ITEM_FOCO') {
+      if (!focusConfig?.focusProductCode) {
+        progress = 0
+      } else {
+        const focusRows = focusRowsByProduct[focusConfig.focusProductCode] ?? []
+        const focusRow = focusRows.find((row) => normalizeCode(row.sellerCode) === sellerCode)
+        const soldKg = focusRow?.soldKg ?? 0
+        const soldClients = focusRow?.soldClients ?? 0
+        if (focusConfig.focusTargetMode === 'BASE_CLIENTS') {
+          const requiredBaseClients = focusConfig.focusTargetBasePct > 0
+            ? Math.ceil(baseClientCount * (focusConfig.focusTargetBasePct / 100))
+            : 0
+          progress = requiredBaseClients > 0 ? soldClients / Math.max(requiredBaseClients, 1) : 0
+        } else {
+          const { volumePct } = parseItemFocoTarget(rule.targetText)
+          const focusTargetKg = Math.max(focusConfig.focusTargetKg ?? 0, 0)
+          if (focusTargetKg > 0 && volumePct > 0) {
+            const requiredKg = focusTargetKg * (volumePct / 100)
+            progress = requiredKg > 0 ? soldKg / requiredKg : 0
+          }
+        }
+      }
     }
 
     return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: Math.min(progress, 1.4), isComputable: true, stageStarted, stageEnded }
   })
 }
+
 function fmtPct(value: number, decimals = 1) {
   return `${fmt(value, decimals)}%`
 }
@@ -375,6 +572,32 @@ export default function SupervisorPwaDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [brandWeightRows, setBrandWeightRows] = useState<BrandWeightRow[]>([])
   const [weightTargetsBySeller, setWeightTargetsBySeller] = useState<Record<string, WeightTarget[]>>({})
+  const [distributionRows, setDistributionRows] = useState<SellerDistributionRow[]>([])
+  const [distributionSellerItemsRows, setDistributionSellerItemsRows] = useState<SellerDistributionItemsRow[]>([])
+  const [distributionProductCount, setDistributionProductCount] = useState(0)
+  const [focusConfigBySeller, setFocusConfigBySeller] = useState<Record<string, FocusConfig>>({})
+  const [focusRowsByProduct, setFocusRowsByProduct] = useState<Record<string, FocusProductRow[]>>({})
+
+  const distributionBySellerProduct = useMemo(() => {
+    const bySeller = new Map<string, SellerDistributionRow[]>()
+    for (const row of distributionRows) {
+      const sellerCode = normalizeCode(String(row.sellerCode ?? ''))
+      if (!sellerCode) continue
+      if (!bySeller.has(sellerCode)) bySeller.set(sellerCode, [])
+      bySeller.get(sellerCode)!.push(row)
+    }
+    return bySeller
+  }, [distributionRows])
+
+  const distributionItemsBySeller = useMemo(() => {
+    const bySeller = new Map<string, SellerDistributionItemsRow>()
+    for (const row of distributionSellerItemsRows) {
+      const sellerCode = normalizeCode(String(row.sellerCode ?? ''))
+      if (!sellerCode) continue
+      bySeller.set(sellerCode, row)
+    }
+    return bySeller
+  }, [distributionSellerItemsRows])
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -412,10 +635,11 @@ export default function SupervisorPwaDashboard() {
     setLoadState('loading')
     setError('')
     try {
-      const [perfRes, summaryRes, brandWeightRes] = await Promise.all([
+      const [perfRes, summaryRes, brandWeightRes, distributionRes] = await Promise.all([
         fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
         fetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
+        fetch(`/api/metas/sellers-performance/item-distribution?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
       ])
 
       if (!perfRes.ok) {
@@ -423,10 +647,11 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData, brandWeightData] = await Promise.all([
+      const [perfData, summaryData, brandWeightData, distributionData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
         brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
+        distributionRes.ok ? distributionRes.json() : Promise.resolve(null),
       ])
 
       setSellers(perfData.sellers ?? [])
@@ -438,13 +663,44 @@ export default function SupervisorPwaDashboard() {
       const mrewards: Record<string, number> = {}
       const srules: Record<string, SellerRule[]> = {}
       const swtargets: Record<string, WeightTarget[]> = {}
+      const sfocus: Record<string, FocusConfig> = {}
+      const focusCodes = new Set<string>()
       if (summaryData?.sellers) {
         for (const s of summaryData.sellers) {
-          if (s.code && s.monthlyTarget > 0) targets[s.code] = s.monthlyTarget
-          if (s.code) ptypes[s.code] = s.profileType ?? 'NOVATO'
-          if (s.code && s.maxReward > 0) mrewards[s.code] = s.maxReward
-          if (s.code && Array.isArray(s.rules)) srules[s.code] = s.rules
-          if (s.code && Array.isArray(s.weightTargets)) swtargets[s.code] = s.weightTargets
+          if (s.code) {
+            const normalizedSellerCode = normalizeCode(String(s.code))
+            if (s.monthlyTarget > 0) {
+              targets[s.code] = s.monthlyTarget
+              if (normalizedSellerCode) targets[normalizedSellerCode] = s.monthlyTarget
+            }
+            ptypes[s.code] = s.profileType ?? 'NOVATO'
+            if (normalizedSellerCode) ptypes[normalizedSellerCode] = s.profileType ?? 'NOVATO'
+            if (s.maxReward > 0) {
+              mrewards[s.code] = s.maxReward
+              if (normalizedSellerCode) mrewards[normalizedSellerCode] = s.maxReward
+            }
+            if (Array.isArray(s.rules)) {
+              srules[s.code] = s.rules
+              if (normalizedSellerCode) srules[normalizedSellerCode] = s.rules
+            }
+            if (Array.isArray(s.weightTargets)) {
+              swtargets[s.code] = s.weightTargets
+              if (normalizedSellerCode) swtargets[normalizedSellerCode] = s.weightTargets
+            }
+          }
+          if (s.code) {
+            const normalizedSellerCode = normalizeCode(String(s.code))
+            const focusProductCode = String(s.focusProductCode ?? '').trim()
+            const focusCfg: FocusConfig = {
+              focusProductCode,
+              focusTargetKg: Number(s.focusTargetKg ?? 0),
+              focusTargetMode: s.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG',
+              focusTargetBasePct: Number(s.focusTargetBasePct ?? 0),
+            }
+            sfocus[s.code] = focusCfg
+            if (normalizedSellerCode) sfocus[normalizedSellerCode] = focusCfg
+            if (focusProductCode) focusCodes.add(focusProductCode)
+          }
         }
       }
       setMonthlyTargets(targets)
@@ -452,6 +708,30 @@ export default function SupervisorPwaDashboard() {
       setMaxRewards(mrewards)
       setSellerRules(srules)
       setWeightTargetsBySeller(swtargets)
+      setFocusConfigBySeller(sfocus)
+      setDistributionRows((distributionData?.rows ?? []) as SellerDistributionRow[])
+      setDistributionSellerItemsRows((distributionData?.sellerItems ?? []) as SellerDistributionItemsRow[])
+      setDistributionProductCount(Number(distributionData?.diagnostics?.productCodesRequested ?? 0))
+
+      if (focusCodes.size > 0) {
+        const entries = await Promise.all(
+          [...focusCodes].map(async (code) => {
+            const res = await fetch(`/api/metas/sellers-performance/product-focus?year=${year}&month=${month}&companyScope=all&productCode=${encodeURIComponent(code)}`, { cache: 'no-store' })
+            if (!res.ok) return [code, []] as const
+            const payload = await res.json().catch(() => ({}))
+            const rows = Array.isArray(payload?.rows) ? payload.rows : []
+            const normalizedRows: FocusProductRow[] = rows.map((row: Record<string, unknown>) => ({
+              sellerCode: normalizeCode(String(row.sellerCode ?? '')),
+              soldKg: Number(row.soldKg ?? 0),
+              soldClients: Number(row.soldClients ?? 0),
+            }))
+            return [code, normalizedRows] as const
+          })
+        )
+        setFocusRowsByProduct(Object.fromEntries(entries))
+      } else {
+        setFocusRowsByProduct({})
+      }
       if (Array.isArray(summaryData?.cycleWeeks)) setCycleWeeks(summaryData.cycleWeeks)
       setLastUpdated(new Date())
       setLoadState('success')
@@ -491,7 +771,8 @@ export default function SupervisorPwaDashboard() {
   const totalWeight = sellers.reduce((s, r) => s + r.totalGrossWeight, 0)
   const totalTarget = sellers.reduce((s, r) => {
     const code = r.id.replace(/^sankhya-/, '')
-    return s + (monthlyTargets[code] ?? 0)
+    const normalizedCode = normalizeCode(code)
+    return s + (monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0)
   }, 0)
   const overallPct = totalTarget > 0 ? (totalRevenue / totalTarget) * 100 : 0
 
@@ -499,15 +780,17 @@ export default function SupervisorPwaDashboard() {
 
   const sellerCards = sellers.map((seller) => {
     const code = seller.id.replace(/^sankhya-/, '')
-    const target = monthlyTargets[code] ?? 0
+    const normalizedCode = normalizeCode(code)
+    const target = monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0
     const pct = target > 0 ? (seller.totalValue / target) * 100 : 0
     const status = inferStatus(pct)
     const clients = countDistinctClients(seller)
-    const profileType = profileTypes[code] ?? 'NOVATO'
-    const maxReward = maxRewards[code] ?? 0
-    const wTargets = weightTargetsBySeller[code] ?? []
+    const profileType = profileTypes[code] ?? profileTypes[normalizedCode] ?? 'NOVATO'
+    const maxReward = maxRewards[code] ?? maxRewards[normalizedCode] ?? 0
+    const wTargets = weightTargetsBySeller[code] ?? weightTargetsBySeller[normalizedCode] ?? []
+    const focusConfig = focusConfigBySeller[code] ?? focusConfigBySeller[normalizedCode] ?? null
     const earnedReward = computeEarnedReward(
-      sellerRules[code] ?? [],
+      sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
       cycleWeeks,
       seller.orders,
       seller.returns ?? [],
@@ -516,11 +799,16 @@ export default function SupervisorPwaDashboard() {
       seller.baseClientCount,
       wTargets,
       brandWeightRows,
-      code,
+      distributionBySellerProduct,
+      distributionItemsBySeller,
+      distributionProductCount,
+      focusConfig,
+      focusRowsByProduct,
+      normalizedCode,
       todayIso,
     )
     const kpiProgress = computeAllKpiProgress(
-      sellerRules[code] ?? [],
+      sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
       cycleWeeks,
       seller.orders,
       seller.returns ?? [],
@@ -529,7 +817,12 @@ export default function SupervisorPwaDashboard() {
       seller.baseClientCount,
       wTargets,
       brandWeightRows,
-      code,
+      distributionBySellerProduct,
+      distributionItemsBySeller,
+      distributionProductCount,
+      focusConfig,
+      focusRowsByProduct,
+      normalizedCode,
       todayIso,
     )
     return { seller, code, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }
@@ -1053,3 +1346,4 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     </div>
   )
 }
+
