@@ -531,6 +531,13 @@ function monthLabel(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 }
 
+function formatHeaderIdentity(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].toUpperCase()
+  return `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase()
+}
+
 function inferStatus(pct: number): SellerStatus {
   if (pct >= 107) return 'SUPEROU'
   if (pct >= 100) return 'NO_ALVO'
@@ -847,28 +854,28 @@ export default function SupervisorPwaDashboard() {
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="relative h-8 w-8 overflow-hidden rounded-lg">
-              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="32px" className="object-contain" />
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
+              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
             </div>
             <div>
-              <p className="text-xs font-semibold leading-tight text-white">{user.name.split(' ')[0]}</p>
-              <p className="text-[10px] text-emerald-400 leading-tight">Supervisor Comercial</p>
+              <p className="text-sm font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">SUPERVISOR COMERCIAL</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <div className="pwa-offline-indicator flex h-8 w-8 items-center justify-center rounded-lg" title="Sem conexão com a internet" aria-label="Sem conexão com a internet">
-                <CloudOff className="h-4 w-4" />
+              <div className="pwa-offline-indicator flex h-9 w-9 items-center justify-center rounded-lg" title="Sem conexão com a internet" aria-label="Sem conexão com a internet">
+                <CloudOff className="h-4.5 w-4.5" />
               </div>
             )}
             <button
               type="button"
               onClick={() => loadData()}
               disabled={loadState === 'loading'}
-              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
+              className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
               aria-label="Atualizar"
             >
               <RefreshCw className={`h-4 w-4 ${loadState === 'loading' ? 'animate-spin text-emerald-400' : ''}`} />
@@ -876,7 +883,7 @@ export default function SupervisorPwaDashboard() {
             <button
               type="button"
               onClick={signOut}
-              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
+              className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
               aria-label="Sair"
             >
               <LogOut className="h-4 w-4" />
@@ -967,28 +974,31 @@ export default function SupervisorPwaDashboard() {
 
               {/* Pedidos */}
               <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <ShoppingCart className="h-3 w-3" />
-                  Pedidos
+                <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                  <span className="flex items-center gap-1.5">
+                    <ShoppingCart className="h-3 w-3" />
+                    Pedidos
+                  </span>
+                  <span className="rounded-md border border-surface-700/60 bg-surface-800/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-surface-300">NO MES</span>
                 </div>
                 <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
                   {fmt(totalOrders)}
-                  <span className="ml-1 text-xs font-semibold text-surface-400">un.</span>
                 </p>
-                <p className="text-[10px] text-surface-500">no mês</p>
               </div>
 
               {/* Peso */}
               <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <Weight className="h-3 w-3" />
-                  Peso Total
+                <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                  <span className="flex items-center gap-1.5">
+                    <Weight className="h-3 w-3" />
+                    Peso Total
+                  </span>
+                  <span className="rounded-md border border-surface-700/60 bg-surface-800/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-surface-300">BRUTO</span>
                 </div>
                 <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
                   {fmt(totalWeight, 2)}
                   <span className="ml-1 text-xs font-semibold text-surface-400">kg</span>
                 </p>
-                <p className="text-[10px] text-surface-500">bruto</p>
               </div>
 
               {/* Valor */}
@@ -1006,7 +1016,7 @@ export default function SupervisorPwaDashboard() {
               <div className="flex items-center gap-2 px-1 pb-1">
                 <Users className="h-4 w-4 text-surface-500" />
                 <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Vendedores</p>
-                <span className="ml-auto text-[10px] text-surface-600">{sellers.length} monitorados</span>
+                <span className="ml-auto text-xs font-semibold tabular-nums text-surface-300">{sellers.length}</span>
               </div>
 
               {sellerCards.map(({ seller, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }, idx) => {
@@ -1332,4 +1342,5 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     </div>
   )
 }
+
 

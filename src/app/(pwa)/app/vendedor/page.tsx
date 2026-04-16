@@ -67,6 +67,13 @@ function countDistinctClients(orders: Order[]) {
   return new Set(orders.map((o) => o.clientCode).filter(Boolean)).size
 }
 
+function formatHeaderIdentity(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].toUpperCase()
+  return `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase()
+}
+
 /* ─────────────────────────────────────────────
    Component
 ───────────────────────────────────────────── */
@@ -195,27 +202,27 @@ export default function VendedorPwaDashboard() {
 
       {/* Top bar */}
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="relative h-8 w-8 overflow-hidden rounded-lg">
-              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="32px" className="object-contain" />
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
+              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
             </div>
             <div>
-              <p className="text-xs font-semibold leading-tight text-white">{user.name.split(' ')[0]}</p>
-              <p className="text-[10px] text-emerald-400 leading-tight">Meu Painel</p>
+              <p className="text-sm font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">MEU PAINEL</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <div className="pwa-offline-indicator flex h-8 w-8 items-center justify-center rounded-lg" title="Sem conexão com a internet" aria-label="Sem conexão com a internet">
-                <CloudOff className="h-4 w-4" />
+              <div className="pwa-offline-indicator flex h-9 w-9 items-center justify-center rounded-lg" title="Sem conexão com a internet" aria-label="Sem conexão com a internet">
+                <CloudOff className="h-4.5 w-4.5" />
               </div>
             )}
             <button
               type="button"
               onClick={() => loadData()}
               disabled={loadState === 'loading'}
-              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
+              className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95 disabled:opacity-50"
               aria-label="Atualizar"
             >
               <RefreshCw className={`h-4 w-4 ${loadState === 'loading' ? 'animate-spin text-emerald-400' : ''}`} />
@@ -223,7 +230,7 @@ export default function VendedorPwaDashboard() {
             <button
               type="button"
               onClick={signOut}
-              className="pwa-icon-btn flex h-8 w-8 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
+              className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
               aria-label="Sair"
             >
               <LogOut className="h-4 w-4" />
