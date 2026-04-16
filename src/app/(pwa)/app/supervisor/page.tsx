@@ -1030,15 +1030,15 @@ export default function SupervisorPwaDashboard() {
                   <ShoppingCart className="h-3 w-3" />
                   Pedidos no mês
                 </div>
-                <div className="mt-1 flex items-end justify-between gap-2">
-                  <p className="text-base font-bold text-white whitespace-nowrap">{fmt(totalOrders)}</p>
+                <p className="mt-1 inline-flex items-baseline gap-2 whitespace-nowrap text-base font-bold text-white">
+                  <span>{fmt(totalOrders)}</span>
                   <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                    className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
                       ordersComparison.trend === 'up'
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                        ? 'text-emerald-300'
                         : ordersComparison.trend === 'down'
-                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-                        : 'border-surface-700/60 bg-surface-800/50 text-surface-300'
+                        ? 'text-amber-300'
+                        : 'text-surface-300'
                     }`}
                     title={`Comparação no mesmo período do mês anterior: ${fmt(ordersComparison.currentSamePeriodOrders)} vs ${fmt(ordersComparison.previousSamePeriodOrders)}`}
                   >
@@ -1048,10 +1048,10 @@ export default function SupervisorPwaDashboard() {
                         {`${ordersComparison.deltaPct >= 0 ? '+' : ''}${fmt(ordersComparison.deltaPct, 1)}%`}
                       </>
                     ) : (
-                      <span>Sem base</span>
+                      <span>sem base</span>
                     )}
                   </span>
-                </div>
+                </p>
               </div>
 
               {/* Peso */}

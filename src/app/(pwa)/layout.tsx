@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'Ouro Verde',
+    absolute: 'Ouro Verde | Café pra vida inteira!',
   },
   description: 'Plataforma corporativa Ouro Verde',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Ouro Verde',
+    title: 'Ouro Verde | Café pra vida inteira!',
   },
 }
 
