@@ -2,6 +2,7 @@
 
 import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import MobilePwaRedirect from './MobilePwaRedirect'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -48,6 +49,15 @@ function notifSymbol(type: string) {
 }
 
 export default function Header() {
+  return (
+    <>
+      <MobilePwaRedirect />
+      <HeaderInner />
+    </>
+  )
+}
+
+function HeaderInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<UserInfo | null>(null)
