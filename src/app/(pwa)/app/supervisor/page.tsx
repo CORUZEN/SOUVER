@@ -1288,7 +1288,6 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const Icon = KPI_TYPE_ICON[kpi.kpiType] ?? Target
                 const pctDisplay = Math.min(kpi.progress * 100, 100)
                 const isHit = kpi.isComputable && kpi.progress >= 1
-                const isOver = kpi.isComputable && kpi.progress > 1
 
                 const barColor = !kpi.isComputable || isPending
                   ? 'bg-surface-600'
@@ -1318,9 +1317,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                         {isHit && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
                         <span className={`text-[11px] font-bold ${pctColor}`}>
                           {kpi.isComputable && !isPending
-                            ? isOver
-                              ? `${fmt(kpi.progress * 100, 0)}%`
-                              : `${fmt(pctDisplay, 0)}%`
+                            ? `${fmt(pctDisplay, 0)}%`
                             : isPending ? '-' : '?'
                           }
                         </span>
