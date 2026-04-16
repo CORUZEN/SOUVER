@@ -669,11 +669,10 @@ export default function SupervisorPwaDashboard() {
     setError('')
     try {
       const prevPeriod = getPreviousPeriod(year, month)
-      const [perfRes, summaryRes, brandWeightRes, distributionRes, prevPerfRes] = await Promise.all([
+      const [perfRes, summaryRes, brandWeightRes, prevPerfRes] = await Promise.all([
         fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
         fetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
-        fetch(`/api/metas/sellers-performance/item-distribution?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`, { cache: 'no-store' }),
       ])
 
@@ -682,13 +681,40 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData, brandWeightData, distributionData, prevPerfData] = await Promise.all([
+      const [perfData, summaryData, brandWeightData, prevPerfData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
         brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
-        distributionRes.ok ? distributionRes.json() : Promise.resolve(null),
         prevPerfRes.ok ? prevPerfRes.json() : Promise.resolve(null),
       ])
+
+      const cycleWeeksFromSummary: CycleWeek[] = Array.isArray(summaryData?.cycleWeeks)
+        ? (summaryData.cycleWeeks as CycleWeek[])
+        : []
+
+      // Keep item-distribution in sync with web calculations by sending stage closing dates.
+      const distParams = new URLSearchParams({
+        year: String(year),
+        month: String(month),
+        companyScope: 'all',
+      })
+      const weekByKey = new Map(cycleWeeksFromSummary.map((w) => [String(w.key).toUpperCase(), w]))
+      const w1 = weekByKey.get('W1')?.end
+      const w2 = weekByKey.get('W2')?.end
+      const w3 = weekByKey.get('W3')?.end
+      const closing = weekByKey.get('CLOSING')?.end
+      if (w1) distParams.set('w1End', w1)
+      if (w2) distParams.set('w2End', w2)
+      if (w3) distParams.set('w3End', w3)
+      if (closing) distParams.set('closingEnd', closing)
+
+      let distributionData: { rows?: SellerDistributionRow[]; sellerItems?: SellerDistributionItemsRow[]; diagnostics?: { productCodesRequested?: number } } | null = null
+      try {
+        const distributionRes = await fetch(`/api/metas/sellers-performance/item-distribution?${distParams.toString()}`, { cache: 'no-store' })
+        distributionData = distributionRes.ok ? await distributionRes.json() : null
+      } catch {
+        distributionData = null
+      }
 
       setSellers(perfData.sellers ?? [])
       setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
@@ -769,7 +795,7 @@ export default function SupervisorPwaDashboard() {
       } else {
         setFocusRowsByProduct({})
       }
-      if (Array.isArray(summaryData?.cycleWeeks)) setCycleWeeks(summaryData.cycleWeeks)
+      if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
       setLastUpdated(new Date())
       setLoadState('success')
     } catch (err) {
