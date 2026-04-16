@@ -93,15 +93,18 @@ export default function VendedorPwaDashboard() {
   const [isOnline, setIsOnline] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showOrders, setShowOrders] = useState(false)
+  const [bootProgress, setBootProgress] = useState(0)
 
   // Auth
   useEffect(() => {
+    setBootProgress(0)
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'SELLER') { router.replace('/app'); return }
+        setBootProgress(100)
         setUser({ name: data.user.name, roleCode, sellerCode: data.user.sellerCode })
       })
       .catch(() => router.replace('/login'))
@@ -120,10 +123,18 @@ export default function VendedorPwaDashboard() {
   const loadData = useCallback(async () => {
     setLoadState('loading')
     setError('')
+    setBootProgress(0)
     try {
+      let completed = 0
+      const total = 2
+      const markDone = () => {
+        completed += 1
+        setBootProgress(Math.round((completed / total) * 100))
+      }
+
       const [perfRes, summaryRes] = await Promise.all([
-        fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
-        fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
+        fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }).finally(markDone),
+        fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }).finally(markDone),
       ])
       if (!perfRes.ok) {
         const d = await perfRes.json().catch(() => ({}))
@@ -145,6 +156,7 @@ export default function VendedorPwaDashboard() {
         const found = summaryData.sellers.find((s: { code: string; monthlyTarget: number }) => s.code === code)
         setTarget(found?.monthlyTarget ?? 0)
       }
+      setBootProgress(100)
       setLastUpdated(new Date())
       setLoadState('success')
     } catch (err) {
@@ -191,7 +203,11 @@ export default function VendedorPwaDashboard() {
   }
 
   if (!user) {
-    return <PwaLoadingScreen label="Validando acesso" />
+    return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
+  }
+
+  if (loadState === 'loading' && !seller) {
+    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
   }
 
   return (
@@ -260,10 +276,6 @@ export default function VendedorPwaDashboard() {
             <p className="mt-1 text-xs text-red-400/80">{error}</p>
             <button type="button" onClick={() => loadData()} className="mt-3 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-300 hover:bg-red-500/30">Tentar novamente</button>
           </div>
-        )}
-
-        {loadState === 'loading' && !seller && (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-surface-800" />)}</div>
         )}
 
         {seller && (

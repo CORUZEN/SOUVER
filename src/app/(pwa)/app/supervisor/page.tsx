@@ -611,6 +611,7 @@ export default function SupervisorPwaDashboard() {
   const [focusConfigBySeller, setFocusConfigBySeller] = useState<Record<string, FocusConfig>>({})
   const [focusRowsByProduct, setFocusRowsByProduct] = useState<Record<string, FocusProductRow[]>>({})
   const [previousMonthSellers, setPreviousMonthSellers] = useState<SellerRow[]>([])
+  const [bootProgress, setBootProgress] = useState(0)
 
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
@@ -635,12 +636,14 @@ export default function SupervisorPwaDashboard() {
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
+    setBootProgress(0)
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'COMMERCIAL_SUPERVISOR') { router.replace('/app'); return }
+        setBootProgress(100)
         setUser({
           name: data.user.name,
           role: data.user.role,
@@ -668,13 +671,31 @@ export default function SupervisorPwaDashboard() {
   const loadData = useCallback(async () => {
     setLoadState('loading')
     setError('')
+    setBootProgress(0)
     try {
+      let completed = 0
+      let total = 0
+      const markTotal = (stepCount = 1) => {
+        total += stepCount
+        const next = total > 0 ? Math.round((completed / total) * 100) : 0
+        setBootProgress(next)
+      }
+      const markDone = () => {
+        completed += 1
+        const next = total > 0 ? Math.round((completed / total) * 100) : 0
+        setBootProgress(next)
+      }
+      const trackedFetch = (url: string) => {
+        markTotal(1)
+        return fetch(url, { cache: 'no-store' }).finally(markDone)
+      }
+
       const prevPeriod = getPreviousPeriod(year, month)
       const [perfRes, summaryRes, brandWeightRes, prevPerfRes] = await Promise.all([
-        fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
-        fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
-        fetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
-        fetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`, { cache: 'no-store' }),
+        trackedFetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`),
+        trackedFetch(`/api/pwa/summary?year=${year}&month=${month}`),
+        trackedFetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`),
+        trackedFetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`),
       ])
 
       if (!perfRes.ok) {
@@ -711,7 +732,7 @@ export default function SupervisorPwaDashboard() {
 
       let distributionData: { rows?: SellerDistributionRow[]; sellerItems?: SellerDistributionItemsRow[]; diagnostics?: { productCodesRequested?: number } } | null = null
       try {
-        const distributionRes = await fetch(`/api/metas/sellers-performance/item-distribution?${distParams.toString()}`, { cache: 'no-store' })
+        const distributionRes = await trackedFetch(`/api/metas/sellers-performance/item-distribution?${distParams.toString()}`)
         distributionData = distributionRes.ok ? await distributionRes.json() : null
       } catch {
         distributionData = null
@@ -778,9 +799,10 @@ export default function SupervisorPwaDashboard() {
       setDistributionProductCount(Number(distributionData?.diagnostics?.productCodesRequested ?? 0))
 
       if (focusCodes.size > 0) {
+        markTotal(focusCodes.size)
         const entries = await Promise.all(
           [...focusCodes].map(async (code) => {
-            const res = await fetch(`/api/metas/sellers-performance/product-focus?year=${year}&month=${month}&companyScope=all&productCode=${encodeURIComponent(code)}`, { cache: 'no-store' })
+            const res = await fetch(`/api/metas/sellers-performance/product-focus?year=${year}&month=${month}&companyScope=all&productCode=${encodeURIComponent(code)}`, { cache: 'no-store' }).finally(markDone)
             if (!res.ok) return [code, []] as const
             const payload = await res.json().catch(() => ({}))
             const rows = Array.isArray(payload?.rows) ? payload.rows : []
@@ -797,6 +819,7 @@ export default function SupervisorPwaDashboard() {
         setFocusRowsByProduct({})
       }
       if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
+      setBootProgress(100)
       setLastUpdated(new Date())
       setLoadState('success')
     } catch (err) {
@@ -920,7 +943,11 @@ export default function SupervisorPwaDashboard() {
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
   if (!user) {
-    return <PwaLoadingScreen label="Validando acesso" />
+    return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
+  }
+
+  if (loadState === 'loading' && sellers.length === 0) {
+    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
   }
 
   return (
