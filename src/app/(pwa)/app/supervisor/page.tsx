@@ -642,7 +642,7 @@ export default function SupervisorPwaDashboard() {
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'COMMERCIAL_SUPERVISOR') { router.replace('/app'); return }
+        if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR') { router.replace('/app'); return }
         setBootProgress(100)
         setUser({
           name: data.user.name,
@@ -963,7 +963,9 @@ export default function SupervisorPwaDashboard() {
             <div className="h-9 w-px bg-surface-700/60" aria-hidden="true" />
             <div>
               <p className="text-[13px] font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">SUPERVISOR COMERCIAL</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">
+                {user.roleCode === 'SALES_SUPERVISOR' ? 'SUPERVISOR DE VENDAS' : 'SUPERVISOR COMERCIAL'}
+              </p>
             </div>
           </div>
 

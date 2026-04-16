@@ -554,7 +554,7 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => Number(a.sellerCode) - Number(b.sellerCode))
 
     // Supervisor scope: filter to only sellers supervised by this user
-    const isSupervisorScope = authUser.role?.code === 'COMMERCIAL_SUPERVISOR'
+    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
     const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
     let sellers = allSellers
     if (supervisorSellerCode) {

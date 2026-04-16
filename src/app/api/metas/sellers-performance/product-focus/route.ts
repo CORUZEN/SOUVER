@@ -263,7 +263,7 @@ export async function GET(req: NextRequest) {
     const appKey = config.appKey ?? config.token ?? null
 
     const allowlist = await readSellerAllowlist()
-    const isSupervisorScope = authUser.role?.code === 'COMMERCIAL_SUPERVISOR'
+    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
     const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
     const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
     const allowedSellers = supervisorSellerCode

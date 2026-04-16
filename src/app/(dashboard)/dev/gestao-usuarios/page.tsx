@@ -149,13 +149,13 @@ export default function GestaoUsuariosPage() {
   }, [search, filterRole, filterDept, filterStatus])
 
   const selectedRole = useMemo(() => roles.find((r) => r.id === form.roleId) ?? null, [roles, form.roleId])
-  const isCommercialSupervisor = selectedRole?.code === 'COMMERCIAL_SUPERVISOR'
+  const isSalesSupervisor = selectedRole?.code === 'SALES_SUPERVISOR'
   const comercialDept = useMemo(() => departments.find((d) => d.name.toLowerCase().includes('comercial') || d.code?.toLowerCase().includes('comercial')) ?? null, [departments])
 
   function handleRoleChange(roleId: string) {
     const role = roles.find((r) => r.id === roleId) ?? null
     const updates: Partial<UserFormData> = { roleId }
-    if (role?.code === 'COMMERCIAL_SUPERVISOR') {
+    if (role?.code === 'SALES_SUPERVISOR') {
       if (comercialDept) updates.departmentId = comercialDept.id
       // clear sellerCode so user picks from selector
       updates.sellerCode = ''
@@ -363,10 +363,10 @@ export default function GestaoUsuariosPage() {
             <Select label="Cargo" value={form.roleId} onChange={(e) => handleRoleChange(e.target.value)} options={roleFormOptions} />
             <Select label="Departamento" value={form.departmentId} onChange={(e) => setForm((p) => ({ ...p, departmentId: e.target.value }))} options={[{ value: '', label: 'Sem departamento' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
-          {isCommercialSupervisor && (
+          {isSalesSupervisor && (
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-surface-700">
-                Supervisor comercial <span className="text-error-500">*</span>
+                Supervisor de vendas <span className="text-error-500">*</span>
               </label>
               {supervisorSellers.length > 0 ? (
                 <select
@@ -419,4 +419,3 @@ export default function GestaoUsuariosPage() {
     </div>
   )
 }
-

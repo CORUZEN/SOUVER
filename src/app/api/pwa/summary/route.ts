@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     'COMMERCIAL_MANAGER',
     'DIRECTORATE',
     'COMMERCIAL_SUPERVISOR',
+    'SALES_SUPERVISOR',
     'SELLER',
   ])
   if (!ALLOWED_ROLES.has(roleCode)) {
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
   const monthConfig = (monthConfigs[activeKey] as Record<string, unknown> | null) ?? null
 
   // ── Allowlist — scoped to supervisor if needed ─────────────────────────────
-  const isSupervisor = roleCode === 'COMMERCIAL_SUPERVISOR'
+  const isSupervisor = roleCode === 'SALES_SUPERVISOR'
   const supervisorCode = isSupervisor ? (user.sellerCode ?? null) : null
   const allowlist = await readSellerAllowlist()
   const activeSellers = getActiveAllowedSellersFromList(allowlist)

@@ -369,7 +369,13 @@ export async function GET(req: NextRequest) {
       readSellerAllowlist(),
       readProductAllowlist(),
     ])
-    const sellerCodes = canonicalizeCodeList(getActiveAllowedSellersFromList(sellerAllowlist)
+    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
+    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+    const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
+    const scopedSellers = supervisorSellerCode
+      ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+      : activeSellers
+    const sellerCodes = canonicalizeCodeList(scopedSellers
       .map((s) => String(s.code ?? '').trim())
       .filter((c) => c.length > 0))
     const productCodes = canonicalizeCodeList(getActiveAllowedProductsFromList(productAllowlist)

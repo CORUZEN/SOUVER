@@ -19,7 +19,8 @@ export const ROLE_CATALOG: RoleCatalogItem[] = [
   { name: 'Produção', code: 'PRODUCTION', description: 'Operação e controle de produção' },
   { name: 'Assistente de Logística', code: 'LOGISTICS_ASSISTANT', description: 'Suporte operacional à logística' },
   { name: 'Vendedor', code: 'SELLER', description: 'Vendedor com acesso ao painel de metas e desempenho próprio' },
-  { name: 'Supervisor Comercial', code: 'COMMERCIAL_SUPERVISOR', description: 'Supervisor com acesso restrito ao painel de metas dos seus vendedores' },
+  { name: 'Supervisor Comercial', code: 'COMMERCIAL_SUPERVISOR', description: 'Supervisor comercial com visão ampla de vendedores e metas da operação' },
+  { name: 'Supervisor de Vendas', code: 'SALES_SUPERVISOR', description: 'Supervisor com acesso restrito ao painel de metas dos seus vendedores' },
 ]
 
 export const ROLE_CATALOG_CODES = ROLE_CATALOG.map((role) => role.code)

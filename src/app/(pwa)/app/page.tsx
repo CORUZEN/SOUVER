@@ -13,7 +13,7 @@ export default function PwaEntryPage() {
       .then((data) => {
         const roleCode = data?.user?.roleCode?.toUpperCase() ?? ''
 
-        if (roleCode === 'COMMERCIAL_SUPERVISOR') {
+        if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
           router.replace('/app/supervisor')
           return
         }
