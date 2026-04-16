@@ -893,8 +893,7 @@ export default function SupervisorPwaDashboard() {
     const code = seller.id.replace(/^sankhya-/, '')
     const normalizedCode = normalizeCode(code)
     const target = monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0
-    const pct = target > 0 ? (seller.totalValue / target) * 100 : 0
-    const status = inferStatus(pct)
+    const financialPct = target > 0 ? (seller.totalValue / target) * 100 : 0
     const clients = countDistinctClients(seller)
     const profileType = profileTypes[code] ?? profileTypes[normalizedCode] ?? 'NOVATO'
     const maxReward = maxRewards[code] ?? maxRewards[normalizedCode] ?? 0
@@ -936,10 +935,23 @@ export default function SupervisorPwaDashboard() {
       normalizedCode,
       todayIso,
     )
-    return { seller, code, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }
-  }).sort((a, b) => b.pct - a.pct)
+    const rulesForSeller = sellerRules[code] ?? sellerRules[normalizedCode] ?? []
+    const pointsAchieved = rulesForSeller.reduce((sum, rule) => {
+      const progress = kpiProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+      return sum + rule.points * Math.min(Math.max(progress, 0), 1)
+    }, 0)
+    const pointsTarget = rulesForSeller.reduce((sum, rule) => sum + Math.max(rule.points ?? 0, 0), 0)
+    const cyclePct = pointsTarget > 0 ? (pointsAchieved / pointsTarget) * 100 : 0
+    const status = inferStatus(cyclePct)
 
-  const metaHit = sellerCards.filter((s) => s.status === 'SUPEROU' || s.status === 'NO_ALVO').length
+    return { seller, code, target, financialPct, cyclePct, status, clients, profileType, maxReward, earnedReward, kpiProgress, pointsAchieved }
+  }).sort((a, b) => {
+    if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
+    if (b.cyclePct !== a.cyclePct) return b.cyclePct - a.cyclePct
+    return a.seller.name.localeCompare(b.seller.name, 'pt-BR')
+  })
+
+  const metaHit = sellerCards.filter((s) => s.financialPct >= 100).length
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
   if (!user) {
@@ -1162,7 +1174,7 @@ export default function SupervisorPwaDashboard() {
                 <span className="ml-auto text-xs font-semibold tabular-nums text-surface-300">{sellers.length}</span>
               </div>
 
-              {sellerCards.map(({ seller, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }, idx) => {
+              {sellerCards.map(({ seller, target, cyclePct, financialPct, status, clients, profileType, maxReward, earnedReward, kpiProgress }, idx) => {
                 const cfg = STATUS_CONFIG[status]
                 const isExpanded = expandedSeller === seller.id
 
@@ -1192,14 +1204,14 @@ export default function SupervisorPwaDashboard() {
                           <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                             <div
                               className={`h-full rounded-full transition-all duration-700 ${cfg.barColor}`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
+                              style={{ width: `${Math.min(cyclePct, 100)}%` }}
                             />
                           </div>
                         </div>
 
                         {/* PCT + chevron */}
                         <div className="shrink-0 text-right">
-                          <p className={`text-base font-extrabold tabular-nums tracking-tight ${cfg.pctColor}`}>{fmtPct(pct)}</p>
+                          <p className={`text-base font-extrabold tabular-nums tracking-tight ${cfg.pctColor}`}>{fmtPct(cyclePct)}</p>
                           {isExpanded ? (
                             <ChevronUp className="ml-auto h-3.5 w-3.5 text-surface-500" />
                           ) : (
@@ -1217,14 +1229,14 @@ export default function SupervisorPwaDashboard() {
                             icon={<DollarSign className="h-3.5 w-3.5" />}
                             label="Vlr. dos Pedidos"
                             value={fmtBrl(seller.totalValue)}
-                            highlight={pct >= 100 ? 'success' : 'none'}
+                            highlight={financialPct >= 100 ? 'success' : 'none'}
                           />
                           <MetricCell icon={<Target className="h-3.5 w-3.5" />} label="Meta" value={target > 0 ? fmtBrl(target) : '—'} />
                           <MetricCell icon={<ShoppingCart className="h-3.5 w-3.5" />} label="Pedidos" value={fmt(seller.totalOrders)} />
                           <MetricCell icon={<Users className="h-3.5 w-3.5" />} label="Clientes" value={`${fmt(clients)}/${fmt(seller.baseClientCount)}`} />
                           <MetricCell icon={<Weight className="h-3.5 w-3.5" />} label="Peso Bruto" value={fmtKg(seller.totalGrossWeight)} />
                           <PremioCell
-                            pct={pct}
+                            pct={cyclePct}
                             profileType={profileType}
                             earnedReward={earnedReward}
                             maxReward={maxReward}
@@ -1232,7 +1244,7 @@ export default function SupervisorPwaDashboard() {
                         </div>
 
                         {/* Gap info */}
-                        {target > 0 && pct < 100 && (
+                        {target > 0 && financialPct < 100 && (
                           <div className="mt-2 rounded-lg bg-surface-800/60 px-3 py-2">
                             <p className="text-[10px] text-surface-400">
                               Faltam{' '}
@@ -1241,7 +1253,7 @@ export default function SupervisorPwaDashboard() {
                             </p>
                           </div>
                         )}
-                        {pct > 100 && (
+                        {financialPct > 100 && (
                           <div className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2">
                             <p className="text-[10px] text-emerald-300">
                               <span className="font-semibold">{fmtBrl(seller.totalValue - target)}</span>
