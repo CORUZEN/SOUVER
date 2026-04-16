@@ -565,6 +565,25 @@ function countOrdersUpToDay(sellers: SellerRow[], year: number, month: number, d
   return total
 }
 
+function sumOrderValueUpToDay(sellers: SellerRow[], year: number, month: number, dayLimit: number) {
+  let total = 0
+  for (const seller of sellers) {
+    for (const order of seller.orders ?? []) {
+      const dateRaw = String(order.negotiatedAt ?? '').trim()
+      if (!dateRaw) continue
+      const dt = new Date(`${dateRaw}T00:00:00`)
+      if (Number.isNaN(dt.getTime())) continue
+      const y = dt.getFullYear()
+      const m = dt.getMonth() + 1
+      const d = dt.getDate()
+      if (y === year && m === month && d <= dayLimit) {
+        total += Number(order.totalValue ?? 0)
+      }
+    }
+  }
+  return total
+}
+
 function inferStatus(pct: number): SellerStatus {
   if (pct >= 107) return 'SUPEROU'
   if (pct >= 100) return 'NO_ALVO'
@@ -611,6 +630,7 @@ export default function SupervisorPwaDashboard() {
   const [focusConfigBySeller, setFocusConfigBySeller] = useState<Record<string, FocusConfig>>({})
   const [focusRowsByProduct, setFocusRowsByProduct] = useState<Record<string, FocusProductRow[]>>({})
   const [previousMonthSellers, setPreviousMonthSellers] = useState<SellerRow[]>([])
+  const [previousMonthTotalTarget, setPreviousMonthTotalTarget] = useState(0)
   const [bootProgress, setBootProgress] = useState(0)
 
   const distributionBySellerProduct = useMemo(() => {
@@ -691,11 +711,12 @@ export default function SupervisorPwaDashboard() {
       }
 
       const prevPeriod = getPreviousPeriod(year, month)
-      const [perfRes, summaryRes, brandWeightRes, prevPerfRes] = await Promise.all([
+      const [perfRes, summaryRes, brandWeightRes, prevPerfRes, prevSummaryRes] = await Promise.all([
         trackedFetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`),
         trackedFetch(`/api/pwa/summary?year=${year}&month=${month}`),
         trackedFetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`),
         trackedFetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`),
+        trackedFetch(`/api/pwa/summary?year=${prevPeriod.year}&month=${prevPeriod.month}`),
       ])
 
       if (!perfRes.ok) {
@@ -703,11 +724,12 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData, brandWeightData, prevPerfData] = await Promise.all([
+      const [perfData, summaryData, brandWeightData, prevPerfData, prevSummaryData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
         brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
         prevPerfRes.ok ? prevPerfRes.json() : Promise.resolve(null),
+        prevSummaryRes.ok ? prevSummaryRes.json() : Promise.resolve(null),
       ])
 
       const cycleWeeksFromSummary: CycleWeek[] = Array.isArray(summaryData?.cycleWeeks)
@@ -740,6 +762,7 @@ export default function SupervisorPwaDashboard() {
 
       setSellers(perfData.sellers ?? [])
       setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
+      setPreviousMonthTotalTarget(Number(prevSummaryData?.totalMonthlyTarget ?? 0))
       setBrandWeightRows(brandWeightData?.rows ?? [])
 
       // Build monthly targets map from summary
@@ -886,6 +909,48 @@ export default function SupervisorPwaDashboard() {
       hasBaseline: previousSamePeriodOrders > 0,
     }
   }, [isCurrentMonth, month, now, previousMonthSellers, sellers, year])
+
+  const valueComparison = useMemo(() => {
+    const cutoffCurrentDay = isCurrentMonth ? now.getDate() : daysInMonth(year, month)
+    const previousPeriod = getPreviousPeriod(year, month)
+    const cutoffPreviousDay = Math.min(cutoffCurrentDay, daysInMonth(previousPeriod.year, previousPeriod.month))
+
+    const currentSamePeriodValue = sumOrderValueUpToDay(sellers, year, month, cutoffCurrentDay)
+    const previousSamePeriodValue = sumOrderValueUpToDay(previousMonthSellers, previousPeriod.year, previousPeriod.month, cutoffPreviousDay)
+    const delta = currentSamePeriodValue - previousSamePeriodValue
+    const deltaPct = previousSamePeriodValue > 0 ? (delta / previousSamePeriodValue) * 100 : currentSamePeriodValue > 0 ? 100 : 0
+    const trend: 'up' | 'down' | 'flat' = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+
+    return {
+      currentSamePeriodValue,
+      previousSamePeriodValue,
+      deltaPct,
+      trend,
+      hasBaseline: previousSamePeriodValue > 0,
+    }
+  }, [isCurrentMonth, month, now, previousMonthSellers, sellers, year])
+
+  const metaComparison = useMemo(() => {
+    const cutoffCurrentDay = isCurrentMonth ? now.getDate() : daysInMonth(year, month)
+    const previousPeriod = getPreviousPeriod(year, month)
+    const cutoffPreviousDay = Math.min(cutoffCurrentDay, daysInMonth(previousPeriod.year, previousPeriod.month))
+
+    const currentSamePeriodValue = sumOrderValueUpToDay(sellers, year, month, cutoffCurrentDay)
+    const previousSamePeriodValue = sumOrderValueUpToDay(previousMonthSellers, previousPeriod.year, previousPeriod.month, cutoffPreviousDay)
+    const currentPct = totalTarget > 0 ? (currentSamePeriodValue / totalTarget) * 100 : 0
+    const previousPct = previousMonthTotalTarget > 0 ? (previousSamePeriodValue / previousMonthTotalTarget) * 100 : 0
+    const delta = currentPct - previousPct
+    const deltaPct = previousPct > 0 ? (delta / previousPct) * 100 : currentPct > 0 ? 100 : 0
+    const trend: 'up' | 'down' | 'flat' = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+
+    return {
+      currentPct,
+      previousPct,
+      deltaPct,
+      trend,
+      hasBaseline: previousMonthTotalTarget > 0,
+    }
+  }, [isCurrentMonth, month, now, previousMonthSellers, sellers, totalTarget, previousMonthTotalTarget, year])
 
   const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -1067,7 +1132,38 @@ export default function SupervisorPwaDashboard() {
             <div className="grid grid-cols-2 gap-3">
               {/* Meta de Faturamento */}
               <div className="pwa-card pwa-card-hero col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Meta Financeira</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Meta Financeira</p>
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
+                    title={`Comparação no mesmo período do mês anterior: ${fmtPct(metaComparison.currentPct)} vs ${fmtPct(metaComparison.previousPct)}`}
+                  >
+                    {metaComparison.hasBaseline ? (
+                      <>
+                        {metaComparison.trend === 'up' ? (
+                          <TrendingUp className="h-3 w-3 text-emerald-300" />
+                        ) : metaComparison.trend === 'down' ? (
+                          <TrendingDown className="h-3 w-3 text-amber-300" />
+                        ) : (
+                          <Minus className="h-3 w-3 text-surface-300" />
+                        )}
+                        <span
+                          className={
+                            metaComparison.trend === 'up'
+                              ? 'text-emerald-300'
+                              : metaComparison.trend === 'down'
+                              ? 'text-amber-300'
+                              : 'text-surface-300'
+                          }
+                        >
+                          {`${metaComparison.deltaPct >= 0 ? '+' : ''}${fmt(metaComparison.deltaPct, 1)}%`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-surface-300">sem base</span>
+                    )}
+                  </span>
+                </div>
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-extrabold tabular-nums tracking-tight ${
                     overallPct >= 100
@@ -1155,9 +1251,40 @@ export default function SupervisorPwaDashboard() {
 
               {/* Valor */}
               <div className="pwa-card col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <DollarSign className="h-3 w-3" />
-                  Valor Total dos Pedidos
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                    <DollarSign className="h-3 w-3" />
+                    Valor Total dos Pedidos
+                  </div>
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
+                    title={`Comparação no mesmo período do mês anterior: ${fmtBrl(valueComparison.currentSamePeriodValue)} vs ${fmtBrl(valueComparison.previousSamePeriodValue)}`}
+                  >
+                    {valueComparison.hasBaseline ? (
+                      <>
+                        {valueComparison.trend === 'up' ? (
+                          <TrendingUp className="h-3 w-3 text-emerald-300" />
+                        ) : valueComparison.trend === 'down' ? (
+                          <TrendingDown className="h-3 w-3 text-amber-300" />
+                        ) : (
+                          <Minus className="h-3 w-3 text-surface-300" />
+                        )}
+                        <span
+                          className={
+                            valueComparison.trend === 'up'
+                              ? 'text-emerald-300'
+                              : valueComparison.trend === 'down'
+                              ? 'text-amber-300'
+                              : 'text-surface-300'
+                          }
+                        >
+                          {`${valueComparison.deltaPct >= 0 ? '+' : ''}${fmt(valueComparison.deltaPct, 1)}%`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-surface-300">sem base</span>
+                    )}
+                  </span>
                 </div>
                 <p className="mt-1 text-xl font-bold text-white">{fmtBrl(totalRevenue)}</p>
               </div>
