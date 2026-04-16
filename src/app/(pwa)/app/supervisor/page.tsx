@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
 import PwaLoadingScreen from '@/components/pwa/PwaLoadingScreen'
+import { PwaLogoutConfirmDialog, PwaSigningOutOverlay } from '@/components/pwa/PwaLogoutExperience'
 import {
   RefreshCw,
   TrendingUp,
@@ -632,6 +633,8 @@ export default function SupervisorPwaDashboard() {
   const [previousMonthSellers, setPreviousMonthSellers] = useState<SellerRow[]>([])
   const [previousMonthTotalTarget, setPreviousMonthTotalTarget] = useState(0)
   const [bootProgress, setBootProgress] = useState(0)
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
@@ -857,7 +860,10 @@ export default function SupervisorPwaDashboard() {
 
   // ── Sign out ──────────────────────────────────────────────────────────────
   async function signOut() {
+    if (isSigningOut) return
     try {
+      setShowSignOutConfirm(false)
+      setIsSigningOut(true)
       await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' }).catch(() => {})
     } finally {
       await clearPwaClientState()
@@ -1061,7 +1067,8 @@ export default function SupervisorPwaDashboard() {
             </button>
             <button
               type="button"
-              onClick={signOut}
+              onClick={() => setShowSignOutConfirm(true)}
+              disabled={isSigningOut}
               className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-rose-400 active:scale-95"
               aria-label="Sair"
             >
@@ -1406,6 +1413,14 @@ export default function SupervisorPwaDashboard() {
           </>
         )}
       </main>
+
+      <PwaLogoutConfirmDialog
+        open={showSignOutConfirm}
+        busy={isSigningOut}
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={signOut}
+      />
+      <PwaSigningOutOverlay visible={isSigningOut} />
     </div>
   )
 }
