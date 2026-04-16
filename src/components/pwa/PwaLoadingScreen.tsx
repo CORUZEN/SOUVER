@@ -15,7 +15,7 @@ export default function PwaLoadingScreen({ label = 'Preparando painel...', progr
       <div className="relative w-[86%] max-w-sm">
         <div className="mx-auto mb-6 h-64 w-64">
           <div className="relative h-full w-full">
-            <Image src="/branding/ouroverde.png" alt="Ouro Verde" fill sizes="256px" className="object-contain" />
+            <Image src="/branding/ouroverde.webp" alt="Ouro Verde" fill sizes="256px" className="object-contain" priority />
           </div>
         </div>
 
