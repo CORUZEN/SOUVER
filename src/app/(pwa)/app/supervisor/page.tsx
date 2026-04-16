@@ -106,11 +106,11 @@ type LoadState = 'idle' | 'loading' | 'success' | 'error'
 type SellerStatus = 'SUPEROU' | 'NO_ALVO' | 'QUASE_LA' | 'ATENCAO' | 'CRITICO'
 
 const STATUS_CONFIG: Record<SellerStatus, { label: string; color: string; bg: string; border: string; barColor: string; Icon: React.ElementType }> = {
-  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-sky-500',     Icon: TrendingUp },
-  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-emerald-500', Icon: CheckCircle2 },
-  QUASE_LA: { label: 'Quase Lá',   color: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30',    barColor: 'bg-cyan-500',    Icon: TrendingUp },
-  ATENCAO:  { label: 'Atenção',    color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-amber-500',   Icon: Clock },
-  CRITICO:  { label: 'Crítico',    color: 'text-rose-400',    bg: 'bg-rose-500/10',    border: 'border-rose-500/30',    barColor: 'bg-rose-500',    Icon: AlertCircle },
+  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-300 shadow-[0_0_10px_rgba(56,189,248,0.28)]',     Icon: TrendingUp },
+  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.28)]', Icon: CheckCircle2 },
+  QUASE_LA: { label: 'Quase Lá',   color: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30',    barColor: 'bg-gradient-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.26)]',    Icon: TrendingUp },
+  ATENCAO:  { label: 'Atenção',    color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.24)]',   Icon: Clock },
+  CRITICO:  { label: 'Crítico',    color: 'text-rose-400',    bg: 'bg-rose-500/10',    border: 'border-rose-500/30',    barColor: 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.26)]',    Icon: AlertCircle },
 }
 
 /* ─────────────────────────────────────────────
@@ -1012,9 +1012,17 @@ export default function SupervisorPwaDashboard() {
                   </p>
                   <p className="text-xs text-surface-400">{metaHit}/{sellers.length} vendedores</p>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-700">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${overallPct >= 100 ? 'bg-emerald-500' : overallPct >= 75 ? 'bg-cyan-500' : overallPct >= 25 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      overallPct >= 100
+                        ? 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.30)]'
+                        : overallPct >= 75
+                        ? 'bg-gradient-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.28)]'
+                        : overallPct >= 25
+                        ? 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
+                        : 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
+                    }`}
                     style={{ width: `${Math.min(overallPct, 100)}%` }}
                   />
                 </div>
@@ -1111,7 +1119,7 @@ export default function SupervisorPwaDashboard() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-white">{seller.name.split(' ').slice(0, 3).join(' ')}</p>
                           {/* Progress bar */}
-                          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-700">
+                          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                             <div
                               className={`h-full rounded-full transition-all duration-700 ${cfg.barColor}`}
                               style={{ width: `${Math.min(pct, 100)}%` }}
@@ -1298,30 +1306,42 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
         const isPending = !!week && week.start > todayIso
         const stageStyle = isEnded
           ? {
-              container: 'rounded-xl border border-slate-500/30 bg-slate-500/5 p-2.5',
+              container: 'rounded-xl border border-slate-500/30 bg-slate-500/6 p-2.5',
+              accent: 'bg-slate-300/70',
               badge: 'bg-slate-500/20 text-slate-200',
-              status: 'text-[10px] font-medium uppercase tracking-wide text-slate-300',
+              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-300',
+              statusDot: 'h-1.5 w-1.5 rounded-full bg-slate-300/80',
               row: 'rounded-lg border border-slate-500/20 bg-slate-950/35 px-3 py-2',
+              count: 'text-slate-300',
             }
           : isActive
           ? {
               container: 'rounded-xl border border-emerald-500/35 bg-emerald-500/10 p-2.5',
+              accent: 'bg-emerald-300/85',
               badge: 'bg-emerald-500/20 text-emerald-300',
-              status: 'text-[10px] font-medium uppercase tracking-wide text-emerald-300',
+              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-300',
+              statusDot: 'h-1.5 w-1.5 rounded-full bg-emerald-300/90',
               row: 'rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2',
+              count: 'text-emerald-300',
             }
           : isPending
           ? {
-              container: 'rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5',
+              container: 'rounded-xl border border-amber-500/30 bg-amber-500/8 p-2.5',
+              accent: 'bg-amber-300/85',
               badge: 'bg-amber-500/20 text-amber-300',
-              status: 'text-[10px] font-medium uppercase tracking-wide text-amber-300',
+              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-300',
+              statusDot: 'h-1.5 w-1.5 rounded-full bg-amber-300/90',
               row: 'rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2',
+              count: 'text-amber-300',
             }
           : {
               container: 'rounded-xl border border-surface-700/60 bg-surface-800/30 p-2.5',
+              accent: 'bg-surface-500/80',
               badge: 'bg-surface-700 text-surface-400',
-              status: 'text-[10px] font-medium uppercase tracking-wide text-surface-400',
+              status: 'inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-surface-400',
+              statusDot: 'h-1.5 w-1.5 rounded-full bg-surface-500',
               row: 'rounded-lg bg-surface-800/50 px-3 py-2',
+              count: 'text-surface-400',
             }
 
         const hitCount = items.filter((i) => i.isComputable && i.progress >= 1).length
@@ -1335,12 +1355,27 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${stageStyle.badge}`}>
                   {label}
                 </span>
-                {isActive  && <span className={stageStyle.status}>Em andamento</span>}
-                {isEnded   && <span className={stageStyle.status}>Etapa encerrada</span>}
-                {isPending && <span className={stageStyle.status}>Aguardando</span>}
+                {isActive && (
+                  <span className={stageStyle.status}>
+                    <span className={stageStyle.statusDot} aria-hidden="true" />
+                    Em andamento
+                  </span>
+                )}
+                {isEnded && (
+                  <span className={stageStyle.status}>
+                    <span className={stageStyle.statusDot} aria-hidden="true" />
+                    Etapa encerrada
+                  </span>
+                )}
+                {isPending && (
+                  <span className={stageStyle.status}>
+                    <span className={stageStyle.statusDot} aria-hidden="true" />
+                    Aguardando
+                  </span>
+                )}
               </div>
               {computableCount > 0 && (
-                <span className={`text-[10px] font-semibold ${hitCount === computableCount ? 'text-emerald-400' : 'text-surface-400'}`}>
+                <span className={`text-[10px] font-semibold ${hitCount === computableCount ? 'text-emerald-300' : stageStyle.count}`}>
                   {hitCount}/{computableCount}
                 </span>
               )}
@@ -1354,12 +1389,12 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const isHit = kpi.isComputable && kpi.progress >= 1
 
                 const barColor = !kpi.isComputable || isPending
-                  ? 'bg-surface-600'
+                  ? 'bg-gradient-to-r from-surface-500 to-surface-400'
                   : isHit
-                  ? 'bg-emerald-500'
+                  ? 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_8px_rgba(52,211,153,0.28)]'
                   : pctDisplay >= 70
-                  ? 'bg-amber-500'
-                  : 'bg-rose-500'
+                  ? 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_8px_rgba(251,191,36,0.24)]'
+                  : 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_8px_rgba(251,113,133,0.24)]'
 
                 const pctColor = !kpi.isComputable || isPending
                   ? 'text-surface-500'
@@ -1388,7 +1423,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                       </div>
                     </div>
                     {/* Progress bar */}
-                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-700">
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${barColor}`}
                         style={{ width: kpi.isComputable && !isPending ? `${pctDisplay}%` : '0%' }}
