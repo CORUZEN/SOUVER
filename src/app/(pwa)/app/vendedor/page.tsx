@@ -204,9 +204,10 @@ export default function VendedorPwaDashboard() {
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
+            <div className="relative h-10 w-10 shrink-0">
+              <Image src="/branding/ouroverde.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
             </div>
+            <div className="h-9 w-px bg-surface-700/60" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
               <p className="text-xs font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">MEU PAINEL</p>

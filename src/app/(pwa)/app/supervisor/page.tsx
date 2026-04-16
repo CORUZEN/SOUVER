@@ -538,6 +538,32 @@ function formatHeaderIdentity(name: string) {
   return `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase()
 }
 
+function getPreviousPeriod(year: number, month: number) {
+  if (month === 1) return { year: year - 1, month: 12 }
+  return { year, month: month - 1 }
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate()
+}
+
+function countOrdersUpToDay(sellers: SellerRow[], year: number, month: number, dayLimit: number) {
+  let total = 0
+  for (const seller of sellers) {
+    for (const order of seller.orders ?? []) {
+      const dateRaw = String(order.negotiatedAt ?? '').trim()
+      if (!dateRaw) continue
+      const dt = new Date(`${dateRaw}T00:00:00`)
+      if (Number.isNaN(dt.getTime())) continue
+      const y = dt.getFullYear()
+      const m = dt.getMonth() + 1
+      const d = dt.getDate()
+      if (y === year && m === month && d <= dayLimit) total += 1
+    }
+  }
+  return total
+}
+
 function inferStatus(pct: number): SellerStatus {
   if (pct >= 107) return 'SUPEROU'
   if (pct >= 100) return 'NO_ALVO'
@@ -583,6 +609,7 @@ export default function SupervisorPwaDashboard() {
   const [distributionProductCount, setDistributionProductCount] = useState(0)
   const [focusConfigBySeller, setFocusConfigBySeller] = useState<Record<string, FocusConfig>>({})
   const [focusRowsByProduct, setFocusRowsByProduct] = useState<Record<string, FocusProductRow[]>>({})
+  const [previousMonthSellers, setPreviousMonthSellers] = useState<SellerRow[]>([])
 
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
@@ -641,11 +668,13 @@ export default function SupervisorPwaDashboard() {
     setLoadState('loading')
     setError('')
     try {
-      const [perfRes, summaryRes, brandWeightRes, distributionRes] = await Promise.all([
+      const prevPeriod = getPreviousPeriod(year, month)
+      const [perfRes, summaryRes, brandWeightRes, distributionRes, prevPerfRes] = await Promise.all([
         fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
         fetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/metas/sellers-performance/item-distribution?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
+        fetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`, { cache: 'no-store' }),
       ])
 
       if (!perfRes.ok) {
@@ -653,14 +682,16 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData, brandWeightData, distributionData] = await Promise.all([
+      const [perfData, summaryData, brandWeightData, distributionData, prevPerfData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
         brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
         distributionRes.ok ? distributionRes.json() : Promise.resolve(null),
+        prevPerfRes.ok ? prevPerfRes.json() : Promise.resolve(null),
       ])
 
       setSellers(perfData.sellers ?? [])
+      setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
       setBrandWeightRows(brandWeightData?.rows ?? [])
 
       // Build monthly targets map from summary
@@ -786,6 +817,26 @@ export default function SupervisorPwaDashboard() {
   }, 0)
   const overallPct = totalTarget > 0 ? (totalRevenue / totalTarget) * 100 : 0
 
+  const ordersComparison = useMemo(() => {
+    const cutoffCurrentDay = isCurrentMonth ? now.getDate() : daysInMonth(year, month)
+    const previousPeriod = getPreviousPeriod(year, month)
+    const cutoffPreviousDay = Math.min(cutoffCurrentDay, daysInMonth(previousPeriod.year, previousPeriod.month))
+
+    const currentSamePeriodOrders = countOrdersUpToDay(sellers, year, month, cutoffCurrentDay)
+    const previousSamePeriodOrders = countOrdersUpToDay(previousMonthSellers, previousPeriod.year, previousPeriod.month, cutoffPreviousDay)
+    const delta = currentSamePeriodOrders - previousSamePeriodOrders
+    const deltaPct = previousSamePeriodOrders > 0 ? (delta / previousSamePeriodOrders) * 100 : currentSamePeriodOrders > 0 ? 100 : 0
+    const trend: 'up' | 'down' | 'flat' = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+
+    return {
+      currentSamePeriodOrders,
+      previousSamePeriodOrders,
+      deltaPct,
+      trend,
+      hasBaseline: previousSamePeriodOrders > 0,
+    }
+  }, [isCurrentMonth, month, now, previousMonthSellers, sellers, year])
+
   const todayIso = new Date().toISOString().slice(0, 10)
 
   const sellerCards = sellers.map((seller) => {
@@ -856,9 +907,10 @@ export default function SupervisorPwaDashboard() {
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
-              <Image src="/branding/ouroverde-badge.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
+            <div className="relative h-10 w-10 shrink-0">
+              <Image src="/branding/ouroverde.png" alt="Ouro Verde" fill sizes="40px" className="object-contain" />
             </div>
+            <div className="h-9 w-px bg-surface-700/60" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
               <p className="text-xs font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">SUPERVISOR COMERCIAL</p>
@@ -974,26 +1026,39 @@ export default function SupervisorPwaDashboard() {
 
               {/* Pedidos */}
               <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <span className="flex items-center gap-1.5">
-                    <ShoppingCart className="h-3 w-3" />
-                    Pedidos
-                  </span>
-                  <span className="rounded-md border border-surface-700/60 bg-surface-800/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-surface-300">NO MES</span>
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                  <ShoppingCart className="h-3 w-3" />
+                  Pedidos no mês
                 </div>
-                <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
-                  {fmt(totalOrders)}
-                </p>
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <p className="text-base font-bold text-white whitespace-nowrap">{fmt(totalOrders)}</p>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                      ordersComparison.trend === 'up'
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                        : ordersComparison.trend === 'down'
+                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                        : 'border-surface-700/60 bg-surface-800/50 text-surface-300'
+                    }`}
+                    title={`Comparação no mesmo período do mês anterior: ${fmt(ordersComparison.currentSamePeriodOrders)} vs ${fmt(ordersComparison.previousSamePeriodOrders)}`}
+                  >
+                    {ordersComparison.hasBaseline ? (
+                      <>
+                        {ordersComparison.trend === 'up' ? <TrendingUp className="h-3 w-3" /> : ordersComparison.trend === 'down' ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                        {`${ordersComparison.deltaPct >= 0 ? '+' : ''}${fmt(ordersComparison.deltaPct, 1)}%`}
+                      </>
+                    ) : (
+                      <span>Sem base</span>
+                    )}
+                  </span>
+                </div>
               </div>
 
               {/* Peso */}
               <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <span className="flex items-center gap-1.5">
-                    <Weight className="h-3 w-3" />
-                    Peso Total
-                  </span>
-                  <span className="rounded-md border border-surface-700/60 bg-surface-800/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-surface-300">BRUTO</span>
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                  <Weight className="h-3 w-3" />
+                  Peso total bruto
                 </div>
                 <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
                   {fmt(totalWeight, 2)}
