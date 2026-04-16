@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
+import PwaLoadingScreen from '@/components/pwa/PwaLoadingScreen'
 import {
   RefreshCw,
   ShoppingCart,
@@ -190,11 +191,7 @@ export default function VendedorPwaDashboard() {
   }
 
   if (!user) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-surface-950">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-      </div>
-    )
+    return <PwaLoadingScreen label="Validando acesso" />
   }
 
   return (

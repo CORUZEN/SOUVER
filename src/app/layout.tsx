@@ -48,11 +48,35 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+              (function () {
+                if (!('serviceWorker' in navigator)) return;
+                var isLocalhost =
+                  location.hostname === 'localhost' ||
+                  location.hostname === '127.0.0.1' ||
+                  location.hostname === '::1';
+                var isProd = ${JSON.stringify(process.env.NODE_ENV === 'production')};
+
+                window.addEventListener('load', function () {
+                  if (!isProd || isLocalhost) {
+                    navigator.serviceWorker.getRegistrations()
+                      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+                      .catch(function () {});
+                    if ('caches' in window) {
+                      caches.keys()
+                        .then(function (keys) {
+                          return Promise.all(
+                            keys
+                              .filter(function (k) { return k.indexOf('ov-pwa-') === 0; })
+                              .map(function (k) { return caches.delete(k); })
+                          );
+                        })
+                        .catch(function () {});
+                    }
+                    return;
+                  }
+                  navigator.serviceWorker.register('/sw.js').catch(function () {});
                 });
-              }
+              })();
             `,
           }}
         />
