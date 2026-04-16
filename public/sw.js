@@ -7,8 +7,8 @@ const API_CACHE = `${CACHE_VERSION}-api`
 const PRECACHE_URLS = [
   '/app',
   '/manifest.json',
-  '/branding/ouroverde-badge.png',
-  '/branding/ouroverde.png',
+  '/branding/ouroverde-badge.webp',
+  '/branding/ouroverde.webp',
 ]
 
 // API routes to cache with network-first strategy (short TTL)

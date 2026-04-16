@@ -35,7 +35,7 @@ export default function PwaEntryPage() {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface-950">
       <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
         <Image
-          src="/branding/ouroverde-badge.png"
+          src="/branding/ouroverde-badge.webp"
           alt="Ouro Verde"
           fill
           sizes="64px"

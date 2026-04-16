@@ -224,7 +224,7 @@ export default function VendedorPwaDashboard() {
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
             <div className="relative h-12 w-12 shrink-0">
-              <Image src="/branding/ouroverde.png" alt="Ouro Verde" fill sizes="48px" className="object-contain" />
+              <Image src="/branding/ouroverde.webp" alt="Ouro Verde" fill sizes="48px" className="object-contain" priority />
             </div>
             <div className="h-9 w-px bg-surface-700/60" aria-hidden="true" />
             <div>
