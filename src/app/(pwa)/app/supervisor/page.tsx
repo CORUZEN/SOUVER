@@ -951,8 +951,6 @@ export default function SupervisorPwaDashboard() {
     return a.seller.name.localeCompare(b.seller.name, 'pt-BR')
   })
 
-  const metaHit = sellerCards.filter((s) => s.financialPct >= 100).length
-
   /* ── Render ─────────────────────────────────────────────────────────────── */
   if (!user) {
     return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
@@ -1082,7 +1080,6 @@ export default function SupervisorPwaDashboard() {
                   }`}>
                     {fmtPct(overallPct)}
                   </p>
-                  <p className="text-xs text-surface-400">{metaHit}/{sellers.length} vendedores</p>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                   <div
