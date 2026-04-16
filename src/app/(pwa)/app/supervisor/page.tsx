@@ -1064,9 +1064,9 @@ export default function SupervisorPwaDashboard() {
                         <span
                           className={
                             ordersComparison.trend === 'up'
-                              ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
+                              ? 'text-emerald-300'
                               : ordersComparison.trend === 'down'
-                              ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
+                              ? 'text-amber-300'
                               : 'text-surface-300'
                           }
                         >
