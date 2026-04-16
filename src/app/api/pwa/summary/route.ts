@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
     monthlyTarget?: number
     profileType?: string
     sellerIds?: string[]
+    weightTargets?: Array<{ brand: string; targetKg: number }>
     rules?: Array<{ id: string; kpi: string; kpiType?: string; points: number; rewardValue: number; stage: string; targetText: string }>
   }
 
@@ -101,10 +102,8 @@ export async function GET(req: NextRequest) {
     }) ?? ruleBlocks[0] ?? null
 
     const profileType = seller.profileType as string
-    const isPercentProfile = profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15'
-    const maxReward: number = isPercentProfile
-      ? 0
-      : (block?.rules ?? []).reduce((sum: number, r: { rewardValue?: number }) => sum + (r.rewardValue ?? 0), 0)
+    void profileType // profileType stored per seller, used by PWA for display formatting
+    const maxReward: number = (block?.rules ?? []).reduce((sum: number, r: { rewardValue?: number }) => sum + (r.rewardValue ?? 0), 0)
 
     return {
       code,
@@ -116,6 +115,10 @@ export async function GET(req: NextRequest) {
       blockId: block?.id ?? null,
       blockName: block?.name ?? null,
       maxReward,
+      weightTargets: (block?.weightTargets ?? []).map((wt: { brand?: unknown; targetKg?: unknown }) => ({
+        brand: String(wt.brand ?? '').toUpperCase(),
+        targetKg: Number(wt.targetKg ?? 0),
+      })).filter((wt) => wt.brand && wt.targetKg > 0),
       rules: (block?.rules ?? []).map((r) => ({
         id: r.id,
         stage: r.stage,

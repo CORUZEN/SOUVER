@@ -44,7 +44,12 @@ interface SellerRow {
   baseClientCount: number
   supervisorCode: string | null
   orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
+  returns: Array<{ negotiatedAt: string; totalValue: number }>
+  openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
 }
+
+type BrandWeightRow = { sellerCode: string; brand: string; totalKg: number }
+type WeightTarget    = { brand: string; targetKg: number }
 
 interface SellerRule {
   id: string
@@ -93,50 +98,69 @@ function fmtKg(value: number) {
   return `${fmt(value, 2)} kg`
 }
 
-function estimatePremioEarned(profileType: string, pct: number, earnedReward: number): string {
-  const safePct = Math.min(pct, 100)
-  if (profileType === 'ANTIGO_1')  return `${fmt(safePct / 100 * 1,   2)}%`
-  if (profileType === 'ANTIGO_15') return `${fmt(safePct / 100 * 1.5, 2)}%`
+function estimatePremioEarned(profileType: string, _pct: number, earnedReward: number): string {
+  if (profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15') {
+    return `${fmt(earnedReward, 2)}%`
+  }
   return fmtBrl(earnedReward)
 }
 function estimatePremioMax(profileType: string, maxReward: number): string {
-  if (profileType === 'ANTIGO_1')  return '/ 1,00%'
-  if (profileType === 'ANTIGO_15') return '/ 1,50%'
+  if (profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15') {
+    if (maxReward > 0) return `/ ${fmt(maxReward, 2)}%`
+    return profileType === 'ANTIGO_1' ? '/ 1,00%' : '/ 1,50%'
+  }
   if (maxReward > 0) return `/ ${fmtBrl(maxReward)}`
   return ''
 }
 
 /**
- * Simplified reward scoring for NOVATO/SUPERVISOR sellers.
- * Handles META_FINANCEIRA and BASE_CLIENTES KPIs — the two most common types
- * that can be evaluated with orders data alone.
+ * Full reward scoring — mirrors MetasWorkspace logic for all computable KPI types.
+ * Handles: META_FINANCEIRA, BASE_CLIENTES, VOLUME, DEVOLUCAO, INADIMPLENCIA.
+ * Non-computable types (DISTRIBUICAO, ITEM_FOCO, RENTABILIDADE) are skipped.
  */
 function computeEarnedReward(
   rules: SellerRule[],
   cycleWeeks: CycleWeek[],
   orders: SellerRow['orders'],
+  returns: SellerRow['returns'],
+  openTitles: SellerRow['openTitles'],
   monthlyTarget: number,
   baseClientCount: number,
+  weightTargets: WeightTarget[],
+  brandWeightRows: BrandWeightRow[],
+  sellerCode: string,
   todayIso: string,
 ): number {
   const startedWeeks = cycleWeeks.filter((w) => w.start <= todayIso)
   if (startedWeeks.length === 0 || monthlyTarget <= 0) return 0
 
+  // Pre-compute brand weight map for VOLUME
+  const brandWeightMap = new Map<string, number>()
+  for (const row of brandWeightRows) {
+    if (row.sellerCode === sellerCode) {
+      const key = row.brand.toUpperCase()
+      brandWeightMap.set(key, (brandWeightMap.get(key) ?? 0) + row.totalKg)
+    }
+  }
+  const weightTargetRatios = weightTargets.map((wt) => {
+    const sold = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
+    return sold / Math.max(wt.targetKg, 0.00001)
+  })
+
   let earned = 0
   for (const rule of rules) {
     const week = cycleWeeks.find((w) => w.key === rule.stage)
-    if (!week || week.start > todayIso) continue // stage not yet started
+    if (!week || week.start > todayIso) continue
 
     const stageEnd = week.end
-    // Resolve kpiType — use explicit value or infer from label
     const kpiLabel = (rule.kpi ?? '').toLowerCase()
     const kpiType = rule.kpiType || (
       kpiLabel.includes('meta financeira') ? 'META_FINANCEIRA' :
-      kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' : ''
+      kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' :
+      kpiLabel.includes('volume') || kpiLabel.includes('categori') ? 'VOLUME' :
+      kpiLabel.includes('devolu') ? 'DEVOLUCAO' :
+      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' : ''
     )
-
-    // Only handle KPI types computable from orders data
-    if (kpiType !== 'META_FINANCEIRA' && kpiType !== 'BASE_CLIENTES') continue
 
     const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= stageEnd)
     let progress = 0
@@ -152,6 +176,37 @@ function computeEarnedReward(
       const base = Math.max(baseClientCount, 1)
       const clients = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
       progress = clients / (base * threshold)
+    } else if (kpiType === 'VOLUME') {
+      const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
+      if (requiredGroups > 0 && weightTargetRatios.length > 0) {
+        const topRatios = [...weightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
+        const normalized = Array.from({ length: requiredGroups }, (_, i) => Math.min(topRatios[i] ?? 0, 1))
+        progress = normalized.reduce((s, v) => s + v, 0) / requiredGroups
+      }
+    } else if (kpiType === 'DEVOLUCAO') {
+      const rawNum = parseFloat(rule.targetText.replace(/[^0-9,.]/g, '').replace(',', '.')) || 0
+      const targetPct = rawNum > 0 ? rawNum / 100 : 0
+      const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const returned = returns.filter((r) => r.negotiatedAt <= stageEnd).reduce((s, r) => s + r.totalValue, 0)
+      if (financial > 0 && targetPct > 0) {
+        const actualPct = returned / financial
+        progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+      }
+    } else if (kpiType === 'INADIMPLENCIA') {
+      const parts = rule.targetText.split('|')
+      const inadPct = parseFloat(parts[0] ?? '0') || 0
+      const atrasoDias = parseFloat(parts[1] ?? '0') || 0
+      const targetPct = inadPct > 0 ? inadPct / 100 : 0
+      const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const overdueValue = openTitles
+        .filter((t) => t.dueDate <= stageEnd && t.overdueDays > atrasoDias)
+        .reduce((s, t) => s + t.totalValue, 0)
+      if (financial > 0 && targetPct > 0) {
+        const actualPct = overdueValue / financial
+        progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+      }
+    } else {
+      continue // DISTRIBUICAO, ITEM_FOCO, RENTABILIDADE — not computable from orders alone
     }
 
     if (progress >= 1) earned += rule.rewardValue
@@ -176,10 +231,28 @@ function computeAllKpiProgress(
   rules: SellerRule[],
   cycleWeeks: CycleWeek[],
   orders: SellerRow['orders'],
+  returns: SellerRow['returns'],
+  openTitles: SellerRow['openTitles'],
   monthlyTarget: number,
   baseClientCount: number,
+  weightTargets: WeightTarget[],
+  brandWeightRows: BrandWeightRow[],
+  sellerCode: string,
   todayIso: string,
 ): KpiProgress[] {
+  // Pre-compute brand weight map for VOLUME
+  const brandWeightMap = new Map<string, number>()
+  for (const row of brandWeightRows) {
+    if (row.sellerCode === sellerCode) {
+      const key = row.brand.toUpperCase()
+      brandWeightMap.set(key, (brandWeightMap.get(key) ?? 0) + row.totalKg)
+    }
+  }
+  const weightTargetRatios = weightTargets.map((wt) => {
+    const sold = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
+    return sold / Math.max(wt.targetKg, 0.00001)
+  })
+
   return rules.map((rule) => {
     const week = cycleWeeks.find((w) => w.key === rule.stage)
     const stageStarted = !!week && week.start <= todayIso
@@ -190,14 +263,23 @@ function computeAllKpiProgress(
     const kpiLabel = (rule.kpi ?? '').toLowerCase()
     const kpiType = rule.kpiType || (
       kpiLabel.includes('meta financeira') ? 'META_FINANCEIRA' :
-      kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' : ''
+      kpiLabel.includes('base de clientes') ? 'BASE_CLIENTES' :
+      kpiLabel.includes('volume') || kpiLabel.includes('categori') ? 'VOLUME' :
+      kpiLabel.includes('devolu') ? 'DEVOLUCAO' :
+      kpiLabel.includes('inadimpl') ? 'INADIMPLENCIA' : ''
     )
 
-    if (kpiType !== 'META_FINANCEIRA' && kpiType !== 'BASE_CLIENTES') {
+    const COMPUTABLE = new Set(['META_FINANCEIRA', 'BASE_CLIENTES', 'VOLUME', 'DEVOLUCAO', 'INADIMPLENCIA'])
+    if (!COMPUTABLE.has(kpiType)) {
       return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted, stageEnded }
     }
 
-    const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= week.end)
+    if (!stageStarted) {
+      return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: true, stageStarted, stageEnded }
+    }
+
+    const stageEnd = week.end
+    const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= stageEnd)
     let progress = 0
 
     if (kpiType === 'META_FINANCEIRA') {
@@ -211,6 +293,35 @@ function computeAllKpiProgress(
       const base = Math.max(baseClientCount, 1)
       const clients = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
       progress = clients / (base * threshold)
+    } else if (kpiType === 'VOLUME') {
+      const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
+      if (requiredGroups > 0 && weightTargetRatios.length > 0) {
+        const topRatios = [...weightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
+        const normalized = Array.from({ length: requiredGroups }, (_, i) => Math.min(topRatios[i] ?? 0, 1))
+        progress = normalized.reduce((s, v) => s + v, 0) / requiredGroups
+      }
+    } else if (kpiType === 'DEVOLUCAO') {
+      const rawNum = parseFloat(rule.targetText.replace(/[^0-9,.]/g, '').replace(',', '.')) || 0
+      const targetPct = rawNum > 0 ? rawNum / 100 : 0
+      const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const returned = returns.filter((r) => r.negotiatedAt <= stageEnd).reduce((s, r) => s + r.totalValue, 0)
+      if (financial > 0 && targetPct > 0) {
+        const actualPct = returned / financial
+        progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+      }
+    } else if (kpiType === 'INADIMPLENCIA') {
+      const parts = rule.targetText.split('|')
+      const inadPct = parseFloat(parts[0] ?? '0') || 0
+      const atrasoDias = parseFloat(parts[1] ?? '0') || 0
+      const targetPct = inadPct > 0 ? inadPct / 100 : 0
+      const financial = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const overdueValue = openTitles
+        .filter((t) => t.dueDate <= stageEnd && t.overdueDays > atrasoDias)
+        .reduce((s, t) => s + t.totalValue, 0)
+      if (financial > 0 && targetPct > 0) {
+        const actualPct = overdueValue / financial
+        progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+      }
     }
 
     return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: Math.min(progress, 1.4), isComputable: true, stageStarted, stageEnded }
@@ -262,6 +373,8 @@ export default function SupervisorPwaDashboard() {
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [brandWeightRows, setBrandWeightRows] = useState<BrandWeightRow[]>([])
+  const [weightTargetsBySeller, setWeightTargetsBySeller] = useState<Record<string, WeightTarget[]>>({})
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -299,9 +412,10 @@ export default function SupervisorPwaDashboard() {
     setLoadState('loading')
     setError('')
     try {
-      const [perfRes, summaryRes] = await Promise.all([
+      const [perfRes, summaryRes, brandWeightRes] = await Promise.all([
         fetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
         fetch(`/api/pwa/summary?year=${year}&month=${month}`, { cache: 'no-store' }),
+        fetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`, { cache: 'no-store' }),
       ])
 
       if (!perfRes.ok) {
@@ -309,30 +423,35 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData] = await Promise.all([
+      const [perfData, summaryData, brandWeightData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
+        brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
       ])
 
       setSellers(perfData.sellers ?? [])
+      setBrandWeightRows(brandWeightData?.rows ?? [])
 
       // Build monthly targets map from summary
       const targets: Record<string, number> = {}
       const ptypes: Record<string, string> = {}
       const mrewards: Record<string, number> = {}
       const srules: Record<string, SellerRule[]> = {}
+      const swtargets: Record<string, WeightTarget[]> = {}
       if (summaryData?.sellers) {
         for (const s of summaryData.sellers) {
           if (s.code && s.monthlyTarget > 0) targets[s.code] = s.monthlyTarget
           if (s.code) ptypes[s.code] = s.profileType ?? 'NOVATO'
           if (s.code && s.maxReward > 0) mrewards[s.code] = s.maxReward
           if (s.code && Array.isArray(s.rules)) srules[s.code] = s.rules
+          if (s.code && Array.isArray(s.weightTargets)) swtargets[s.code] = s.weightTargets
         }
       }
       setMonthlyTargets(targets)
       setProfileTypes(ptypes)
       setMaxRewards(mrewards)
       setSellerRules(srules)
+      setWeightTargetsBySeller(swtargets)
       if (Array.isArray(summaryData?.cycleWeeks)) setCycleWeeks(summaryData.cycleWeeks)
       setLastUpdated(new Date())
       setLoadState('success')
@@ -386,21 +505,31 @@ export default function SupervisorPwaDashboard() {
     const clients = countDistinctClients(seller)
     const profileType = profileTypes[code] ?? 'NOVATO'
     const maxReward = maxRewards[code] ?? 0
-    const isPercentProfile = profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15'
-    const earnedReward = isPercentProfile ? 0 : computeEarnedReward(
+    const wTargets = weightTargetsBySeller[code] ?? []
+    const earnedReward = computeEarnedReward(
       sellerRules[code] ?? [],
       cycleWeeks,
       seller.orders,
+      seller.returns ?? [],
+      seller.openTitles ?? [],
       target,
       seller.baseClientCount,
+      wTargets,
+      brandWeightRows,
+      code,
       todayIso,
     )
     const kpiProgress = computeAllKpiProgress(
       sellerRules[code] ?? [],
       cycleWeeks,
       seller.orders,
+      seller.returns ?? [],
+      seller.openTitles ?? [],
       target,
       seller.baseClientCount,
+      wTargets,
+      brandWeightRows,
+      code,
       todayIso,
     )
     return { seller, code, target, pct, status, clients, profileType, maxReward, earnedReward, kpiProgress }
