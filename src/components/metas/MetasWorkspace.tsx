@@ -1128,8 +1128,10 @@ export default function MetasWorkspace() {
   const dashboardFocusProductsPrefetchAttemptedRef = useRef(false)
 
   const activeKey = monthKey(year, month)
+  const performanceRequestKey = `${year}-${month + 1}-${companyScopeFilter}`
   const activeMonth = monthConfigs[activeKey]
   const prevActiveKeyRef = useRef(activeKey)
+  const performanceRequestKeyRef = useRef(performanceRequestKey)
   const pendingBeforePeriodChangeRef = useRef(false)
   const shouldRebaselineAfterAutoMonthInitRef = useRef(false)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
@@ -1602,6 +1604,10 @@ export default function MetasWorkspace() {
     setMonth(nextMonth)
   }
 
+  useEffect(() => {
+    performanceRequestKeyRef.current = performanceRequestKey
+  }, [performanceRequestKey])
+
   function updateActiveMonthConfig(
     patch:
       | Partial<MonthConfig>
@@ -1753,8 +1759,12 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController()
+    const requestKey = performanceRequestKey
     setSellersLoading(true)
     setSellersError('')
+    // Clear prior period data immediately to avoid mixed-month dashboards.
+    setSellers([])
+    setPerformanceDiagnostics(null)
 
     fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`, { signal: controller.signal })
       .then(async (response) => {
@@ -1765,6 +1775,7 @@ export default function MetasWorkspace() {
         return payload
       })
       .then((data) => {
+        if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         const remoteSellers = (data?.sellers ?? []) as Array<{
           id: string
           name: string
@@ -1840,23 +1851,26 @@ export default function MetasWorkspace() {
         setPerformanceDiagnostics(diag)
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         setSellers([])
         setPerformanceDiagnostics(null)
         setSellersError(error instanceof Error ? error.message : 'Falha ao carregar dados de vendedores.')
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSellersLoading(false)
+        if (!controller.signal.aborted && performanceRequestKeyRef.current === requestKey) setSellersLoading(false)
       })
 
     return () => controller.abort()
-  }, [companyScopeFilter, month, year])
+  }, [companyScopeFilter, month, performanceRequestKey, year])
 
   // ── Brand weight effect ────────────────────────────────────────────────
   useEffect(() => {
     const controller = new AbortController()
+    const requestKey = performanceRequestKey
     setBrandWeightLoading(true)
     setBrandWeightError('')
+    setBrandWeightRows([])
+    setBrandWeightBrands([])
     fetch(
       `/api/metas/sellers-performance/brand-weight?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`,
       { signal: controller.signal }
@@ -1866,16 +1880,19 @@ export default function MetasWorkspace() {
         if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar peso por marca.')
         const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>
         const brands = (payload.brands ?? []) as string[]
+        if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         setBrandWeightRows(rows)
         setBrandWeightBrands(brands)
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         setBrandWeightError(err instanceof Error ? err.message : 'Falha ao carregar peso por marca.')
       })
-      .finally(() => { if (!controller.signal.aborted) setBrandWeightLoading(false) })
+      .finally(() => {
+        if (!controller.signal.aborted && performanceRequestKeyRef.current === requestKey) setBrandWeightLoading(false)
+      })
     return () => controller.abort()
-  }, [companyScopeFilter, month, year])
+  }, [companyScopeFilter, month, performanceRequestKey, year])
 
   // ── Sankhya configured targets (financial + weight per brand) ─────────
 
@@ -1883,6 +1900,7 @@ export default function MetasWorkspace() {
     const controller = new AbortController()
     setSankhyaTargetsLoading(true)
     setSankhyaTargetsError('')
+    setSankhyaTargets([])
     setSankhyaConnected(false)
     setSankhyaNoDataForPeriod(false)
     setSankhyaDiagnostics(null)
@@ -2150,11 +2168,12 @@ export default function MetasWorkspace() {
       )
       setAllowlistSuccess('Lista de vendedores da meta atualizada.')
       // Recarrega visao de desempenho imediatamente.
+      const requestKey = `${year}-${month + 1}-${companyScopeFilter}`
       setSellersLoading(true)
       setSellersError('')
       const perfResponse = await fetch(`/api/metas/sellers-performance?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`)
       const perfData = await perfResponse.json().catch(() => ({}))
-      if (perfResponse.ok) {
+      if (perfResponse.ok && performanceRequestKeyRef.current === requestKey) {
         const remoteSellers = (perfData?.sellers ?? []) as Array<{
           id: string
           name: string
@@ -2220,7 +2239,7 @@ export default function MetasWorkspace() {
           }
         )
       }
-      setSellersLoading(false)
+      if (performanceRequestKeyRef.current === requestKey) setSellersLoading(false)
     } catch (error) {
       setAllowlistError(error instanceof Error ? error.message : 'Falha ao salvar vendedores da meta.')
     } finally {
@@ -2578,8 +2597,11 @@ export default function MetasWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController()
+    const requestKey = `${performanceRequestKey}|${stageEnds.w1}|${stageEnds.w2}|${stageEnds.w3}|${stageEnds.closing}`
     setDistributionLoading(true)
     setDistributionError('')
+    setDistributionRows([])
+    setDistributionSellerItemsRows([])
     setDistributionDiagnostics(null)
 
     const params = new URLSearchParams({
@@ -2601,6 +2623,9 @@ export default function MetasWorkspace() {
         return payload
       })
       .then((data) => {
+        if (controller.signal.aborted) return
+        const activeRequestKey = `${performanceRequestKeyRef.current}|${stageEnds.w1}|${stageEnds.w2}|${stageEnds.w3}|${stageEnds.closing}`
+        if (activeRequestKey !== requestKey) return
         const rows = Array.isArray(data?.rows) ? data.rows : []
         const sellerItemsRows = Array.isArray(data?.sellerItems) ? data.sellerItems : []
         const mapped = rows.map((row: Record<string, unknown>) => ({
@@ -2626,13 +2651,18 @@ export default function MetasWorkspace() {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
+        const activeRequestKey = `${performanceRequestKeyRef.current}|${stageEnds.w1}|${stageEnds.w2}|${stageEnds.w3}|${stageEnds.closing}`
+        if (activeRequestKey !== requestKey) return
         setDistributionRows([])
         setDistributionSellerItemsRows([])
         setDistributionDiagnostics(null)
         setDistributionError(error instanceof Error ? error.message : 'Falha ao carregar distribuicao de itens.')
       })
       .finally(() => {
-        if (!controller.signal.aborted) setDistributionLoading(false)
+        if (controller.signal.aborted) return
+        const activeRequestKey = `${performanceRequestKeyRef.current}|${stageEnds.w1}|${stageEnds.w2}|${stageEnds.w3}|${stageEnds.closing}`
+        if (activeRequestKey !== requestKey) return
+        setDistributionLoading(false)
       })
 
     return () => controller.abort()
