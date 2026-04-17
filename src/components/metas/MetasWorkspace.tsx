@@ -1030,6 +1030,7 @@ export default function MetasWorkspace() {
   const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
   const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
   const [kpiConsolidatedPreviousByType, setKpiConsolidatedPreviousByType] = useState<Record<string, { hit: number; pending: number }>>({})
+  const [kpiConsolidatedExpandedType, setKpiConsolidatedExpandedType] = useState<KpiType | null>(null)
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
@@ -3492,6 +3493,127 @@ export default function MetasWorkspace() {
         return a.label.localeCompare(b.label, 'pt-BR')
       })
   }, [kpiConsolidatedFilteredSellerRows])
+
+  const kpiConsolidatedDetailsByType = useMemo(() => {
+    const typeLabelByKey = new Map<KpiType, string>(KPI_CATALOG.map((item) => [item.type, item.label]))
+    const map = new Map<KpiType, {
+      type: KpiType
+      label: string
+      total: number
+      hit: number
+      progressSum: number
+      sellers: Array<{
+        sellerId: string
+        sellerName: string
+        sellerShortName: string
+        total: number
+        hit: number
+        pending: number
+        avgProgressRatio: number
+      }>
+    }>()
+
+    for (const row of kpiConsolidatedFilteredSellerRows) {
+      const block = row.block
+      if (!block) continue
+      const perSellerType = new Map<KpiType, { total: number; hit: number; progressSum: number }>()
+      for (const rule of block.rules) {
+        const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
+        if (kpiType === 'VOLUME') continue
+        const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        const current = perSellerType.get(kpiType) ?? { total: 0, hit: 0, progressSum: 0 }
+        current.total += 1
+        current.hit += progress >= 1 ? 1 : 0
+        current.progressSum += Math.max(0, Math.min(progress, 1))
+        perSellerType.set(kpiType, current)
+      }
+
+      for (const [type, values] of perSellerType.entries()) {
+        const currentType = map.get(type) ?? {
+          type,
+          label: typeLabelByKey.get(type) ?? type,
+          total: 0,
+          hit: 0,
+          progressSum: 0,
+          sellers: [],
+        }
+        const pending = Math.max(values.total - values.hit, 0)
+        const avgProgressRatio = values.total > 0 ? values.progressSum / values.total : 0
+        currentType.total += values.total
+        currentType.hit += values.hit
+        currentType.progressSum += values.progressSum
+        currentType.sellers.push({
+          sellerId: row.sellerId,
+          sellerName: row.sellerName,
+          sellerShortName: getSellerShortName(row.sellerName),
+          total: values.total,
+          hit: values.hit,
+          pending,
+          avgProgressRatio,
+        })
+        map.set(type, currentType)
+      }
+    }
+
+    const result: Record<string, {
+      type: KpiType
+      label: string
+      total: number
+      hit: number
+      pending: number
+      avgProgressRatio: number
+      sellersCount: number
+      sellersWithPending: number
+      highestPendingSeller: null | {
+        sellerId: string
+        sellerName: string
+        sellerShortName: string
+        total: number
+        hit: number
+        pending: number
+        avgProgressRatio: number
+      }
+      sellers: Array<{
+        sellerId: string
+        sellerName: string
+        sellerShortName: string
+        total: number
+        hit: number
+        pending: number
+        avgProgressRatio: number
+      }>
+    }> = {}
+
+    for (const [type, detail] of map.entries()) {
+      const sellers = [...detail.sellers].sort((a, b) => {
+        if (b.pending !== a.pending) return b.pending - a.pending
+        if (a.avgProgressRatio !== b.avgProgressRatio) return a.avgProgressRatio - b.avgProgressRatio
+        return a.sellerShortName.localeCompare(b.sellerShortName, 'pt-BR')
+      })
+      const pending = Math.max(detail.total - detail.hit, 0)
+      const sellersWithPending = sellers.filter((seller) => seller.pending > 0).length
+      const highestPendingSeller = sellers.find((seller) => seller.pending > 0) ?? null
+      result[type] = {
+        type,
+        label: detail.label,
+        total: detail.total,
+        hit: detail.hit,
+        pending,
+        avgProgressRatio: detail.total > 0 ? detail.progressSum / detail.total : 0,
+        sellersCount: sellers.length,
+        sellersWithPending,
+        highestPendingSeller,
+        sellers,
+      }
+    }
+    return result
+  }, [kpiConsolidatedFilteredSellerRows])
+
+  useEffect(() => {
+    if (!kpiConsolidatedExpandedType) return
+    const exists = kpiConsolidatedTypeRows.some((row) => row.type === kpiConsolidatedExpandedType)
+    if (!exists) setKpiConsolidatedExpandedType(null)
+  }, [kpiConsolidatedExpandedType, kpiConsolidatedTypeRows])
 
   const kpiConsolidatedHighlights = useMemo(() => {
     if (kpiConsolidatedTypeRows.length === 0) {
@@ -7963,6 +8085,8 @@ export default function MetasWorkspace() {
                               const pending = Math.max(row.total - row.hit, 0)
                               const healthPct = row.avgProgressRatio * 100
                               const previous = kpiConsolidatedPreviousByType[row.type]
+                              const detail = kpiConsolidatedDetailsByType[row.type]
+                              const isExpanded = kpiConsolidatedExpandedType === row.type
                               const previousHit = previous?.hit
                               const previousPending = previous?.pending
                               const hitDeltaPct = typeof previousHit === 'number'
@@ -7993,11 +8117,22 @@ export default function MetasWorkspace() {
                                 row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.2 ? 'Atenção' : 'Crítico'
                               const criticalityClass =
                                 row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.2 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
-                              return (
+                              return [
                                 <tr key={`kpi-consolidated-type-${row.type}`} className="border-t border-surface-100">
                                   <td className="px-3 py-2.5">
-                                    <p className="font-semibold text-surface-800">{row.label}</p>
-                                    <p className="text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</p>
+                                    <button
+                                      type="button"
+                                      className="group flex w-full items-start gap-2 text-left"
+                                      onClick={() => setKpiConsolidatedExpandedType((prev) => (prev === row.type ? null : row.type))}
+                                    >
+                                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-500 transition-colors group-hover:border-cyan-200 group-hover:text-cyan-700">
+                                        {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                      </span>
+                                      <span>
+                                        <span className="block font-semibold text-surface-800">{row.label}</span>
+                                        <span className="block text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</span>
+                                      </span>
+                                    </button>
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
                                     <div className="flex items-center justify-end gap-2">
@@ -8039,8 +8174,88 @@ export default function MetasWorkspace() {
                                       {criticalityLabel}
                                     </span>
                                   </td>
-                                </tr>
-                              )
+                                </tr>,
+                                isExpanded ? (
+                                  <tr key={`kpi-consolidated-type-detail-${row.type}`} className="border-t border-surface-100 bg-surface-50/40">
+                                    <td colSpan={6} className="px-3 py-3">
+                                      <div className="rounded-lg border border-surface-200 bg-white p-3">
+                                        <div className="grid gap-2 md:grid-cols-4">
+                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Vendedores no KPI</p>
+                                            <p className="mt-1 text-sm font-semibold text-surface-800">{num(detail?.sellersCount ?? 0, 0)}</p>
+                                          </div>
+                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Com pendência</p>
+                                            <p className="mt-1 text-sm font-semibold text-rose-700">{num(detail?.sellersWithPending ?? 0, 0)}</p>
+                                          </div>
+                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pendências totais</p>
+                                            <p className="mt-1 text-sm font-semibold text-amber-700">{num(detail?.pending ?? 0, 0)}</p>
+                                          </div>
+                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Maior pendência</p>
+                                            <p className="mt-1 text-sm font-semibold text-surface-800">{detail?.highestPendingSeller?.sellerShortName ?? 'Sem pendências'}</p>
+                                            <p className="text-[10px] text-surface-500">
+                                              {detail?.highestPendingSeller ? `${num(detail.highestPendingSeller.pending, 0)} pendente(s)` : 'Todos no alvo'}
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-3 overflow-x-auto">
+                                          <table className="min-w-full text-[11px]">
+                                            <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                                              <tr>
+                                                <th className="px-2 py-1.5 text-left">Vendedor</th>
+                                                <th className="px-2 py-1.5 text-right">Conquistadas</th>
+                                                <th className="px-2 py-1.5 text-right">Pendentes</th>
+                                                <th className="px-2 py-1.5 text-right">Aderência</th>
+                                                <th className="px-2 py-1.5 text-right">Falta para 100%</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {(detail?.sellers ?? []).length === 0 ? (
+                                                <tr className="border-t border-surface-100">
+                                                  <td colSpan={5} className="px-2 py-3 text-center text-[10px] text-surface-400">
+                                                    Sem detalhamento de vendedores para este KPI.
+                                                  </td>
+                                                </tr>
+                                              ) : (
+                                                (detail?.sellers ?? []).map((sellerDetail) => {
+                                                  const adherencePct = sellerDetail.avgProgressRatio * 100
+                                                  const gapToTarget = Math.max(100 - adherencePct, 0)
+                                                  const adherenceBarClass =
+                                                    sellerDetail.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : sellerDetail.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : sellerDetail.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
+                                                  return (
+                                                    <tr key={`kpi-consolidated-seller-detail-${row.type}-${sellerDetail.sellerId}`} className="border-t border-surface-100">
+                                                      <td className="px-2 py-1.5">
+                                                        <p className="font-medium text-surface-800">{sellerDetail.sellerShortName}</p>
+                                                        <p className="text-[10px] text-surface-500">{sellerDetail.sellerName}</p>
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{num(sellerDetail.hit, 0)}</td>
+                                                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-rose-700">{num(sellerDetail.pending, 0)}</td>
+                                                      <td className="px-2 py-1.5">
+                                                        <div className="ml-auto flex w-full max-w-32 items-center justify-end gap-2">
+                                                          <div className="h-1.5 w-full max-w-14 overflow-hidden rounded-full bg-surface-100">
+                                                            <div className={`h-full ${adherenceBarClass}`} style={{ width: `${Math.min(adherencePct, 100)}%` }} />
+                                                          </div>
+                                                          <span className="text-[10px] font-semibold tabular-nums text-surface-900">{num(adherencePct, 1)}%</span>
+                                                        </div>
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right tabular-nums text-[10px] font-semibold text-surface-600">
+                                                        {num(gapToTarget, 1)}%
+                                                      </td>
+                                                    </tr>
+                                                  )
+                                                })
+                                              )}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ) : null,
+                              ]
                             })
                           )}
                         </tbody>
