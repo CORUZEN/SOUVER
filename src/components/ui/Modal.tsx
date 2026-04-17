@@ -81,7 +81,7 @@ export default function Modal({
               <button
                 onClick={onClose}
                 className={cn(
-                  'w-8 h-8 flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0',
+                  'w-8 h-8 cursor-pointer flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0',
                   closeButtonClassName
                 )}
                 aria-label="Fechar"
