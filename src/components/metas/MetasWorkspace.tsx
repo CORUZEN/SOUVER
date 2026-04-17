@@ -231,6 +231,9 @@ interface PositivationDetailsPayload {
   pendingProducts: PositivationDetailItem[]
 }
 
+type PositivatedSortKey = 'code' | 'description' | 'brand' | 'soldWeightKg' | 'soldQty'
+type PendingSortKey = 'code' | 'description' | 'brand'
+
 interface MetasUiPermissionSection {
   view: boolean
   edit: boolean
@@ -1148,6 +1151,14 @@ export default function MetasWorkspace() {
   const [positivationDetailsLoading, setPositivationDetailsLoading] = useState(false)
   const [positivationDetailsError, setPositivationDetailsError] = useState('')
   const [positivationDetailsData, setPositivationDetailsData] = useState<PositivationDetailsPayload | null>(null)
+  const [positivatedSort, setPositivatedSort] = useState<{ key: PositivatedSortKey; direction: SortDirection }>({
+    key: 'soldWeightKg',
+    direction: 'desc',
+  })
+  const [pendingSort, setPendingSort] = useState<{ key: PendingSortKey; direction: SortDirection }>({
+    key: 'description',
+    direction: 'asc',
+  })
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
@@ -2744,6 +2755,45 @@ export default function MetasWorkspace() {
 
     return () => controller.abort()
   }, [companyScopeFilter, month, positivationDetailsModal.open, positivationDetailsModal.sellerId, year])
+
+  const positivatedProductsSorted = useMemo(() => {
+    const list = positivationDetailsData?.positivatedProducts ?? []
+    return [...list].sort((a, b) => {
+      let comparison = 0
+      if (positivatedSort.key === 'soldWeightKg') {
+        comparison = a.soldWeightKg - b.soldWeightKg
+      } else if (positivatedSort.key === 'soldQty') {
+        comparison = a.soldQty - b.soldQty
+      } else {
+        comparison = String(a[positivatedSort.key] ?? '').localeCompare(String(b[positivatedSort.key] ?? ''), 'pt-BR')
+      }
+      return positivatedSort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [positivationDetailsData, positivatedSort])
+
+  const pendingProductsSorted = useMemo(() => {
+    const list = positivationDetailsData?.pendingProducts ?? []
+    return [...list].sort((a, b) => {
+      const comparison = String(a[pendingSort.key] ?? '').localeCompare(String(b[pendingSort.key] ?? ''), 'pt-BR')
+      return pendingSort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [pendingSort, positivationDetailsData])
+
+  function togglePositivatedSort(key: PositivatedSortKey) {
+    setPositivatedSort((prev) => (
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: key === 'soldWeightKg' || key === 'soldQty' ? 'desc' : 'asc' }
+    ))
+  }
+
+  function togglePendingSort(key: PendingSortKey) {
+    setPendingSort((prev) => (
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    ))
+  }
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
   const nextKey = monthKey(nextDate.getFullYear(), nextDate.getMonth())
@@ -9118,110 +9168,165 @@ export default function MetasWorkspace() {
           setPositivationDetailsError('')
           setPositivationDetailsLoading(false)
         }}
-        title="Detalhes da positivação"
-        description={`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year}`}
+        title="Painel Executivo de Positivação"
+        description={`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year} · Visão detalhada por SKU`}
         size="xl"
+        className="overflow-hidden [&>div:first-child]:border-b-0 [&>div:first-child]:bg-linear-to-r [&>div:first-child]:from-slate-900 [&>div:first-child]:via-slate-800 [&>div:first-child]:to-slate-900 [&>div:first-child]:py-5 [&>div:first-child]:shadow-[inset_0_-1px_0_rgba(148,163,184,0.25)] [&>div:first-child>div>h2]:text-lg [&>div:first-child>div>h2]:font-semibold [&>div:first-child>div>h2]:text-slate-50 [&>div:first-child>div>p]:text-slate-300 [&>div:first-child_button]:text-slate-300 [&>div:first-child_button:hover]:bg-white/10 [&>div:first-child_button:hover]:text-white [&>div:nth-child(2)]:overflow-hidden"
       >
-        <div className="space-y-3 px-1">
+        <div className="flex h-[calc(90vh-8.5rem)] min-h-0 flex-col gap-4 overflow-hidden px-1">
           {positivationDetailsLoading ? (
-            <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-6 text-sm text-surface-500">
+            <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-4 py-6 text-sm text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
               Carregando detalhes da positivacao...
             </div>
           ) : positivationDetailsError ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 shadow-[0_8px_20px_rgba(190,24,93,0.10)]">
               {positivationDetailsError}
             </div>
           ) : positivationDetailsData ? (
             <>
-              <div className="grid gap-2 sm:grid-cols-4">
-                <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+              <div className="grid shrink-0 gap-2.5 sm:grid-cols-4">
+                <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-cyan-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(8,145,178,0.14)]">
+                  <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-cyan-500 to-sky-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Positivados</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-cyan-900">
                     {num(positivationDetailsData.summary.totalPositivatedItems, 0)} / {num(positivationDetailsData.summary.totalTargetItems, 0)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 via-white to-emerald-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(5,150,105,0.14)]">
+                  <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 to-teal-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Peso vendido</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-emerald-900">{num(positivationDetailsData.summary.totalSoldWeightKg, 2)} kg</p>
                 </div>
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 via-white to-violet-50/50 px-3 py-2.5 shadow-[0_10px_24px_rgba(79,70,229,0.14)]">
+                  <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-indigo-500 to-violet-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Quantidade vendida</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-indigo-900">{num(positivationDetailsData.summary.totalSoldQty, 0)}</p>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-linear-to-br from-amber-50 via-white to-amber-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(217,119,6,0.14)]">
+                  <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-amber-500 to-orange-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Pendentes</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-amber-900">{num(positivationDetailsData.summary.totalPendingItems, 0)}</p>
                 </div>
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40">
-                  <div className="border-b border-emerald-200 px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Produtos positivados</p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {positivationDetailsData.positivatedProducts.length === 0 ? (
-                      <p className="px-3 py-4 text-xs text-surface-500">Nenhum produto positivado no período.</p>
-                    ) : (
-                      <table className="min-w-full text-xs">
-                        <thead className="sticky top-0 bg-emerald-100/80 text-[10px] uppercase tracking-widest text-emerald-700">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left">Produto</th>
-                            <th className="px-2 py-1.5 text-right">Peso (kg)</th>
-                            <th className="px-2 py-1.5 text-right">Qtd.</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {positivationDetailsData.positivatedProducts.map((item) => (
-                            <tr key={`pos-${item.code}`} className="border-t border-emerald-100">
-                              <td className="px-2 py-1.5">
-                                <p className="font-semibold text-surface-800">{item.description || item.code}</p>
-                                <p className="text-[10px] text-surface-500">{item.code} · {item.brand || 'Sem grupo'}</p>
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldWeightKg, 2)}</td>
-                              <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldQty, 0)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
+              {(() => {
+                const hasPendingProducts = pendingProductsSorted.length > 0
+                const sortIndicator = (active: boolean, direction: SortDirection) =>
+                  active ? (direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="opacity-50" />
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50/40">
-                  <div className="border-b border-amber-200 px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {positivationDetailsData.pendingProducts.length === 0 ? (
-                      <p className="px-3 py-4 text-xs text-emerald-700">Todos os produtos da meta foram positivados no período.</p>
-                    ) : (
-                      <table className="min-w-full text-xs">
-                        <thead className="sticky top-0 bg-amber-100/80 text-[10px] uppercase tracking-widest text-amber-700">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left">Produto</th>
-                            <th className="px-2 py-1.5 text-left">Grupo</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {positivationDetailsData.pendingProducts.map((item) => (
-                            <tr key={`pending-${item.code}`} className="border-t border-amber-100">
-                              <td className="px-2 py-1.5">
-                                <p className="font-semibold text-surface-800">{item.description || item.code}</p>
-                                <p className="text-[10px] text-surface-500">{item.code}</p>
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px] text-surface-700">{item.brand || 'Sem grupo'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
-              </div>
+                return (
+                  <>
+                    {!hasPendingProducts ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                        Todos os produtos da meta foram positivados no período atual.
+                      </div>
+                    ) : null}
+
+                    <div className={`grid min-h-0 flex-1 gap-3 ${hasPendingProducts ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+                      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_14px_30px_rgba(5,150,105,0.12)]">
+                        <div className="shrink-0 border-b border-emerald-200 bg-linear-to-r from-emerald-50 via-cyan-50 to-white px-3 py-2.5">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Produtos positivados</p>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                          {positivatedProductsSorted.length === 0 ? (
+                            <p className="px-3 py-4 text-xs text-surface-500">Nenhum produto positivado no período.</p>
+                          ) : (
+                            <table className="min-w-full text-xs">
+                              <thead className="sticky top-0 z-10 bg-emerald-100/95 text-[10px] uppercase tracking-widest text-emerald-700 backdrop-blur-sm">
+                                <tr>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePositivatedSort('code')}>
+                                      SKU {sortIndicator(positivatedSort.key === 'code', positivatedSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePositivatedSort('description')}>
+                                      Descrição {sortIndicator(positivatedSort.key === 'description', positivatedSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePositivatedSort('brand')}>
+                                      Grupo {sortIndicator(positivatedSort.key === 'brand', positivatedSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-right">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePositivatedSort('soldWeightKg')}>
+                                      Peso (kg) {sortIndicator(positivatedSort.key === 'soldWeightKg', positivatedSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-right">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePositivatedSort('soldQty')}>
+                                      Qtd. {sortIndicator(positivatedSort.key === 'soldQty', positivatedSort.direction)}
+                                    </button>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {positivatedProductsSorted.map((item) => (
+                                  <tr key={`pos-${item.code}`} className="border-t border-emerald-100 hover:bg-emerald-50/50">
+                                    <td className="px-2 py-1.5 text-[11px] font-semibold tabular-nums text-slate-700">{item.code}</td>
+                                    <td className="px-2 py-1.5">
+                                      <p className="font-semibold text-surface-800">{item.description || item.code}</p>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-[11px] text-surface-700">{item.brand || 'Sem grupo'}</td>
+                                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldWeightKg, 2)}</td>
+                                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldQty, 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+
+                      {hasPendingProducts ? (
+                        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_14px_30px_rgba(217,119,6,0.12)]">
+                          <div className="shrink-0 border-b border-amber-200 bg-linear-to-r from-amber-50 via-orange-50 to-white px-3 py-2.5">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
+                          </div>
+                          <div className="min-h-0 flex-1 overflow-y-auto">
+                            <table className="min-w-full text-xs">
+                              <thead className="sticky top-0 z-10 bg-amber-100/95 text-[10px] uppercase tracking-widest text-amber-700 backdrop-blur-sm">
+                                <tr>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePendingSort('code')}>
+                                      SKU {sortIndicator(pendingSort.key === 'code', pendingSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePendingSort('description')}>
+                                      Descrição {sortIndicator(pendingSort.key === 'description', pendingSort.direction)}
+                                    </button>
+                                  </th>
+                                  <th className="px-2 py-2 text-left">
+                                    <button type="button" className="inline-flex items-center gap-1" onClick={() => togglePendingSort('brand')}>
+                                      Grupo {sortIndicator(pendingSort.key === 'brand', pendingSort.direction)}
+                                    </button>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {pendingProductsSorted.map((item) => (
+                                  <tr key={`pending-${item.code}`} className="border-t border-amber-100 hover:bg-amber-50/50">
+                                    <td className="px-2 py-1.5 text-[11px] font-semibold tabular-nums text-slate-700">{item.code}</td>
+                                    <td className="px-2 py-1.5">
+                                      <p className="font-semibold text-surface-800">{item.description || item.code}</p>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-[11px] text-surface-700">{item.brand || 'Sem grupo'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                )
+              })()}
             </>
           ) : (
-            <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-4 text-sm text-surface-500">
+            <div className="rounded-2xl border border-surface-200 bg-linear-to-br from-surface-50 to-white px-4 py-4 text-sm text-surface-500 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
               Nenhum dado disponivel para o vendedor selecionado.
             </div>
           )}
