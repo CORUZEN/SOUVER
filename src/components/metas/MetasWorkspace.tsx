@@ -9405,7 +9405,7 @@ export default function MetasWorkspace() {
       >
         <div className="flex h-[calc(90vh-8.5rem)] min-h-0 flex-col gap-4 overflow-hidden px-1">
           {positivationDetailsLoading ? (
-            <div className="flex min-h-[24rem] flex-1 items-center justify-center">
+            <div className="flex min-h-96 flex-1 items-center justify-center">
               <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50">
@@ -9527,7 +9527,7 @@ export default function MetasWorkspace() {
                       </div>
 
                       {hasPendingProducts ? (
-                        <div className="flex max-h-[16rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white">
+                        <div className="flex max-h-64 min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white">
                           <div className="shrink-0 border-b border-amber-200 bg-linear-to-r from-amber-50 via-orange-50 to-white px-3 py-2.5">
                             <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
                           </div>
