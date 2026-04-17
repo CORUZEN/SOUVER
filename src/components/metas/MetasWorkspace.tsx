@@ -1063,17 +1063,18 @@ export default function MetasWorkspace() {
   const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
   const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
   const [kpiConsolidatedPreviousByType, setKpiConsolidatedPreviousByType] = useState<Record<string, { hit: number; pending: number }>>({})
-  const [previousPeriodTotals, setPreviousPeriodTotals] = useState<{
+  const [previousSellersData, setPreviousSellersData] = useState<Array<{
+    id: string
+    supervisorCode: string
     totalOrders: number
     totalGrossWeight: number
     totalRevenue: number
-    uniqueClients: number
-    totalBaseClients: number
+    clientCodes: string[]
+    baseClientCount: number
     positivadosSold: number
-    positivadosTarget: number
     metasHit: number
     metasTotal: number
-  } | null>(null)
+  }>>([])
   const [kpiConsolidatedExpandedType, setKpiConsolidatedExpandedType] = useState<KpiType | null>(null)
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
@@ -3923,6 +3924,34 @@ export default function MetasWorkspace() {
     }
   }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
 
+  // Previous-period totals scoped to the same seller/supervisor as the current view
+  const previousPeriodScopedTotals = useMemo(() => {
+    if (previousSellersData.length === 0) return null
+    let filtered = previousSellersData
+    if (kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId) {
+      filtered = previousSellersData.filter((s) => s.id === kpiGeneralPanelSellerId)
+    } else if (kpiGeneralPanelView === 'SUPERVISOR' && kpiGeneralPanelSupervisorKey) {
+      filtered = previousSellersData.filter((s) => s.supervisorCode === kpiGeneralPanelSupervisorKey)
+    }
+    if (filtered.length === 0) return null
+    const uniqueClients = new Set<string>()
+    for (const s of filtered) {
+      for (const code of s.clientCodes) uniqueClients.add(code)
+    }
+    const activeProductsCount = Math.max(productAllowlist.filter((p) => p.active).length, 0)
+    return {
+      totalOrders: filtered.reduce((sum, s) => sum + s.totalOrders, 0),
+      totalGrossWeight: filtered.reduce((sum, s) => sum + s.totalGrossWeight, 0),
+      totalRevenue: filtered.reduce((sum, s) => sum + s.totalRevenue, 0),
+      uniqueClients: uniqueClients.size,
+      totalBaseClients: filtered.reduce((sum, s) => sum + s.baseClientCount, 0),
+      positivadosSold: filtered.reduce((sum, s) => sum + s.positivadosSold, 0),
+      positivadosTarget: activeProductsCount * filtered.length,
+      metasHit: filtered.reduce((sum, s) => sum + s.metasHit, 0),
+      metasTotal: filtered.reduce((sum, s) => sum + s.metasTotal, 0),
+    }
+  }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, previousSellersData, productAllowlist])
+
   const kpiConsolidatedFilteredSellerRows = useMemo(() => {
     if (kpiGeneralPanelView === 'SUPERVISOR') {
       if (!kpiGeneralPanelSupervisorKey) return []
@@ -4405,6 +4434,7 @@ export default function MetasWorkspace() {
         const supervisorScopeKey = normalizeEntityCode(kpiConsolidatedSupervisorKey)
 
         const previousByType = new Map<KpiType, { total: number; hit: number }>()
+        const perSellerMetas = new Map<string, { hit: number; total: number }>()
         for (const seller of previousSellers) {
           const sellerCode = toSellerCodeFromId(seller.id)
           const sellerNameLookup = normalizeSellerNameForLookup(seller.name)
@@ -4501,6 +4531,7 @@ export default function MetasWorkspace() {
           const focusTargetBasePct = Math.max(Number(summarySeller.focusTargetBasePct ?? 0), 0)
 
           const rules = Array.isArray(summarySeller.rules) ? summarySeller.rules : []
+          const sellerMetasObj = { hit: 0, total: 0 }
           for (const rule of rules) {
             const kpiType = (rule.kpiType ?? inferKpiType(rule.kpi)) as KpiType
             if (kpiType === 'VOLUME') continue
@@ -4622,9 +4653,11 @@ export default function MetasWorkspace() {
 
             const bucket = previousByType.get(kpiType) ?? { total: 0, hit: 0 }
             bucket.total += 1
-            if (Math.max(0, Math.min(progress, 1)) >= 1) bucket.hit += 1
+            sellerMetasObj.total += 1
+            if (Math.max(0, Math.min(progress, 1)) >= 1) { bucket.hit += 1; sellerMetasObj.hit += 1 }
             previousByType.set(kpiType, bucket)
           }
+          perSellerMetas.set(seller.id, sellerMetasObj)
         }
 
         if (cancelled) return
@@ -4637,46 +4670,30 @@ export default function MetasWorkspace() {
         }
         setKpiConsolidatedPreviousByType(mapped)
 
-        // Aggregate previous month totals for comparison badges
-        const prevTotalOrders = previousSellers.reduce((sum, s) => sum + s.totalOrders, 0)
-        const prevTotalGrossWeight = previousSellers.reduce((sum, s) => sum + s.totalGrossWeight, 0)
-        const prevTotalRevenue = previousSellers.reduce((sum, s) => sum + s.totalValue, 0)
-        const prevUniqueClients = new Set<string>()
-        for (const s of previousSellers) {
-          for (const o of s.orders) {
-            const code = String(o.clientCode ?? '').trim()
-            if (code) prevUniqueClients.add(code)
-          }
-        }
-        const prevTotalBaseClients = previousSellers.reduce((sum, s) => sum + Math.max(s.baseClientCount ?? 0, 0), 0)
-        const prevActiveProducts = productAllowlist.filter((p) => p.active).length
-        const prevPositivadosTarget = prevActiveProducts * previousSellers.length
-        const prevPositivadosSold = previousSellers.reduce((sum, s) => {
+        // Build per-seller data for scoped MoM comparison
+        const newPreviousSellersData = previousSellers.map((s) => {
           const sellerCode = toSellerCodeFromId(s.id)
           const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
-          return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
-        }, 0)
-        let prevMetasHit = 0
-        let prevMetasTotal = 0
-        for (const [, values] of previousByType.entries()) {
-          prevMetasHit += values.hit
-          prevMetasTotal += values.total
-        }
-        setPreviousPeriodTotals({
-          totalOrders: prevTotalOrders,
-          totalGrossWeight: prevTotalGrossWeight,
-          totalRevenue: prevTotalRevenue,
-          uniqueClients: prevUniqueClients.size,
-          totalBaseClients: prevTotalBaseClients,
-          positivadosSold: prevPositivadosSold,
-          positivadosTarget: prevPositivadosTarget,
-          metasHit: prevMetasHit,
-          metasTotal: prevMetasTotal,
+          const positivadosSold = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+          const metas = perSellerMetas.get(s.id) ?? { hit: 0, total: 0 }
+          return {
+            id: s.id,
+            supervisorCode: String(s.supervisorCode ?? '').trim(),
+            totalOrders: s.totalOrders,
+            totalGrossWeight: s.totalGrossWeight,
+            totalRevenue: s.totalValue,
+            clientCodes: s.orders.map((o) => String(o.clientCode ?? '').trim()).filter(Boolean),
+            baseClientCount: Math.max(s.baseClientCount ?? 0, 0),
+            positivadosSold,
+            metasHit: metas.hit,
+            metasTotal: metas.total,
+          }
         })
+        setPreviousSellersData(newPreviousSellersData)
       } catch {
         if (cancelled || controller.signal.aborted) return
         setKpiConsolidatedPreviousByType({})
-        setPreviousPeriodTotals(null)
+        setPreviousSellersData([])
       }
     }
 
@@ -8590,7 +8607,7 @@ export default function MetasWorkspace() {
               ) : (
                 <div className="mt-4 space-y-4">
                   {(() => {
-                    const prev = previousPeriodTotals
+                    const prev = previousPeriodScopedTotals
                     const delta = (current: number, previous: number | undefined) => {
                       if (previous === undefined || previous === null || previous === 0) return null
                       const diff = current - previous
@@ -8746,7 +8763,7 @@ export default function MetasWorkspace() {
                       </div>
 
                       {(() => {
-                        const prev = previousPeriodTotals
+                        const prev = previousPeriodScopedTotals
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
