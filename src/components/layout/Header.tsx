@@ -76,10 +76,14 @@ function HeaderInner() {
       .then((data) => {
         if (data?.user) {
           const { name, email, role, roleCode, avatarUrl, impersonation } = data.user
+          const resolvedRole =
+            typeof role === 'string'
+              ? role
+              : role?.name ?? 'Usuário'
           setUser({
             name,
             email,
-            role: role?.name ?? role ?? 'Usuário',
+            role: resolvedRole,
             roleCode: roleCode ?? null,
             avatarUrl: avatarUrl ?? null,
             impersonation: impersonation ?? null,

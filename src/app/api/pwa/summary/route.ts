@@ -100,10 +100,8 @@ export async function GET(req: NextRequest) {
   // ── Sellers with their codes ───────────────────────────────────────────────
   const sellerSummaries = scopedSellers.map((seller) => {
     const code = String(seller.code ?? '').trim()
-    const sellerId = String(seller.id ?? '').trim()
     const normalizedCode = code.replace(/^sankhya-/, '')
     const sellerCandidates = new Set([
-      sellerId,
       code,
       normalizedCode,
       normalizedCode ? `sankhya-${normalizedCode}` : '',

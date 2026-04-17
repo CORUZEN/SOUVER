@@ -3,10 +3,23 @@
 type AuthMeResponse = {
   user?: {
     id?: string
-    name?: string
-    email?: string
+    name: string
+    email: string
+    role?: string | { name?: string; code?: string } | null
     roleCode?: string
     sellerCode?: string
+    avatarUrl?: string | null
+    impersonation?: {
+      active: boolean
+      developerName: string
+    } | null
+    canAccessIntegrations?: boolean
+    modulePermissions?: Record<string, boolean>
+    metasPermissions?: {
+      config?: { view?: boolean; edit?: boolean; save?: boolean; remove?: boolean }
+      sellers?: { view?: boolean; edit?: boolean; save?: boolean; remove?: boolean }
+      products?: { view?: boolean; edit?: boolean; save?: boolean; remove?: boolean }
+    }
   }
 } | null
 
@@ -45,4 +58,3 @@ export async function fetchAuthMeCached(options: FetchAuthMeOptions = {}): Promi
   }
   return result
 }
-

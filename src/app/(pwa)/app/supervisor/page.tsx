@@ -1194,7 +1194,7 @@ export default function SupervisorPwaDashboard() {
               <div className="pwa-card pwa-card-hero col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Meta Financeira</p>
-                  <span className={`max-w-[170px] text-right text-[11px] font-semibold leading-tight tabular-nums ${
+                  <span className={`max-w-42.5 text-right text-[11px] font-semibold leading-tight tabular-nums ${
                     totalTarget <= 0
                       ? 'text-surface-300'
                       : targetGapPct >= 0
@@ -1296,7 +1296,7 @@ export default function SupervisorPwaDashboard() {
                     <DollarSign className="h-3 w-3" />
                     Valor Total dos Pedidos
                   </div>
-                  <span className={`max-w-[180px] text-right text-[11px] font-semibold leading-tight tabular-nums ${
+                  <span className={`max-w-45 text-right text-[11px] font-semibold leading-tight tabular-nums ${
                     totalTarget <= 0
                       ? 'text-surface-300'
                       : targetGapValue >= 0
