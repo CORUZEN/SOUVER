@@ -8925,18 +8925,18 @@ export default function MetasWorkspace() {
                                         <button
                                           type="button"
                                           onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
-                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-teal-300/70 bg-linear-to-br from-cyan-50 via-teal-50 to-emerald-50 px-3 py-2.5 text-left transition-all duration-200 hover:border-teal-400 hover:from-cyan-100 hover:via-teal-50 hover:to-emerald-100"
+                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-teal-300/70 bg-linear-to-br from-cyan-50 via-teal-50 to-emerald-50 px-3 py-2.5 pr-14 text-left transition-all duration-200 hover:border-teal-400 hover:from-cyan-100 hover:via-teal-50 hover:to-emerald-100"
                                         >
                                           <span className="absolute inset-y-0 left-0 w-1 bg-linear-to-b from-cyan-500 to-emerald-500" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-teal-700">Positivação</p>
-                                          <div className="mt-1 flex items-center justify-between gap-3">
+                                          <div className="mt-1 flex items-center">
                                             <p className="text-xl leading-tight font-semibold tabular-nums text-slate-900">
                                               {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
                                             </p>
-                                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-teal-300 bg-white/90 text-teal-700 transition-all duration-200 group-hover:border-teal-400 group-hover:bg-white">
-                                              <ChevronRight size={16} strokeWidth={2.5} />
-                                            </span>
                                           </div>
+                                          <span className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl border border-sky-700/20 bg-linear-to-br from-sky-600 via-cyan-600 to-teal-600 text-white shadow-[0_6px_14px_rgba(8,145,178,0.28)] ring-1 ring-white/35 transition-colors duration-200 hover:from-sky-700 hover:via-cyan-700 hover:to-teal-700">
+                                            <ChevronRight size={15} strokeWidth={2.6} />
+                                          </span>
                                         </button>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" />
