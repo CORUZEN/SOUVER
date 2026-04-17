@@ -6966,7 +6966,7 @@ export default function MetasWorkspace() {
                   <p className="mt-0.5 text-[10px] text-surface-400">
                     {strategicMetricsPanelMode === 'WEIGHT'
                       ? `Visão geral, por vendedor e por supervisor — ${MONTHS[month]} ${year}`
-                      : `Consolidação corporativa de KPIs (exceto Volume) por período — ${MONTHS[month]} ${year}`}
+                      : `Consolidação corporativa de metas (exceto Volume) por período — ${MONTHS[month]} ${year}`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -7357,11 +7357,11 @@ export default function MetasWorkspace() {
                 </>
               ) : sellersLoading ? (
                 <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                  Carregando consolidação de KPIs...
+                  Carregando consolidação de metas...
                 </div>
               ) : snapshots.length === 0 ? (
                 <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                  Nenhum vendedor ativo encontrado para consolidar KPIs.
+                  Nenhum vendedor ativo encontrado para consolidar metas.
                 </div>
               ) : (
                 <div className="mt-4 space-y-4">
@@ -7405,7 +7405,7 @@ export default function MetasWorkspace() {
 
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Melhor KPI do ciclo</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Melhor meta do ciclo</p>
                       <p className="mt-1 text-sm font-semibold text-emerald-900">
                         {kpiConsolidatedHighlights.topPerformer?.label ?? '—'}
                       </p>
@@ -7427,7 +7427,7 @@ export default function MetasWorkspace() {
                       </p>
                     </div>
                     <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Maior backlog de KPI</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Maior backlog de meta</p>
                       <p className="mt-1 text-sm font-semibold text-amber-900">
                         {kpiConsolidatedHighlights.largestBacklog?.label ?? '—'}
                       </p>
@@ -7438,7 +7438,7 @@ export default function MetasWorkspace() {
                       </p>
                     </div>
                     <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Saúde dos KPIs</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Saúde das metas</p>
                       <p className="mt-1 text-sm font-semibold text-cyan-900">
                         {num(kpiConsolidatedHighlights.healthyCount, 0)} saudáveis · {num(kpiConsolidatedHighlights.attentionCount, 0)} críticos
                       </p>
@@ -7451,20 +7451,19 @@ export default function MetasWorkspace() {
                       <table className="min-w-full text-xs">
                         <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
                           <tr>
-                            <th className="px-3 py-2 text-left">KPI estratégico</th>
+                            <th className="px-3 py-2 text-left">Meta estratégica</th>
                             <th className="px-3 py-2 text-right">Conquistados</th>
                             <th className="px-3 py-2 text-right">Pendentes</th>
                             <th className="px-3 py-2 text-right">Conversão</th>
                             <th className="px-3 py-2 text-right">Aderência média</th>
-                            <th className="px-3 py-2 text-left">Saúde</th>
                             <th className="px-3 py-2 text-right">Criticidade</th>
                           </tr>
                         </thead>
                         <tbody>
                           {kpiConsolidatedTypeRows.length === 0 ? (
                             <tr className="border-t border-surface-100">
-                              <td colSpan={7} className="px-3 py-6 text-center text-[11px] text-surface-400">
-                                Nenhum KPI consolidado encontrado para o escopo selecionado.
+                              <td colSpan={6} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                Nenhuma meta consolidada encontrada para o escopo selecionado.
                               </td>
                             </tr>
                           ) : (
@@ -7490,13 +7489,12 @@ export default function MetasWorkspace() {
                                     {num(pending, 0)}
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.hitRatio * 100, 1)}%</td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(healthPct, 1)}%</td>
                                   <td className="px-3 py-2.5">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-1.5 w-full max-w-36 overflow-hidden rounded-full bg-surface-100">
+                                    <div className="ml-auto flex w-full max-w-36 items-center justify-end gap-2">
+                                      <div className="h-1.5 w-full max-w-16 overflow-hidden rounded-full bg-surface-100">
                                         <div className={`h-full transition-[width] duration-700 ${healthBarClass}`} style={{ width: `${Math.min(healthPct, 100)}%` }} />
                                       </div>
-                                      <span className="text-[10px] font-semibold tabular-nums text-surface-700">{num(healthPct, 1)}%</span>
+                                      <span className="text-[10px] font-semibold tabular-nums text-surface-900">{num(healthPct, 1)}%</span>
                                     </div>
                                   </td>
                                   <td className="px-3 py-2.5 text-right">
@@ -7514,7 +7512,7 @@ export default function MetasWorkspace() {
                   </div>
 
                   <p className="text-[10px] text-surface-400">
-                    Consolidação calculada no período selecionado, considerando todos os KPIs aplicáveis ao escopo e desconsiderando o KPI de Volume (já monitorado no modo de metas de peso). Esta leitura prioriza gestão de risco, pendências e saúde operacional por KPI.
+                    Consolidação calculada no período selecionado, considerando todas as metas aplicáveis ao escopo e desconsiderando a meta de Volume (já monitorada no modo de metas de peso). Esta leitura prioriza gestão de risco, pendências e saúde operacional por meta.
                   </p>
                 </div>
               )}
