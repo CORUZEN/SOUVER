@@ -8839,19 +8839,27 @@ export default function MetasWorkspace() {
                               key={`seller-accordion-${row.id}`}
                               className={`overflow-hidden rounded-xl border transition-all duration-200 ${
                                 isOpen
-                                  ? 'border-slate-300 bg-white shadow-md ring-1 ring-slate-200'
+                                  ? 'border-slate-300 bg-white shadow-sm ring-1 ring-slate-200/90'
                                   : 'border-surface-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50/50 hover:shadow-md'
                               }`}
                             >
                               <button
                                 type="button"
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
-                                className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
+                                className={`w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200 ${
+                                  isOpen
+                                    ? 'border-b border-slate-200 bg-linear-to-r from-slate-50 to-slate-100/70'
+                                    : 'hover:bg-slate-50/40'
+                                }`}
                               >
                                 <div className="grid grid-cols-[44px_2.15fr_0.9fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{index + 1}</span>
-                                  <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
-                                  <span className="rounded-md border border-cyan-200 bg-cyan-50/70 px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-cyan-800">
+                                  <span className={`block min-w-0 truncate text-sm font-semibold ${isOpen ? 'text-slate-900' : 'text-surface-900'}`}>{row.nameShort}</span>
+                                  <span className={`rounded-md border px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums ${
+                                    isOpen
+                                      ? 'border-slate-300 bg-slate-100 text-slate-700'
+                                      : 'border-cyan-200 bg-cyan-50/70 text-cyan-800'
+                                  }`}>
                                     {num(Math.min(Math.max(row.pointsRatio, 0), 1) * 100, 1)}%
                                   </span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
@@ -8949,9 +8957,9 @@ export default function MetasWorkspace() {
                                     </div>
                                   </div>
 
-                                  <div className="mt-2 border-t border-slate-200 bg-slate-50/70 px-3 py-3">
+                                  <div className="mt-2 bg-slate-50/70 px-3 py-3">
                                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">KPIs e parâmetros do ciclo</p>
+                                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Metas e parâmetros do ciclo</p>
                                       <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700">
                                         {kpisHit}/{kpisTotal} concluídos
                                       </span>
