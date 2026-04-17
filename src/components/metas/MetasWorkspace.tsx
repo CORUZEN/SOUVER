@@ -3841,6 +3841,61 @@ export default function MetasWorkspace() {
     return kpiGeneralSellerPerformanceRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
   }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, kpiGeneralSellerPerformanceRows])
 
+  const kpiGeneralScopedSummary = useMemo(() => {
+    const scopedSellerIds = new Set(kpiGeneralScopedSellerRows.map((row) => row.sellerId))
+    const scopedSnapshots = snapshots.filter((snapshot) => scopedSellerIds.has(snapshot.seller.id))
+
+    const totalOrders = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0)
+    const totalGrossWeight = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0)
+    const totalRevenue = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0)
+
+    const uniqueClients = new Set<string>()
+    for (const seller of sellers) {
+      if (!scopedSellerIds.has(seller.id)) continue
+      for (const order of seller.orders) {
+        const code = String(order.clientCode ?? '').trim()
+        if (code) uniqueClients.add(code)
+      }
+    }
+
+    const totalBaseClients = scopedSnapshots.reduce((sum, snapshot) => sum + Math.max(snapshot.seller.baseClientCount ?? 0, 0), 0)
+    const activeProductsCount = Math.max(productAllowlist.filter((product) => product.active).length, 0)
+    const positivadosTarget = activeProductsCount * scopedSnapshots.length
+    const positivadosSold = scopedSnapshots.reduce((sum, snapshot) => {
+      const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+      const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+      return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+    }, 0)
+
+    const metas = scopedSnapshots.reduce(
+      (acc, snapshot) => {
+        const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
+        if (!block) return acc
+        const applicableRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
+        acc.total += applicableRules.length
+        acc.hit += applicableRules.filter((rule) => {
+          const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          return progress >= 1
+        }).length
+        return acc
+      },
+      { hit: 0, total: 0 }
+    )
+
+    return {
+      sellerCount: scopedSnapshots.length,
+      uniqueClients: uniqueClients.size,
+      totalBaseClients,
+      totalOrders,
+      totalGrossWeight,
+      totalRevenue,
+      positivadosSold,
+      positivadosTarget,
+      metasHit: metas.hit,
+      metasTotal: metas.total,
+    }
+  }, [distributionItemsBySeller, kpiGeneralScopedSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
+
   const kpiConsolidatedFilteredSellerRows = useMemo(() => {
     if (kpiGeneralPanelView === 'SUPERVISOR') {
       if (!kpiGeneralPanelSupervisorKey) return []
@@ -8594,225 +8649,42 @@ export default function MetasWorkspace() {
                         )}
                       </div>
 
-                      <div className="overflow-hidden rounded-xl border border-surface-200">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-xs">
-                            <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
-                              <tr>
-                                <th className="px-3 py-2 text-left">Meta estratégica</th>
-                                <th className="px-3 py-2 text-right">Conquistados</th>
-                                <th className="px-3 py-2 text-right">Pendentes</th>
-                                <th className="px-3 py-2 text-right">Conversão</th>
-                                <th className="px-3 py-2 text-right">Aderência média</th>
-                                <th className="px-3 py-2 text-right">Criticidade</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {kpiConsolidatedTypeRows.length === 0 ? (
-                                <tr className="border-t border-surface-100">
-                                  <td colSpan={6} className="px-3 py-6 text-center text-[11px] text-surface-400">
-                                    Nenhuma meta consolidada encontrada para o escopo selecionado.
-                                  </td>
-                                </tr>
-                              ) : (
-                                kpiConsolidatedTypeRows.map((row) => {
-                              const pending = Math.max(row.total - row.hit, 0)
-                              const healthPct = row.avgProgressRatio * 100
-                              const previous = kpiConsolidatedPreviousByType[row.type]
-                              const detail = kpiConsolidatedDetailsByType[row.type]
-                              const isExpanded = kpiConsolidatedExpandedType === row.type
-                              const previousHit = previous?.hit
-                              const previousPending = previous?.pending
-                              const hitDeltaPct = typeof previousHit === 'number'
-                                ? (previousHit > 0 ? ((row.hit - previousHit) / previousHit) * 100 : row.hit > 0 ? 100 : 0)
-                                : null
-                              const pendingDeltaPct = typeof previousPending === 'number'
-                                ? (previousPending > 0 ? ((pending - previousPending) / previousPending) * 100 : pending > 0 ? 100 : 0)
-                                : null
-                              const hitTrendClass =
-                                hitDeltaPct === null
-                                  ? 'text-surface-500'
-                                  : hitDeltaPct > 0
-                                    ? 'text-emerald-600'
-                                    : hitDeltaPct < 0
-                                      ? 'text-rose-600'
-                                      : 'text-surface-500'
-                              const pendingTrendClass =
-                                pendingDeltaPct === null
-                                  ? 'text-surface-500'
-                                  : pendingDeltaPct < 0
-                                    ? 'text-emerald-600'
-                                    : pendingDeltaPct > 0
-                                      ? 'text-rose-600'
-                                      : 'text-surface-500'
-                              const pendingImproved = pendingDeltaPct !== null && pendingDeltaPct < 0
-                              const pendingWorsened = pendingDeltaPct !== null && pendingDeltaPct > 0
-                              const healthBarClass =
-                                row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
-                              const criticalityLabel =
-                                row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.2 ? 'Atenção' : 'Crítico'
-                              const criticalityClass =
-                                row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.2 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
-                              const toggleExpanded = () => {
-                                setKpiConsolidatedExpandedType((prev) => (prev === row.type ? null : row.type))
-                              }
-                              return [
-                                <tr
-                                  key={`kpi-consolidated-type-${row.type}`}
-                                  className={`cursor-pointer border-t border-surface-100 transition-colors ${
-                                    isExpanded
-                                      ? 'bg-cyan-50/60 shadow-[inset_3px_0_0_0_#06b6d4]'
-                                      : 'hover:bg-surface-50/50'
-                                  }`}
-                                  onClick={toggleExpanded}
-                                >
-                                  <td className="px-3 py-2.5">
-                                    <div className="group flex w-full items-start gap-2 text-left">
-                                      <span className={`mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border transition-colors ${
-                                        isExpanded
-                                          ? 'border-cyan-300 bg-cyan-100 text-cyan-700'
-                                          : 'border-surface-200 bg-white text-surface-500 group-hover:border-cyan-200 group-hover:text-cyan-700'
-                                      }`}>
-                                        {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                                      </span>
-                                      <span>
-                                        <span className={`block font-semibold ${isExpanded ? 'text-cyan-900' : 'text-surface-800'}`}>{row.label}</span>
-                                        <span className="block text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</span>
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <span className={hitTrendClass}>{num(row.hit, 0)}</span>
-                                      {hitDeltaPct === null ? (
-                                        <span className="text-[10px] font-medium text-surface-400">sem base</span>
-                                      ) : (
-                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${hitTrendClass}`}>
-                                          {hitDeltaPct > 0 ? <ArrowUp size={11} /> : hitDeltaPct < 0 ? <ArrowDown size={11} /> : <ArrowUpDown size={11} />}
-                                          {num(Math.abs(hitDeltaPct), 1)}%
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <span className={pendingTrendClass}>{num(pending, 0)}</span>
-                                      {pendingDeltaPct === null ? (
-                                        <span className="text-[10px] font-medium text-surface-400">sem base</span>
-                                      ) : (
-                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${pendingTrendClass}`}>
-                                          {pendingImproved ? <ArrowUp size={11} /> : pendingWorsened ? <ArrowDown size={11} /> : <ArrowUpDown size={11} />}
-                                          {num(Math.abs(pendingDeltaPct), 1)}%
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.hitRatio * 100, 1)}%</td>
-                                  <td className="px-3 py-2.5">
-                                    <div className="ml-auto flex w-full max-w-36 items-center justify-end gap-2">
-                                      <div className="h-1.5 w-full max-w-16 overflow-hidden rounded-full bg-surface-100">
-                                        <div className={`h-full transition-[width] duration-700 ${healthBarClass}`} style={{ width: `${Math.min(healthPct, 100)}%` }} />
-                                      </div>
-                                      <span className="text-[10px] font-semibold tabular-nums text-surface-900">{num(healthPct, 1)}%</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right">
-                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${criticalityClass}`}>
-                                      {criticalityLabel}
-                                    </span>
-                                  </td>
-                                </tr>,
-                                isExpanded ? (
-                                  <tr key={`kpi-consolidated-type-detail-${row.type}`} className="border-t border-surface-100 bg-surface-50/40">
-                                    <td colSpan={6} className="px-3 py-3">
-                                      <div className="rounded-lg border border-surface-200 bg-white p-3">
-                                        <div className="grid gap-2 md:grid-cols-4">
-                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
-                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Vendedores no KPI</p>
-                                            <p className="mt-1 text-sm font-semibold text-surface-800">{num(detail?.sellersCount ?? 0, 0)}</p>
-                                          </div>
-                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
-                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Com pendência</p>
-                                            <p className="mt-1 text-sm font-semibold text-rose-700">{num(detail?.sellersWithPending ?? 0, 0)}</p>
-                                          </div>
-                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
-                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pendências totais</p>
-                                            <p className="mt-1 text-sm font-semibold text-amber-700">{num(detail?.pending ?? 0, 0)}</p>
-                                          </div>
-                                          <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
-                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Maior pendência</p>
-                                            <p className="mt-1 text-sm font-semibold text-surface-800">{detail?.highestPendingSeller?.sellerShortName ?? 'Sem pendências'}</p>
-                                            <p className="text-[10px] text-surface-500">
-                                              {detail?.highestPendingSeller ? `${num(detail.highestPendingSeller.pending, 0)} pendente(s)` : 'Todos no alvo'}
-                                            </p>
-                                          </div>
-                                        </div>
-
-                                        <div className="mt-3 overflow-x-auto">
-                                          <table className="min-w-full table-fixed text-[11px]">
-                                            <colgroup>
-                                              <col style={{ width: '38%' }} />
-                                              <col style={{ width: '14%' }} />
-                                              <col style={{ width: '14%' }} />
-                                              <col style={{ width: '18%' }} />
-                                              <col style={{ width: '16%' }} />
-                                            </colgroup>
-                                            <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
-                                              <tr>
-                                                <th className="px-2 py-1.5 text-left">Vendedor</th>
-                                                <th className="px-2 py-1.5 text-right">Metas conquistadas</th>
-                                                <th className="px-2 py-1.5 text-right">Metas pendentes</th>
-                                                <th className="px-2 py-1.5 text-right">Aderência</th>
-                                                <th className="px-2 py-1.5 text-right">Falta para 100%</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {(detail?.sellers ?? []).length === 0 ? (
-                                                <tr className="border-t border-surface-100">
-                                                  <td colSpan={5} className="px-2 py-3 text-center text-[10px] text-surface-400">
-                                                    Sem detalhamento de vendedores para este KPI.
-                                                  </td>
-                                                </tr>
-                                              ) : (
-                                                (detail?.sellers ?? []).map((sellerDetail) => {
-                                                  const adherencePct = sellerDetail.avgProgressRatio * 100
-                                                  const gapToTarget = Math.max(100 - adherencePct, 0)
-                                                  const adherenceBarClass =
-                                                    sellerDetail.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : sellerDetail.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : sellerDetail.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
-                                                  return (
-                                                    <tr key={`kpi-consolidated-seller-detail-${row.type}-${sellerDetail.sellerId}`} className="border-t border-surface-100">
-                                                      <td className="px-2 py-1.5">
-                                                        <p className="font-medium text-surface-800">{sellerDetail.sellerShortName}</p>
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{num(sellerDetail.hit, 0)}</td>
-                                                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-rose-700">{num(sellerDetail.pending, 0)}</td>
-                                                      <td className="px-2 py-1.5 text-right">
-                                                        <div className="ml-auto inline-flex items-center justify-end gap-2">
-                                                          <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-surface-100">
-                                                            <div className={`h-full ${adherenceBarClass}`} style={{ width: `${Math.min(adherencePct, 100)}%` }} />
-                                                          </div>
-                                                          <span className="w-12 text-right text-[10px] font-semibold tabular-nums text-surface-900">{num(adherencePct, 1)}%</span>
-                                                        </div>
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right tabular-nums text-[10px] font-semibold text-surface-600">
-                                                        {num(gapToTarget, 1)}%
-                                                      </td>
-                                                    </tr>
-                                                  )
-                                                })
-                                              )}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ) : null,
-                              ]
-                                })
-                              )}
-                            </tbody>
-                          </table>
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                            {num(kpiGeneralScopedSummary.positivadosSold, 0)} / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}
+                          </p>
+                          <p className="text-[10px] text-surface-500">Total de itens positivados no escopo</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                            {num(kpiGeneralScopedSummary.metasHit, 0)} / {num(kpiGeneralScopedSummary.metasTotal, 0)}
+                          </p>
+                          <p className="text-[10px] text-surface-500">KPIs concluídos no escopo selecionado</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                            {num(kpiGeneralScopedSummary.uniqueClients, 0)} / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}
+                          </p>
+                          <p className="text-[10px] text-surface-500">Cobertura da base no escopo selecionado</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
+                          <p className="text-[10px] text-surface-500">Total de pedidos no período</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Peso total dos pedidos</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                          <p className="text-[10px] text-surface-500">Consolidado de peso bruto</p>
+                        </div>
+                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Valor total de Pedidos</p>
+                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                          <p className="text-[10px] text-surface-500">Faturamento no escopo selecionado</p>
                         </div>
                       </div>
                     </div>
@@ -8868,9 +8740,6 @@ export default function MetasWorkspace() {
                     </div>
                   </div>
 
-                  <p className="text-center text-[10px] text-surface-400">
-                    Consolidação calculada no período selecionado, considerando todas as metas aplicáveis ao escopo e desconsiderando a meta de Volume (já monitorada no modo de metas de peso).
-                  </p>
                 </div>
               )}
             </Card>
