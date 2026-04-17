@@ -3586,13 +3586,22 @@ export default function MetasWorkspace() {
 
     for (const [type, detail] of map.entries()) {
       const sellers = [...detail.sellers].sort((a, b) => {
-        if (b.pending !== a.pending) return b.pending - a.pending
-        if (a.avgProgressRatio !== b.avgProgressRatio) return a.avgProgressRatio - b.avgProgressRatio
+        // Best performers first: higher adherence, fewer pending, more hits
+        if (b.avgProgressRatio !== a.avgProgressRatio) return b.avgProgressRatio - a.avgProgressRatio
+        if (a.pending !== b.pending) return a.pending - b.pending
+        if (b.hit !== a.hit) return b.hit - a.hit
         return a.sellerShortName.localeCompare(b.sellerShortName, 'pt-BR')
       })
       const pending = Math.max(detail.total - detail.hit, 0)
       const sellersWithPending = sellers.filter((seller) => seller.pending > 0).length
-      const highestPendingSeller = sellers.find((seller) => seller.pending > 0) ?? null
+      const highestPendingSeller =
+        sellers.reduce<typeof sellers[number] | null>((worst, seller) => {
+          if (seller.pending <= 0) return worst
+          if (!worst) return seller
+          if (seller.pending !== worst.pending) return seller.pending > worst.pending ? seller : worst
+          if (seller.avgProgressRatio !== worst.avgProgressRatio) return seller.avgProgressRatio < worst.avgProgressRatio ? seller : worst
+          return seller.sellerShortName.localeCompare(worst.sellerShortName, 'pt-BR') < 0 ? seller : worst
+        }, null)
       result[type] = {
         type,
         label: detail.label,
@@ -8123,16 +8132,24 @@ export default function MetasWorkspace() {
                               return [
                                 <tr
                                   key={`kpi-consolidated-type-${row.type}`}
-                                  className="cursor-pointer border-t border-surface-100 transition-colors hover:bg-surface-50/50"
+                                  className={`cursor-pointer border-t border-surface-100 transition-colors ${
+                                    isExpanded
+                                      ? 'bg-cyan-50/60 shadow-[inset_3px_0_0_0_#06b6d4]'
+                                      : 'hover:bg-surface-50/50'
+                                  }`}
                                   onClick={toggleExpanded}
                                 >
                                   <td className="px-3 py-2.5">
                                     <div className="group flex w-full items-start gap-2 text-left">
-                                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-500 transition-colors group-hover:border-cyan-200 group-hover:text-cyan-700">
+                                      <span className={`mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border transition-colors ${
+                                        isExpanded
+                                          ? 'border-cyan-300 bg-cyan-100 text-cyan-700'
+                                          : 'border-surface-200 bg-white text-surface-500 group-hover:border-cyan-200 group-hover:text-cyan-700'
+                                      }`}>
                                         {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                                       </span>
                                       <span>
-                                        <span className="block font-semibold text-surface-800">{row.label}</span>
+                                        <span className={`block font-semibold ${isExpanded ? 'text-cyan-900' : 'text-surface-800'}`}>{row.label}</span>
                                         <span className="block text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</span>
                                       </span>
                                     </div>
@@ -8232,7 +8249,6 @@ export default function MetasWorkspace() {
                                                     <tr key={`kpi-consolidated-seller-detail-${row.type}-${sellerDetail.sellerId}`} className="border-t border-surface-100">
                                                       <td className="px-2 py-1.5">
                                                         <p className="font-medium text-surface-800">{sellerDetail.sellerShortName}</p>
-                                                        <p className="text-[10px] text-surface-500">{sellerDetail.sellerName}</p>
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{num(sellerDetail.hit, 0)}</td>
                                                       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-rose-700">{num(sellerDetail.pending, 0)}</td>
