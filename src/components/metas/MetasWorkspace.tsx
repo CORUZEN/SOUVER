@@ -2526,6 +2526,35 @@ export default function MetasWorkspace() {
     w3: cycle.weeks.find((w) => w.key === 'W3')?.end ?? '',
     closing: cycle.weeks.find((w) => w.key === 'CLOSING')?.end ?? '',
   }), [cycle.weeks])
+  const kpiConsolidatedComparableStages = useMemo(() => {
+    const today = new Date()
+    const currentMonthRef = new Date(today.getFullYear(), today.getMonth(), 1).getTime()
+    const selectedMonthRef = new Date(year, month, 1).getTime()
+
+    // Past month: compare full cycle against previous full cycle.
+    if (selectedMonthRef < currentMonthRef) {
+      return new Set<StageKey>(['W1', 'W2', 'W3', 'CLOSING', 'FULL'])
+    }
+
+    // Future month: no operational stage available yet.
+    if (selectedMonthRef > currentMonthRef) {
+      return new Set<StageKey>()
+    }
+
+    // Current month: compare only the stages already available in the active cycle.
+    const todayIso = toIsoDate(today)
+    const startedOperational = new Set<OperationalStageKey>()
+    for (const stageKey of OPERATIONAL_STAGE_KEYS) {
+      const stage = cycle.weeks.find((week) => week.key === stageKey)
+      if (stage?.start && stage.start <= todayIso) startedOperational.add(stageKey)
+    }
+
+    const stages = new Set<StageKey>(startedOperational)
+    if (startedOperational.size === OPERATIONAL_STAGE_KEYS.length) {
+      stages.add('FULL')
+    }
+    return stages
+  }, [cycle.weeks, month, year])
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
     for (const row of distributionRows) {
@@ -3882,11 +3911,7 @@ export default function MetasWorkspace() {
           distributionItemsBySeller.set(row.sellerCode, row)
         }
 
-        const todayIso = toIsoDate(new Date())
-        const stageStarted = new Set<StageKey>(
-          previousCycleWeeksWithFull.filter((week) => week.start && week.start <= todayIso).map((week) => week.key)
-        )
-        if (!stageStarted.has('FULL')) stageStarted.add('FULL')
+        const stageStarted = new Set<StageKey>(kpiConsolidatedComparableStages)
 
         const teamAverageValue =
           previousSellers.length > 0 ? previousSellers.reduce((sum, seller) => sum + seller.totalValue, 0) / previousSellers.length : 0
@@ -4145,7 +4170,7 @@ export default function MetasWorkspace() {
       cancelled = true
       controller.abort()
     }
-  }, [companyScopeFilter, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, year])
+  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, year])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
