@@ -100,10 +100,18 @@ export async function GET(req: NextRequest) {
   // ── Sellers with their codes ───────────────────────────────────────────────
   const sellerSummaries = scopedSellers.map((seller) => {
     const code = String(seller.code ?? '').trim()
+    const sellerId = String(seller.id ?? '').trim()
+    const normalizedCode = code.replace(/^sankhya-/, '')
+    const sellerCandidates = new Set([
+      sellerId,
+      code,
+      normalizedCode,
+      normalizedCode ? `sankhya-${normalizedCode}` : '',
+    ].filter(Boolean))
     // Find the block that covers this seller
     const block = ruleBlocks.find((b) => {
       if (!b.sellerIds || b.sellerIds.length === 0) return false
-      return b.sellerIds.includes(code) || b.sellerIds.includes(`sankhya-${code}`)
+      return b.sellerIds.some((rawSellerId) => sellerCandidates.has(String(rawSellerId ?? '').trim()))
     }) ?? ruleBlocks[0] ?? null
 
     const profileType = seller.profileType as string
@@ -144,26 +152,12 @@ export async function GET(req: NextRequest) {
   const cycleWeeks = (() => {
     if (!monthConfig) return null
     const mc = monthConfig as Record<string, unknown>
-
-    // Prefer explicit weekPeriods saved by MetasWorkspace (same source as the web system)
-    const weekPeriodsRaw = mc.weekPeriods
-    if (weekPeriodsRaw && typeof weekPeriodsRaw === 'object' && !Array.isArray(weekPeriodsRaw)) {
-      const wp = weekPeriodsRaw as Record<string, { start?: string; end?: string }>
-      const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
-      const result: { key: string; start: string; end: string }[] = []
-      for (const key of stages) {
-        const p = wp[key]
-        if (p?.start && p?.end && p.start <= p.end) {
-          result.push({ key, start: p.start, end: p.end })
-        }
-      }
-      if (result.length > 0) return result
-    }
-
-    // Fallback: reconstruct from week1StartDate + closingWeekEndDate
-    const w1Raw = String(mc.week1StartDate ?? '')
-    const closeRaw = String(mc.closingWeekEndDate ?? '')
-    if (!w1Raw) return null
+    const customOffDates = Array.isArray(mc.customOffDates)
+      ? new Set(
+          mc.customOffDates
+            .filter((date): date is string => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))
+        )
+      : new Set<string>()
 
     function parseDate(s: string): Date | null {
       if (!s) return null
@@ -177,6 +171,40 @@ export async function GET(req: NextRequest) {
     function iso(d: Date) {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     }
+    function buildBusinessDays(startIso: string, endIso: string) {
+      const start = parseDate(startIso)
+      const end = parseDate(endIso)
+      if (!start || !end || start > end) return [] as string[]
+      const days: string[] = []
+      for (let dt = new Date(start); dt <= end; dt = addDays(dt, 1)) {
+        const day = dt.getDay()
+        const currentIso = iso(dt)
+        if (day === 0 || day === 6) continue
+        if (customOffDates.has(currentIso)) continue
+        days.push(currentIso)
+      }
+      return days
+    }
+
+    // Prefer explicit weekPeriods saved by MetasWorkspace (same source as the web system)
+    const weekPeriodsRaw = mc.weekPeriods
+    if (weekPeriodsRaw && typeof weekPeriodsRaw === 'object' && !Array.isArray(weekPeriodsRaw)) {
+      const wp = weekPeriodsRaw as Record<string, { start?: string; end?: string }>
+      const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
+      const result: { key: string; start: string; end: string; businessDays: string[] }[] = []
+      for (const key of stages) {
+        const p = wp[key]
+        if (p?.start && p?.end && p.start <= p.end) {
+          result.push({ key, start: p.start, end: p.end, businessDays: buildBusinessDays(p.start, p.end) })
+        }
+      }
+      if (result.length > 0) return result
+    }
+
+    // Fallback: reconstruct from week1StartDate + closingWeekEndDate
+    const w1Raw = String(mc.week1StartDate ?? '')
+    const closeRaw = String(mc.closingWeekEndDate ?? '')
+    if (!w1Raw) return null
 
     const monthStart = new Date(year, month - 1, 1)
     const monthEnd = new Date(year, month, 0)
@@ -184,13 +212,15 @@ export async function GET(req: NextRequest) {
     const cycleEnd = parseDate(closeRaw) ?? monthEnd
 
     const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
-    const result: { key: string; start: string; end: string }[] = []
+    const result: { key: string; start: string; end: string; businessDays: string[] }[] = []
     stages.forEach((key, i) => {
       const stageStart = addDays(baseStart, i * 7)
       if (stageStart > cycleEnd) return
       const rawEnd = key === 'CLOSING' ? cycleEnd : addDays(stageStart, 4)
       const stageEnd = rawEnd > cycleEnd ? cycleEnd : rawEnd
-      result.push({ key, start: iso(stageStart), end: iso(stageEnd) })
+      const startIso = iso(stageStart)
+      const endIso = iso(stageEnd)
+      result.push({ key, start: startIso, end: endIso, businessDays: buildBusinessDays(startIso, endIso) })
     })
     return result
   })()

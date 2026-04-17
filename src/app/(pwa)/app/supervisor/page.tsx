@@ -95,6 +95,7 @@ interface CycleWeek {
   key: string
   start: string
   end: string
+  businessDays?: string[]
 }
 
 interface UserInfo {
@@ -406,7 +407,11 @@ function computeAllKpiProgress(
   for (const order of orders) {
     const clientCode = String(order.clientCode ?? '').trim()
     if (!clientCode) continue
-    const stage = operationalWeeks.find((week) => order.negotiatedAt >= week.start && order.negotiatedAt <= week.end)?.key
+    const stage = operationalWeeks.find((week) => {
+      const days = Array.isArray(week.businessDays) ? week.businessDays : []
+      if (days.length > 0) return days.includes(order.negotiatedAt)
+      return order.negotiatedAt >= week.start && order.negotiatedAt <= week.end
+    })?.key
     if (!stage || !stageOrder.includes(stage as (typeof stageOrder)[number])) continue
     stageClients[stage as (typeof stageOrder)[number]].add(clientCode)
   }

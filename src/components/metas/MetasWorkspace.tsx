@@ -421,7 +421,17 @@ const DEFAULT_RULE_BLOCKS: RuleBlock[] = [
 ]
 
 function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
-  const specific = blocks.find((b) => b.sellerIds.includes(sellerId))
+  const normalizedId = String(sellerId ?? '').trim()
+  const normalizedCode = normalizedId.replace(/^sankhya-/, '')
+  const candidates = new Set([
+    normalizedId,
+    normalizedCode,
+    normalizedCode ? `sankhya-${normalizedCode}` : '',
+  ].filter(Boolean))
+
+  const specific = blocks.find((b) =>
+    b.sellerIds.some((rawId) => candidates.has(String(rawId ?? '').trim()))
+  )
   if (specific) return specific
   return blocks.find((b) => b.sellerIds.length === 0) ?? blocks[0]
 }
