@@ -9313,12 +9313,13 @@ export default function MetasWorkspace() {
             type="button"
             onClick={exportPositivationPdf}
             disabled={positivationPdfExporting || !positivationDetailsData}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileDown size={14} />
             {positivationPdfExporting ? 'Exportando...' : 'Exportar PDF'}
           </button>
         }
+        closeButtonClassName="h-9 w-9 cursor-pointer rounded-xl border border-white/25 bg-white/5 text-slate-200 ring-1 ring-white/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/15 hover:text-white hover:ring-white/20"
         size="xl"
         className="overflow-hidden [&>div:first-child]:border-b-0 [&>div:first-child]:bg-linear-to-r [&>div:first-child]:from-slate-900 [&>div:first-child]:via-slate-800 [&>div:first-child]:to-slate-900 [&>div:first-child]:py-5 [&>div:first-child]:shadow-[inset_0_-1px_0_rgba(148,163,184,0.25)] [&>div:first-child>div>h2]:text-lg [&>div:first-child>div>h2]:font-semibold [&>div:first-child>div>h2]:text-slate-50 [&>div:first-child>div>p]:text-slate-300 [&>div:first-child_button]:text-slate-300 [&>div:first-child_button:hover]:bg-white/10 [&>div:first-child_button:hover]:text-white [&>div:nth-child(2)]:overflow-hidden"
       >
@@ -9334,24 +9335,24 @@ export default function MetasWorkspace() {
           ) : positivationDetailsData ? (
             <>
               <div className="grid shrink-0 gap-2.5 sm:grid-cols-4">
-                <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-cyan-50/60 px-3 py-2.5">
+                <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-white px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-cyan-500 to-sky-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Positivados</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-cyan-900">
                     {num(positivationDetailsData.summary.totalPositivatedItems, 0)} / {num(positivationDetailsData.summary.totalTargetItems, 0)}
                   </p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 via-white to-emerald-50/60 px-3 py-2.5">
+                <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-white px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 to-teal-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Peso vendido</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-emerald-900">{num(positivationDetailsData.summary.totalSoldWeightKg, 2)} kg</p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 via-white to-violet-50/50 px-3 py-2.5">
+                <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-white px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-indigo-500 to-violet-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Quantidade vendida</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-indigo-900">{num(positivationDetailsData.summary.totalSoldQty, 0)}</p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-linear-to-br from-amber-50 via-white to-amber-50/60 px-3 py-2.5">
+                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-white px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-amber-500 to-orange-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Pendentes</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-amber-900">{num(positivationDetailsData.summary.totalPendingItems, 0)}</p>

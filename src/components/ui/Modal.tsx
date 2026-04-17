@@ -11,6 +11,7 @@ interface ModalProps {
   title?: string
   description?: string
   headerActions?: ReactNode
+  closeButtonClassName?: string
   children: ReactNode
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -23,6 +24,7 @@ export default function Modal({
   title,
   description,
   headerActions,
+  closeButtonClassName,
   children,
   footer,
   size = 'md',
@@ -78,7 +80,10 @@ export default function Modal({
               {headerActions}
               <button
                 onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0"
+                className={cn(
+                  'w-8 h-8 flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0',
+                  closeButtonClassName
+                )}
                 aria-label="Fechar"
               >
                 <X className="w-4 h-4" />
