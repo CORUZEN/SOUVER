@@ -3520,14 +3520,6 @@ export default function MetasWorkspace() {
     }
   }, [kpiConsolidatedTypeRows])
 
-  const kpiConsolidatedScopeLabel = useMemo(() => {
-    if (kpiConsolidatedScope === 'ALL') return 'Visão geral'
-    if (kpiConsolidatedScope === 'SUPERVISOR') {
-      return performanceSupervisorOptions.find((option) => option.key === kpiConsolidatedSupervisorKey)?.name ?? 'Supervisor'
-    }
-    return SELLER_PROFILE_LABEL[kpiConsolidatedScope]
-  }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, performanceSupervisorOptions])
-
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
     for (const row of sellerWeightPerformanceRows) {
@@ -7397,9 +7389,6 @@ export default function MetasWorkspace() {
                         )}
                       </>
                     )}
-                    <span className="text-[10px] text-cyan-700">
-                      Escopo atual: {kpiConsolidatedScopeLabel}
-                    </span>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -7519,7 +7508,7 @@ export default function MetasWorkspace() {
                   </div>
 
                   <p className="text-[10px] text-surface-400">
-                    Consolidação calculada no período selecionado, considerando todas as metas aplicáveis ao escopo e desconsiderando a meta de Volume (já monitorada no modo de metas de peso). Esta leitura prioriza gestão de risco, pendências e saúde operacional por meta.
+                    Consolidação calculada no período selecionado, considerando todas as metas aplicáveis ao escopo e desconsiderando a meta de Volume (já monitorada no modo de metas de peso).
                   </p>
                 </div>
               )}
