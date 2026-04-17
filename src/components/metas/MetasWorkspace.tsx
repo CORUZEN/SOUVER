@@ -42,6 +42,7 @@ type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
 type SellerPerformanceScope = 'ALL' | SellerProfileType
 type RewardMode = 'CURRENCY' | 'PERCENT'
 type WeightPanelView = 'GENERAL' | 'SELLER' | 'SUPERVISOR'
+type KpiApplyMonthScope = 'CURRENT' | 'CURRENT_AND_PREVIOUS' | 'CURRENT_AND_NEXT' | 'ALL_WITH_DATA'
 
 interface GoalRule {
   id: string
@@ -439,6 +440,29 @@ function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
 const DEFAULT_PRIZES: CampaignPrize[] = [
   { id: 'month', title: 'Campanha VDD do mês', frequency: 'MONTHLY', type: 'CASH', cashMode: 'PERCENT', rewardValue: 0, benefitDescription: '', minPoints: 0.6, active: true },
   { id: 'quarter', title: 'Campanha VDD do trimestre', frequency: 'QUARTERLY', type: 'BENEFIT', rewardValue: 0, benefitDescription: '', minPoints: 18, active: true },
+]
+
+const KPI_APPLY_MONTH_SCOPE_OPTIONS: Array<{ value: KpiApplyMonthScope; label: string; description: string }> = [
+  {
+    value: 'CURRENT',
+    label: 'Somente mês atual (padrão)',
+    description: 'Aplica os parâmetros apenas no mês selecionado no momento.',
+  },
+  {
+    value: 'CURRENT_AND_PREVIOUS',
+    label: 'Mês atual + meses anteriores com dados',
+    description: 'Replica para os meses anteriores que já possuem parâmetros registrados.',
+  },
+  {
+    value: 'CURRENT_AND_NEXT',
+    label: 'Mês atual + próximos meses com dados',
+    description: 'Replica para os meses seguintes que já possuem parâmetros registrados.',
+  },
+  {
+    value: 'ALL_WITH_DATA',
+    label: 'Todos os meses com dados',
+    description: 'Replica para todos os meses que já possuem parâmetros registrados.',
+  },
 ]
 
 function normalizePrize(prize: CampaignPrize): CampaignPrize {
@@ -1041,7 +1065,8 @@ export default function MetasWorkspace() {
     open: boolean
     sourceBlockId: string
     selectedSellerIds: string[]
-  }>({ open: false, sourceBlockId: '', selectedSellerIds: [] })
+    monthScope: KpiApplyMonthScope
+  }>({ open: false, sourceBlockId: '', selectedSellerIds: [], monthScope: 'CURRENT' })
   const [sellerPickerBlockId, setSellerPickerBlockId] = useState<string | null>(null)
   const [sellerPickerSearch, setSellerPickerSearch] = useState('')
   const [addGroupModal, setAddGroupModal] = useState<{
@@ -1245,7 +1270,8 @@ export default function MetasWorkspace() {
   }, [resolveSellerProfileForId, sellerProfileByName, sellerProfileByShortName])
   const closeAddAllowlistModal = () =>
     setAddAllowlistModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
-  const closeApplyKpiModal = () => setApplyKpiModal({ open: false, sourceBlockId: '', selectedSellerIds: [] })
+  const closeApplyKpiModal = () =>
+    setApplyKpiModal({ open: false, sourceBlockId: '', selectedSellerIds: [], monthScope: 'CURRENT' })
   const kpiApplySourceBlock = useMemo(
     () => ruleBlocks.find((block) => block.id === applyKpiModal.sourceBlockId) ?? null,
     [applyKpiModal.sourceBlockId, ruleBlocks]
@@ -1296,29 +1322,81 @@ export default function MetasWorkspace() {
     })
   }, [applyKpiModal.open, kpiApplyTargetOptions])
 
+  const resolveKpiApplyMonthKeys = useCallback((scope: KpiApplyMonthScope): string[] => {
+    if (scope === 'CURRENT') return [activeKey]
+    const monthsWithData = Object.entries(metaConfigs)
+      .filter(([, cfg]) => Array.isArray(cfg?.ruleBlocks) && cfg.ruleBlocks.length > 0)
+      .map(([key]) => key)
+    const uniqueKeys = new Set(monthsWithData)
+    uniqueKeys.add(activeKey)
+    const orderedKeys = Array.from(uniqueKeys).sort()
+    if (scope === 'ALL_WITH_DATA') return orderedKeys
+    if (scope === 'CURRENT_AND_PREVIOUS') return orderedKeys.filter((key) => key <= activeKey)
+    if (scope === 'CURRENT_AND_NEXT') return orderedKeys.filter((key) => key >= activeKey)
+    return [activeKey]
+  }, [activeKey, metaConfigs])
+
   const applyKpiRulesToSelectedSellers = () => {
     const validTargetIds = new Set(kpiApplyTargetOptions.map((option) => option.sellerId))
     const selectedIds = new Set(applyKpiModal.selectedSellerIds.filter((sellerId) => validTargetIds.has(sellerId)))
-    if (selectedIds.size === 0) return
-    setRuleBlocks((prev) => {
-      const sourceBlock = prev.find((block) => block.id === applyKpiModal.sourceBlockId)
-      if (!sourceBlock) return prev
+    const sourceSellerIds = new Set(kpiApplySourceBlock?.sellerIds ?? [])
+    const selectedAndSourceIds = new Set<string>([...selectedIds, ...sourceSellerIds])
+    if (selectedAndSourceIds.size === 0) return
+
+    const sourceRulesTemplate =
+      kpiApplySourceBlock?.rules.map((rule) => ({ ...rule })) ??
+      ruleBlocks.find((block) => block.id === applyKpiModal.sourceBlockId)?.rules.map((rule) => ({ ...rule })) ??
+      null
+    if (!sourceRulesTemplate || sourceRulesTemplate.length === 0) return
+
+    const applyRulesToBlocks = (blocks: RuleBlock[], options?: { skipBlockId?: string }) => {
       const targetBlockIds = new Set(
-        prev
-          .filter((candidate) => candidate.id !== sourceBlock.id && candidate.sellerIds.some((sellerId) => selectedIds.has(sellerId)))
+        blocks
+          .filter((candidate) => {
+            if (options?.skipBlockId && candidate.id === options.skipBlockId) return false
+            return candidate.sellerIds.some((sellerId) => selectedAndSourceIds.has(sellerId))
+          })
           .map((candidate) => candidate.id)
       )
-      if (targetBlockIds.size === 0) return prev
+      if (targetBlockIds.size === 0) return { blocks, changed: false }
       const stamp = Date.now()
-      return prev.map((candidate) => {
+      let changed = false
+      const nextBlocks = blocks.map((candidate) => {
         if (!targetBlockIds.has(candidate.id)) return candidate
-        const clonedRules = sourceBlock.rules.map((rule, index) => ({
+        changed = true
+        const clonedRules = sourceRulesTemplate.map((rule, index) => ({
           ...rule,
           id: `rule-${stamp}-${candidate.id}-${index}`,
         }))
         return { ...candidate, rules: clonedRules }
       })
-    })
+      return { blocks: nextBlocks, changed }
+    }
+
+    setRuleBlocks((prev) => applyRulesToBlocks(prev, { skipBlockId: applyKpiModal.sourceBlockId }).blocks)
+
+    if (applyKpiModal.monthScope !== 'CURRENT') {
+      const targetMonthKeys = resolveKpiApplyMonthKeys(applyKpiModal.monthScope).filter((key) => key !== activeKey)
+      if (targetMonthKeys.length > 0) {
+        setMetaConfigs((prevConfigs) => {
+          let hasChanges = false
+          const nextConfigs = { ...prevConfigs }
+          for (const monthKeyCandidate of targetMonthKeys) {
+            const existingConfig = prevConfigs[monthKeyCandidate]
+            if (!existingConfig || !Array.isArray(existingConfig.ruleBlocks) || existingConfig.ruleBlocks.length === 0) continue
+            const applied = applyRulesToBlocks(existingConfig.ruleBlocks)
+            if (!applied.changed) continue
+            nextConfigs[monthKeyCandidate] = {
+              ...existingConfig,
+              ruleBlocks: applied.blocks,
+            }
+            hasChanges = true
+          }
+          return hasChanges ? nextConfigs : prevConfigs
+        })
+      }
+    }
+
     closeApplyKpiModal()
   }
 
@@ -4906,6 +4984,7 @@ export default function MetasWorkspace() {
                           open: true,
                           sourceBlockId: block.id,
                           selectedSellerIds: otherSellerIdsForKpiApply,
+                          monthScope: 'CURRENT',
                         })
                       }
                       className="inline-flex items-center gap-1 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -7552,6 +7631,36 @@ export default function MetasWorkspace() {
         }
       >
         <div className="space-y-3">
+          <div className="rounded-lg border border-surface-200 bg-white px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Alcance da aplicação</p>
+            <div className="mt-2 space-y-2">
+              {KPI_APPLY_MONTH_SCOPE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`block cursor-pointer rounded-lg border px-3 py-2 transition-colors ${
+                    applyKpiModal.monthScope === option.value
+                      ? 'border-primary-300 bg-primary-50'
+                      : 'border-surface-200 bg-white hover:bg-surface-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="kpi-apply-month-scope"
+                      className="mt-0.5 h-3.5 w-3.5 accent-primary-600"
+                      checked={applyKpiModal.monthScope === option.value}
+                      onChange={() => setApplyKpiModal((prev) => ({ ...prev, monthScope: option.value }))}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-surface-800">{option.label}</p>
+                      <p className="text-[11px] text-surface-500">{option.description}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
             <label className="flex items-center gap-2 text-sm font-semibold text-surface-800">
               <input
