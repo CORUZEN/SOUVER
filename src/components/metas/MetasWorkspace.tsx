@@ -8120,6 +8120,8 @@ export default function MetasWorkspace() {
                                     : pendingDeltaPct > 0
                                       ? 'text-rose-600'
                                       : 'text-surface-500'
+                              const pendingImproved = pendingDeltaPct !== null && pendingDeltaPct < 0
+                              const pendingWorsened = pendingDeltaPct !== null && pendingDeltaPct > 0
                               const healthBarClass =
                                 row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
                               const criticalityLabel =
@@ -8174,7 +8176,7 @@ export default function MetasWorkspace() {
                                         <span className="text-[10px] font-medium text-surface-400">sem base</span>
                                       ) : (
                                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${pendingTrendClass}`}>
-                                          {pendingDeltaPct < 0 ? <ArrowDown size={11} /> : pendingDeltaPct > 0 ? <ArrowUp size={11} /> : <ArrowUpDown size={11} />}
+                                          {pendingImproved ? <ArrowUp size={11} /> : pendingWorsened ? <ArrowDown size={11} /> : <ArrowUpDown size={11} />}
                                           {num(Math.abs(pendingDeltaPct), 1)}%
                                         </span>
                                       )}
@@ -8222,12 +8224,19 @@ export default function MetasWorkspace() {
                                         </div>
 
                                         <div className="mt-3 overflow-x-auto">
-                                          <table className="min-w-full text-[11px]">
+                                          <table className="min-w-full table-fixed text-[11px]">
+                                            <colgroup>
+                                              <col style={{ width: '38%' }} />
+                                              <col style={{ width: '14%' }} />
+                                              <col style={{ width: '14%' }} />
+                                              <col style={{ width: '18%' }} />
+                                              <col style={{ width: '16%' }} />
+                                            </colgroup>
                                             <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
                                               <tr>
                                                 <th className="px-2 py-1.5 text-left">Vendedor</th>
-                                                <th className="px-2 py-1.5 text-right">Conquistadas</th>
-                                                <th className="px-2 py-1.5 text-right">Pendentes</th>
+                                                <th className="px-2 py-1.5 text-right">Metas conquistadas</th>
+                                                <th className="px-2 py-1.5 text-right">Metas pendentes</th>
                                                 <th className="px-2 py-1.5 text-right">Aderência</th>
                                                 <th className="px-2 py-1.5 text-right">Falta para 100%</th>
                                               </tr>
@@ -8252,12 +8261,12 @@ export default function MetasWorkspace() {
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{num(sellerDetail.hit, 0)}</td>
                                                       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-rose-700">{num(sellerDetail.pending, 0)}</td>
-                                                      <td className="px-2 py-1.5">
-                                                        <div className="ml-auto flex w-full max-w-32 items-center justify-end gap-2">
-                                                          <div className="h-1.5 w-full max-w-14 overflow-hidden rounded-full bg-surface-100">
+                                                      <td className="px-2 py-1.5 text-right">
+                                                        <div className="ml-auto inline-flex items-center justify-end gap-2">
+                                                          <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-surface-100">
                                                             <div className={`h-full ${adherenceBarClass}`} style={{ width: `${Math.min(adherencePct, 100)}%` }} />
                                                           </div>
-                                                          <span className="text-[10px] font-semibold tabular-nums text-surface-900">{num(adherencePct, 1)}%</span>
+                                                          <span className="w-12 text-right text-[10px] font-semibold tabular-nums text-surface-900">{num(adherencePct, 1)}%</span>
                                                         </div>
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right tabular-nums text-[10px] font-semibold text-surface-600">
