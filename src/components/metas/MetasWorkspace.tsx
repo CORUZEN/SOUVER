@@ -8931,16 +8931,16 @@ export default function MetasWorkspace() {
                                         <button
                                           type="button"
                                           onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
-                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-teal-200 bg-teal-50/40 px-3 py-2.5 text-left transition-all duration-200 hover:border-teal-300 hover:bg-teal-50"
+                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-teal-300/70 bg-linear-to-br from-cyan-50 via-teal-50 to-emerald-50 px-3 py-2.5 text-left transition-all duration-200 hover:border-teal-400 hover:from-cyan-100 hover:via-teal-50 hover:to-emerald-100"
                                         >
                                           <span className="absolute inset-y-0 left-0 w-1 bg-linear-to-b from-cyan-500 to-emerald-500" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-teal-700">Positivação</p>
-                                          <div className="mt-1 flex items-end justify-between gap-2">
+                                          <div className="mt-1 flex items-end justify-between gap-3">
                                             <p className="text-xl leading-tight font-semibold tabular-nums text-slate-900">
                                               {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
                                             </p>
-                                            <span className="rounded-md border border-teal-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-teal-700 transition-colors group-hover:bg-teal-100">
-                                              Detalhar
+                                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-teal-300 bg-white/90 text-teal-700 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-teal-400 group-hover:bg-white">
+                                              <ChevronRight size={22} strokeWidth={2.25} />
                                             </span>
                                           </div>
                                           <p className="mt-1 text-[11px] font-medium text-teal-700/90">Produtos positivados no período atual</p>
