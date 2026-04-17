@@ -7263,7 +7263,7 @@ export default function MetasWorkspace() {
                             <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">
                               {num(filteredUniqueClients, 0)}
                               {filteredTotalBaseClients > 0 && (
-                                <span className="font-bold text-indigo-300"> / {num(filteredTotalBaseClients, 0)}</span>
+                                <span className="font-bold text-indigo-700/80"> / {num(filteredTotalBaseClients, 0)}</span>
                               )}
                             </p>
                             <p className="text-[10px] text-indigo-700">Total em {scopeLabel.toLowerCase()}</p>
@@ -7276,8 +7276,11 @@ export default function MetasWorkspace() {
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">KPIs conquistados no ciclo</p>
-                            <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">{kpiSummary.hit}/{kpiSummary.total}</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Metas conquistadas no ciclo</p>
+                            <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">
+                              {num(kpiSummary.hit, 0)}
+                              <span className="font-bold text-emerald-700/80"> / {num(kpiSummary.total, 0)}</span>
+                            </p>
                             <p className="text-[10px] text-emerald-700">
                               {periodClosed ? `Gap médio para 1,00 pt: ${num(avgGapToFull, 2)} pts` : 'Parcial até a data atual'}
                             </p>
