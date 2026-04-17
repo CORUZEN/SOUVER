@@ -3411,6 +3411,19 @@ export default function MetasWorkspace() {
     [snapshots]
   )
   const corporatePeriodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
+  const corporatePositivacaoTargetItems = useMemo(
+    () => Math.max(productAllowlist.filter((product) => product.active).length, 0) * snapshots.length,
+    [productAllowlist, snapshots.length]
+  )
+  const corporatePositivacaoSoldItems = useMemo(
+    () =>
+      snapshots.reduce((sum, snapshot) => {
+        const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+        const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+        return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+      }, 0),
+    [distributionItemsBySeller, snapshots]
+  )
   // Sum of each seller's individual monthly target (from their assigned block)
   const corporateTotalTarget = useMemo(
     () =>
@@ -7735,9 +7748,11 @@ export default function MetasWorkspace() {
             </div>
             <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
               <span className="absolute inset-y-0 left-0 w-1 bg-cyan-500/70" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Média geral de atingimento</p>
-              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">{num(factoryGoalRatio * 100, 1)}%</p>
-              <p className="text-[10px] text-surface-500">Percentual médio dos vendedores monitorados</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Produtos positivados</p>
+              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">
+                {num(corporatePositivacaoSoldItems, 0)} / {num(corporatePositivacaoTargetItems, 0)}
+              </p>
+              <p className="text-[10px] text-surface-500">Total positivado dos vendedores monitorados</p>
             </div>
             <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
               <span className="absolute inset-y-0 left-0 w-1 bg-emerald-500/70" />
