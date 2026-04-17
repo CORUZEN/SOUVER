@@ -10,6 +10,7 @@ interface ModalProps {
   onClose: () => void
   title?: string
   description?: string
+  headerActions?: ReactNode
   children: ReactNode
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -21,6 +22,7 @@ export default function Modal({
   onClose,
   title,
   description,
+  headerActions,
   children,
   footer,
   size = 'md',
@@ -72,13 +74,16 @@ export default function Modal({
                 <p className="text-sm text-surface-500 mt-1">{description}</p>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0"
-              aria-label="Fechar"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {headerActions}
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-700 transition-colors shrink-0"
+                aria-label="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
         <div className="flex-1 overflow-y-auto p-6">{children}</div>

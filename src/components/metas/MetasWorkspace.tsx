@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CircleHelp,
   CircleDollarSign,
+  FileDown,
   Plus,
   Pencil,
   RefreshCw,
@@ -1151,6 +1152,7 @@ export default function MetasWorkspace() {
   const [positivationDetailsLoading, setPositivationDetailsLoading] = useState(false)
   const [positivationDetailsError, setPositivationDetailsError] = useState('')
   const [positivationDetailsData, setPositivationDetailsData] = useState<PositivationDetailsPayload | null>(null)
+  const [positivationPdfExporting, setPositivationPdfExporting] = useState(false)
   const [positivatedSort, setPositivatedSort] = useState<{ key: PositivatedSortKey; direction: SortDirection }>({
     key: 'soldWeightKg',
     direction: 'desc',
@@ -2793,6 +2795,110 @@ export default function MetasWorkspace() {
         ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
         : { key, direction: 'asc' }
     ))
+  }
+
+  async function exportPositivationPdf() {
+    if (!positivationDetailsData || positivationPdfExporting) return
+    try {
+      setPositivationPdfExporting(true)
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      // Header
+      doc.setFillColor(15, 23, 42)
+      doc.rect(0, 0, pageWidth, 72, 'F')
+      doc.setTextColor(248, 250, 252)
+      doc.setFontSize(18)
+      doc.text('Painel Executivo de Positivação', 36, 34)
+      doc.setFontSize(11)
+      doc.setTextColor(203, 213, 225)
+      doc.text(`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year}`, 36, 56)
+
+      // KPI strip
+      const cards = [
+        { title: 'Positivados', value: `${num(positivationDetailsData.summary.totalPositivatedItems, 0)} / ${num(positivationDetailsData.summary.totalTargetItems, 0)}`, color: [8, 145, 178] as [number, number, number] },
+        { title: 'Peso vendido', value: `${num(positivationDetailsData.summary.totalSoldWeightKg, 2)} kg`, color: [5, 150, 105] as [number, number, number] },
+        { title: 'Quantidade vendida', value: `${num(positivationDetailsData.summary.totalSoldQty, 0)}`, color: [79, 70, 229] as [number, number, number] },
+        { title: 'Pendentes', value: `${num(positivationDetailsData.summary.totalPendingItems, 0)}`, color: [217, 119, 6] as [number, number, number] },
+      ]
+      const cardY = 88
+      const cardGap = 12
+      const cardW = (pageWidth - 72 - (cards.length - 1) * cardGap) / cards.length
+      cards.forEach((card, index) => {
+        const x = 36 + index * (cardW + cardGap)
+        doc.setDrawColor(card.color[0], card.color[1], card.color[2])
+        doc.setFillColor(248, 250, 252)
+        doc.roundedRect(x, cardY, cardW, 58, 8, 8, 'FD')
+        doc.setFillColor(card.color[0], card.color[1], card.color[2])
+        doc.rect(x, cardY, cardW, 3, 'F')
+        doc.setFontSize(9)
+        doc.setTextColor(card.color[0], card.color[1], card.color[2])
+        doc.text(card.title.toUpperCase(), x + 10, cardY + 16)
+        doc.setFontSize(16)
+        doc.setTextColor(15, 23, 42)
+        doc.text(card.value, x + 10, cardY + 40)
+      })
+
+      const tableStartY = 168
+      const bodyRows = positivatedProductsSorted.map((item) => ([
+        item.code,
+        item.description || '-',
+        item.brand || 'Sem grupo',
+        num(item.soldWeightKg, 2),
+        num(item.soldQty, 0),
+      ]))
+
+      // Keep a single page: estimate max rows that fit in available height.
+      const reservedAfterTable = 36
+      const usableHeight = pageHeight - tableStartY - reservedAfterTable
+      const estimatedHeaderAndPadding = 34
+      const estimatedRowHeight = 18
+      const maxRows = Math.max(Math.floor((usableHeight - estimatedHeaderAndPadding) / estimatedRowHeight), 6)
+      const rowsForPdf = bodyRows.slice(0, maxRows)
+      const omittedRows = Math.max(bodyRows.length - rowsForPdf.length, 0)
+
+      autoTable(doc, {
+        startY: tableStartY,
+        head: [['SKU', 'Descrição', 'Grupo', 'Peso (kg)', 'Qtd.']],
+        body: rowsForPdf,
+        margin: { left: 36, right: 36 },
+        theme: 'grid',
+        styles: { fontSize: 8.5, cellPadding: 4, textColor: [30, 41, 59] },
+        headStyles: { fillColor: [220, 252, 231], textColor: [6, 95, 70], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 62 },
+          1: { cellWidth: 320 },
+          2: { cellWidth: 150 },
+          3: { cellWidth: 90, halign: 'right' },
+          4: { cellWidth: 66, halign: 'right' },
+        },
+        pageBreak: 'avoid',
+      })
+
+      const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY + 120
+      doc.setFontSize(9)
+      doc.setTextColor(71, 85, 105)
+      if (omittedRows > 0) {
+        doc.text(`Exibindo ${rowsForPdf.length} de ${bodyRows.length} SKUs positivados nesta página. ${omittedRows} SKU(s) omitido(s) para manter uma única página.`, 36, finalY + 18)
+      } else {
+        doc.text(`Total de SKUs positivados no período: ${bodyRows.length}.`, 36, finalY + 18)
+      }
+      doc.text(`Relatório gerado em ${new Date().toLocaleString('pt-BR')} · SOUVER`, pageWidth - 320, pageHeight - 16)
+
+      const sellerSlug = (positivationDetailsModal.sellerName || 'vendedor').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
+      doc.save(`positivacao-${sellerSlug}-${year}-${String(month + 1).padStart(2, '0')}.pdf`)
+    } catch (error) {
+      setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao exportar PDF de positivacao.')
+    } finally {
+      setPositivationPdfExporting(false)
+    }
   }
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
@@ -9169,7 +9275,18 @@ export default function MetasWorkspace() {
           setPositivationDetailsLoading(false)
         }}
         title="Painel Executivo de Positivação"
-        description={`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year} · Visão detalhada por SKU`}
+        description={`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year}`}
+        headerActions={
+          <button
+            type="button"
+            onClick={exportPositivationPdf}
+            disabled={positivationPdfExporting || !positivationDetailsData}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileDown size={14} />
+            {positivationPdfExporting ? 'Exportando...' : 'Exportar PDF'}
+          </button>
+        }
         size="xl"
         className="overflow-hidden [&>div:first-child]:border-b-0 [&>div:first-child]:bg-linear-to-r [&>div:first-child]:from-slate-900 [&>div:first-child]:via-slate-800 [&>div:first-child]:to-slate-900 [&>div:first-child]:py-5 [&>div:first-child]:shadow-[inset_0_-1px_0_rgba(148,163,184,0.25)] [&>div:first-child>div>h2]:text-lg [&>div:first-child>div>h2]:font-semibold [&>div:first-child>div>h2]:text-slate-50 [&>div:first-child>div>p]:text-slate-300 [&>div:first-child_button]:text-slate-300 [&>div:first-child_button:hover]:bg-white/10 [&>div:first-child_button:hover]:text-white [&>div:nth-child(2)]:overflow-hidden"
       >
@@ -9222,12 +9339,12 @@ export default function MetasWorkspace() {
                       </div>
                     ) : null}
 
-                    <div className={`grid min-h-0 flex-1 gap-3 ${hasPendingProducts ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+                    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-1">
                       <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_14px_30px_rgba(5,150,105,0.12)]">
                         <div className="shrink-0 border-b border-emerald-200 bg-linear-to-r from-emerald-50 via-cyan-50 to-white px-3 py-2.5">
                           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Produtos positivados</p>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto">
+                        <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
                           {positivatedProductsSorted.length === 0 ? (
                             <p className="px-3 py-4 text-xs text-surface-500">Nenhum produto positivado no período.</p>
                           ) : (
@@ -9280,11 +9397,11 @@ export default function MetasWorkspace() {
                       </div>
 
                       {hasPendingProducts ? (
-                        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_14px_30px_rgba(217,119,6,0.12)]">
+                        <div className="flex max-h-[16rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_14px_30px_rgba(217,119,6,0.12)]">
                           <div className="shrink-0 border-b border-amber-200 bg-linear-to-r from-amber-50 via-orange-50 to-white px-3 py-2.5">
                             <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
                           </div>
-                          <div className="min-h-0 flex-1 overflow-y-auto">
+                          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
                             <table className="min-w-full text-xs">
                               <thead className="sticky top-0 z-10 bg-amber-100/95 text-[10px] uppercase tracking-widest text-amber-700 backdrop-blur-sm">
                                 <tr>
