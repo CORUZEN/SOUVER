@@ -9325,8 +9325,25 @@ export default function MetasWorkspace() {
       >
         <div className="flex h-[calc(90vh-8.5rem)] min-h-0 flex-col gap-4 overflow-hidden px-1">
           {positivationDetailsLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-4 py-6 text-sm text-slate-500">
-              Carregando detalhes da positivacao...
+            <div className="flex min-h-[24rem] flex-1 items-center justify-center">
+              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
+                <div className="flex flex-col items-center text-center">
+                  <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50">
+                    <span className="absolute inset-0 rounded-2xl border border-cyan-300/70 [animation-duration:1.8s] animate-ping" />
+                    <RefreshCw className="relative h-6 w-6 animate-spin text-cyan-700" />
+                  </div>
+                  <p className="text-base font-semibold text-slate-800">Carregando detalhes da positivacao</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Estamos consolidando os dados do vendedor no periodo selecionado.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="h-2.5 w-full animate-pulse rounded-full bg-slate-200" />
+                  <div className="h-2.5 w-10/12 animate-pulse rounded-full bg-slate-200 [animation-delay:120ms]" />
+                  <div className="h-2.5 w-8/12 animate-pulse rounded-full bg-slate-200 [animation-delay:220ms]" />
+                </div>
+              </div>
             </div>
           ) : positivationDetailsError ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
