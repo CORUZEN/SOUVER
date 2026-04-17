@@ -8888,53 +8888,69 @@ export default function MetasWorkspace() {
                                       </div>
                                     </div>
 
-                                    <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pontuação</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.pointsAchieved, 3)} / {num(row.snapshot.pointsTarget, 3)} pts</p>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Pedidos no mês</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalOrders, 0)}</p>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Vlr. de pedidos realizados</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.totalValue)}</p>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Peso bruto</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Premiação por KPIs</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">
-                                          {formatRewardValue(row.snapshot.kpiRewardAchieved, row.snapshot.rewardMode)}
-                                        </p>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Clientes atendidos</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.uniqueClients, 0)}</p>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
-                                        className="group relative cursor-pointer overflow-hidden rounded-lg border border-emerald-200/80 bg-white px-3 py-2 text-left transition-colors duration-200 hover:border-emerald-300 hover:bg-emerald-50/30"
-                                      >
-                                        <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 via-cyan-500 to-sky-500" />
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Positivação</p>
-                                        <div className="mt-0.5 flex items-end justify-between gap-2">
-                                          <p className="text-sm font-semibold text-slate-900 tabular-nums">
-                                            {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
-                                          </p>
-                                          <span className="rounded-md border border-emerald-200 bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 transition-colors group-hover:bg-emerald-100">
-                                            Detalhar
-                                          </span>
+                                    <div className="p-3">
+                                      <div className="grid gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pontuação</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.pointsAchieved, 3)}</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">de {num(row.snapshot.pointsTarget, 3)} pts</p>
                                         </div>
-                                        <p className="mt-0.5 text-[10px] text-emerald-700/80">Produtos positivados no período atual</p>
-                                      </button>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">KPIs alcançados</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{kpisHit}/{kpisTotal}</p>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-slate-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pedidos no mês</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalOrders, 0)}</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Consolidado no período</p>
+                                        </div>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Vlr. de pedidos realizados</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{currency(row.snapshot.totalValue)}</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Valor total faturado no ciclo</p>
+                                        </div>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-cyan-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Peso bruto</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Peso movimentado no mês</p>
+                                        </div>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-violet-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Premiação por KPIs</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">
+                                            {formatRewardValue(row.snapshot.kpiRewardAchieved, row.snapshot.rewardMode)}
+                                          </p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Resultado acumulado</p>
+                                        </div>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-blue-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Clientes atendidos</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.uniqueClients, 0)}</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Clientes ativos no período</p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
+                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-teal-200 bg-teal-50/40 px-3 py-2.5 text-left transition-all duration-200 hover:border-teal-300 hover:bg-teal-50"
+                                        >
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-linear-to-b from-cyan-500 to-emerald-500" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-teal-700">Positivação</p>
+                                          <div className="mt-1 flex items-end justify-between gap-2">
+                                            <p className="text-xl leading-tight font-semibold tabular-nums text-slate-900">
+                                              {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
+                                            </p>
+                                            <span className="rounded-md border border-teal-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-teal-700 transition-colors group-hover:bg-teal-100">
+                                              Detalhar
+                                            </span>
+                                          </div>
+                                          <p className="mt-1 text-[11px] font-medium text-teal-700/90">Produtos positivados no período atual</p>
+                                        </button>
+                                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                          <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" />
+                                          <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">KPIs alcançados</p>
+                                          <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{kpisHit}/{kpisTotal}</p>
+                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Indicadores concluídos</p>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
