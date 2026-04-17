@@ -8918,7 +8918,7 @@ export default function MetasWorkspace() {
                                       <button
                                         type="button"
                                         onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
-                                        className="group relative overflow-hidden rounded-lg border border-emerald-200/80 bg-linear-to-br from-emerald-50 via-cyan-50 to-white px-3 py-2 text-left shadow-[0_10px_24px_rgba(16,185,129,0.16)] ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(6,95,70,0.22)]"
+                                        className="group relative cursor-pointer overflow-hidden rounded-lg border border-emerald-200/80 bg-white px-3 py-2 text-left transition-colors duration-200 hover:border-emerald-300 hover:bg-emerald-50/30"
                                       >
                                         <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 via-cyan-500 to-sky-500" />
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Positivação</p>
