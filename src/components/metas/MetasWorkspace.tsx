@@ -3386,6 +3386,31 @@ export default function MetasWorkspace() {
     }
     return uniqueClients.size
   }, [sellers])
+  const corporateTotalBaseClients = useMemo(
+    () => snapshots.reduce((sum, snapshot) => sum + Math.max(snapshot.seller.baseClientCount ?? 0, 0), 0),
+    [snapshots]
+  )
+  const corporateKpiSummary = useMemo(
+    () =>
+      snapshots.reduce(
+        (acc, snapshot) => {
+          const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
+          const total = block?.rules.length ?? 0
+          const hit = (block?.rules ?? []).filter((rule) => {
+            const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+            return progress >= 1
+          }).length
+          return { hit: acc.hit + hit, total: acc.total + total }
+        },
+        { hit: 0, total: 0 }
+      ),
+    [ruleBlocks, snapshots]
+  )
+  const corporateAvgGapToFull = useMemo(
+    () => (snapshots.length > 0 ? snapshots.reduce((sum, snapshot) => sum + Math.max(1 - snapshot.pointsAchieved, 0), 0) / snapshots.length : 0),
+    [snapshots]
+  )
+  const corporatePeriodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
   // Sum of each seller's individual monthly target (from their assigned block)
   const corporateTotalTarget = useMemo(
     () =>
@@ -7689,6 +7714,45 @@ export default function MetasWorkspace() {
               <p className="mt-2 text-xs text-surface-500">Consolidado dos vendedores monitorados</p>
             </Card>
           </div>
+
+          <Card className="mt-4 border-surface-200 bg-linear-to-r from-slate-50 via-white to-slate-50 shadow-sm">
+            <div className="grid gap-2 sm:grid-cols-4">
+              <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">Vendedores monitorados</p>
+                <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{snapshots.length}</p>
+                <p className="text-[10px] text-sky-700">Visão geral no período selecionado</p>
+              </div>
+              <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Clientes únicos atendidos</p>
+                <p className="mt-1 text-2xl font-bold text-indigo-900 tabular-nums">
+                  {num(corporateUniqueClients, 0)}
+                  {corporateTotalBaseClients > 0 && (
+                    <span className="font-bold text-indigo-700/80"> / {num(corporateTotalBaseClients, 0)}</span>
+                  )}
+                </p>
+                <p className="text-[10px] text-indigo-700">Total em visão geral</p>
+              </div>
+              <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Média geral de atingimento</p>
+                <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(factoryGoalRatio * 100, 1)}%</p>
+                <p className="text-[10px] text-cyan-700">Percentual médio dos vendedores monitorados</p>
+              </div>
+              <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Metas conquistadas no ciclo</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">
+                  {num(corporateKpiSummary.hit, 0)}
+                  <span className="font-bold text-emerald-700/80"> / {num(corporateKpiSummary.total, 0)}</span>
+                </p>
+                <p className="text-[10px] text-emerald-700">
+                  {corporatePeriodClosed ? `Gap médio para 1,00 pt: ${num(corporateAvgGapToFull, 2)} pts` : 'Parcial até a data atual'}
+                </p>
+              </div>
+            </div>
+          </Card>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card className={executiveMetricCardClass}>
