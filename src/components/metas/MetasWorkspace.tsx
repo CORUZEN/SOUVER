@@ -1029,6 +1029,7 @@ export default function MetasWorkspace() {
   const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
   const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
   const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
+  const kpiConsolidatedTrendCacheRef = useRef<Record<string, Record<string, { hit: number; pending: number }>>>({})
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
@@ -3519,6 +3520,39 @@ export default function MetasWorkspace() {
       overallAdherenceRatio,
     }
   }, [kpiConsolidatedTypeRows])
+
+  const kpiConsolidatedScopeSuffix = useMemo(
+    () =>
+      kpiConsolidatedScope === 'SUPERVISOR'
+        ? `${kpiConsolidatedScope}:${kpiConsolidatedSupervisorKey || 'ALL'}`
+        : kpiConsolidatedScope,
+    [kpiConsolidatedScope, kpiConsolidatedSupervisorKey]
+  )
+
+  const kpiConsolidatedCurrentCacheKey = useMemo(
+    () => `${monthKey(year, month)}|${kpiConsolidatedScopeSuffix}`,
+    [kpiConsolidatedScopeSuffix, month, year]
+  )
+
+  const kpiConsolidatedPreviousCacheKey = useMemo(() => {
+    const previousMonthDate = new Date(year, month - 1, 1)
+    return `${monthKey(previousMonthDate.getFullYear(), previousMonthDate.getMonth())}|${kpiConsolidatedScopeSuffix}`
+  }, [kpiConsolidatedScopeSuffix, month, year])
+
+  useEffect(() => {
+    const payload = Object.fromEntries(
+      kpiConsolidatedTypeRows.map((row) => [
+        row.type,
+        { hit: row.hit, pending: Math.max(row.total - row.hit, 0) },
+      ])
+    )
+    kpiConsolidatedTrendCacheRef.current[kpiConsolidatedCurrentCacheKey] = payload
+  }, [kpiConsolidatedCurrentCacheKey, kpiConsolidatedTypeRows])
+
+  const kpiConsolidatedPreviousByType = useMemo(
+    () => kpiConsolidatedTrendCacheRef.current[kpiConsolidatedPreviousCacheKey] ?? {},
+    [kpiConsolidatedPreviousCacheKey, kpiConsolidatedTypeRows]
+  )
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
@@ -7466,6 +7500,15 @@ export default function MetasWorkspace() {
                             kpiConsolidatedTypeRows.map((row) => {
                               const pending = Math.max(row.total - row.hit, 0)
                               const healthPct = row.avgProgressRatio * 100
+                              const previous = kpiConsolidatedPreviousByType[row.type]
+                              const previousHit = previous?.hit
+                              const previousPending = previous?.pending
+                              const hitDeltaPct = typeof previousHit === 'number'
+                                ? (previousHit > 0 ? ((row.hit - previousHit) / previousHit) * 100 : row.hit > 0 ? 100 : 0)
+                                : null
+                              const pendingDeltaPct = typeof previousPending === 'number'
+                                ? (previousPending > 0 ? ((pending - previousPending) / previousPending) * 100 : pending > 0 ? 100 : 0)
+                                : null
                               const healthBarClass =
                                 row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
                               const criticalityLabel =
@@ -7479,10 +7522,34 @@ export default function MetasWorkspace() {
                                     <p className="text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</p>
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-emerald-700">
-                                    {num(row.hit, 0)}
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      <span>{num(row.hit, 0)}</span>
+                                      {hitDeltaPct === null ? (
+                                        <span className="text-[10px] font-medium text-surface-400">sem base</span>
+                                      ) : (
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
+                                          hitDeltaPct > 0 ? 'text-emerald-600' : hitDeltaPct < 0 ? 'text-rose-600' : 'text-surface-500'
+                                        }`}>
+                                          {hitDeltaPct > 0 ? <ArrowUp size={11} /> : hitDeltaPct < 0 ? <ArrowDown size={11} /> : <ArrowUpDown size={11} />}
+                                          {hitDeltaPct > 0 ? 'Melhorou' : hitDeltaPct < 0 ? 'Piorou' : 'Estável'} {num(Math.abs(hitDeltaPct), 1)}%
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-rose-700">
-                                    {num(pending, 0)}
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      <span>{num(pending, 0)}</span>
+                                      {pendingDeltaPct === null ? (
+                                        <span className="text-[10px] font-medium text-surface-400">sem base</span>
+                                      ) : (
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
+                                          pendingDeltaPct < 0 ? 'text-emerald-600' : pendingDeltaPct > 0 ? 'text-rose-600' : 'text-surface-500'
+                                        }`}>
+                                          {pendingDeltaPct < 0 ? <ArrowDown size={11} /> : pendingDeltaPct > 0 ? <ArrowUp size={11} /> : <ArrowUpDown size={11} />}
+                                          {pendingDeltaPct < 0 ? 'Melhorou' : pendingDeltaPct > 0 ? 'Piorou' : 'Estável'} {num(Math.abs(pendingDeltaPct), 1)}%
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.hitRatio * 100, 1)}%</td>
                                   <td className="px-3 py-2.5">
@@ -7507,7 +7574,7 @@ export default function MetasWorkspace() {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-surface-400">
+                  <p className="text-center text-[10px] text-surface-400">
                     Consolidação calculada no período selecionado, considerando todas as metas aplicáveis ao escopo e desconsiderando a meta de Volume (já monitorada no modo de metas de peso).
                   </p>
                 </div>
