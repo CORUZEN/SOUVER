@@ -3456,43 +3456,6 @@ export default function MetasWorkspace() {
     if (!exists) setKpiConsolidatedSupervisorKey(performanceSupervisorOptions[0].key)
   }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, performanceSupervisorOptions])
 
-  const kpiConsolidatedRankingRows = useMemo(() => {
-    return kpiConsolidatedFilteredSellerRows
-      .map((row) => {
-        const block = row.block
-        if (!block) {
-          return {
-            sellerId: row.sellerId,
-            sellerName: row.sellerName,
-            profileType: row.profileType,
-            totalKpis: 0,
-            hitKpis: 0,
-            ratio: 0,
-          }
-        }
-        const eligibleRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
-        const hitKpis = eligibleRules.reduce((sum, rule) => {
-          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-          return sum + (progress >= 1 ? 1 : 0)
-        }, 0)
-        const totalKpis = eligibleRules.length
-        const ratio = totalKpis > 0 ? hitKpis / totalKpis : 0
-        return {
-          sellerId: row.sellerId,
-          sellerName: row.sellerName,
-          profileType: row.profileType,
-          totalKpis,
-          hitKpis,
-          ratio,
-        }
-      })
-      .sort((a, b) => {
-        if (b.ratio !== a.ratio) return b.ratio - a.ratio
-        if (b.hitKpis !== a.hitKpis) return b.hitKpis - a.hitKpis
-        return a.sellerName.localeCompare(b.sellerName, 'pt-BR')
-      })
-  }, [kpiConsolidatedFilteredSellerRows])
-
   const kpiConsolidatedTypeRows = useMemo(() => {
     const typeLabelByKey = new Map<KpiType, string>(KPI_CATALOG.map((item) => [item.type, item.label]))
     const map = new Map<KpiType, { type: KpiType; label: string; total: number; hit: number; progressSum: number }>()
@@ -3529,21 +3492,34 @@ export default function MetasWorkspace() {
       })
   }, [kpiConsolidatedFilteredSellerRows])
 
-  const kpiConsolidatedOverview = useMemo(() => {
-    const totalKpis = kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.total, 0)
-    const hitKpis = kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.hit, 0)
-    const avgProgressRatio = totalKpis > 0
-      ? kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.progressSum, 0) / totalKpis
-      : 0
-    const sellersTracked = kpiConsolidatedFilteredSellerRows.length
-    return {
-      sellersTracked,
-      totalKpis,
-      hitKpis,
-      hitRatio: totalKpis > 0 ? hitKpis / totalKpis : 0,
-      avgProgressRatio,
+  const kpiConsolidatedHighlights = useMemo(() => {
+    if (kpiConsolidatedTypeRows.length === 0) {
+      return {
+        topPerformer: null as (typeof kpiConsolidatedTypeRows)[number] | null,
+        topRisk: null as (typeof kpiConsolidatedTypeRows)[number] | null,
+        largestBacklog: null as (typeof kpiConsolidatedTypeRows)[number] | null,
+        healthyCount: 0,
+        attentionCount: 0,
+      }
     }
-  }, [kpiConsolidatedFilteredSellerRows.length, kpiConsolidatedTypeRows])
+    const rows = [...kpiConsolidatedTypeRows]
+    const topPerformer = rows.reduce((best, row) => (row.hitRatio > best.hitRatio ? row : best), rows[0])
+    const topRisk = rows.reduce((risk, row) => (row.avgProgressRatio < risk.avgProgressRatio ? row : risk), rows[0])
+    const largestBacklog = rows.reduce((worst, row) => {
+      const rowPending = Math.max(row.total - row.hit, 0)
+      const worstPending = Math.max(worst.total - worst.hit, 0)
+      return rowPending > worstPending ? row : worst
+    }, rows[0])
+    const healthyCount = rows.filter((row) => row.avgProgressRatio >= 0.8).length
+    const attentionCount = rows.filter((row) => row.avgProgressRatio < 0.5).length
+    return {
+      topPerformer,
+      topRisk,
+      largestBacklog,
+      healthyCount,
+      attentionCount,
+    }
+  }, [kpiConsolidatedTypeRows])
 
   const kpiConsolidatedScopeLabel = useMemo(() => {
     if (kpiConsolidatedScope === 'ALL') return 'Visão geral'
@@ -7428,112 +7404,117 @@ export default function MetasWorkspace() {
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Vendedores monitorados</p>
-                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(kpiConsolidatedOverview.sellersTracked, 0)}</p>
-                    </div>
-                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">KPIs monitorados</p>
-                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(kpiConsolidatedOverview.totalKpis, 0)}</p>
-                    </div>
-                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">KPIs conquistados</p>
-                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">
-                        {num(kpiConsolidatedOverview.hitKpis, 0)}
-                        <span className="text-base font-semibold text-surface-500"> / {num(kpiConsolidatedOverview.totalKpis, 0)}</span>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Melhor KPI do ciclo</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-900">
+                        {kpiConsolidatedHighlights.topPerformer?.label ?? '—'}
+                      </p>
+                      <p className="text-[10px] text-emerald-700">
+                        {kpiConsolidatedHighlights.topPerformer
+                          ? `${num(kpiConsolidatedHighlights.topPerformer.hitRatio * 100, 1)}% de conclusão`
+                          : 'Sem dados no escopo'}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Aderência média</p>
-                      <p className={`mt-1 text-lg font-semibold tabular-nums ${
-                        kpiConsolidatedOverview.avgProgressRatio >= 0.85
-                          ? 'text-emerald-600'
-                          : kpiConsolidatedOverview.avgProgressRatio >= 0.6
-                            ? 'text-cyan-600'
-                            : kpiConsolidatedOverview.avgProgressRatio >= 0.4
-                              ? 'text-amber-500'
-                              : 'text-rose-600'
-                      }`}>{num(kpiConsolidatedOverview.avgProgressRatio * 100, 1)}%</p>
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-700">Maior risco operacional</p>
+                      <p className="mt-1 text-sm font-semibold text-rose-900">
+                        {kpiConsolidatedHighlights.topRisk?.label ?? '—'}
+                      </p>
+                      <p className="text-[10px] text-rose-700">
+                        {kpiConsolidatedHighlights.topRisk
+                          ? `${num(kpiConsolidatedHighlights.topRisk.avgProgressRatio * 100, 1)}% de aderência média`
+                          : 'Sem dados no escopo'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Maior backlog de KPI</p>
+                      <p className="mt-1 text-sm font-semibold text-amber-900">
+                        {kpiConsolidatedHighlights.largestBacklog?.label ?? '—'}
+                      </p>
+                      <p className="text-[10px] text-amber-700">
+                        {kpiConsolidatedHighlights.largestBacklog
+                          ? `${num(Math.max(kpiConsolidatedHighlights.largestBacklog.total - kpiConsolidatedHighlights.largestBacklog.hit, 0), 0)} pendentes`
+                          : 'Sem dados no escopo'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Saúde dos KPIs</p>
+                      <p className="mt-1 text-sm font-semibold text-cyan-900">
+                        {num(kpiConsolidatedHighlights.healthyCount, 0)} saudáveis · {num(kpiConsolidatedHighlights.attentionCount, 0)} críticos
+                      </p>
+                      <p className="text-[10px] text-cyan-700">Leitura por aderência média no período</p>
                     </div>
                   </div>
 
-                  <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
-                    <div className="overflow-hidden rounded-xl border border-surface-200">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-xs">
-                          <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
-                            <tr>
-                              <th className="px-3 py-2 text-left">KPI</th>
-                              <th className="px-3 py-2 text-right">Conquistados</th>
-                              <th className="px-3 py-2 text-right">% concluído</th>
-                              <th className="px-3 py-2 text-right">Aderência média</th>
+                  <div className="overflow-hidden rounded-xl border border-surface-200">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                          <tr>
+                            <th className="px-3 py-2 text-left">KPI estratégico</th>
+                            <th className="px-3 py-2 text-right">Conquistados</th>
+                            <th className="px-3 py-2 text-right">Pendentes</th>
+                            <th className="px-3 py-2 text-right">Conversão</th>
+                            <th className="px-3 py-2 text-right">Aderência média</th>
+                            <th className="px-3 py-2 text-left">Saúde</th>
+                            <th className="px-3 py-2 text-right">Criticidade</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {kpiConsolidatedTypeRows.length === 0 ? (
+                            <tr className="border-t border-surface-100">
+                              <td colSpan={7} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                Nenhum KPI consolidado encontrado para o escopo selecionado.
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {kpiConsolidatedTypeRows.length === 0 ? (
-                              <tr className="border-t border-surface-100">
-                                <td colSpan={4} className="px-3 py-6 text-center text-[11px] text-surface-400">
-                                  Nenhum KPI consolidado encontrado para o escopo selecionado.
-                                </td>
-                              </tr>
-                            ) : (
-                              kpiConsolidatedTypeRows.map((row) => (
+                          ) : (
+                            kpiConsolidatedTypeRows.map((row) => {
+                              const pending = Math.max(row.total - row.hit, 0)
+                              const healthPct = row.avgProgressRatio * 100
+                              const healthBarClass =
+                                row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
+                              const criticalityLabel =
+                                row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.4 ? 'Atenção' : 'Crítico'
+                              const criticalityClass =
+                                row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.4 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
+                              return (
                                 <tr key={`kpi-consolidated-type-${row.type}`} className="border-t border-surface-100">
-                                  <td className="px-3 py-2.5 font-semibold text-surface-700">{row.label}</td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">
-                                    {num(row.hit, 0)}/{num(row.total, 0)}
+                                  <td className="px-3 py-2.5">
+                                    <p className="font-semibold text-surface-800">{row.label}</p>
+                                    <p className="text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</p>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-emerald-700">
+                                    {num(row.hit, 0)}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-rose-700">
+                                    {num(pending, 0)}
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.hitRatio * 100, 1)}%</td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(row.avgProgressRatio * 100, 1)}%</td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(healthPct, 1)}%</td>
+                                  <td className="px-3 py-2.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-1.5 w-full max-w-36 overflow-hidden rounded-full bg-surface-100">
+                                        <div className={`h-full transition-[width] duration-700 ${healthBarClass}`} style={{ width: `${Math.min(healthPct, 100)}%` }} />
+                                      </div>
+                                      <span className="text-[10px] font-semibold tabular-nums text-surface-700">{num(healthPct, 1)}%</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right">
+                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${criticalityClass}`}>
+                                      {criticalityLabel}
+                                    </span>
+                                  </td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Ranking de aderência por vendedor</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {kpiConsolidatedRankingRows.length === 0 ? (
-                          <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-center text-[11px] text-surface-500">
-                            Nenhum vendedor disponível no escopo selecionado.
-                          </div>
-                        ) : (
-                          kpiConsolidatedRankingRows.map((row, index) => {
-                            const ratioPct = row.ratio * 100
-                            const barPct = Math.min(ratioPct, 100)
-                            const barClass =
-                              row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
-                            return (
-                              <div
-                                key={`kpi-consolidated-rank-${row.sellerId}`}
-                                className="w-full rounded-xl border border-surface-200 bg-white px-3 py-2"
-                              >
-                                <div className="mb-1.5 flex items-center justify-between gap-2">
-                                  <span className="truncate text-[11px] font-semibold text-surface-700">{getSellerShortName(row.sellerName)}</span>
-                                  <span className="text-[10px] text-surface-400">#{index + 1}</span>
-                                </div>
-                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
-                                  <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
-                                </div>
-                                <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
-                                  <span>{row.hitKpis}/{row.totalKpis} KPIs</span>
-                                  <span className="font-semibold tabular-nums text-surface-700">{num(ratioPct, 1)}%</span>
-                                </div>
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
+                              )
+                            })
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
                   <p className="text-[10px] text-surface-400">
-                    Consolidação calculada no período selecionado, considerando todos os KPIs aplicáveis ao escopo e desconsiderando o KPI de Volume (já monitorado no modo de metas de peso).
+                    Consolidação calculada no período selecionado, considerando todos os KPIs aplicáveis ao escopo e desconsiderando o KPI de Volume (já monitorado no modo de metas de peso). Esta leitura prioriza gestão de risco, pendências e saúde operacional por KPI.
                   </p>
                 </div>
               )}
