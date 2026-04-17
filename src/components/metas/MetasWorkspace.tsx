@@ -8877,7 +8877,7 @@ export default function MetasWorkspace() {
 
                               {isOpen && (
                                 <div className="border-t border-slate-200 bg-slate-100/70 px-3 py-3">
-                                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-slate-100">
+                                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white ring-1 ring-slate-100">
                                     <div className="relative border-b border-slate-200 bg-linear-to-r from-slate-900 via-slate-800 to-cyan-900">
                                       <div className="relative grid gap-3 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-end">
                                         <div>
@@ -8900,36 +8900,36 @@ export default function MetasWorkspace() {
 
                                     <div className="p-3">
                                       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pontuação</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.pointsAchieved, 3)}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pedidos no mês</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalOrders, 0)}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Vlr. de pedidos realizados</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{currency(row.snapshot.totalValue)}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Peso bruto</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Premiação por KPIs</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">
                                             {formatRewardValue(row.snapshot.kpiRewardAchieved, row.snapshot.rewardMode)}
                                           </p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Clientes atendidos</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.uniqueClients, 0)}</p>
                                         </div>
                                         <button
                                           type="button"
                                           onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
-                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-sky-50 to-white px-3 py-2.5 pr-14 text-left shadow-sm transition-all duration-200 hover:border-cyan-300 hover:shadow-md"
+                                          className="group relative cursor-pointer overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-sky-50 to-white px-3 py-2.5 pr-14 text-left transition-all duration-200 hover:border-cyan-300"
                                         >
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-cyan-800">Positivação</p>
                                           <div className="mt-1 flex items-center">
@@ -8941,7 +8941,7 @@ export default function MetasWorkspace() {
                                             <ChevronRight size={15} strokeWidth={2.6} />
                                           </span>
                                         </button>
-                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-linear-to-b from-white to-slate-50 px-3 py-2.5">
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">KPIs alcançados</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{kpisHit}/{kpisTotal}</p>
                                         </div>
