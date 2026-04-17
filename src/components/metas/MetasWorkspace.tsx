@@ -2806,7 +2806,7 @@ export default function MetasWorkspace() {
         import('jspdf-autotable'),
       ])
 
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
 
@@ -2854,43 +2854,67 @@ export default function MetasWorkspace() {
         num(item.soldQty, 0),
       ]))
 
-      // Keep a single page: estimate max rows that fit in available height.
-      const reservedAfterTable = 36
-      const usableHeight = pageHeight - tableStartY - reservedAfterTable
-      const estimatedHeaderAndPadding = 34
-      const estimatedRowHeight = 18
-      const maxRows = Math.max(Math.floor((usableHeight - estimatedHeaderAndPadding) / estimatedRowHeight), 6)
-      const rowsForPdf = bodyRows.slice(0, maxRows)
-      const omittedRows = Math.max(bodyRows.length - rowsForPdf.length, 0)
+      doc.setFontSize(11)
+      doc.setTextColor(6, 95, 70)
+      doc.text('PRODUTOS POSITIVADOS', 36, tableStartY - 10)
 
       autoTable(doc, {
         startY: tableStartY,
         head: [['SKU', 'Descrição', 'Grupo', 'Peso (kg)', 'Qtd.']],
-        body: rowsForPdf,
-        margin: { left: 36, right: 36 },
+        body: bodyRows,
+        margin: { left: 24, right: 24 },
         theme: 'grid',
-        styles: { fontSize: 8.5, cellPadding: 4, textColor: [30, 41, 59] },
+        styles: { fontSize: 8, cellPadding: 4, textColor: [30, 41, 59], overflow: 'linebreak' },
         headStyles: { fillColor: [220, 252, 231], textColor: [6, 95, 70], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
-          0: { cellWidth: 62 },
-          1: { cellWidth: 320 },
-          2: { cellWidth: 150 },
-          3: { cellWidth: 90, halign: 'right' },
-          4: { cellWidth: 66, halign: 'right' },
+          0: { cellWidth: 52 },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 'auto' },
+          3: { cellWidth: 86, halign: 'right' },
+          4: { cellWidth: 54, halign: 'right' },
         },
-        pageBreak: 'avoid',
+        tableWidth: 'auto',
+        pageBreak: 'auto',
       })
 
-      const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY + 120
-      doc.setFontSize(9)
-      doc.setTextColor(71, 85, 105)
-      if (omittedRows > 0) {
-        doc.text(`Exibindo ${rowsForPdf.length} de ${bodyRows.length} SKUs positivados nesta página. ${omittedRows} SKU(s) omitido(s) para manter uma única página.`, 36, finalY + 18)
-      } else {
-        doc.text(`Total de SKUs positivados no período: ${bodyRows.length}.`, 36, finalY + 18)
+      const afterPositivatedY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY + 120
+      if (pendingProductsSorted.length > 0) {
+        let pendingStartY = afterPositivatedY + 28
+        if (pendingStartY > pageHeight - 110) {
+          doc.addPage()
+          pendingStartY = 68
+        }
+        doc.setFontSize(11)
+        doc.setTextColor(180, 83, 9)
+        doc.text('PRODUTOS PENDENTES', 36, pendingStartY - 10)
+        autoTable(doc, {
+          startY: pendingStartY,
+          head: [['SKU', 'Descrição', 'Grupo']],
+          body: pendingProductsSorted.map((item) => ([item.code, item.description || '-', item.brand || 'Sem grupo'])),
+          margin: { left: 24, right: 24 },
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85], overflow: 'linebreak' },
+          headStyles: { fillColor: [254, 243, 199], textColor: [180, 83, 9], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [255, 251, 235] },
+          columnStyles: {
+            0: { cellWidth: 58 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 'auto' },
+          },
+          tableWidth: 'auto',
+          pageBreak: 'auto',
+        })
       }
-      doc.text(`Relatório gerado em ${new Date().toLocaleString('pt-BR')} · SOUVER`, pageWidth - 320, pageHeight - 16)
+
+      const pages = doc.getNumberOfPages()
+      for (let page = 1; page <= pages; page += 1) {
+        doc.setPage(page)
+        doc.setFontSize(9)
+        doc.setTextColor(71, 85, 105)
+        doc.text(`Relatório gerado em ${new Date().toLocaleString('pt-BR')} · SISTEMA OURO VERDE`, 24, pageHeight - 16)
+        doc.text(`Página ${page} de ${pages}`, pageWidth - 110, pageHeight - 16)
+      }
 
       const sellerSlug = (positivationDetailsModal.sellerName || 'vendedor').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
       doc.save(`positivacao-${sellerSlug}-${year}-${String(month + 1).padStart(2, '0')}.pdf`)
