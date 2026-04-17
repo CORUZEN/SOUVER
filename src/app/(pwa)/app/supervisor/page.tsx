@@ -933,6 +933,21 @@ export default function SupervisorPwaDashboard() {
     return s + (monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0)
   }, 0)
   const overallPct = totalTarget > 0 ? (totalRevenue / totalTarget) * 100 : 0
+  const overallPctDisplay = Math.min(Math.max(overallPct, 0), 100)
+  const overallPctDisplayRounded = Math.min(Math.max(Number(overallPctDisplay.toFixed(1)), 0), 100)
+  const overallPctDisplayLabel = overallPctDisplayRounded >= 100 ? '100%' : fmtPct(overallPctDisplayRounded)
+  const targetGapValue = totalRevenue - totalTarget
+  const targetGapPct = totalTarget > 0 ? (targetGapValue / totalTarget) * 100 : 0
+  const metaFinancialTrendLabel = totalTarget <= 0
+    ? 'Meta não configurada'
+    : targetGapPct >= 0
+      ? `+${fmt(targetGapPct, 1)}% acima da meta ↑`
+      : `${fmt(Math.abs(targetGapPct), 1)}% para meta`
+  const valueGapLabel = totalTarget <= 0
+    ? 'Meta não configurada'
+    : targetGapValue >= 0
+      ? `+${fmtBrl(Math.abs(targetGapValue))} ↑`
+      : `-${fmtBrl(Math.abs(targetGapValue))} ↓`
 
   const ordersComparison = useMemo(() => {
     const cutoffCurrentDay = isCurrentMonth ? now.getDate() : daysInMonth(year, month)
@@ -1179,34 +1194,14 @@ export default function SupervisorPwaDashboard() {
               <div className="pwa-card pwa-card-hero col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Meta Financeira</p>
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
-                    title={`Comparação no mesmo período do mês anterior: ${fmtPct(metaComparison.currentPct)} vs ${fmtPct(metaComparison.previousPct)}`}
-                  >
-                    {metaComparison.hasBaseline ? (
-                      <>
-                        {metaComparison.trend === 'up' ? (
-                          <TrendingUp className="h-3 w-3 text-emerald-300" />
-                        ) : metaComparison.trend === 'down' ? (
-                          <TrendingDown className="h-3 w-3 text-amber-300" />
-                        ) : (
-                          <Minus className="h-3 w-3 text-surface-300" />
-                        )}
-                        <span
-                          className={
-                            metaComparison.trend === 'up'
-                              ? 'text-emerald-300'
-                              : metaComparison.trend === 'down'
-                              ? 'text-amber-300'
-                              : 'text-surface-300'
-                          }
-                        >
-                          {`${metaComparison.deltaPct >= 0 ? '+' : ''}${fmt(metaComparison.deltaPct, 1)}%`}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-surface-300">sem base</span>
-                    )}
+                  <span className={`max-w-[170px] text-right text-[11px] font-semibold leading-tight tabular-nums ${
+                    totalTarget <= 0
+                      ? 'text-surface-300'
+                      : targetGapPct >= 0
+                        ? 'text-emerald-300'
+                        : 'text-amber-300'
+                  }`}>
+                    {metaFinancialTrendLabel}
                   </span>
                 </div>
                 <div className="mt-1 flex items-end justify-between gap-2">
@@ -1219,7 +1214,7 @@ export default function SupervisorPwaDashboard() {
                       ? 'bg-linear-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
                       : 'bg-linear-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
                   }`}>
-                    {fmtPct(overallPct)}
+                    {overallPctDisplayLabel}
                   </p>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
@@ -1301,34 +1296,14 @@ export default function SupervisorPwaDashboard() {
                     <DollarSign className="h-3 w-3" />
                     Valor Total dos Pedidos
                   </div>
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
-                    title={`Comparação no mesmo período do mês anterior: ${fmtBrl(valueComparison.currentSamePeriodValue)} vs ${fmtBrl(valueComparison.previousSamePeriodValue)}`}
-                  >
-                    {valueComparison.hasBaseline ? (
-                      <>
-                        {valueComparison.trend === 'up' ? (
-                          <TrendingUp className="h-3 w-3 text-emerald-300" />
-                        ) : valueComparison.trend === 'down' ? (
-                          <TrendingDown className="h-3 w-3 text-amber-300" />
-                        ) : (
-                          <Minus className="h-3 w-3 text-surface-300" />
-                        )}
-                        <span
-                          className={
-                            valueComparison.trend === 'up'
-                              ? 'text-emerald-300'
-                              : valueComparison.trend === 'down'
-                              ? 'text-amber-300'
-                              : 'text-surface-300'
-                          }
-                        >
-                          {`${valueComparison.deltaPct >= 0 ? '+' : ''}${fmt(valueComparison.deltaPct, 1)}%`}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-surface-300">sem base</span>
-                    )}
+                  <span className={`max-w-[180px] text-right text-[11px] font-semibold leading-tight tabular-nums ${
+                    totalTarget <= 0
+                      ? 'text-surface-300'
+                      : targetGapValue >= 0
+                        ? 'text-emerald-300'
+                        : 'text-amber-300'
+                  }`}>
+                    {valueGapLabel}
                   </span>
                 </div>
                 <p className="mt-1 text-xl font-bold text-white">{fmtBrl(totalRevenue)}</p>
