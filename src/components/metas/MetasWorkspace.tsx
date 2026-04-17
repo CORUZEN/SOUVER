@@ -3835,14 +3835,30 @@ export default function MetasWorkspace() {
       })
   }, [kpiConsolidatedSellerRows])
 
+  // Rows used for the ranking list (never filters to a single seller)
   const kpiGeneralScopedSellerRows = useMemo(() => {
-    if (kpiGeneralPanelView !== 'SUPERVISOR') return kpiGeneralSellerPerformanceRows
-    if (!kpiGeneralPanelSupervisorKey) return []
-    return kpiGeneralSellerPerformanceRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
+    if (kpiGeneralPanelView === 'SUPERVISOR') {
+      if (!kpiGeneralPanelSupervisorKey) return []
+      return kpiGeneralSellerPerformanceRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
+    }
+    return kpiGeneralSellerPerformanceRows
+  }, [kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, kpiGeneralSellerPerformanceRows])
+
+  // Rows used for the 6 summary cards (filters to selected seller when in SELLER view)
+  const kpiGeneralCardSellerRows = useMemo(() => {
+    if (kpiGeneralPanelView === 'SELLER') {
+      if (!kpiGeneralPanelSellerId) return kpiGeneralSellerPerformanceRows
+      return kpiGeneralSellerPerformanceRows.filter((row) => row.sellerId === kpiGeneralPanelSellerId)
+    }
+    if (kpiGeneralPanelView === 'SUPERVISOR') {
+      if (!kpiGeneralPanelSupervisorKey) return []
+      return kpiGeneralSellerPerformanceRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
+    }
+    return kpiGeneralSellerPerformanceRows
   }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, kpiGeneralSellerPerformanceRows])
 
   const kpiGeneralScopedSummary = useMemo(() => {
-    const scopedSellerIds = new Set(kpiGeneralScopedSellerRows.map((row) => row.sellerId))
+    const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
     const scopedSnapshots = snapshots.filter((snapshot) => scopedSellerIds.has(snapshot.seller.id))
 
     const totalOrders = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0)
@@ -3894,7 +3910,7 @@ export default function MetasWorkspace() {
       metasHit: metas.hit,
       metasTotal: metas.total,
     }
-  }, [distributionItemsBySeller, kpiGeneralScopedSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
+  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
 
   const kpiConsolidatedFilteredSellerRows = useMemo(() => {
     if (kpiGeneralPanelView === 'SUPERVISOR') {
