@@ -7181,7 +7181,7 @@ export default function MetasWorkspace() {
                     })
                     .filter((row): row is NonNullable<typeof row> => row !== null)
 
-                    const filteredRows = sellerPerformanceScope === 'ALL'
+                    const filteredRows = (sellerPerformanceScope === 'ALL'
                       ? rows
                       : sellerPerformanceScope === 'SUPERVISOR'
                         ? rows.filter((row) => {
@@ -7189,7 +7189,12 @@ export default function MetasWorkspace() {
                             if (!sellerData?.supervisorCode) return false
                             return performanceSupervisorKey ? sellerData.supervisorCode === performanceSupervisorKey : true
                           })
-                        : rows.filter((row) => row.profileType === sellerPerformanceScope)
+                        : rows.filter((row) => row.profileType === sellerPerformanceScope))
+                      .sort((a, b) => {
+                        if (b.pointsRatio !== a.pointsRatio) return b.pointsRatio - a.pointsRatio
+                        if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
+                        return a.fullName.localeCompare(b.fullName, 'pt-BR')
+                      })
                     const filteredSellerIds = new Set(filteredRows.map((row) => row.id))
                     const filteredUniqueClientsSet = new Set<string>()
                     for (const seller of sellers) {
@@ -7205,8 +7210,8 @@ export default function MetasWorkspace() {
                       return sum + (sellerData?.baseClientCount ?? 0)
                     }, 0)
                     const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
-                    const avgPoints = filteredRows.length > 0
-                      ? filteredRows.reduce((sum, row) => sum + row.pointsAchieved, 0) / filteredRows.length
+                    const avgOverallPercent = rows.length > 0
+                      ? (rows.reduce((sum, row) => sum + Math.min(Math.max(row.pointsRatio, 0), 1), 0) / rows.length) * 100
                       : 0
                     const avgGapToFull = filteredRows.length > 0
                       ? filteredRows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / filteredRows.length
@@ -7270,9 +7275,9 @@ export default function MetasWorkspace() {
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Pontuação média da equipe</p>
-                            <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgPoints, 2)} pts</p>
-                            <p className="text-[10px] text-cyan-700">Média geral de pontos alcançados no ciclo</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Média geral de atingimento</p>
+                            <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgOverallPercent, 1)}%</p>
+                            <p className="text-[10px] text-cyan-700">Percentual médio de 0% a 100% considerando todos os vendedores monitorados</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
@@ -7288,9 +7293,10 @@ export default function MetasWorkspace() {
                         </div>
 
                       <div className="space-y-1.5">
-                        <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
+                        <div className="grid grid-cols-[44px_2.15fr_0.9fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
                           <span>Vendedor</span>
+                          <span className="text-center">% geral</span>
                           <span className="text-center">Premiação atual</span>
                           <span className="text-center">Clientes atendidos</span>
                           {STAGES.filter((stage) => stage.key !== 'FULL').map((stage) => (
@@ -7324,9 +7330,12 @@ export default function MetasWorkspace() {
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
                                 className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200"
                               >
-                                <div className="grid grid-cols-[44px_2.35fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
+                                <div className="grid grid-cols-[44px_2.15fr_0.9fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5">
                                   <span className={`text-center text-xs font-semibold tabular-nums ${isOpen ? 'text-slate-700' : 'text-surface-500'}`}>{index + 1}</span>
                                   <span className="block min-w-0 truncate text-sm font-semibold text-surface-900">{row.nameShort}</span>
+                                  <span className="rounded-md border border-cyan-200 bg-cyan-50/70 px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-cyan-800">
+                                    {num(Math.min(Math.max(row.pointsRatio, 0), 1) * 100, 1)}%
+                                  </span>
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
                                     {formatRewardValue(row.rewardAchieved, row.snapshot.rewardMode)}
                                   </span>

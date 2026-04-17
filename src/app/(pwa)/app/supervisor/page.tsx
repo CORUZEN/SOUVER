@@ -393,6 +393,33 @@ function computeAllKpiProgress(
   sellerCode: string,
   todayIso: string,
 ): KpiProgress[] {
+  const stageOrder = ['W1', 'W2', 'W3', 'CLOSING'] as const
+  const operationalWeeks = cycleWeeks
+    .filter((week) => stageOrder.includes(week.key as (typeof stageOrder)[number]) && week.start && week.end)
+    .sort((a, b) => a.start.localeCompare(b.start))
+
+  const stageClients = stageOrder.reduce((acc, stage) => {
+    acc[stage] = new Set<string>()
+    return acc
+  }, {} as Record<(typeof stageOrder)[number], Set<string>>)
+
+  for (const order of orders) {
+    const clientCode = String(order.clientCode ?? '').trim()
+    if (!clientCode) continue
+    const stage = operationalWeeks.find((week) => order.negotiatedAt >= week.start && order.negotiatedAt <= week.end)?.key
+    if (!stage || !stageOrder.includes(stage as (typeof stageOrder)[number])) continue
+    stageClients[stage as (typeof stageOrder)[number]].add(clientCode)
+  }
+
+  const cumulativeDistinctClients = stageOrder.reduce((acc, stage) => {
+    const previous = stage === 'W1'
+      ? new Set<string>()
+      : new Set(acc[stageOrder[stageOrder.indexOf(stage) - 1] as (typeof stageOrder)[number]].codes)
+    for (const code of stageClients[stage]) previous.add(code)
+    acc[stage] = { count: previous.size, codes: previous }
+    return acc
+  }, {} as Record<(typeof stageOrder)[number], { count: number; codes: Set<string> }>)
+
   const brandWeightMap = new Map<string, number>()
   for (const row of brandWeightRows) {
     if (row.sellerCode === sellerCode) {
@@ -445,7 +472,10 @@ function computeAllKpiProgress(
       const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
       const threshold = rawNum > 0 ? rawNum / 100 : 1
       const base = Math.max(baseClientCount, 1)
-      const clients = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
+      const stageKey = (rule.stage as (typeof stageOrder)[number])
+      const clients = stageOrder.includes(stageKey)
+        ? cumulativeDistinctClients[stageKey]?.count ?? 0
+        : new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
       progress = clients / (base * threshold)
     } else if (kpiType === 'VOLUME') {
       const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
@@ -492,7 +522,10 @@ function computeAllKpiProgress(
         progress = Math.min(itemsProgress, clientsProgress)
       } else if (clientsPct > 0 && baseClientCount > 0) {
         const fallbackRequiredClients = Math.ceil(baseClientCount * (clientsPct / 100))
-        const clientsAchieved = new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
+        const stageKey = (rule.stage as (typeof stageOrder)[number])
+        const clientsAchieved = stageOrder.includes(stageKey)
+          ? cumulativeDistinctClients[stageKey]?.count ?? 0
+          : new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
         progress = clientsAchieved / Math.max(fallbackRequiredClients, 1)
       } else {
         progress = ordersUpToStage.length > 0 ? 1 : 0
@@ -1017,8 +1050,8 @@ export default function SupervisorPwaDashboard() {
 
     return { seller, code, target, financialPct, cyclePct, status, clients, profileType, maxReward, earnedReward, kpiProgress, pointsAchieved }
   }).sort((a, b) => {
-    if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
     if (b.cyclePct !== a.cyclePct) return b.cyclePct - a.cyclePct
+    if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
     return a.seller.name.localeCompare(b.seller.name, 'pt-BR')
   })
 
