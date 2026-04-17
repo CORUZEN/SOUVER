@@ -1029,7 +1029,7 @@ export default function MetasWorkspace() {
   const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
   const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
   const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
-  const kpiConsolidatedTrendCacheRef = useRef<Record<string, Record<string, { hit: number; pending: number }>>>({})
+  const [kpiConsolidatedPreviousByType, setKpiConsolidatedPreviousByType] = useState<Record<string, { hit: number; pending: number }>>({})
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
@@ -3521,38 +3521,500 @@ export default function MetasWorkspace() {
     }
   }, [kpiConsolidatedTypeRows])
 
-  const kpiConsolidatedScopeSuffix = useMemo(
-    () =>
-      kpiConsolidatedScope === 'SUPERVISOR'
-        ? `${kpiConsolidatedScope}:${kpiConsolidatedSupervisorKey || 'ALL'}`
-        : kpiConsolidatedScope,
-    [kpiConsolidatedScope, kpiConsolidatedSupervisorKey]
-  )
-
-  const kpiConsolidatedCurrentCacheKey = useMemo(
-    () => `${monthKey(year, month)}|${kpiConsolidatedScopeSuffix}`,
-    [kpiConsolidatedScopeSuffix, month, year]
-  )
-
-  const kpiConsolidatedPreviousCacheKey = useMemo(() => {
-    const previousMonthDate = new Date(year, month - 1, 1)
-    return `${monthKey(previousMonthDate.getFullYear(), previousMonthDate.getMonth())}|${kpiConsolidatedScopeSuffix}`
-  }, [kpiConsolidatedScopeSuffix, month, year])
-
   useEffect(() => {
-    const payload = Object.fromEntries(
-      kpiConsolidatedTypeRows.map((row) => [
-        row.type,
-        { hit: row.hit, pending: Math.max(row.total - row.hit, 0) },
-      ])
-    )
-    kpiConsolidatedTrendCacheRef.current[kpiConsolidatedCurrentCacheKey] = payload
-  }, [kpiConsolidatedCurrentCacheKey, kpiConsolidatedTypeRows])
+    const controller = new AbortController()
+    let cancelled = false
 
-  const kpiConsolidatedPreviousByType = useMemo(
-    () => kpiConsolidatedTrendCacheRef.current[kpiConsolidatedPreviousCacheKey] ?? {},
-    [kpiConsolidatedPreviousCacheKey, kpiConsolidatedTypeRows]
-  )
+    const loadPreviousConsolidated = async () => {
+      try {
+        const previousMonthDate = new Date(year, month - 1, 1)
+        const previousYear = previousMonthDate.getFullYear()
+        const previousMonth = previousMonthDate.getMonth() + 1
+
+        const [summaryRes, perfRes] = await Promise.all([
+          fetch(`/api/pwa/summary?year=${previousYear}&month=${previousMonth}`, { signal: controller.signal }),
+          fetch(`/api/metas/sellers-performance?year=${previousYear}&month=${previousMonth}&companyScope=${companyScopeFilter}`, { signal: controller.signal }),
+        ])
+        const summaryPayload = await summaryRes.json().catch(() => ({}))
+        const perfPayload = await perfRes.json().catch(() => ({}))
+
+        if (!summaryRes.ok) {
+          throw new Error(typeof summaryPayload?.message === 'string' ? summaryPayload.message : 'Falha ao carregar resumo do mês anterior.')
+        }
+        if (!perfRes.ok) {
+          throw new Error(typeof perfPayload?.message === 'string' ? perfPayload.message : 'Falha ao carregar desempenho do mês anterior.')
+        }
+
+        const previousSummarySellers = (Array.isArray(summaryPayload?.sellers) ? summaryPayload.sellers : []) as Array<{
+          code: string
+          name: string
+          profileType?: SellerProfileType
+          supervisorCode?: string | null
+          focusProductCode?: string
+          focusTargetMode?: FocusTargetMode
+          focusTargetKg?: number
+          focusTargetBasePct?: number
+          monthlyTarget?: number
+          rules?: Array<{ id: string; stage: StageKey; kpi: string; kpiType?: KpiType; targetText: string }>
+        }>
+
+        const previousCycleWeeksRaw = (Array.isArray(summaryPayload?.cycleWeeks) ? summaryPayload.cycleWeeks : []) as Array<{
+          key: StageKey
+          start?: string | null
+          end?: string | null
+          businessDays?: string[]
+        }>
+
+        const previousCycleWeeks: CycleWeek[] = previousCycleWeeksRaw
+          .filter((week) => week.key === 'W1' || week.key === 'W2' || week.key === 'W3' || week.key === 'CLOSING')
+          .map((week) => ({
+            key: week.key,
+            label: STAGES.find((stage) => stage.key === week.key)?.label ?? week.key,
+            start: week.start ? String(week.start).slice(0, 10) : null,
+            end: week.end ? String(week.end).slice(0, 10) : null,
+            businessDays: Array.isArray(week.businessDays) ? week.businessDays.map((date) => String(date).slice(0, 10)) : [],
+          }))
+
+        const firstStart = [...previousCycleWeeks]
+          .map((week) => week.start)
+          .filter((value): value is string => Boolean(value))
+          .sort()[0] ?? null
+        const lastEnd = [...previousCycleWeeks]
+          .map((week) => week.end)
+          .filter((value): value is string => Boolean(value))
+          .sort()
+          .slice(-1)[0] ?? null
+        const previousCycleWeeksWithFull: CycleWeek[] = [
+          ...previousCycleWeeks,
+          {
+            key: 'FULL',
+            label: STAGES.find((stage) => stage.key === 'FULL')?.label ?? 'Todo o período',
+            start: firstStart,
+            end: lastEnd,
+            businessDays: [],
+          },
+        ]
+
+        const focusCodes = [...new Set(previousSummarySellers.map((seller) => String(seller.focusProductCode ?? '').trim()).filter(Boolean))]
+        const focusRowsByCode: Record<string, Array<{ sellerCode: string; soldKg: number; soldClients: number }>> = {}
+        if (focusCodes.length > 0) {
+          const focusResults = await Promise.all(
+            focusCodes.map(async (code) => {
+              const response = await fetch(
+                `/api/metas/sellers-performance/product-focus?year=${previousYear}&month=${previousMonth}&companyScope=${companyScopeFilter}&productCode=${encodeURIComponent(code)}`,
+                { signal: controller.signal }
+              )
+              const payload = await response.json().catch(() => ({}))
+              if (!response.ok) {
+                throw new Error(typeof payload?.message === 'string' ? payload.message : `Falha ao carregar item foco (${code}) do mês anterior.`)
+              }
+              const rows = (Array.isArray(payload?.rows) ? payload.rows : []) as Array<{
+                sellerCode: string
+                soldKg?: number
+                soldClients?: number
+              }>
+              return {
+                code,
+                rows: rows.map((row) => ({
+                  sellerCode: normalizeEntityCode(String(row.sellerCode ?? '').trim()),
+                  soldKg: Number(row.soldKg ?? 0),
+                  soldClients: Number(row.soldClients ?? 0),
+                })),
+              }
+            })
+          )
+          for (const result of focusResults) {
+            focusRowsByCode[result.code] = result.rows
+          }
+        }
+
+        const stageEndByKey = new Map<OperationalStageKey, string>()
+        for (const stageKey of OPERATIONAL_STAGE_KEYS) {
+          const stage = previousCycleWeeksWithFull.find((week) => week.key === stageKey)
+          if (stage?.end) stageEndByKey.set(stageKey, stage.end)
+        }
+
+        let previousDistributionRows: SellerDistributionRow[] = []
+        let previousDistributionItemsRows: SellerDistributionItemsRow[] = []
+        let previousDistributionReady = false
+        const hasAllStageEnds = OPERATIONAL_STAGE_KEYS.every((stageKey) => stageEndByKey.has(stageKey))
+        if (hasAllStageEnds) {
+          const params = new URLSearchParams({
+            year: String(previousYear),
+            month: String(previousMonth),
+            companyScope: companyScopeFilter,
+            w1End: stageEndByKey.get('W1') ?? '',
+            w2End: stageEndByKey.get('W2') ?? '',
+            w3End: stageEndByKey.get('W3') ?? '',
+            closingEnd: stageEndByKey.get('CLOSING') ?? '',
+          })
+          const distributionRes = await fetch(`/api/metas/sellers-performance/item-distribution?${params.toString()}`, { signal: controller.signal })
+          const distributionPayload = await distributionRes.json().catch(() => ({}))
+          if (distributionRes.ok) {
+            const rows = Array.isArray(distributionPayload?.rows) ? distributionPayload.rows : []
+            const sellerItems = Array.isArray(distributionPayload?.sellerItems) ? distributionPayload.sellerItems : []
+            previousDistributionRows = rows.map((row: Record<string, unknown>) => ({
+              sellerCode: normalizeEntityCode(String(row.sellerCode ?? '').trim()),
+              clientCode: normalizeEntityCode(String(row.clientCode ?? '').trim()),
+              productsW1: Math.max(Math.floor(parseDecimal(String(row.productsW1 ?? 0), 0)), 0),
+              productsW2: Math.max(Math.floor(parseDecimal(String(row.productsW2 ?? 0), 0)), 0),
+              productsW3: Math.max(Math.floor(parseDecimal(String(row.productsW3 ?? 0), 0)), 0),
+              productsClosing: Math.max(Math.floor(parseDecimal(String(row.productsClosing ?? 0), 0)), 0),
+              productsMonth: Math.max(Math.floor(parseDecimal(String(row.productsMonth ?? 0), 0)), 0),
+            }))
+            previousDistributionItemsRows = sellerItems.map((row: Record<string, unknown>) => ({
+              sellerCode: normalizeEntityCode(String(row.sellerCode ?? '').trim()),
+              itemsW1: Math.max(Math.floor(parseDecimal(String(row.itemsW1 ?? 0), 0)), 0),
+              itemsW2: Math.max(Math.floor(parseDecimal(String(row.itemsW2 ?? 0), 0)), 0),
+              itemsW3: Math.max(Math.floor(parseDecimal(String(row.itemsW3 ?? 0), 0)), 0),
+              itemsClosing: Math.max(Math.floor(parseDecimal(String(row.itemsClosing ?? 0), 0)), 0),
+              itemsMonth: Math.max(Math.floor(parseDecimal(String(row.itemsMonth ?? 0), 0)), 0),
+            }))
+            previousDistributionReady = true
+          }
+        }
+
+        const remoteSellers = (Array.isArray(perfPayload?.sellers) ? perfPayload.sellers : []) as Array<{
+          id: string
+          name: string
+          login: string
+          supervisorCode?: string | null
+          supervisorName?: string | null
+          baseClientCount?: number
+          totalValue?: number
+          totalGrossWeight?: number
+          totalOrders?: number
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
+          openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
+        }>
+
+        const previousSellers: Salesperson[] = remoteSellers.map((seller) => {
+          const normalizedOrders = (seller.orders ?? [])
+            .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
+            .map((order) => ({
+              orderNumber: String(order.orderNumber ?? ''),
+              negotiatedAt: String(order.negotiatedAt).slice(0, 10),
+              totalValue: Number(order.totalValue ?? 0),
+              grossWeight: Number(order.grossWeight ?? 0),
+              clientCode: String(order.clientCode ?? ''),
+            }))
+          const normalizedReturns = (seller.returns ?? [])
+            .filter((item) => typeof item.negotiatedAt === 'string' && item.negotiatedAt.length >= 10)
+            .map((item) => ({
+              negotiatedAt: String(item.negotiatedAt).slice(0, 10),
+              totalValue: Number(item.totalValue ?? 0),
+            }))
+          const normalizedOpenTitles = (seller.openTitles ?? [])
+            .filter((item) => typeof item.dueDate === 'string' && item.dueDate.length >= 10)
+            .map((item) => ({
+              titleId: String(item.titleId ?? ''),
+              dueDate: String(item.dueDate).slice(0, 10),
+              overdueDays: Number(item.overdueDays ?? 0),
+              totalValue: Number(item.totalValue ?? 0),
+            }))
+          return {
+            id: seller.id,
+            name: seller.name,
+            login: seller.login,
+            supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
+            supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
+            totalValue: Number(seller.totalValue ?? 0),
+            totalReturnedValue: normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0),
+            totalOpenTitlesValue: normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0),
+            totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
+            totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+            baseClientCount: Number(seller.baseClientCount ?? 0),
+            orders: normalizedOrders,
+            returns: normalizedReturns,
+            openTitles: normalizedOpenTitles,
+          }
+        })
+
+        const summaryByCode = new Map<string, (typeof previousSummarySellers)[number]>()
+        const summaryByName = new Map<string, (typeof previousSummarySellers)[number]>()
+        for (const seller of previousSummarySellers) {
+          const code = normalizeEntityCode(String(seller.code ?? '').trim())
+          const nameKey = normalizeSellerNameForLookup(String(seller.name ?? ''))
+          if (code) summaryByCode.set(code, seller)
+          if (nameKey) summaryByName.set(nameKey, seller)
+        }
+
+        const distributionBySellerProduct = new Map<string, SellerDistributionRow[]>()
+        for (const row of previousDistributionRows) {
+          const list = distributionBySellerProduct.get(row.sellerCode) ?? []
+          list.push(row)
+          distributionBySellerProduct.set(row.sellerCode, list)
+        }
+        const distributionItemsBySeller = new Map<string, SellerDistributionItemsRow>()
+        for (const row of previousDistributionItemsRows) {
+          distributionItemsBySeller.set(row.sellerCode, row)
+        }
+
+        const todayIso = toIsoDate(new Date())
+        const stageStarted = new Set<StageKey>(
+          previousCycleWeeksWithFull.filter((week) => week.start && week.start <= todayIso).map((week) => week.key)
+        )
+        if (!stageStarted.has('FULL')) stageStarted.add('FULL')
+
+        const teamAverageValue =
+          previousSellers.length > 0 ? previousSellers.reduce((sum, seller) => sum + seller.totalValue, 0) / previousSellers.length : 0
+        const teamAverageTicket = (() => {
+          const tickets = previousSellers
+            .filter((seller) => seller.totalOrders > 0)
+            .map((seller) => seller.totalValue / Math.max(seller.totalOrders, 1))
+          if (tickets.length === 0) return 0
+          return tickets.reduce((sum, value) => sum + value, 0) / tickets.length
+        })()
+        const teamAverageValueSafe = Math.max(teamAverageValue, 0.00001)
+        const teamAverageTicketSafe = Math.max(teamAverageTicket, 0.00001)
+        const totalActiveProducts = productAllowlist.filter((p) => p.active).length
+        const supervisorScopeKey = normalizeEntityCode(kpiConsolidatedSupervisorKey)
+
+        const previousByType = new Map<KpiType, { total: number; hit: number }>()
+        for (const seller of previousSellers) {
+          const sellerCode = toSellerCodeFromId(seller.id)
+          const sellerNameLookup = normalizeSellerNameForLookup(seller.name)
+          const summarySeller = summaryByCode.get(sellerCode) ?? summaryByName.get(sellerNameLookup)
+          if (!summarySeller) continue
+
+          const sellerProfile = normalizeSellerProfileType(summarySeller.profileType)
+          const sellerSupervisorCode = normalizeEntityCode(
+            String(summarySeller.supervisorCode ?? seller.supervisorCode ?? '')
+          )
+          if (kpiConsolidatedScope === 'SUPERVISOR') {
+            if (!sellerSupervisorCode) continue
+            if (supervisorScopeKey && sellerSupervisorCode !== supervisorScopeKey) continue
+          } else if (kpiConsolidatedScope !== 'ALL' && sellerProfile !== kpiConsolidatedScope) {
+            continue
+          }
+
+          const stageMetrics = STAGES.reduce(
+            (acc, stage) => {
+              acc[stage.key] = { orderCount: 0, totalValue: 0, clientCodes: new Set<string>() }
+              return acc
+            },
+            {} as Record<StageKey, { orderCount: number; totalValue: number; clientCodes: Set<string> }>
+          )
+
+          const allMonthClientCodes = new Set<string>()
+          for (const order of seller.orders) {
+            if (order.clientCode) allMonthClientCodes.add(order.clientCode)
+            const stage = findStageForDate(order.negotiatedAt, previousCycleWeeksWithFull)
+            if (!stage) continue
+            stageMetrics[stage].orderCount += 1
+            stageMetrics[stage].totalValue += order.totalValue
+            if (order.clientCode) stageMetrics[stage].clientCodes.add(order.clientCode)
+            if (stage !== 'FULL') {
+              stageMetrics.FULL.orderCount += 1
+              stageMetrics.FULL.totalValue += order.totalValue
+              if (order.clientCode) stageMetrics.FULL.clientCodes.add(order.clientCode)
+            }
+          }
+
+          const stageOrder: StageKey[] = ['W1', 'W2', 'W3', 'CLOSING']
+          const cumulativeMetrics: Record<StageKey, { orderCount: number; totalValue: number; distinctClients: number }> = {
+            W1: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+            W2: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+            W3: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+            CLOSING: { orderCount: 0, totalValue: 0, distinctClients: 0 },
+            FULL: {
+              orderCount: stageMetrics.FULL.orderCount,
+              totalValue: stageMetrics.FULL.totalValue,
+              distinctClients: stageMetrics.FULL.clientCodes.size,
+            },
+          }
+          let cumulativeOrders = 0
+          let cumulativeValue = 0
+          const cumulativeClients = new Set<string>()
+          for (const stageKey of stageOrder) {
+            cumulativeOrders += stageMetrics[stageKey].orderCount
+            cumulativeValue += stageMetrics[stageKey].totalValue
+            for (const clientCode of stageMetrics[stageKey].clientCodes) cumulativeClients.add(clientCode)
+            cumulativeMetrics[stageKey] = {
+              orderCount: cumulativeOrders,
+              totalValue: cumulativeValue,
+              distinctClients: cumulativeClients.size,
+            }
+          }
+
+          const stageEndDateMap: Partial<Record<StageKey, string>> = {}
+          for (const week of previousCycleWeeksWithFull) {
+            if (week.end) stageEndDateMap[week.key] = week.end
+          }
+          const financialByStageEnd: Partial<Record<StageKey, number>> = {}
+          const returnsByStageEnd: Partial<Record<StageKey, number>> = {}
+          for (const stageKey of ['W1', 'W2', 'W3', 'CLOSING', 'FULL'] as StageKey[]) {
+            const endDate = stageEndDateMap[stageKey]
+            financialByStageEnd[stageKey] = endDate
+              ? seller.orders.reduce((sum, order) => (order.negotiatedAt <= endDate ? sum + order.totalValue : sum), 0)
+              : 0
+            returnsByStageEnd[stageKey] = endDate
+              ? seller.returns.reduce((sum, item) => (item.negotiatedAt <= endDate ? sum + item.totalValue : sum), 0)
+              : 0
+          }
+
+          const totalDistinctClients = allMonthClientCodes.size
+          const officialBaseClients = Math.max(seller.baseClientCount ?? 0, 0)
+          const monthlyTarget = Number(summarySeller.monthlyTarget ?? 0)
+          const monthlyTargetSafe = monthlyTarget > 0 ? monthlyTarget : teamAverageValueSafe
+          const focusCode = String(summarySeller.focusProductCode ?? '').trim()
+          const focusRows = focusCode ? (focusRowsByCode[focusCode] ?? []) : []
+          const focusRow = focusRows.find((row) => row.sellerCode === sellerCode)
+          const focusSoldKg = Number(focusRow?.soldKg ?? 0)
+          const focusSoldClients = Number(focusRow?.soldClients ?? 0)
+          const focusMode: FocusTargetMode = summarySeller.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG'
+          const focusTargetKg = Math.max(Number(summarySeller.focusTargetKg ?? 0), 0)
+          const focusTargetBasePct = Math.max(Number(summarySeller.focusTargetBasePct ?? 0), 0)
+
+          const rules = Array.isArray(summarySeller.rules) ? summarySeller.rules : []
+          for (const rule of rules) {
+            const kpiType = (rule.kpiType ?? inferKpiType(rule.kpi)) as KpiType
+            if (kpiType === 'VOLUME') continue
+            if (!stageStarted.has(rule.stage)) continue
+
+            const rawNumber = parseTargetNumber(rule.targetText) ?? 0
+            const cumulativeStage = cumulativeMetrics[rule.stage]
+            const pctKpis: KpiType[] = ['BASE_CLIENTES', 'META_FINANCEIRA', 'RENTABILIDADE', 'DEVOLUCAO', 'INADIMPLENCIA']
+            const asPct = pctKpis.includes(kpiType) && rawNumber > 0
+              ? Math.max(rawNumber / 100, 0.00001)
+              : (rule.targetText.includes('%') && rawNumber > 0 ? Math.max(rawNumber / 100, 0.00001) : null)
+            const lockedValue = Math.max(cumulativeStage.totalValue, 0.00001)
+            const lockedOrders = Math.max(cumulativeStage.orderCount, 1)
+            const lockedTicket = cumulativeStage.orderCount > 0 ? cumulativeStage.totalValue / cumulativeStage.orderCount : 0
+            let progress = 0
+
+            switch (kpiType) {
+              case 'META_FINANCEIRA': {
+                const financialAccumulated = financialByStageEnd[rule.stage] ?? cumulativeStage.totalValue
+                progress = asPct ? financialAccumulated / (monthlyTargetSafe * asPct) : financialAccumulated / monthlyTargetSafe
+                break
+              }
+              case 'RENTABILIDADE':
+                progress = (lockedTicket / teamAverageTicketSafe) / (asPct ?? 1)
+                break
+              case 'BASE_CLIENTES': {
+                if (asPct) {
+                  const denominator = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 1)
+                  const clientCoverage = cumulativeStage.distinctClients / denominator
+                  progress = clientCoverage / asPct
+                } else {
+                  progress = cumulativeStage.distinctClients > 0 ? 1 : 0
+                }
+                break
+              }
+              case 'DISTRIBUICAO': {
+                const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
+                const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
+                const requiredClients = clientsPct > 0 && baseTotalClients > 0
+                  ? Math.ceil(baseTotalClients * (clientsPct / 100))
+                  : 0
+                const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+                const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+                const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
+                const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+                  const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
+                  return sum + (productsByStage >= 1 ? 1 : 0)
+                }, 0)
+                if (previousDistributionReady && resolvedItems > 0 && requiredClients > 0 && totalActiveProducts > 0) {
+                  const itemsProgress = soldItemsStage / Math.max(resolvedItems, 1)
+                  const clientsProgress = clientsWithAnyItems / Math.max(requiredClients, 1)
+                  progress = Math.min(itemsProgress, clientsProgress)
+                } else if (resolvedItems > 0 && clientsPct > 0 && baseTotalClients > 0) {
+                  const fallbackRequiredClients = Math.ceil(baseTotalClients * (clientsPct / 100))
+                  const clientsAchieved = cumulativeStage.distinctClients
+                  progress = clientsAchieved / Math.max(fallbackRequiredClients, 1)
+                } else {
+                  progress = cumulativeStage.orderCount > 0 ? 1 : 0
+                }
+                break
+              }
+              case 'DEVOLUCAO': {
+                const financialAccumulated = Math.max(financialByStageEnd[rule.stage] ?? 0, 0)
+                const returnedAccumulated = Math.max(returnsByStageEnd[rule.stage] ?? 0, 0)
+                const targetPct = asPct ?? (rawNumber > 0 ? rawNumber / 100 : 0)
+                if (financialAccumulated <= 0 || targetPct <= 0) {
+                  progress = 0
+                  break
+                }
+                const actualPct = returnedAccumulated / financialAccumulated
+                progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+                break
+              }
+              case 'INADIMPLENCIA': {
+                const financialAccumulated = Math.max(financialByStageEnd[rule.stage] ?? 0, 0)
+                const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
+                const stageEnd = stageEndDateMap[rule.stage]
+                const overdueOpenTitles = stageEnd
+                  ? seller.openTitles.filter((title) => title.dueDate <= stageEnd && title.overdueDays > atrasoDias)
+                  : []
+                const overdueValue = overdueOpenTitles.reduce((sum, title) => sum + title.totalValue, 0)
+                const targetPct = inadPct > 0 ? inadPct / 100 : 0
+                if (financialAccumulated <= 0 || targetPct <= 0) {
+                  progress = 0
+                  break
+                }
+                const actualPct = overdueValue / financialAccumulated
+                progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+                break
+              }
+              case 'ITEM_FOCO': {
+                const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
+                if (!focusCode) {
+                  progress = 0
+                  break
+                }
+                if (focusMode === 'BASE_CLIENTS') {
+                  const requiredBaseClients = focusTargetBasePct > 0
+                    ? Math.ceil(baseTotalClients * (focusTargetBasePct / 100))
+                    : 0
+                  progress = requiredBaseClients > 0 ? focusSoldClients / Math.max(requiredBaseClients, 1) : 0
+                  break
+                }
+                const { volumePct } = parseItemFocoTarget(rule.targetText)
+                if (volumePct > 0) {
+                  const requiredKg = monthlyTargetSafe * (volumePct / 100)
+                  progress = requiredKg > 0 ? focusSoldKg / Math.max(requiredKg, 0.00001) : 0
+                } else if (focusTargetKg > 0) {
+                  progress = focusSoldKg / Math.max(focusTargetKg, 0.00001)
+                } else {
+                  progress = focusSoldKg > 0 ? 1 : 0
+                }
+                break
+              }
+              default:
+                progress = lockedValue / lockedOrders
+                break
+            }
+
+            const bucket = previousByType.get(kpiType) ?? { total: 0, hit: 0 }
+            bucket.total += 1
+            if (Math.max(0, Math.min(progress, 1)) >= 1) bucket.hit += 1
+            previousByType.set(kpiType, bucket)
+          }
+        }
+
+        if (cancelled) return
+        const mapped: Record<string, { hit: number; pending: number }> = {}
+        for (const [type, values] of previousByType.entries()) {
+          mapped[type] = {
+            hit: values.hit,
+            pending: Math.max(values.total - values.hit, 0),
+          }
+        }
+        setKpiConsolidatedPreviousByType(mapped)
+      } catch {
+        if (cancelled || controller.signal.aborted) return
+        setKpiConsolidatedPreviousByType({})
+      }
+    }
+
+    void loadPreviousConsolidated()
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [companyScopeFilter, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, year])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
@@ -7509,6 +7971,22 @@ export default function MetasWorkspace() {
                               const pendingDeltaPct = typeof previousPending === 'number'
                                 ? (previousPending > 0 ? ((pending - previousPending) / previousPending) * 100 : pending > 0 ? 100 : 0)
                                 : null
+                              const hitTrendClass =
+                                hitDeltaPct === null
+                                  ? 'text-surface-500'
+                                  : hitDeltaPct > 0
+                                    ? 'text-emerald-600'
+                                    : hitDeltaPct < 0
+                                      ? 'text-rose-600'
+                                      : 'text-surface-500'
+                              const pendingTrendClass =
+                                pendingDeltaPct === null
+                                  ? 'text-surface-500'
+                                  : pendingDeltaPct < 0
+                                    ? 'text-emerald-600'
+                                    : pendingDeltaPct > 0
+                                      ? 'text-rose-600'
+                                      : 'text-surface-500'
                               const healthBarClass =
                                 row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
                               const criticalityLabel =
@@ -7521,32 +7999,28 @@ export default function MetasWorkspace() {
                                     <p className="font-semibold text-surface-800">{row.label}</p>
                                     <p className="text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</p>
                                   </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-emerald-700">
-                                    <div className="flex flex-col items-end gap-0.5">
-                                      <span>{num(row.hit, 0)}</span>
+                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className={hitTrendClass}>{num(row.hit, 0)}</span>
                                       {hitDeltaPct === null ? (
                                         <span className="text-[10px] font-medium text-surface-400">sem base</span>
                                       ) : (
-                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
-                                          hitDeltaPct > 0 ? 'text-emerald-600' : hitDeltaPct < 0 ? 'text-rose-600' : 'text-surface-500'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${hitTrendClass}`}>
                                           {hitDeltaPct > 0 ? <ArrowUp size={11} /> : hitDeltaPct < 0 ? <ArrowDown size={11} /> : <ArrowUpDown size={11} />}
-                                          {hitDeltaPct > 0 ? 'Melhorou' : hitDeltaPct < 0 ? 'Piorou' : 'Estável'} {num(Math.abs(hitDeltaPct), 1)}%
+                                          {num(Math.abs(hitDeltaPct), 1)}%
                                         </span>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-rose-700">
-                                    <div className="flex flex-col items-end gap-0.5">
-                                      <span>{num(pending, 0)}</span>
+                                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className={pendingTrendClass}>{num(pending, 0)}</span>
                                       {pendingDeltaPct === null ? (
                                         <span className="text-[10px] font-medium text-surface-400">sem base</span>
                                       ) : (
-                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
-                                          pendingDeltaPct < 0 ? 'text-emerald-600' : pendingDeltaPct > 0 ? 'text-rose-600' : 'text-surface-500'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${pendingTrendClass}`}>
                                           {pendingDeltaPct < 0 ? <ArrowDown size={11} /> : pendingDeltaPct > 0 ? <ArrowUp size={11} /> : <ArrowUpDown size={11} />}
-                                          {pendingDeltaPct < 0 ? 'Melhorou' : pendingDeltaPct > 0 ? 'Piorou' : 'Estável'} {num(Math.abs(pendingDeltaPct), 1)}%
+                                          {num(Math.abs(pendingDeltaPct), 1)}%
                                         </span>
                                       )}
                                     </div>
