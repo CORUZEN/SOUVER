@@ -8540,54 +8540,41 @@ export default function MetasWorkspace() {
                 </div>
               ) : (
                 <div className="mt-4 space-y-4">
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Melhor meta do ciclo</p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-900">
-                        {kpiConsolidatedHighlights.topPerformer?.label ?? '—'}
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                      <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
+                      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">
+                        {num(kpiGeneralScopedSummary.positivadosSold, 0)}
+                        <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}</span>
                       </p>
-                      <p className="text-[10px] text-emerald-700">
-                        {kpiConsolidatedHighlights.topPerformer
-                          ? `${num(kpiConsolidatedHighlights.topPerformer.hitRatio * 100, 1)}% de conclusão`
-                          : 'Sem dados no escopo'}
-                      </p>
+                      <p className="mt-1 text-[10px] text-surface-500">Total de itens positivados no escopo</p>
                     </div>
-                    <div className="rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-700">Maior risco operacional</p>
-                      <p className="mt-1 text-sm font-semibold text-rose-900">
-                        {kpiConsolidatedHighlights.topRisk?.label ?? '—'}
+                    <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                      <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
+                      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">
+                        {num(kpiGeneralScopedSummary.uniqueClients, 0)}
+                        {kpiGeneralScopedSummary.totalBaseClients > 0 && (
+                          <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}</span>
+                        )}
                       </p>
-                      <p className="text-[10px] text-rose-700">
-                        {kpiConsolidatedHighlights.topRisk
-                          ? `${num(kpiConsolidatedHighlights.topRisk.avgProgressRatio * 100, 1)}% de aderência média`
-                          : 'Sem dados no escopo'}
-                      </p>
+                      <p className="mt-1 text-[10px] text-surface-500">Cobertura da base no escopo selecionado</p>
                     </div>
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Maior backlog de meta</p>
-                      <p className="mt-1 text-sm font-semibold text-amber-900">
-                        {kpiConsolidatedHighlights.largestBacklog?.label ?? '—'}
-                      </p>
-                      <p className="text-[10px] text-amber-700">
-                        {kpiConsolidatedHighlights.largestBacklog
-                          ? `${num(Math.max(kpiConsolidatedHighlights.largestBacklog.total - kpiConsolidatedHighlights.largestBacklog.hit, 0), 0)} pendentes`
-                          : 'Sem dados no escopo'}
-                      </p>
+                    <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                      <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
+                      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
+                      <p className="mt-1 text-[10px] text-surface-500">Total de pedidos no período</p>
                     </div>
-                    <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Aderência geral</p>
-                      <p className={`mt-1 text-sm font-semibold ${
-                        kpiConsolidatedHighlights.overallAdherenceRatio >= 0.85
-                          ? 'text-emerald-700'
-                          : kpiConsolidatedHighlights.overallAdherenceRatio >= 0.65
-                            ? 'text-cyan-900'
-                            : kpiConsolidatedHighlights.overallAdherenceRatio >= 0.4
-                              ? 'text-amber-700'
-                              : 'text-rose-700'
-                      }`}>
-                        {num(kpiConsolidatedHighlights.overallAdherenceRatio * 100, 1)}%
+                    <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                      <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
+                      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">
+                        {num(kpiGeneralScopedSummary.metasHit, 0)}
+                        <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.metasTotal, 0)}</span>
                       </p>
-                      <p className="text-[10px] text-cyan-700">Consolidação média de aderência das metas no período</p>
+                      <p className="mt-1 text-[10px] text-surface-500">KPIs concluídos no escopo selecionado</p>
                     </div>
                   </div>
 
@@ -8665,39 +8652,15 @@ export default function MetasWorkspace() {
                         )}
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
-                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                            {num(kpiGeneralScopedSummary.positivadosSold, 0)} / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}
-                          </p>
-                          <p className="text-[10px] text-surface-500">Total de itens positivados no escopo</p>
-                        </div>
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
-                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                            {num(kpiGeneralScopedSummary.metasHit, 0)} / {num(kpiGeneralScopedSummary.metasTotal, 0)}
-                          </p>
-                          <p className="text-[10px] text-surface-500">KPIs concluídos no escopo selecionado</p>
-                        </div>
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
-                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                            {num(kpiGeneralScopedSummary.uniqueClients, 0)} / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}
-                          </p>
-                          <p className="text-[10px] text-surface-500">Cobertura da base no escopo selecionado</p>
-                        </div>
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
-                          <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
-                          <p className="text-[10px] text-surface-500">Total de pedidos no período</p>
-                        </div>
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                          <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-cyan-500" />
                           <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Peso total dos pedidos</p>
                           <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
                           <p className="text-[10px] text-surface-500">Consolidado de peso bruto</p>
                         </div>
-                        <div className="rounded-xl border border-surface-200 bg-white px-3 py-3 shadow-sm">
+                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                          <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Valor total de Pedidos</p>
                           <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
                           <p className="text-[10px] text-surface-500">Faturamento no escopo selecionado</p>
@@ -8734,7 +8697,7 @@ export default function MetasWorkspace() {
                                 }`}
                                 onClick={() => {
                                   setKpiGeneralPanelSellerId(row.sellerId)
-                                  if (kpiGeneralPanelView !== 'SUPERVISOR') setKpiGeneralPanelView('SELLER')
+                                  setKpiGeneralPanelView('SELLER')
                                 }}
                               >
                                 <div className="mb-1.5 flex items-center justify-between gap-2">
