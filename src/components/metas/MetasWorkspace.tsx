@@ -7366,7 +7366,7 @@ export default function MetasWorkspace() {
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Média geral de atingimento</p>
                             <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgOverallPercent, 1)}%</p>
-                            <p className="text-[10px] text-cyan-700">Percentual médio de 0% a 100% considerando todos os vendedores monitorados</p>
+                            <p className="text-[10px] text-cyan-700">Percentual médio dos vendedores monitorados</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
