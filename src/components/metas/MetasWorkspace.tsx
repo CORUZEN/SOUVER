@@ -1057,6 +1057,9 @@ export default function MetasWorkspace() {
   const [weightPanelView, setWeightPanelView] = useState<WeightPanelView>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
   const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
+  const [kpiGeneralPanelView, setKpiGeneralPanelView] = useState<WeightPanelView>('GENERAL')
+  const [kpiGeneralPanelSellerId, setKpiGeneralPanelSellerId] = useState('')
+  const [kpiGeneralPanelSupervisorKey, setKpiGeneralPanelSupervisorKey] = useState('')
   const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
   const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
   const [kpiConsolidatedPreviousByType, setKpiConsolidatedPreviousByType] = useState<Record<string, { hit: number; pending: number }>>({})
@@ -3795,30 +3798,89 @@ export default function MetasWorkspace() {
     })
   }, [resolveBlockProfileType, resolveSellerProfileForId, ruleBlocks, sellers, snapshots])
 
-  const kpiConsolidatedFilteredSellerRows = useMemo(() => {
-    if (kpiConsolidatedScope === 'ALL') return kpiConsolidatedSellerRows
-    if (kpiConsolidatedScope === 'SUPERVISOR') {
-      return kpiConsolidatedSellerRows.filter((row) => {
-        if (!row.supervisorCode) return false
-        return kpiConsolidatedSupervisorKey ? row.supervisorCode === kpiConsolidatedSupervisorKey : true
+  const kpiGeneralSellerPerformanceRows = useMemo(() => {
+    return kpiConsolidatedSellerRows
+      .map((row) => {
+        const block = row.block
+        if (!block) return null
+        const applicableRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
+        const total = applicableRules.length
+        const hit = applicableRules.filter((rule) => {
+          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          return progress >= 1
+        }).length
+        const progressSum = applicableRules.reduce((sum, rule) => {
+          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          return sum + Math.max(0, Math.min(progress, 1))
+        }, 0)
+        const avgProgressRatio = total > 0 ? progressSum / total : 0
+        return {
+          sellerId: row.sellerId,
+          sellerName: row.sellerName,
+          sellerShortName: getSellerShortName(row.sellerName),
+          supervisorCode: row.supervisorCode,
+          supervisorName: row.supervisorName,
+          total,
+          hit,
+          pending: Math.max(total - hit, 0),
+          avgProgressRatio,
+        }
       })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .sort((a, b) => {
+        if (b.avgProgressRatio !== a.avgProgressRatio) return b.avgProgressRatio - a.avgProgressRatio
+        if (a.pending !== b.pending) return a.pending - b.pending
+        if (b.hit !== a.hit) return b.hit - a.hit
+        return a.sellerShortName.localeCompare(b.sellerShortName, 'pt-BR')
+      })
+  }, [kpiConsolidatedSellerRows])
+
+  const kpiGeneralScopedSellerRows = useMemo(() => {
+    if (kpiGeneralPanelView !== 'SUPERVISOR') return kpiGeneralSellerPerformanceRows
+    if (!kpiGeneralPanelSupervisorKey) return []
+    return kpiGeneralSellerPerformanceRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
+  }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, kpiGeneralSellerPerformanceRows])
+
+  const kpiConsolidatedFilteredSellerRows = useMemo(() => {
+    if (kpiGeneralPanelView === 'SUPERVISOR') {
+      if (!kpiGeneralPanelSupervisorKey) return []
+      return kpiConsolidatedSellerRows.filter((row) => row.supervisorCode === kpiGeneralPanelSupervisorKey)
     }
-    return kpiConsolidatedSellerRows.filter((row) => row.profileType === kpiConsolidatedScope)
-  }, [kpiConsolidatedScope, kpiConsolidatedSellerRows, kpiConsolidatedSupervisorKey])
+    if (kpiGeneralPanelView === 'SELLER') {
+      if (!kpiGeneralPanelSellerId) return []
+      return kpiConsolidatedSellerRows.filter((row) => row.sellerId === kpiGeneralPanelSellerId)
+    }
+    return kpiConsolidatedSellerRows
+  }, [kpiConsolidatedSellerRows, kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView])
 
   useEffect(() => {
-    if (kpiConsolidatedScope !== 'SUPERVISOR') return
+    if (kpiGeneralPanelView !== 'SUPERVISOR') return
     if (performanceSupervisorOptions.length === 0) {
-      if (kpiConsolidatedSupervisorKey !== '') setKpiConsolidatedSupervisorKey('')
+      if (kpiGeneralPanelSupervisorKey !== '') setKpiGeneralPanelSupervisorKey('')
       return
     }
-    if (!kpiConsolidatedSupervisorKey) {
-      setKpiConsolidatedSupervisorKey(performanceSupervisorOptions[0].key)
+    if (!kpiGeneralPanelSupervisorKey) {
+      setKpiGeneralPanelSupervisorKey(performanceSupervisorOptions[0].key)
       return
     }
-    const exists = performanceSupervisorOptions.some((option) => option.key === kpiConsolidatedSupervisorKey)
-    if (!exists) setKpiConsolidatedSupervisorKey(performanceSupervisorOptions[0].key)
-  }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, performanceSupervisorOptions])
+    const exists = performanceSupervisorOptions.some((option) => option.key === kpiGeneralPanelSupervisorKey)
+    if (!exists) setKpiGeneralPanelSupervisorKey(performanceSupervisorOptions[0].key)
+  }, [kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, performanceSupervisorOptions])
+
+  useEffect(() => {
+    if (kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId) return
+    if (kpiGeneralPanelSellerId !== '') setKpiGeneralPanelSellerId('')
+  }, [kpiGeneralPanelSellerId, kpiGeneralPanelView])
+
+  useEffect(() => {
+    if (kpiGeneralPanelView === 'SUPERVISOR') {
+      if (kpiConsolidatedScope !== 'SUPERVISOR') setKpiConsolidatedScope('SUPERVISOR')
+      if (kpiConsolidatedSupervisorKey !== kpiGeneralPanelSupervisorKey) setKpiConsolidatedSupervisorKey(kpiGeneralPanelSupervisorKey)
+      return
+    }
+    if (kpiConsolidatedScope !== 'ALL') setKpiConsolidatedScope('ALL')
+    if (kpiConsolidatedSupervisorKey !== '') setKpiConsolidatedSupervisorKey('')
+  }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView])
 
   const kpiConsolidatedTypeRows = useMemo(() => {
     const typeLabelByKey = new Map<KpiType, string>(KPI_CATALOG.map((item) => [item.type, item.label]))
@@ -8001,34 +8063,61 @@ export default function MetasWorkspace() {
                       Metas gerais
                     </button>
                   </div>
-                  {strategicMetricsPanelMode === 'WEIGHT' && (
-                    <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
-                      <button
-                        type="button"
-                        className={`px-3 py-1.5 transition-colors ${weightPanelView === 'GENERAL' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                        onClick={() => setWeightPanelView('GENERAL')}
-                      >
-                        Visão geral
-                      </button>
-                      <button
-                        type="button"
-                        className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SELLER' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                        onClick={() => setWeightPanelView('SELLER')}
-                      >
-                        Por vendedor
-                      </button>
-                      <button
-                        type="button"
-                        className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SUPERVISOR' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                        onClick={() => {
+                  <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 transition-colors ${
+                        (strategicMetricsPanelMode === 'WEIGHT' ? weightPanelView : kpiGeneralPanelView) === 'GENERAL'
+                          ? 'bg-cyan-50 text-cyan-700'
+                          : 'hover:bg-surface-50'
+                      }`}
+                      onClick={() => {
+                        if (strategicMetricsPanelMode === 'WEIGHT') {
+                          setWeightPanelView('GENERAL')
+                        } else {
+                          setKpiGeneralPanelView('GENERAL')
+                        }
+                      }}
+                    >
+                      Visão geral
+                    </button>
+                    <button
+                      type="button"
+                      className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${
+                        (strategicMetricsPanelMode === 'WEIGHT' ? weightPanelView : kpiGeneralPanelView) === 'SELLER'
+                          ? 'bg-cyan-50 text-cyan-700'
+                          : 'hover:bg-surface-50'
+                      }`}
+                      onClick={() => {
+                        if (strategicMetricsPanelMode === 'WEIGHT') {
+                          setWeightPanelView('SELLER')
+                        } else {
+                          setKpiGeneralPanelView('SELLER')
+                        }
+                      }}
+                    >
+                      Por vendedor
+                    </button>
+                    <button
+                      type="button"
+                      className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${
+                        (strategicMetricsPanelMode === 'WEIGHT' ? weightPanelView : kpiGeneralPanelView) === 'SUPERVISOR'
+                          ? 'bg-cyan-50 text-cyan-700'
+                          : 'hover:bg-surface-50'
+                      }`}
+                      onClick={() => {
+                        if (strategicMetricsPanelMode === 'WEIGHT') {
                           setWeightPanelView('SUPERVISOR')
                           setWeightPanelSellerId('')
-                        }}
-                      >
-                        Por supervisor
-                      </button>
-                    </div>
-                  )}
+                        } else {
+                          setKpiGeneralPanelView('SUPERVISOR')
+                          setKpiGeneralPanelSellerId('')
+                        }
+                      }}
+                    >
+                      Por supervisor
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -8380,41 +8469,6 @@ export default function MetasWorkspace() {
                 </div>
               ) : (
                 <div className="mt-4 space-y-4">
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
-                    <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Escopo</label>
-                    <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-cyan-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
-                      {SELLER_PERFORMANCE_SCOPE_OPTIONS.map((option) => (
-                        <button
-                          key={`kpi-consolidated-scope-${option.value}`}
-                          type="button"
-                          className={`border-l border-cyan-200 px-3 py-1.5 transition-colors first:border-l-0 ${
-                            kpiConsolidatedScope === option.value ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'
-                          }`}
-                          onClick={() => setKpiConsolidatedScope(option.value)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                    {kpiConsolidatedScope === 'SUPERVISOR' && (
-                      <>
-                        {performanceSupervisorOptions.length === 0 ? (
-                          <span className="text-xs text-surface-500">Nenhum supervisor vinculado na lista de vendedores.</span>
-                        ) : (
-                          <select
-                            className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
-                            value={kpiConsolidatedSupervisorKey}
-                            onChange={(event) => setKpiConsolidatedSupervisorKey(event.target.value)}
-                          >
-                            {performanceSupervisorOptions.map((option) => (
-                              <option key={`kpi-consolidated-supervisor-${option.key}`} value={option.key}>{option.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </>
-                    )}
-                  </div>
-
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Melhor meta do ciclo</p>
@@ -8466,28 +8520,102 @@ export default function MetasWorkspace() {
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border border-surface-200">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs">
-                        <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Meta estratégica</th>
-                            <th className="px-3 py-2 text-right">Conquistados</th>
-                            <th className="px-3 py-2 text-right">Pendentes</th>
-                            <th className="px-3 py-2 text-right">Conversão</th>
-                            <th className="px-3 py-2 text-right">Aderência média</th>
-                            <th className="px-3 py-2 text-right">Criticidade</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {kpiConsolidatedTypeRows.length === 0 ? (
-                            <tr className="border-t border-surface-100">
-                              <td colSpan={6} className="px-3 py-6 text-center text-[11px] text-surface-400">
-                                Nenhuma meta consolidada encontrada para o escopo selecionado.
-                              </td>
-                            </tr>
+                  <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
+                        <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">
+                          {kpiGeneralPanelView === 'SUPERVISOR' ? 'Supervisor' : 'Vendedor'}
+                        </label>
+                        <select
+                          className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
+                          value={
+                            kpiGeneralPanelView === 'GENERAL'
+                              ? '__ALL__'
+                              : kpiGeneralPanelView === 'SUPERVISOR'
+                                ? kpiGeneralPanelSupervisorKey
+                                : kpiGeneralPanelSellerId
+                          }
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (kpiGeneralPanelView === 'SUPERVISOR') {
+                              setKpiGeneralPanelSupervisorKey(nextValue)
+                              setKpiGeneralPanelSellerId('')
+                              return
+                            }
+                            if (nextValue === '__ALL__') {
+                              setKpiGeneralPanelView('GENERAL')
+                              return
+                            }
+                            setKpiGeneralPanelSellerId(nextValue)
+                            setKpiGeneralPanelView('SELLER')
+                          }}
+                        >
+                          {kpiGeneralPanelView === 'SUPERVISOR' ? (
+                            <>
+                              {performanceSupervisorOptions.length === 0 ? (
+                                <option value="">Nenhum supervisor com vendedores vinculados</option>
+                              ) : (
+                                performanceSupervisorOptions.map((option) => (
+                                  <option key={`kpi-general-supervisor-${option.key}`} value={option.key}>
+                                    {option.name}
+                                  </option>
+                                ))
+                              )}
+                            </>
                           ) : (
-                            kpiConsolidatedTypeRows.map((row) => {
+                            <>
+                              <option value="__ALL__">Todos</option>
+                              {kpiGeneralSellerPerformanceRows.map((row) => (
+                                <option key={`kpi-general-seller-${row.sellerId}`} value={row.sellerId}>
+                                  {row.sellerShortName} · {num(row.avgProgressRatio * 100, 1)}%
+                                </option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                        {kpiGeneralPanelView === 'GENERAL' ? (
+                          <span className="text-[10px] text-cyan-700">
+                            {num(kpiConsolidatedHighlights.overallAdherenceRatio * 100, 1)}% de aderência média
+                          </span>
+                        ) : kpiGeneralPanelView === 'SELLER' ? (
+                          (() => {
+                            const selected = kpiGeneralSellerPerformanceRows.find((row) => row.sellerId === kpiGeneralPanelSellerId)
+                            if (!selected) return null
+                            return (
+                              <span className="text-[10px] text-cyan-700">
+                                {selected.hit}/{selected.total} metas conquistadas
+                              </span>
+                            )
+                          })()
+                        ) : (
+                          <span className="text-[10px] text-cyan-700">
+                            {kpiGeneralScopedSellerRows.length} vendedor(es) no escopo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="overflow-hidden rounded-xl border border-surface-200">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Meta estratégica</th>
+                                <th className="px-3 py-2 text-right">Conquistados</th>
+                                <th className="px-3 py-2 text-right">Pendentes</th>
+                                <th className="px-3 py-2 text-right">Conversão</th>
+                                <th className="px-3 py-2 text-right">Aderência média</th>
+                                <th className="px-3 py-2 text-right">Criticidade</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {kpiConsolidatedTypeRows.length === 0 ? (
+                                <tr className="border-t border-surface-100">
+                                  <td colSpan={6} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                    Nenhuma meta consolidada encontrada para o escopo selecionado.
+                                  </td>
+                                </tr>
+                              ) : (
+                                kpiConsolidatedTypeRows.map((row) => {
                               const pending = Math.max(row.total - row.hit, 0)
                               const healthPct = row.avgProgressRatio * 100
                               const previous = kpiConsolidatedPreviousByType[row.type]
@@ -8681,10 +8809,62 @@ export default function MetasWorkspace() {
                                   </tr>
                                 ) : null,
                               ]
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Progresso por vendedor</p>
+                      </div>
+                      <div className="flex max-h-76 flex-col gap-2 overflow-y-auto pr-1">
+                        {kpiGeneralScopedSellerRows.length === 0 ? (
+                          <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-center text-[11px] text-surface-500">
+                            {kpiGeneralPanelView === 'SUPERVISOR'
+                              ? 'Nenhum vendedor ativo encontrado para o supervisor selecionado.'
+                              : 'Nenhum vendedor encontrado no período.'}
+                          </div>
+                        ) : (
+                          kpiGeneralScopedSellerRows.map((row, index) => {
+                            const progressPct = row.avgProgressRatio * 100
+                            const barPct = Math.min(progressPct, 100)
+                            const isSelected = kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId === row.sellerId
+                            const barClass =
+                              row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
+                            return (
+                              <button
+                                key={`kpi-general-row-${row.sellerId}`}
+                                type="button"
+                                className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                                  isSelected
+                                    ? 'border-cyan-300 bg-cyan-50 shadow-sm'
+                                    : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
+                                }`}
+                                onClick={() => {
+                                  setKpiGeneralPanelSellerId(row.sellerId)
+                                  if (kpiGeneralPanelView !== 'SUPERVISOR') setKpiGeneralPanelView('SELLER')
+                                }}
+                              >
+                                <div className="mb-1.5 flex items-center justify-between gap-2">
+                                  <span className="truncate text-[11px] font-semibold text-surface-700">{row.sellerShortName}</span>
+                                  <span className="text-[10px] text-surface-400">#{index + 1}</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                                  <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
+                                </div>
+                                <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
+                                  <span>{row.hit}/{row.total} metas</span>
+                                  <span className="font-semibold tabular-nums text-surface-700">{num(progressPct, 1)}%</span>
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
 
