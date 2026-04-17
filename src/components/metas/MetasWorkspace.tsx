@@ -8117,14 +8117,17 @@ export default function MetasWorkspace() {
                                 row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.2 ? 'Atenção' : 'Crítico'
                               const criticalityClass =
                                 row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.2 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
+                              const toggleExpanded = () => {
+                                setKpiConsolidatedExpandedType((prev) => (prev === row.type ? null : row.type))
+                              }
                               return [
-                                <tr key={`kpi-consolidated-type-${row.type}`} className="border-t border-surface-100">
+                                <tr
+                                  key={`kpi-consolidated-type-${row.type}`}
+                                  className="cursor-pointer border-t border-surface-100 transition-colors hover:bg-surface-50/50"
+                                  onClick={toggleExpanded}
+                                >
                                   <td className="px-3 py-2.5">
-                                    <button
-                                      type="button"
-                                      className="group flex w-full items-start gap-2 text-left"
-                                      onClick={() => setKpiConsolidatedExpandedType((prev) => (prev === row.type ? null : row.type))}
-                                    >
+                                    <div className="group flex w-full items-start gap-2 text-left">
                                       <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-surface-200 bg-white text-surface-500 transition-colors group-hover:border-cyan-200 group-hover:text-cyan-700">
                                         {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                                       </span>
@@ -8132,7 +8135,7 @@ export default function MetasWorkspace() {
                                         <span className="block font-semibold text-surface-800">{row.label}</span>
                                         <span className="block text-[10px] text-surface-500">{num(row.total, 0)} ocorrências no período</span>
                                       </span>
-                                    </button>
+                                    </div>
                                   </td>
                                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold">
                                     <div className="flex items-center justify-end gap-2">
