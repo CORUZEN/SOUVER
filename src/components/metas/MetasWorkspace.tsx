@@ -42,6 +42,7 @@ type SellerProfileType = 'NOVATO' | 'ANTIGO_1' | 'ANTIGO_15' | 'SUPERVISOR'
 type SellerPerformanceScope = 'ALL' | SellerProfileType
 type RewardMode = 'CURRENCY' | 'PERCENT'
 type WeightPanelView = 'GENERAL' | 'SELLER' | 'SUPERVISOR'
+type StrategicMetricsPanelMode = 'WEIGHT' | 'KPI_GENERAL'
 type KpiApplyMonthScope = 'CURRENT' | 'CURRENT_AND_PREVIOUS' | 'CURRENT_AND_NEXT' | 'ALL_WITH_DATA'
 
 interface GoalRule {
@@ -1022,9 +1023,12 @@ export default function MetasWorkspace() {
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [sellerPerformanceScope, setSellerPerformanceScope] = useState<SellerPerformanceScope>('ALL')
   const [performanceSupervisorKey, setPerformanceSupervisorKey] = useState('')
+  const [strategicMetricsPanelMode, setStrategicMetricsPanelMode] = useState<StrategicMetricsPanelMode>('WEIGHT')
   const [weightPanelView, setWeightPanelView] = useState<WeightPanelView>('GENERAL')
   const [weightPanelSellerId, setWeightPanelSellerId] = useState('')
   const [weightPanelSupervisorKey, setWeightPanelSupervisorKey] = useState('')
+  const [kpiConsolidatedScope, setKpiConsolidatedScope] = useState<SellerPerformanceScope>('ALL')
+  const [kpiConsolidatedSupervisorKey, setKpiConsolidatedSupervisorKey] = useState('')
   const [weightRankingListMaxHeight, setWeightRankingListMaxHeight] = useState<number | null>(null)
   const [sellersLoading, setSellersLoading] = useState(true)
   const [sellersError, setSellersError] = useState('')
@@ -3395,6 +3399,159 @@ export default function MetasWorkspace() {
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
   }, [sellers])
+
+  const kpiConsolidatedSellerRows = useMemo(() => {
+    return snapshots.map((snapshot) => {
+      const sellerData = sellers.find((seller) => seller.id === snapshot.seller.id)
+      const snapshotBlock =
+        ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+        findBlockForSeller(snapshot.seller.id, ruleBlocks)
+      const profileType = snapshotBlock
+        ? resolveBlockProfileType(snapshotBlock)
+        : (resolveSellerProfileForId(snapshot.seller.id) ?? 'NOVATO')
+      const supervisorCode = String(
+        sellerData?.supervisorCode ??
+        snapshot.seller.supervisorCode ??
+        ''
+      ).trim()
+      const supervisorName = String(
+        sellerData?.supervisorName ??
+        snapshot.seller.supervisorName ??
+        ''
+      ).trim()
+      return {
+        sellerId: snapshot.seller.id,
+        sellerName: snapshot.seller.name,
+        profileType,
+        supervisorCode,
+        supervisorName,
+        block: snapshotBlock,
+        snapshot,
+      }
+    })
+  }, [resolveBlockProfileType, resolveSellerProfileForId, ruleBlocks, sellers, snapshots])
+
+  const kpiConsolidatedFilteredSellerRows = useMemo(() => {
+    if (kpiConsolidatedScope === 'ALL') return kpiConsolidatedSellerRows
+    if (kpiConsolidatedScope === 'SUPERVISOR') {
+      return kpiConsolidatedSellerRows.filter((row) => {
+        if (!row.supervisorCode) return false
+        return kpiConsolidatedSupervisorKey ? row.supervisorCode === kpiConsolidatedSupervisorKey : true
+      })
+    }
+    return kpiConsolidatedSellerRows.filter((row) => row.profileType === kpiConsolidatedScope)
+  }, [kpiConsolidatedScope, kpiConsolidatedSellerRows, kpiConsolidatedSupervisorKey])
+
+  useEffect(() => {
+    if (kpiConsolidatedScope !== 'SUPERVISOR') return
+    if (performanceSupervisorOptions.length === 0) {
+      if (kpiConsolidatedSupervisorKey !== '') setKpiConsolidatedSupervisorKey('')
+      return
+    }
+    if (!kpiConsolidatedSupervisorKey) {
+      setKpiConsolidatedSupervisorKey(performanceSupervisorOptions[0].key)
+      return
+    }
+    const exists = performanceSupervisorOptions.some((option) => option.key === kpiConsolidatedSupervisorKey)
+    if (!exists) setKpiConsolidatedSupervisorKey(performanceSupervisorOptions[0].key)
+  }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, performanceSupervisorOptions])
+
+  const kpiConsolidatedRankingRows = useMemo(() => {
+    return kpiConsolidatedFilteredSellerRows
+      .map((row) => {
+        const block = row.block
+        if (!block) {
+          return {
+            sellerId: row.sellerId,
+            sellerName: row.sellerName,
+            profileType: row.profileType,
+            totalKpis: 0,
+            hitKpis: 0,
+            ratio: 0,
+          }
+        }
+        const eligibleRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
+        const hitKpis = eligibleRules.reduce((sum, rule) => {
+          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          return sum + (progress >= 1 ? 1 : 0)
+        }, 0)
+        const totalKpis = eligibleRules.length
+        const ratio = totalKpis > 0 ? hitKpis / totalKpis : 0
+        return {
+          sellerId: row.sellerId,
+          sellerName: row.sellerName,
+          profileType: row.profileType,
+          totalKpis,
+          hitKpis,
+          ratio,
+        }
+      })
+      .sort((a, b) => {
+        if (b.ratio !== a.ratio) return b.ratio - a.ratio
+        if (b.hitKpis !== a.hitKpis) return b.hitKpis - a.hitKpis
+        return a.sellerName.localeCompare(b.sellerName, 'pt-BR')
+      })
+  }, [kpiConsolidatedFilteredSellerRows])
+
+  const kpiConsolidatedTypeRows = useMemo(() => {
+    const typeLabelByKey = new Map<KpiType, string>(KPI_CATALOG.map((item) => [item.type, item.label]))
+    const map = new Map<KpiType, { type: KpiType; label: string; total: number; hit: number; progressSum: number }>()
+    for (const row of kpiConsolidatedFilteredSellerRows) {
+      const block = row.block
+      if (!block) continue
+      for (const rule of block.rules) {
+        const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
+        if (kpiType === 'VOLUME') continue
+        const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        const current = map.get(kpiType) ?? {
+          type: kpiType,
+          label: typeLabelByKey.get(kpiType) ?? rule.kpi,
+          total: 0,
+          hit: 0,
+          progressSum: 0,
+        }
+        current.total += 1
+        current.hit += progress >= 1 ? 1 : 0
+        current.progressSum += Math.max(0, Math.min(progress, 1))
+        map.set(kpiType, current)
+      }
+    }
+    return Array.from(map.values())
+      .map((item) => ({
+        ...item,
+        hitRatio: item.total > 0 ? item.hit / item.total : 0,
+        avgProgressRatio: item.total > 0 ? item.progressSum / item.total : 0,
+      }))
+      .sort((a, b) => {
+        if (b.hitRatio !== a.hitRatio) return b.hitRatio - a.hitRatio
+        if (b.hit !== a.hit) return b.hit - a.hit
+        return a.label.localeCompare(b.label, 'pt-BR')
+      })
+  }, [kpiConsolidatedFilteredSellerRows])
+
+  const kpiConsolidatedOverview = useMemo(() => {
+    const totalKpis = kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.total, 0)
+    const hitKpis = kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.hit, 0)
+    const avgProgressRatio = totalKpis > 0
+      ? kpiConsolidatedTypeRows.reduce((sum, row) => sum + row.progressSum, 0) / totalKpis
+      : 0
+    const sellersTracked = kpiConsolidatedFilteredSellerRows.length
+    return {
+      sellersTracked,
+      totalKpis,
+      hitKpis,
+      hitRatio: totalKpis > 0 ? hitKpis / totalKpis : 0,
+      avgProgressRatio,
+    }
+  }, [kpiConsolidatedFilteredSellerRows.length, kpiConsolidatedTypeRows])
+
+  const kpiConsolidatedScopeLabel = useMemo(() => {
+    if (kpiConsolidatedScope === 'ALL') return 'Visão geral'
+    if (kpiConsolidatedScope === 'SUPERVISOR') {
+      return performanceSupervisorOptions.find((option) => option.key === kpiConsolidatedSupervisorKey)?.name ?? 'Supervisor'
+    }
+    return SELLER_PROFILE_LABEL[kpiConsolidatedScope]
+  }, [kpiConsolidatedScope, kpiConsolidatedSupervisorKey, performanceSupervisorOptions])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
@@ -6826,37 +6983,66 @@ export default function MetasWorkspace() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                    Metas de peso por grupo de produto
+                    {strategicMetricsPanelMode === 'WEIGHT'
+                      ? 'Metas de peso por grupo de produto'
+                      : 'Metas gerais consolidadas'}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-surface-400">Visão geral, por vendedor e por supervisor — {MONTHS[month]} {year}</p>
+                  <p className="mt-0.5 text-[10px] text-surface-400">
+                    {strategicMetricsPanelMode === 'WEIGHT'
+                      ? `Visão geral, por vendedor e por supervisor — ${MONTHS[month]} ${year}`
+                      : `Consolidação corporativa de KPIs (exceto Volume) por período — ${MONTHS[month]} ${year}`}
+                  </p>
                 </div>
-                <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
-                  <button
-                    type="button"
-                    className={`px-3 py-1.5 transition-colors ${weightPanelView === 'GENERAL' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                    onClick={() => setWeightPanelView('GENERAL')}
-                  >
-                    Visão geral
-                  </button>
-                  <button
-                    type="button"
-                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SELLER' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                    onClick={() => setWeightPanelView('SELLER')}
-                  >
-                    Por vendedor
-                  </button>
-                  <button
-                    type="button"
-                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SUPERVISOR' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
-                    onClick={() => {
-                      setWeightPanelView('SUPERVISOR')
-                      setWeightPanelSellerId('')
-                    }}
-                  >
-                    Por supervisor
-                  </button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="inline-flex overflow-hidden rounded-lg border border-cyan-200 bg-cyan-50/40 text-[10px] font-semibold uppercase tracking-widest text-cyan-700">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 transition-colors ${strategicMetricsPanelMode === 'WEIGHT' ? 'bg-cyan-600 text-white' : 'hover:bg-cyan-100/60'}`}
+                      onClick={() => setStrategicMetricsPanelMode('WEIGHT')}
+                    >
+                      Peso por grupo
+                    </button>
+                    <button
+                      type="button"
+                      className={`border-l border-cyan-200 px-3 py-1.5 transition-colors ${strategicMetricsPanelMode === 'KPI_GENERAL' ? 'bg-cyan-600 text-white' : 'hover:bg-cyan-100/60'}`}
+                      onClick={() => setStrategicMetricsPanelMode('KPI_GENERAL')}
+                    >
+                      Metas gerais
+                    </button>
+                  </div>
+                  {strategicMetricsPanelMode === 'WEIGHT' && (
+                    <div className="inline-flex overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                      <button
+                        type="button"
+                        className={`px-3 py-1.5 transition-colors ${weightPanelView === 'GENERAL' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                        onClick={() => setWeightPanelView('GENERAL')}
+                      >
+                        Visão geral
+                      </button>
+                      <button
+                        type="button"
+                        className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SELLER' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                        onClick={() => setWeightPanelView('SELLER')}
+                      >
+                        Por vendedor
+                      </button>
+                      <button
+                        type="button"
+                        className={`border-l border-surface-200 px-3 py-1.5 transition-colors ${weightPanelView === 'SUPERVISOR' ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'}`}
+                        onClick={() => {
+                          setWeightPanelView('SUPERVISOR')
+                          setWeightPanelSellerId('')
+                        }}
+                      >
+                        Por supervisor
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {strategicMetricsPanelMode === 'WEIGHT' ? (
+                <>
 
               {(brandWeightLoading || sankhyaTargetsLoading) && (
                 <p className="mt-3 text-[10px] text-surface-400">Atualizando metas de peso e vendidos por grupo…</p>
@@ -7190,6 +7376,165 @@ export default function MetasWorkspace() {
                       )}
                     </>
                   )}
+                </div>
+              )}
+                </>
+              ) : sellersLoading ? (
+                <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                  Carregando consolidação de KPIs...
+                </div>
+              ) : snapshots.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                  Nenhum vendedor ativo encontrado para consolidar KPIs.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
+                    <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Escopo</label>
+                    <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-cyan-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                      {SELLER_PERFORMANCE_SCOPE_OPTIONS.map((option) => (
+                        <button
+                          key={`kpi-consolidated-scope-${option.value}`}
+                          type="button"
+                          className={`border-l border-cyan-200 px-3 py-1.5 transition-colors first:border-l-0 ${
+                            kpiConsolidatedScope === option.value ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'
+                          }`}
+                          onClick={() => setKpiConsolidatedScope(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    {kpiConsolidatedScope === 'SUPERVISOR' && (
+                      <>
+                        {performanceSupervisorOptions.length === 0 ? (
+                          <span className="text-xs text-surface-500">Nenhum supervisor vinculado na lista de vendedores.</span>
+                        ) : (
+                          <select
+                            className="min-w-56 rounded-lg border border-cyan-200 bg-white px-2 py-1 text-sm text-surface-800"
+                            value={kpiConsolidatedSupervisorKey}
+                            onChange={(event) => setKpiConsolidatedSupervisorKey(event.target.value)}
+                          >
+                            {performanceSupervisorOptions.map((option) => (
+                              <option key={`kpi-consolidated-supervisor-${option.key}`} value={option.key}>{option.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </>
+                    )}
+                    <span className="text-[10px] text-cyan-700">
+                      Escopo atual: {kpiConsolidatedScopeLabel}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Vendedores monitorados</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(kpiConsolidatedOverview.sellersTracked, 0)}</p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">KPIs monitorados</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(kpiConsolidatedOverview.totalKpis, 0)}</p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">KPIs conquistados</p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">
+                        {num(kpiConsolidatedOverview.hitKpis, 0)}
+                        <span className="text-base font-semibold text-surface-500"> / {num(kpiConsolidatedOverview.totalKpis, 0)}</span>
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Aderência média</p>
+                      <p className={`mt-1 text-lg font-semibold tabular-nums ${
+                        kpiConsolidatedOverview.avgProgressRatio >= 0.85
+                          ? 'text-emerald-600'
+                          : kpiConsolidatedOverview.avgProgressRatio >= 0.6
+                            ? 'text-cyan-600'
+                            : kpiConsolidatedOverview.avgProgressRatio >= 0.4
+                              ? 'text-amber-500'
+                              : 'text-rose-600'
+                      }`}>{num(kpiConsolidatedOverview.avgProgressRatio * 100, 1)}%</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
+                    <div className="overflow-hidden rounded-xl border border-surface-200">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                            <tr>
+                              <th className="px-3 py-2 text-left">KPI</th>
+                              <th className="px-3 py-2 text-right">Conquistados</th>
+                              <th className="px-3 py-2 text-right">% concluído</th>
+                              <th className="px-3 py-2 text-right">Aderência média</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {kpiConsolidatedTypeRows.length === 0 ? (
+                              <tr className="border-t border-surface-100">
+                                <td colSpan={4} className="px-3 py-6 text-center text-[11px] text-surface-400">
+                                  Nenhum KPI consolidado encontrado para o escopo selecionado.
+                                </td>
+                              </tr>
+                            ) : (
+                              kpiConsolidatedTypeRows.map((row) => (
+                                <tr key={`kpi-consolidated-type-${row.type}`} className="border-t border-surface-100">
+                                  <td className="px-3 py-2.5 font-semibold text-surface-700">{row.label}</td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">
+                                    {num(row.hit, 0)}/{num(row.total, 0)}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.hitRatio * 100, 1)}%</td>
+                                  <td className="px-3 py-2.5 text-right tabular-nums text-surface-900">{num(row.avgProgressRatio * 100, 1)}%</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Ranking de aderência por vendedor</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {kpiConsolidatedRankingRows.length === 0 ? (
+                          <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-center text-[11px] text-surface-500">
+                            Nenhum vendedor disponível no escopo selecionado.
+                          </div>
+                        ) : (
+                          kpiConsolidatedRankingRows.map((row, index) => {
+                            const ratioPct = row.ratio * 100
+                            const barPct = Math.min(ratioPct, 100)
+                            const barClass =
+                              row.ratio >= 1 ? 'bg-emerald-500' : row.ratio >= 0.8 ? 'bg-cyan-500' : row.ratio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
+                            return (
+                              <div
+                                key={`kpi-consolidated-rank-${row.sellerId}`}
+                                className="w-full rounded-xl border border-surface-200 bg-white px-3 py-2"
+                              >
+                                <div className="mb-1.5 flex items-center justify-between gap-2">
+                                  <span className="truncate text-[11px] font-semibold text-surface-700">{getSellerShortName(row.sellerName)}</span>
+                                  <span className="text-[10px] text-surface-400">#{index + 1}</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+                                  <div className={`h-full transition-[width] duration-700 ${barClass}`} style={{ width: `${barPct}%` }} />
+                                </div>
+                                <div className="mt-1.5 flex items-center justify-between text-[10px] text-surface-500">
+                                  <span>{row.hitKpis}/{row.totalKpis} KPIs</span>
+                                  <span className="font-semibold tabular-nums text-surface-700">{num(ratioPct, 1)}%</span>
+                                </div>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-surface-400">
+                    Consolidação calculada no período selecionado, considerando todos os KPIs aplicáveis ao escopo e desconsiderando o KPI de Volume (já monitorado no modo de metas de peso).
+                  </p>
                 </div>
               )}
             </Card>
