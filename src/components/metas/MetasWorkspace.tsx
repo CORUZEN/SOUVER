@@ -8848,7 +8848,7 @@ export default function MetasWorkspace() {
                                 onClick={() => setSelectedSellerId((prev) => (prev === row.id ? '' : row.id))}
                                 className={`w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors duration-200 ${
                                   isOpen
-                                    ? 'border-b border-slate-200 bg-linear-to-r from-slate-50 to-slate-100/70'
+                                    ? 'border-b border-slate-300 bg-linear-to-r from-slate-200 via-slate-200 to-slate-300/90'
                                     : 'hover:bg-slate-50/40'
                                 }`}
                               >
