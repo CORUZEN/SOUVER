@@ -8882,7 +8882,7 @@ export default function MetasWorkspace() {
                                       <div className="relative grid gap-3 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-end">
                                         <div>
                                           <p className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-100">
-                                            Painel do vendedor
+                                            Detalhes do vendedor
                                           </p>
                                           <p className="mt-2 text-base font-semibold text-white">{row.fullName}</p>
                                           <p className="text-[11px] text-slate-200">
@@ -8949,9 +8949,14 @@ export default function MetasWorkspace() {
                                     </div>
                                   </div>
 
-                                  <div className="mt-3">
-                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">KPIs e parâmetros do ciclo</p>
-                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                  <div className="mt-2 border-t border-slate-200 bg-slate-50/70 px-3 py-3">
+                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">KPIs e parâmetros do ciclo</p>
+                                      <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700">
+                                        {kpisHit}/{kpisTotal} concluídos
+                                      </span>
+                                    </div>
+                                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                       {sellerBlock.rules.map((rule) => {
                                         const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                                         const done = progress >= 1
@@ -8968,40 +8973,40 @@ export default function MetasWorkspace() {
                                         const progressTrackClass = 'bg-slate-200/80'
                                         const stateTheme: Record<'HIT' | 'NEAR' | 'MID' | 'FAR', { card: string; bar: string; text: string; icon: string; subtext: string; badgeBg: string; top: string }> = {
                                           HIT: {
-                                            card: 'border-emerald-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-emerald-100/70',
+                                            card: 'border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-100/70',
                                             bar: 'bg-emerald-500',
                                             text: 'text-emerald-700',
                                             icon: 'text-emerald-600',
                                             subtext: 'text-slate-600',
                                             badgeBg: 'bg-emerald-50',
-                                            top: 'bg-emerald-400/70',
+                                            top: 'bg-emerald-500/75',
                                           },
                                           NEAR: {
-                                            card: 'border-amber-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-amber-100/70',
+                                            card: 'border-cyan-200 bg-white shadow-sm ring-1 ring-cyan-100/70',
+                                            bar: 'bg-cyan-500',
+                                            text: 'text-cyan-700',
+                                            icon: 'text-cyan-600',
+                                            subtext: 'text-slate-600',
+                                            badgeBg: 'bg-cyan-50',
+                                            top: 'bg-cyan-500/75',
+                                          },
+                                          MID: {
+                                            card: 'border-amber-200 bg-white shadow-sm ring-1 ring-amber-100/70',
                                             bar: 'bg-amber-500',
                                             text: 'text-amber-700',
                                             icon: 'text-amber-600',
                                             subtext: 'text-slate-600',
                                             badgeBg: 'bg-amber-50',
-                                            top: 'bg-amber-400/70',
-                                          },
-                                          MID: {
-                                            card: 'border-orange-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-orange-100/70',
-                                            bar: 'bg-orange-500',
-                                            text: 'text-orange-700',
-                                            icon: 'text-orange-600',
-                                            subtext: 'text-slate-600',
-                                            badgeBg: 'bg-orange-50',
-                                            top: 'bg-orange-400/70',
+                                            top: 'bg-amber-500/75',
                                           },
                                           FAR: {
-                                            card: 'border-red-300 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] ring-1 ring-red-100/80',
-                                            bar: 'bg-red-500',
-                                            text: 'text-red-700',
-                                            icon: 'text-red-600',
+                                            card: 'border-rose-300 bg-white shadow-sm ring-1 ring-rose-100/80',
+                                            bar: 'bg-rose-500',
+                                            text: 'text-rose-700',
+                                            icon: 'text-rose-600',
                                             subtext: 'text-slate-600',
-                                            badgeBg: 'bg-red-50',
-                                            top: 'bg-red-400/70',
+                                            badgeBg: 'bg-rose-50',
+                                            top: 'bg-rose-500/75',
                                           },
                                         }
                                         const visual = stateTheme[kpiState]
@@ -9009,7 +9014,7 @@ export default function MetasWorkspace() {
                                         return (
                                           <div
                                             key={`seller-rule-${row.id}-${rule.id}`}
-                                            className={`group relative overflow-hidden rounded-xl border px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.12)] ${visual.card}`}
+                                            className={`group relative overflow-hidden rounded-xl border px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${visual.card}`}
                                           >
                                             <div className={`absolute inset-x-0 top-0 h-0.75 ${topAccentClass}`} />
                                             <div className="mb-1 flex items-start justify-between gap-2">
