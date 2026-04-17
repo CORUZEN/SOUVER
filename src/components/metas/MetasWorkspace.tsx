@@ -8894,25 +8894,21 @@ export default function MetasWorkspace() {
                                           <span className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pontuação</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.pointsAchieved, 3)}</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">de {num(row.snapshot.pointsTarget, 3)} pts</p>
                                         </div>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-slate-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Pedidos no mês</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalOrders, 0)}</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Consolidado no período</p>
                                         </div>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Vlr. de pedidos realizados</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{currency(row.snapshot.totalValue)}</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Valor total faturado no ciclo</p>
                                         </div>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-cyan-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Peso bruto</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.totalGrossWeight, 2)} kg</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Peso movimentado no mês</p>
                                         </div>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-violet-400" />
@@ -8920,13 +8916,11 @@ export default function MetasWorkspace() {
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">
                                             {formatRewardValue(row.snapshot.kpiRewardAchieved, row.snapshot.rewardMode)}
                                           </p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Resultado acumulado</p>
                                         </div>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-blue-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">Clientes atendidos</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{num(row.snapshot.uniqueClients, 0)}</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Clientes ativos no período</p>
                                         </div>
                                         <button
                                           type="button"
@@ -8935,21 +8929,19 @@ export default function MetasWorkspace() {
                                         >
                                           <span className="absolute inset-y-0 left-0 w-1 bg-linear-to-b from-cyan-500 to-emerald-500" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-teal-700">Positivação</p>
-                                          <div className="mt-1 flex items-end justify-between gap-3">
+                                          <div className="mt-1 flex items-center justify-between gap-3">
                                             <p className="text-xl leading-tight font-semibold tabular-nums text-slate-900">
                                               {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
                                             </p>
-                                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-teal-300 bg-white/90 text-teal-700 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-teal-400 group-hover:bg-white">
-                                              <ChevronRight size={22} strokeWidth={2.25} />
+                                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-teal-300 bg-white/90 text-teal-700 transition-all duration-200 group-hover:border-teal-400 group-hover:bg-white">
+                                              <ChevronRight size={16} strokeWidth={2.5} />
                                             </span>
                                           </div>
-                                          <p className="mt-1 text-[11px] font-medium text-teal-700/90">Produtos positivados no período atual</p>
                                         </button>
                                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                                           <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" />
                                           <p className="text-[10px] uppercase tracking-[0.09em] text-slate-500">KPIs alcançados</p>
                                           <p className="mt-1 text-xl leading-tight font-semibold tabular-nums text-slate-900">{kpisHit}/{kpisTotal}</p>
-                                          <p className="mt-1 text-[11px] font-medium text-slate-500">Indicadores concluídos</p>
                                         </div>
                                       </div>
                                     </div>
