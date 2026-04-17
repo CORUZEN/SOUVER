@@ -3498,8 +3498,7 @@ export default function MetasWorkspace() {
         topPerformer: null as (typeof kpiConsolidatedTypeRows)[number] | null,
         topRisk: null as (typeof kpiConsolidatedTypeRows)[number] | null,
         largestBacklog: null as (typeof kpiConsolidatedTypeRows)[number] | null,
-        healthyCount: 0,
-        attentionCount: 0,
+        overallAdherenceRatio: 0,
       }
     }
     const rows = [...kpiConsolidatedTypeRows]
@@ -3510,14 +3509,14 @@ export default function MetasWorkspace() {
       const worstPending = Math.max(worst.total - worst.hit, 0)
       return rowPending > worstPending ? row : worst
     }, rows[0])
-    const healthyCount = rows.filter((row) => row.avgProgressRatio >= 0.8).length
-    const attentionCount = rows.filter((row) => row.avgProgressRatio < 0.5).length
+    const overallTotal = rows.reduce((sum, row) => sum + row.total, 0)
+    const overallProgress = rows.reduce((sum, row) => sum + row.progressSum, 0)
+    const overallAdherenceRatio = overallTotal > 0 ? overallProgress / overallTotal : 0
     return {
       topPerformer,
       topRisk,
       largestBacklog,
-      healthyCount,
-      attentionCount,
+      overallAdherenceRatio,
     }
   }, [kpiConsolidatedTypeRows])
 
@@ -7438,11 +7437,19 @@ export default function MetasWorkspace() {
                       </p>
                     </div>
                     <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Saúde das metas</p>
-                      <p className="mt-1 text-sm font-semibold text-cyan-900">
-                        {num(kpiConsolidatedHighlights.healthyCount, 0)} saudáveis · {num(kpiConsolidatedHighlights.attentionCount, 0)} críticos
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Aderência geral</p>
+                      <p className={`mt-1 text-sm font-semibold ${
+                        kpiConsolidatedHighlights.overallAdherenceRatio >= 0.85
+                          ? 'text-emerald-700'
+                          : kpiConsolidatedHighlights.overallAdherenceRatio >= 0.65
+                            ? 'text-cyan-900'
+                            : kpiConsolidatedHighlights.overallAdherenceRatio >= 0.4
+                              ? 'text-amber-700'
+                              : 'text-rose-700'
+                      }`}>
+                        {num(kpiConsolidatedHighlights.overallAdherenceRatio * 100, 1)}%
                       </p>
-                      <p className="text-[10px] text-cyan-700">Leitura por aderência média no período</p>
+                      <p className="text-[10px] text-cyan-700">Consolidação média de aderência das metas no período</p>
                     </div>
                   </div>
 
@@ -7473,9 +7480,9 @@ export default function MetasWorkspace() {
                               const healthBarClass =
                                 row.avgProgressRatio >= 0.85 ? 'bg-emerald-500' : row.avgProgressRatio >= 0.65 ? 'bg-cyan-500' : row.avgProgressRatio >= 0.4 ? 'bg-amber-400' : 'bg-rose-500'
                               const criticalityLabel =
-                                row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.4 ? 'Atenção' : 'Crítico'
+                                row.avgProgressRatio >= 0.85 ? 'Controlado' : row.avgProgressRatio >= 0.65 ? 'Monitorar' : row.avgProgressRatio >= 0.2 ? 'Atenção' : 'Crítico'
                               const criticalityClass =
-                                row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.4 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
+                                row.avgProgressRatio >= 0.85 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : row.avgProgressRatio >= 0.65 ? 'text-cyan-700 bg-cyan-50 border-cyan-200' : row.avgProgressRatio >= 0.2 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'
                               return (
                                 <tr key={`kpi-consolidated-type-${row.type}`} className="border-t border-surface-100">
                                   <td className="px-3 py-2.5">
