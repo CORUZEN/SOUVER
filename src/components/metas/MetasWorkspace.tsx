@@ -8481,6 +8481,7 @@ export default function MetasWorkspace() {
                       : sellerPerformanceScope === 'SUPERVISOR'
                         ? (performanceSupervisorOptions.find((o) => o.key === performanceSupervisorKey)?.name ?? 'Supervisor')
                         : SELLER_PROFILE_LABEL[sellerPerformanceScope]
+                    const activeMetaProductsCount = productAllowlist.filter((product) => product.active).length
 
                     return (
                       <>
@@ -8559,6 +8560,10 @@ export default function MetasWorkspace() {
                         ) : filteredRows.map((row, index) => {
                           const isOpen = selectedSellerId === row.id
                           const sellerBlock = findBlockForSeller(row.id, ruleBlocks)
+                          const sellerCode = toSellerCodeFromId(row.id)
+                          const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+                          const positivacaoTargetItems = Math.max(activeMetaProductsCount, 0)
+                          const positivacaoSoldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
                           const kpisTotal = sellerBlock.rules.length
                           const kpisHit = sellerBlock.rules.filter((rule) => {
                             const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
@@ -8628,7 +8633,7 @@ export default function MetasWorkspace() {
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.totalOrders, 0)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Faturamento</p>
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Vlr. de pedidos realizados</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{currency(row.snapshot.totalValue)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
@@ -8646,8 +8651,10 @@ export default function MetasWorkspace() {
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.uniqueClients, 0)}</p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Gap para meta</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.gapToTarget, 3)} pts</p>
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Positivação</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">
+                                          {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
+                                        </p>
                                       </div>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">KPIs alcançados</p>
