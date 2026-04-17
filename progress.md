@@ -309,5 +309,92 @@ Porta de saida para fechamento completo:
 
 ---
 
-**Ultima atualizacao:** 15/04/2026  
+### Sessao 16-17/04/2026 — Evolucao PWA: scoring completo, visuais, versionamento e performance
+
+#### Modulo Metas — PWA supervisor: paridade completa com o sistema web
+
+**Bug: Est. Premiacao exibindo R$0,00 para todos os vendedores**
+- Arquivo corrigido: `src/app/api/pwa/summary/route.ts`
+- Causa raiz: `cycleWeeks` retornava `null` quando `week1StartDate` nao estava configurado diretamente; o calculo de pontuacao dependia das semanas e colapsava para zero
+- Solucao: `cycleWeeks` agora le primeiro `weekPeriods` salvo diretamente no `monthConfig` (exatamente o que o `MetasWorkspace` persiste), com fallback de reconstrucao a partir de `week1StartDate` + `closingWeekEndDate`
+
+**Bug: maxReward zerado para perfis ANTIGO_1 / ANTIGO_15**
+- Arquivo corrigido: `src/app/api/pwa/summary/route.ts`
+- Causa: curto-circuito `isPercentProfile ? 0 : ...` impedia o calculo correto do premio maximo
+- Solucao: calculo sempre soma os `rewardValue` de todas as regras, independente do tipo de perfil
+
+**Feature: scoring KPI completo no PWA (paridade com web)**
+- Arquivo: `src/app/(pwa)/app/supervisor/page.tsx`
+- Implementados no cliente PWA os mesmos algoritmos de pontuacao do sistema web para todos os tipos de KPI:
+  - `META_FINANCEIRA`: progressao linear entre faixas de faturamento
+  - `BASE_CLIENTES`: clientes unicos atendidos vs meta de base
+  - `VOLUME`: integracao com API `/api/metas/sellers-performance/brand-weight`; logica `getVolumeProgressByClosestTargets` com multiplas marcas
+  - `DEVOLUCAO`: valor de devolucoes vs faturamento (percentual invertido)
+  - `INADIMPLENCIA`: titulos em aberto e vencidos vs faturamento
+  - `DISTRIBUICAO`, `ITEM_FOCO`, `RENTABILIDADE`: marcados como `isComputable: false` (requerem dados adicionais nao disponiveis no cliente)
+
+**Feature: painel de KPI por semana no detalhe do vendedor**
+- Componente adicionado: `KpiStagesPanel`
+- Agrupa KPIs por etapa (W1 / W2 / W3 / FECHAMENTO) com badge de status (em andamento / encerrada / aguardando)
+- Barra de progresso individual por KPI com icone de check quando atingido
+- KPIs nao computaveis exibem "?" com legenda "Requer dados adicionais"
+- Mapa de icones por tipo: `DollarSign`, `Users`, `Package`, `LayoutGrid`, `Star`, `RotateCcw`, `Ban`, `BarChart2`
+
+**Feature: estimativa de premiacao com formula correta por perfil**
+- `estimatePremioEarned`: ANTIGO_1/ANTIGO_15 agora usa scoring KPI real em vez de progressao linear; exibe em percentual (ex.: `0,87%`)
+- `estimatePremioMax`: ANTIGO_1/ANTIGO_15 exibe o maximo em percentual; outros perfis exibem em BRL
+
+**Feature: hierarquia visual da celula de premiacao**
+- Componente `PremioCell`: valor ganho exibido com destaque; valor maximo como sufixo discreto (`text-[10px] font-normal text-surface-500`)
+
+**Feature: fracao de clientes unicos no cartao do sistema web**
+- Arquivo: `src/components/metas/MetasWorkspace.tsx`
+- Cartao "Clientes Unicos Atendidos" agora exibe `atendidos / base_total` (ex.: `138 / 412`)
+- Calculo: `filteredTotalBaseClients` soma `baseClientCount` de cada vendedor no filtro ativo
+- Estilo: fracao em `font-bold text-indigo-300` para diferenciar sem perder legibilidade
+
+---
+
+#### Infraestrutura PWA: versionamento automatico de cache
+
+**Feature: CACHE_VERSION do service worker sincronizado com a versao do app**
+- Arquivo modificado: `scripts/sync-app-version.mjs`
+- Problema: `public/sw.js` tinha `CACHE_VERSION = 'ov-pwa-v1'` hardcoded; caches antigos nao eram invalidados em novos deploys
+- Solucao: o script de sincronizacao agora tambem faz patch na linha `CACHE_VERSION` do `sw.js`, substituindo pelo padrao `ov-pwa-v{APP_VERSION}` (ex.: `ov-pwa-v1.00.282`)
+- Fluxo automatico: `predev` / `prebuild` → `version:sync` → `app-version.ts` atualizado + `sw.js` CACHE_VERSION atualizado → browser detecta SW alterado → reinstala SW → activate deletes caches antigos com prefixo `ov-pwa-` → PWA busca assets frescos
+
+---
+
+#### Performance PWA: conversao de logos para WebP
+
+**Feature: logos convertidos para WebP com reducao significativa de tamanho**
+- Ferramenta: `sharp` (ja disponivel no projeto), qualidade 90, effort 6
+- Resultados:
+
+| Arquivo | PNG | WebP | Reducao |
+|---|---|---|---|
+| `ouroverde.png` | 115 KB | 38 KB | -67% |
+| `ouroverde-badge.png` | 43 KB | 9 KB | -79% |
+| `graoverde.png` | 124 KB | 41 KB | -67% |
+
+- Arquivos PNG originais mantidos em disco para uso no `manifest.json` (compatibilidade maxima com instalacao PWA no iOS/Android)
+- Todos os `<Image>` nas paginas PWA atualizados para `.webp`
+
+**Fix: aviso de LCP (Largest Contentful Paint) no PWA**
+- Arquivos corrigidos: `src/components/pwa/PwaLoadingScreen.tsx`, `src/app/(pwa)/app/supervisor/page.tsx`, `src/app/(pwa)/app/vendedor/page.tsx`
+- Causa: logo principal (256px) no `PwaLoadingScreen` e logos de header (48px) nao tinham `priority`, gerando aviso de LCP e carregamento subotimo
+- Solucao: adicionado `priority` em todos os `<Image>` acima do fold nas paginas PWA; Next.js injeta automaticamente `fetchpriority="high"` e `loading="eager"`
+- Service worker (`public/sw.js`): lista de precache atualizada de `.png` para `.webp`
+
+---
+
+#### Resultado final da sessao
+- Nenhuma regressao introduzida nos modulos existentes
+- PWA com scoring 100% pareado ao sistema web para KPIs computaveis
+- Cache do PWA versionado automaticamente a cada commit/deploy
+- Tempo de carregamento inicial do PWA reduzido com logos WebP e LCP otimizado
+
+---
+
+**Ultima atualizacao:** 17/04/2026  
 **Responsavel pelo controle:** Time de Desenvolvimento SOUVER
