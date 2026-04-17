@@ -25,7 +25,7 @@ export default function PwaLoadingScreen({ label = 'Preparando painel...', progr
           <>
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-surface-800/90 ring-1 ring-emerald-500/25">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-300 to-lime-300 transition-[width] duration-500 ease-out"
+                className="h-full rounded-full bg-linear-to-r from-emerald-400 via-cyan-300 to-lime-300 transition-[width] duration-500 ease-out"
                 style={{ width: `${progressValue}%` }}
               />
             </div>

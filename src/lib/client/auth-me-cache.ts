@@ -1,7 +1,13 @@
 'use client'
 
 type AuthMeResponse = {
-  user?: unknown
+  user?: {
+    id?: string
+    name?: string
+    email?: string
+    roleCode?: string
+    sellerCode?: string
+  }
 } | null
 
 let inFlightAuthMe: Promise<AuthMeResponse> | null = null

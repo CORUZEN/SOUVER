@@ -108,11 +108,11 @@ type LoadState = 'idle' | 'loading' | 'success' | 'error'
 type SellerStatus = 'SUPEROU' | 'NO_ALVO' | 'QUASE_LA' | 'ATENCAO' | 'CRITICO'
 
 const STATUS_CONFIG: Record<SellerStatus, { label: string; color: string; pctColor: string; bg: string; border: string; barColor: string; Icon: React.ElementType }> = {
-  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     pctColor: 'bg-gradient-to-r from-sky-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-300 shadow-[0_0_10px_rgba(56,189,248,0.28)]',     Icon: TrendingUp },
-  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', pctColor: 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.28)]', Icon: CheckCircle2 },
-  QUASE_LA: { label: 'Quase Lá',   color: 'text-amber-400',   pctColor: 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.24)]',   Icon: TrendingUp },
-  ATENCAO:  { label: 'Atenção',    color: 'text-orange-400',  pctColor: 'bg-gradient-to-r from-orange-200 to-rose-300 bg-clip-text text-transparent',    bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  barColor: 'bg-gradient-to-r from-orange-300 to-rose-300 shadow-[0_0_10px_rgba(251,146,60,0.24)]',   Icon: Clock },
-  CRITICO:  { label: 'Crítico',    color: 'text-red-400',     pctColor: 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent',      bg: 'bg-red-500/10',     border: 'border-red-500/30',     barColor: 'bg-gradient-to-r from-rose-400 to-red-500 shadow-[0_0_10px_rgba(239,68,68,0.28)]',      Icon: AlertCircle },
+  SUPEROU:  { label: 'Superou',    color: 'text-sky-400',     pctColor: 'bg-linear-to-r from-sky-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     barColor: 'bg-linear-to-r from-sky-400 via-cyan-300 to-emerald-300 shadow-[0_0_10px_rgba(56,189,248,0.28)]',     Icon: TrendingUp },
+  NO_ALVO:  { label: 'Meta Batida', color: 'text-emerald-400', pctColor: 'bg-linear-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', barColor: 'bg-linear-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.28)]', Icon: CheckCircle2 },
+  QUASE_LA: { label: 'Quase Lá',   color: 'text-amber-400',   pctColor: 'bg-linear-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   barColor: 'bg-linear-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.24)]',   Icon: TrendingUp },
+  ATENCAO:  { label: 'Atenção',    color: 'text-orange-400',  pctColor: 'bg-linear-to-r from-orange-200 to-rose-300 bg-clip-text text-transparent',    bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  barColor: 'bg-linear-to-r from-orange-300 to-rose-300 shadow-[0_0_10px_rgba(251,146,60,0.24)]',   Icon: Clock },
+  CRITICO:  { label: 'Crítico',    color: 'text-red-400',     pctColor: 'bg-linear-to-r from-rose-300 to-red-300 bg-clip-text text-transparent',      bg: 'bg-red-500/10',     border: 'border-red-500/30',     barColor: 'bg-linear-to-r from-rose-400 to-red-500 shadow-[0_0_10px_rgba(239,68,68,0.28)]',      Icon: AlertCircle },
 }
 
 /* ─────────────────────────────────────────────
@@ -1174,12 +1174,12 @@ export default function SupervisorPwaDashboard() {
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-extrabold tabular-nums tracking-tight ${
                     overallPct >= 100
-                      ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
+                      ? 'bg-linear-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
                       : overallPct >= 75
-                      ? 'bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent'
+                      ? 'bg-linear-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent'
                       : overallPct >= 25
-                      ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
-                      : 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
+                      ? 'bg-linear-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
+                      : 'bg-linear-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
                   }`}>
                     {fmtPct(overallPct)}
                   </p>
@@ -1188,12 +1188,12 @@ export default function SupervisorPwaDashboard() {
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${
                       overallPct >= 100
-                        ? 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.30)]'
+                        ? 'bg-linear-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.30)]'
                         : overallPct >= 75
-                        ? 'bg-gradient-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.28)]'
+                        ? 'bg-linear-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.28)]'
                         : overallPct >= 25
-                        ? 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
-                        : 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
+                        ? 'bg-linear-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
+                        : 'bg-linear-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
                     }`}
                     style={{ width: `${Math.min(overallPct, 100)}%` }}
                   />
@@ -1610,20 +1610,20 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const isHit = kpi.isComputable && kpi.progress >= 1
 
                 const barColor = !kpi.isComputable || isPending
-                  ? 'bg-gradient-to-r from-surface-500 to-surface-400'
+                  ? 'bg-linear-to-r from-surface-500 to-surface-400'
                   : isHit
-                  ? 'bg-gradient-to-r from-emerald-400 to-lime-300 shadow-[0_0_8px_rgba(52,211,153,0.28)]'
+                  ? 'bg-linear-to-r from-emerald-400 to-lime-300 shadow-[0_0_8px_rgba(52,211,153,0.28)]'
                   : pctDisplay >= 70
-                  ? 'bg-gradient-to-r from-amber-300 to-orange-300 shadow-[0_0_8px_rgba(251,191,36,0.24)]'
-                  : 'bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_8px_rgba(251,113,133,0.24)]'
+                  ? 'bg-linear-to-r from-amber-300 to-orange-300 shadow-[0_0_8px_rgba(251,191,36,0.24)]'
+                  : 'bg-linear-to-r from-rose-400 to-red-400 shadow-[0_0_8px_rgba(251,113,133,0.24)]'
 
                 const pctColor = !kpi.isComputable || isPending
                   ? 'text-surface-500'
                   : isHit
-                  ? 'bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
+                  ? 'bg-linear-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
                   : pctDisplay >= 70
-                  ? 'bg-gradient-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
-                  : 'bg-gradient-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
+                  ? 'bg-linear-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
+                  : 'bg-linear-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
 
                 return (
                   <div key={kpi.ruleId} className={stageStyle.row}>
