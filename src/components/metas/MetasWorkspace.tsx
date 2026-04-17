@@ -2814,8 +2814,10 @@ export default function MetasWorkspace() {
       doc.setFillColor(15, 23, 42)
       doc.rect(0, 0, pageWidth, 72, 'F')
       doc.setTextColor(248, 250, 252)
+      doc.setFont('helvetica', 'bold')
       doc.setFontSize(18)
-      doc.text('Painel Executivo de Positivação', 36, 34)
+      doc.text('PAINEL EXECUTIVO DE POSITIVAÇÃO', 36, 34)
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(11)
       doc.setTextColor(203, 213, 225)
       doc.text(`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year}`, 36, 56)
@@ -2828,24 +2830,29 @@ export default function MetasWorkspace() {
         { title: 'Pendentes', value: `${num(positivationDetailsData.summary.totalPendingItems, 0)}`, color: [217, 119, 6] as [number, number, number] },
       ]
       const cardY = 88
-      const cardGap = 12
-      const cardW = (pageWidth - 72 - (cards.length - 1) * cardGap) / cards.length
+      const cardGap = 10
+      const cardInset = 24
+      const cardW = (pageWidth - cardInset * 2 - (cards.length - 1) * cardGap) / cards.length
       cards.forEach((card, index) => {
-        const x = 36 + index * (cardW + cardGap)
+        const x = cardInset + index * (cardW + cardGap)
         doc.setDrawColor(card.color[0], card.color[1], card.color[2])
-        doc.setFillColor(248, 250, 252)
-        doc.roundedRect(x, cardY, cardW, 58, 8, 8, 'FD')
+        doc.setFillColor(250, 252, 255)
+        doc.roundedRect(x, cardY, cardW, 60, 10, 10, 'FD')
         doc.setFillColor(card.color[0], card.color[1], card.color[2])
-        doc.rect(x, cardY, cardW, 3, 'F')
+        // Rounded top accent to match the card corners.
+        doc.roundedRect(x + 1, cardY + 1, cardW - 2, 3.5, 2, 2, 'F')
         doc.setFontSize(9)
         doc.setTextColor(card.color[0], card.color[1], card.color[2])
-        doc.text(card.title.toUpperCase(), x + 10, cardY + 16)
-        doc.setFontSize(16)
+        doc.text(card.title.toUpperCase(), x + 10, cardY + 17)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(15)
         doc.setTextColor(15, 23, 42)
-        doc.text(card.value, x + 10, cardY + 40)
+        doc.text(card.value, x + 10, cardY + 42)
+        doc.setFont('helvetica', 'normal')
       })
 
-      const tableStartY = 168
+      const tableTitleY = 177
+      const tableStartY = 188
       const bodyRows = positivatedProductsSorted.map((item) => ([
         item.code,
         item.description || '-',
@@ -2856,7 +2863,7 @@ export default function MetasWorkspace() {
 
       doc.setFontSize(11)
       doc.setTextColor(6, 95, 70)
-      doc.text('PRODUTOS POSITIVADOS', 36, tableStartY - 10)
+      doc.text('PRODUTOS POSITIVADOS', 24, tableTitleY)
 
       autoTable(doc, {
         startY: tableStartY,
@@ -2868,14 +2875,15 @@ export default function MetasWorkspace() {
         headStyles: { fillColor: [220, 252, 231], textColor: [6, 95, 70], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
-          0: { cellWidth: 52 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 'auto' },
-          3: { cellWidth: 86, halign: 'right' },
-          4: { cellWidth: 54, halign: 'right' },
+          0: { cellWidth: 45 },
+          1: { cellWidth: 260 },
+          2: { cellWidth: 145 },
+          3: { cellWidth: 62, halign: 'right' },
+          4: { cellWidth: 35, halign: 'right' },
         },
         tableWidth: 'auto',
         pageBreak: 'auto',
+        rowPageBreak: 'avoid',
       })
 
       const afterPositivatedY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY + 120
@@ -2887,7 +2895,7 @@ export default function MetasWorkspace() {
         }
         doc.setFontSize(11)
         doc.setTextColor(180, 83, 9)
-        doc.text('PRODUTOS PENDENTES', 36, pendingStartY - 10)
+        doc.text('PRODUTOS PENDENTES', 24, pendingStartY - 10)
         autoTable(doc, {
           startY: pendingStartY,
           head: [['SKU', 'Descrição', 'Grupo']],
@@ -2896,14 +2904,14 @@ export default function MetasWorkspace() {
           theme: 'grid',
           styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85], overflow: 'linebreak' },
           headStyles: { fillColor: [254, 243, 199], textColor: [180, 83, 9], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [255, 251, 235] },
           columnStyles: {
             0: { cellWidth: 58 },
-            1: { cellWidth: 'auto' },
-            2: { cellWidth: 'auto' },
+            1: { cellWidth: 290 },
+            2: { cellWidth: 199 },
           },
           tableWidth: 'auto',
           pageBreak: 'auto',
+          rowPageBreak: 'avoid',
         })
       }
 
@@ -9316,34 +9324,34 @@ export default function MetasWorkspace() {
       >
         <div className="flex h-[calc(90vh-8.5rem)] min-h-0 flex-col gap-4 overflow-hidden px-1">
           {positivationDetailsLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-4 py-6 text-sm text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+            <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 to-white px-4 py-6 text-sm text-slate-500">
               Carregando detalhes da positivacao...
             </div>
           ) : positivationDetailsError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 shadow-[0_8px_20px_rgba(190,24,93,0.10)]">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
               {positivationDetailsError}
             </div>
           ) : positivationDetailsData ? (
             <>
               <div className="grid shrink-0 gap-2.5 sm:grid-cols-4">
-                <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-cyan-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(8,145,178,0.14)]">
+                <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-cyan-50/60 px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-cyan-500 to-sky-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Positivados</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-cyan-900">
                     {num(positivationDetailsData.summary.totalPositivatedItems, 0)} / {num(positivationDetailsData.summary.totalTargetItems, 0)}
                   </p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 via-white to-emerald-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(5,150,105,0.14)]">
+                <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 via-white to-emerald-50/60 px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 to-teal-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Peso vendido</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-emerald-900">{num(positivationDetailsData.summary.totalSoldWeightKg, 2)} kg</p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 via-white to-violet-50/50 px-3 py-2.5 shadow-[0_10px_24px_rgba(79,70,229,0.14)]">
+                <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 via-white to-violet-50/50 px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-indigo-500 to-violet-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Quantidade vendida</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-indigo-900">{num(positivationDetailsData.summary.totalSoldQty, 0)}</p>
                 </div>
-                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-linear-to-br from-amber-50 via-white to-amber-50/60 px-3 py-2.5 shadow-[0_10px_24px_rgba(217,119,6,0.14)]">
+                <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-linear-to-br from-amber-50 via-white to-amber-50/60 px-3 py-2.5">
                   <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-amber-500 to-orange-500" />
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Pendentes</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-amber-900">{num(positivationDetailsData.summary.totalPendingItems, 0)}</p>
@@ -9364,7 +9372,7 @@ export default function MetasWorkspace() {
                     ) : null}
 
                     <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-1">
-                      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_14px_30px_rgba(5,150,105,0.12)]">
+                      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-200 bg-white">
                         <div className="shrink-0 border-b border-emerald-200 bg-linear-to-r from-emerald-50 via-cyan-50 to-white px-3 py-2.5">
                           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Produtos positivados</p>
                         </div>
@@ -9421,7 +9429,7 @@ export default function MetasWorkspace() {
                       </div>
 
                       {hasPendingProducts ? (
-                        <div className="flex max-h-[16rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_14px_30px_rgba(217,119,6,0.12)]">
+                        <div className="flex max-h-[16rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200 bg-white">
                           <div className="shrink-0 border-b border-amber-200 bg-linear-to-r from-amber-50 via-orange-50 to-white px-3 py-2.5">
                             <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
                           </div>
@@ -9467,7 +9475,7 @@ export default function MetasWorkspace() {
               })()}
             </>
           ) : (
-            <div className="rounded-2xl border border-surface-200 bg-linear-to-br from-surface-50 to-white px-4 py-4 text-sm text-surface-500 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+            <div className="rounded-2xl border border-surface-200 bg-linear-to-br from-surface-50 to-white px-4 py-4 text-sm text-surface-500">
               Nenhum dado disponivel para o vendedor selecionado.
             </div>
           )}
