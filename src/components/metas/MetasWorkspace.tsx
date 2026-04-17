@@ -205,6 +205,32 @@ interface DistributionDiagnostics {
   companyScope?: string
 }
 
+interface PositivationDetailItem {
+  code: string
+  description: string
+  brand: string
+  unit: string
+  soldQty: number
+  soldWeightKg: number
+  distinctClients: number
+  positivated: boolean
+}
+
+interface PositivationDetailsPayload {
+  year: number
+  month: number
+  sellerCode: string
+  summary: {
+    totalTargetItems: number
+    totalPositivatedItems: number
+    totalPendingItems: number
+    totalSoldWeightKg: number
+    totalSoldQty: number
+  }
+  positivatedProducts: PositivationDetailItem[]
+  pendingProducts: PositivationDetailItem[]
+}
+
 interface MetasUiPermissionSection {
   view: boolean
   edit: boolean
@@ -1114,6 +1140,14 @@ export default function MetasWorkspace() {
   const [distributionLoading, setDistributionLoading] = useState(false)
   const [distributionError, setDistributionError] = useState('')
   const [distributionDiagnostics, setDistributionDiagnostics] = useState<DistributionDiagnostics | null>(null)
+  const [positivationDetailsModal, setPositivationDetailsModal] = useState<{
+    open: boolean
+    sellerId: string
+    sellerName: string
+  }>({ open: false, sellerId: '', sellerName: '' })
+  const [positivationDetailsLoading, setPositivationDetailsLoading] = useState(false)
+  const [positivationDetailsError, setPositivationDetailsError] = useState('')
+  const [positivationDetailsData, setPositivationDetailsData] = useState<PositivationDetailsPayload | null>(null)
   const [kpiInspectorOpenKey, setKpiInspectorOpenKey] = useState<string | null>(null)
   const [kpiInspectorSellerId, setKpiInspectorSellerId] = useState('')
   const [kpiInspectorAnchor, setKpiInspectorAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null)
@@ -2667,6 +2701,49 @@ export default function MetasWorkspace() {
 
     return () => controller.abort()
   }, [companyScopeFilter, month, stageEnds.closing, stageEnds.w1, stageEnds.w2, stageEnds.w3, year])
+
+  useEffect(() => {
+    if (!positivationDetailsModal.open) return
+    const sellerCode = toSellerCodeFromId(positivationDetailsModal.sellerId)
+    if (!sellerCode) {
+      setPositivationDetailsError('Vendedor sem codigo para consultar detalhes de positivacao.')
+      setPositivationDetailsData(null)
+      return
+    }
+
+    const controller = new AbortController()
+    const requestKey = `${year}-${month + 1}-${companyScopeFilter}-${sellerCode}`
+    setPositivationDetailsLoading(true)
+    setPositivationDetailsError('')
+    setPositivationDetailsData(null)
+
+    fetch(
+      `/api/metas/sellers-performance/positivation-details?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}&sellerCode=${encodeURIComponent(sellerCode)}`,
+      { signal: controller.signal }
+    )
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar detalhes de positivacao.')
+        }
+        return payload as PositivationDetailsPayload
+      })
+      .then((payload) => {
+        if (controller.signal.aborted) return
+        const activeKey = `${year}-${month + 1}-${companyScopeFilter}-${toSellerCodeFromId(positivationDetailsModal.sellerId)}`
+        if (activeKey !== requestKey) return
+        setPositivationDetailsData(payload)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao carregar detalhes de positivacao.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPositivationDetailsLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [companyScopeFilter, month, positivationDetailsModal.open, positivationDetailsModal.sellerId, year])
 
   const nextDate = useMemo(() => new Date(year, month + 1, 1), [month, year])
   const nextKey = monthKey(nextDate.getFullYear(), nextDate.getMonth())
@@ -8650,12 +8727,23 @@ export default function MetasWorkspace() {
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Clientes atendidos</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{num(row.snapshot.uniqueClients, 0)}</p>
                                       </div>
-                                      <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Positivação</p>
-                                        <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">
-                                          {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
-                                        </p>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPositivationDetailsModal({ open: true, sellerId: row.id, sellerName: row.fullName })}
+                                        className="group relative overflow-hidden rounded-lg border border-emerald-200/80 bg-linear-to-br from-emerald-50 via-cyan-50 to-white px-3 py-2 text-left shadow-[0_10px_24px_rgba(16,185,129,0.16)] ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(6,95,70,0.22)]"
+                                      >
+                                        <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-emerald-500 via-cyan-500 to-sky-500" />
+                                        <p className="text-[10px] uppercase tracking-[0.08em] text-emerald-700">Positivação</p>
+                                        <div className="mt-0.5 flex items-end justify-between gap-2">
+                                          <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                                            {num(positivacaoSoldItems, 0)} / {num(positivacaoTargetItems, 0)}
+                                          </p>
+                                          <span className="rounded-md border border-emerald-200 bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 transition-colors group-hover:bg-emerald-100">
+                                            Detalhar
+                                          </span>
+                                        </div>
+                                        <p className="mt-0.5 text-[10px] text-emerald-700/80">Produtos positivados no período atual</p>
+                                      </button>
                                       <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                         <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">KPIs alcançados</p>
                                         <p className="mt-0.5 text-sm font-semibold text-slate-900 tabular-nums">{kpisHit}/{kpisTotal}</p>
@@ -9017,6 +9105,125 @@ export default function MetasWorkspace() {
                   )
                 })}
             </ul>
+          )}
+        </div>
+      </Modal>
+
+      {/* ── Positivation detail modal ─────────────────────────── */} 
+      <Modal
+        open={positivationDetailsModal.open}
+        onClose={() => {
+          setPositivationDetailsModal({ open: false, sellerId: '', sellerName: '' })
+          setPositivationDetailsData(null)
+          setPositivationDetailsError('')
+          setPositivationDetailsLoading(false)
+        }}
+        title="Detalhes da positivação"
+        description={`${positivationDetailsModal.sellerName || 'Vendedor'} · ${MONTHS[month]} ${year}`}
+        size="xl"
+      >
+        <div className="space-y-3 px-1">
+          {positivationDetailsLoading ? (
+            <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-6 text-sm text-surface-500">
+              Carregando detalhes da positivacao...
+            </div>
+          ) : positivationDetailsError ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+              {positivationDetailsError}
+            </div>
+          ) : positivationDetailsData ? (
+            <>
+              <div className="grid gap-2 sm:grid-cols-4">
+                <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Positivados</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-cyan-900">
+                    {num(positivationDetailsData.summary.totalPositivatedItems, 0)} / {num(positivationDetailsData.summary.totalTargetItems, 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Peso vendido</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-emerald-900">{num(positivationDetailsData.summary.totalSoldWeightKg, 2)} kg</p>
+                </div>
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-700">Quantidade vendida</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-indigo-900">{num(positivationDetailsData.summary.totalSoldQty, 0)}</p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Pendentes</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-amber-900">{num(positivationDetailsData.summary.totalPendingItems, 0)}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40">
+                  <div className="border-b border-emerald-200 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Produtos positivados</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {positivationDetailsData.positivatedProducts.length === 0 ? (
+                      <p className="px-3 py-4 text-xs text-surface-500">Nenhum produto positivado no período.</p>
+                    ) : (
+                      <table className="min-w-full text-xs">
+                        <thead className="sticky top-0 bg-emerald-100/80 text-[10px] uppercase tracking-widest text-emerald-700">
+                          <tr>
+                            <th className="px-2 py-1.5 text-left">Produto</th>
+                            <th className="px-2 py-1.5 text-right">Peso (kg)</th>
+                            <th className="px-2 py-1.5 text-right">Qtd.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {positivationDetailsData.positivatedProducts.map((item) => (
+                            <tr key={`pos-${item.code}`} className="border-t border-emerald-100">
+                              <td className="px-2 py-1.5">
+                                <p className="font-semibold text-surface-800">{item.description || item.code}</p>
+                                <p className="text-[10px] text-surface-500">{item.code} · {item.brand || 'Sem grupo'}</p>
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldWeightKg, 2)}</td>
+                              <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-800">{num(item.soldQty, 0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50/40">
+                  <div className="border-b border-amber-200 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Produtos pendentes</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {positivationDetailsData.pendingProducts.length === 0 ? (
+                      <p className="px-3 py-4 text-xs text-emerald-700">Todos os produtos da meta foram positivados no período.</p>
+                    ) : (
+                      <table className="min-w-full text-xs">
+                        <thead className="sticky top-0 bg-amber-100/80 text-[10px] uppercase tracking-widest text-amber-700">
+                          <tr>
+                            <th className="px-2 py-1.5 text-left">Produto</th>
+                            <th className="px-2 py-1.5 text-left">Grupo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {positivationDetailsData.pendingProducts.map((item) => (
+                            <tr key={`pending-${item.code}`} className="border-t border-amber-100">
+                              <td className="px-2 py-1.5">
+                                <p className="font-semibold text-surface-800">{item.description || item.code}</p>
+                                <p className="text-[10px] text-surface-500">{item.code}</p>
+                              </td>
+                              <td className="px-2 py-1.5 text-[11px] text-surface-700">{item.brand || 'Sem grupo'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-4 text-sm text-surface-500">
+              Nenhum dado disponivel para o vendedor selecionado.
+            </div>
           )}
         </div>
       </Modal>
