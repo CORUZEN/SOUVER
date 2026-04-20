@@ -4294,10 +4294,17 @@ export default function MetasWorkspace() {
     let cancelled = false
 
     const loadPreviousConsolidated = async () => {
+      // Reset immediately so stale data from previous navigation never shows as comparison
+      setPreviousSellersData([])
+      setKpiConsolidatedPreviousByType({})
       try {
         const previousMonthDate = new Date(year, month - 1, 1)
         const previousYear = previousMonthDate.getFullYear()
         const previousMonth = previousMonthDate.getMonth() + 1
+
+        // sellerIncludedDates for the previous period (already in state — no extra fetch needed)
+        const previousMonthKey = `${previousYear}-${String(previousMonth).padStart(2, '0')}`
+        const previousSellerIncludedDates = monthConfigs[previousMonthKey]?.sellerIncludedDates ?? []
 
         const [summaryRes, perfRes, sankhyaTargetsRes, brandWeightRes] = await Promise.all([
           fetch(`/api/pwa/summary?year=${previousYear}&month=${previousMonth}`, { signal: controller.signal }),
@@ -4314,6 +4321,11 @@ export default function MetasWorkspace() {
           financialTarget: number
           weightTargets?: Array<{ brand: string; targetKg: number }>
         }>
+        // previousSankhyaConnected mirrors what sankhyaConnected is for the current month:
+        // true when the sankhya-targets endpoint returned rows for the previous period.
+        // Using the current-month sankhyaConnected state here would be WRONG because
+        // Sankhya connectivity can change between periods.
+        const previousSankhyaConnected = previousSankhyaTargets.length > 0
         const previousBrandWeightRows = (Array.isArray(brandWeightPayload?.rows) ? brandWeightPayload.rows : []) as Array<{
           sellerCode: string
           brand: string
@@ -4395,6 +4407,10 @@ export default function MetasWorkspace() {
           }
           return result
         })()
+
+        // Only use date-range fallback (findStageForIncludedDate) when businessDays are unavailable.
+        // When businessDays ARE populated, strict matching prevents weekend orders from being counted.
+        const previousCycleHasBusinessDays = previousCycleWeeks.some((w) => w.key !== 'FULL' && w.businessDays.length > 0)
 
         const firstStart = [...previousCycleWeeks]
           .map((week) => week.start)
@@ -4620,10 +4636,20 @@ export default function MetasWorkspace() {
           )
 
           const allMonthClientCodes = new Set<string>()
+          // Per-seller included dates for the previous period (mirrors activeMonth?.sellerIncludedDates in snapshot scoring)
+          const sellerIncludedDatesForPrev = new Set(
+            previousSellerIncludedDates
+              .filter((entry) => entry.sellerId === seller.id)
+              .map((entry) => entry.date)
+          )
           for (const order of seller.orders) {
             if (order.clientCode) allMonthClientCodes.add(order.clientCode)
-            const stage = findStageForDate(order.negotiatedAt, previousCycleWeeksWithFull)
-              ?? findStageForIncludedDate(order.negotiatedAt, previousCycleWeeksWithFull)
+            let stage = findStageForDate(order.negotiatedAt, previousCycleWeeksWithFull)
+            if (!stage && sellerIncludedDatesForPrev.has(order.negotiatedAt)) {
+              stage = findStageForIncludedDate(order.negotiatedAt, previousCycleWeeksWithFull)
+            } else if (!stage && !previousCycleHasBusinessDays) {
+              stage = findStageForIncludedDate(order.negotiatedAt, previousCycleWeeksWithFull)
+            }
             if (!stage) continue
             stageMetrics[stage].orderCount += 1
             stageMetrics[stage].totalValue += order.totalValue
@@ -4701,11 +4727,20 @@ export default function MetasWorkspace() {
             )
           })()
 
-          const resolvedMonthlyTarget = previousSankhyaFinancial > 0
-            ? previousSankhyaFinancial
-            : summaryMonthlyTarget > 0
-              ? summaryMonthlyTarget
-              : Number(fallbackBlock?.monthlyTarget ?? 0)
+          const resolvedMonthlyTarget = (() => {
+            if (previousSankhyaFinancial > 0) return previousSankhyaFinancial
+            // Mirror direct scoring: if previousSankhya NOT connected, use block.monthlyTarget (legacy)
+            if (!previousSankhyaConnected) {
+              const legacyTarget = summaryMonthlyTarget > 0
+                ? summaryMonthlyTarget
+                : Number(fallbackBlock?.monthlyTarget ?? 0)
+              return legacyTarget
+            }
+            // previousSankhya connected but no data → use manualFinancialByPeriod for previous period
+            // summaryMonthlyTarget already resolves manualFinancialByPeriod[prevPeriodKey] via the summary API
+            if (summaryMonthlyTarget > 0) return summaryMonthlyTarget
+            return Number(fallbackBlock?.monthlyTarget ?? 0)
+          })()
           const monthlyTargetSafe = resolvedMonthlyTarget > 0 ? resolvedMonthlyTarget : teamAverageValueSafe
 
           const focusCode = (String(summarySeller.focusProductCode ?? '').trim() || String(fallbackBlock?.focusProductCode ?? '').trim())
@@ -4734,7 +4769,7 @@ export default function MetasWorkspace() {
               )
               if (sk) return { brand: wt.brand, targetKg: sk.targetKg }
             }
-            if (sankhyaConnected) {
+            if (previousSankhyaConnected) {
               const manualVal = (wt as { manualKgByPeriod?: Record<string, number> }).manualKgByPeriod?.[previousPeriodKey] ?? 0
               return { brand: wt.brand, targetKg: manualVal }
             }
@@ -4859,20 +4894,30 @@ export default function MetasWorkspace() {
                   progress = requiredBaseClients > 0 ? focusSoldClients / Math.max(requiredBaseClients, 1) : 0
                   break
                 }
+                // Mirror direct scoring: requiredKg = focusTargetKg * (volumePct / 100)
                 const { volumePct } = parseItemFocoTarget(rule.targetText)
-                if (volumePct > 0) {
-                  const requiredKg = monthlyTargetSafe * (volumePct / 100)
-                  progress = requiredKg > 0 ? focusSoldKg / Math.max(requiredKg, 0.00001) : 0
-                } else if (focusTargetKg > 0) {
-                  progress = focusSoldKg / Math.max(focusTargetKg, 0.00001)
+                const resolvedFocusTargetKg = Math.max(focusTargetKg, 0)
+                if (resolvedFocusTargetKg <= 0 || volumePct <= 0) {
+                  progress = 0
+                  break
+                }
+                const requiredKg = resolvedFocusTargetKg * (volumePct / 100)
+                progress = requiredKg > 0 ? focusSoldKg / requiredKg : 0
+                break
+              }
+              default: {
+                // Mirror direct scoring: stage (non-cumulative) orderCount vs rawNumber
+                const stageOnly = stageMetrics[rule.stage]
+                if (asPct !== null) {
+                  const stageShare = stageOnly.totalValue / lockedValue
+                  progress = stageShare / asPct
+                } else if (rawNumber > 0) {
+                  progress = stageOnly.orderCount / rawNumber
                 } else {
-                  progress = focusSoldKg > 0 ? 1 : 0
+                  progress = stageOnly.orderCount > 0 ? 1 : 0
                 }
                 break
               }
-              default:
-                progress = lockedValue / lockedOrders
-                break
             }
 
             const clampedProgress = Math.max(0, Math.min(progress, 1))
@@ -4940,7 +4985,7 @@ export default function MetasWorkspace() {
       cancelled = true
       controller.abort()
     }
-  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, ruleBlocks, year])
+  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, monthConfigs, productAllowlist, ruleBlocks, year])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()

@@ -396,5 +396,94 @@ Porta de saida para fechamento completo:
 
 ---
 
-**Ultima atualizacao:** 17/04/2026  
+### Sessao 18-20/04/2026 — Correcao dos indicadores comparativos no painel Metas Gerais Consolidadas
+
+#### Contexto
+
+O painel "Metas Gerais Consolidadas" exibe badges "vs mes anterior" (ex.: ▲24.4%, ▼21.9%) comparando o mes visualizado com o mes anterior. A funcao `loadPreviousConsolidated` (dentro de `useEffect` em `MetasWorkspace.tsx`) recalcula a pontuacao do mes anterior de forma assincrona para alimentar esses indicadores. Varios bugs cascateados faziam os deltas ficarem errados — chegando a mais de 13 hits de diferenca em alguns meses. Ao final da sessao, Marco ficou 100% correto (▲24.4%) com os demais meses convergindo progressivamente.
+
+---
+
+#### Bug 1 — Estado obsoleto (stale state) nos badges comparativos
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** `previousSellersData` retinha dados da navegacao anterior; os badges comparativos exibiam a comparacao errada ate a nova requisicao completar (ou seja, ao navegar de marco para fevereiro, o badge ainda mostrava a comparacao de marco por alguns segundos, podendo persistir em conexoes lentas)
+- **Solucao:** adicionado reset imediato de `setPreviousSellersData([])` e `setKpiConsolidatedPreviousByType({})` no topo de `loadPreviousConsolidated`, antes de qualquer `await`
+
+---
+
+#### Bug 2 — Pedidos de fim de semana contados no periodo anterior
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** o loop de pedidos usava `findStageForIncludedDate` como fallback universal, que associa o pedido a qualquer etapa cujo intervalo `start`/`end` contemple a data — incluindo sabados e domingos. O scoring direto so conta dias uteis via `businessDays[]`, gerando contagem divergente
+- **Solucao:** o fallback para `findStageForIncludedDate` agora so e acionado quando:
+  - a data consta em `sellerIncludedDates` do vendedor (datas especiais inclusas pelo gestor), OU
+  - o ciclo anterior nao possui `businessDays` configurados (`!previousCycleHasBusinessDays`)
+
+---
+
+#### Bug 3 — `sellerIncludedDates` nao aplicados ao periodo anterior
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** datas especiais inclusas pelo gestor (sellerIncludedDates) nao eram lidas para o mes anterior, fazendo pedidos validos serem ignorados
+- **Solucao:** leitura a partir de `monthConfigs[previousMonthKey]?.sellerIncludedDates`; `monthConfigs` adicionado as dependencias do `useEffect`
+
+---
+
+#### Bug 4 — Formula errada para KPI `ITEM_FOCO`
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** o calculo comparativo usava `monthlyTargetSafe * (volumePct / 100)` como meta de kg, enquanto o scoring direto usa `focusTargetKg * (volumePct / 100)` — bases completamente diferentes, gerando progresso incorreto
+- **Solucao:** formula corrigida para `focusTargetKg * (volumePct / 100)`, espelhando o scoring direto
+
+---
+
+#### Bug 5 — Caso `default` do switch calculando ticket medio em vez de contagem de pedidos
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** o `default` do switch de tipos de KPI calculava `lockedValue / lockedOrders` (ticket medio), que e sempre maior que 1 para qualquer vendedor com faturamento — portanto toda regra do tipo default era marcada como "hit" independente da meta real
+- **Solucao:** substituido pelo calculo correto espelhando o scoring direto: `stageOnly.orderCount / rawNumber` para metas numericas ou `stageOnly.orderCount > 0 ? 1 : 0` como fallback
+
+---
+
+#### Bug 6 — `sankhyaConnected` do mes atual usado para calcular metas do mes anterior
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** a variavel `sankhyaConnected` reflete o estado de conexao do mes *visualizado* (estado do componente), nao do mes anterior. Usar esse valor para resolver `prevWeightTargets` e `resolvedMonthlyTarget` causava calculo incorreto sempre que os dois meses tinham estados de conexao diferentes
+- **Solucao:** introducao de `previousSankhyaConnected = previousSankhyaTargets.length > 0`, derivado exclusivamente dos dados retornados pelo endpoint do mes anterior; todas as referencias a `sankhyaConnected` dentro de `loadPreviousConsolidated` substituidas por `previousSankhyaConnected`
+
+---
+
+#### Bug 7 — `resolvedMonthlyTarget` ignorando `manualFinancialByPeriod` no mes anterior
+
+- **Arquivo:** `src/app/api/pwa/summary/route.ts`
+- **Problema:** o endpoint de summary nao resolvia `manualFinancialByPeriod[YYYY-MM]` antes de cair no `block.monthlyTarget` legado, fazendo meses com meta financeira manual retornarem o valor errado
+- **Solucao:** `resolvedMonthlyTarget` no endpoint agora verifica `manualFinancialByPeriod[periodKey]` primeiro; o mesmo padrao de resolucao foi aplicado dentro de `loadPreviousConsolidated` para espelhar as ramificacoes do scoring direto
+
+---
+
+#### Bug 8 — `break` orfao apos bloco `default` no switch de KPI comparativo
+
+- **Arquivo:** `src/components/metas/MetasWorkspace.tsx`
+- **Problema:** residuo de refactor anterior deixou um `break` fora do bloco `default: { ... }`, tornando-o codigo morto (nunca executado, mas confuso e passivel de mascarar bugs futuros em reescrita)
+- **Solucao:** `break` orfao removido; estrutura do switch agora e semanticamente limpa
+
+---
+
+#### Resultado da sessao
+
+| Mes visualizado | Delta antes das correcoes | Delta apos correcoes | Esperado |
+|---|---|---|---|
+| Marco/2026 | Incorreto (muitos hits fora) | ▲24.4% | ▲24.4% ✅ |
+| Fevereiro/2026 | Incorreto | ▼21.2% | ▼21.9% (1 hit restante) |
+| Janeiro/2026 | Incorreto | ▲87.5% | ▲87.5% aprox. |
+
+- Marco 100% correto: `(102 - 82) / 82 = 24.39%` ✅
+- Fevereiro converge para 1 hit de diferenca (de 13+ anteriores); investigacao continua
+- Nenhum erro de TypeScript introduzido (`get_errors` sem ocorrencias)
+- `useEffect` com dependencias corretas (`monthConfigs` adicionado)
+
+---
+
+**Ultima atualizacao:** 20/04/2026  
 **Responsavel pelo controle:** Time de Desenvolvimento SOUVER
