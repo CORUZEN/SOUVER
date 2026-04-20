@@ -4017,11 +4017,14 @@ export default function MetasWorkspace() {
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
     if (previousSellersData.length === 0) return null
+    const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
+    if (scopedSellerIds.size === 0) return null
     let filtered = previousSellersData
+      .filter((s) => scopedSellerIds.has(s.id))
     if (kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId) {
-      filtered = previousSellersData.filter((s) => s.id === kpiGeneralPanelSellerId)
+      filtered = filtered.filter((s) => s.id === kpiGeneralPanelSellerId)
     } else if (kpiGeneralPanelView === 'SUPERVISOR' && kpiGeneralPanelSupervisorKey) {
-      filtered = previousSellersData.filter((s) => s.supervisorCode === kpiGeneralPanelSupervisorKey)
+      filtered = filtered.filter((s) => s.supervisorCode === kpiGeneralPanelSupervisorKey)
     }
     if (filtered.length === 0) return null
     const uniqueClients = new Set<string>()
@@ -4049,7 +4052,7 @@ export default function MetasWorkspace() {
       metasHit: filtered.reduce((sum, s) => sum + s.metasHit, 0),
       metasTotal: filtered.reduce((sum, s) => sum + s.metasTotal, 0),
     }
-  }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, previousSellersData, productAllowlist])
+  }, [kpiGeneralCardSellerRows, kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, previousSellersData, productAllowlist])
 
   const kpiConsolidatedFilteredSellerRows = useMemo(() => {
     if (kpiGeneralPanelView === 'SUPERVISOR') {
