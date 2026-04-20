@@ -8919,24 +8919,6 @@ export default function MetasWorkspace() {
                         </span>
                       )
                     }
-                    // Para métricas que já são percentuais: diferença absoluta em p.p.
-                    // Arredonda ambos os operandos às mesmas casas exibidas para que
-                    // exibido(A) − exibido(B) = delta exibido (sem surpresa de ponto flutuante).
-                    const deltaPp = (current: number, previous: number | undefined, decimals = 2) => {
-                      if (previous === undefined || previous === null) return null
-                      const factor = Math.pow(10, decimals)
-                      const roundedCurrent = Math.round(current * factor) / factor
-                      const roundedPrevious = Math.round(previous * factor) / factor
-                      const diff = roundedCurrent - roundedPrevious
-                      const up = diff >= 0
-                      return (
-                        <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
-                          up ? 'text-emerald-600' : 'text-rose-600'
-                        }`}>
-                          {up ? '▲' : '▼'} {numFixed(Math.abs(diff), decimals)} p.p.
-                        </span>
-                      )
-                    }
                     // Para contagens (pedidos, volumes): variação relativa, exibida como p.p. para consistência visual
                     const deltaRel = (current: number, previous: number | undefined) => {
                       if (previous === undefined || previous === null || previous === 0) return null
@@ -8979,7 +8961,6 @@ export default function MetasWorkspace() {
                                 <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
-                                  {prev && deltaPp(positivadosPct, prevPositivadosPct)}
                                 </div>
                                 <div className="mt-1.5 flex items-baseline gap-2">
                                   <p className="text-2xl font-semibold tabular-nums text-surface-900">
