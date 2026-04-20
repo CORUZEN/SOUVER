@@ -9011,30 +9011,15 @@ export default function MetasWorkspace() {
                                   <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">40% base</span>
                                 </div>
                               </div>
-                              <div className="mt-2 space-y-1.5">
-                                <div>
-                                  <div className="flex items-baseline justify-between gap-2">
-                                    <div className="flex items-baseline gap-1">
-                                      <span className="text-xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</span>
-                                      <span className="text-xs text-surface-400">/ {num(itemsTarget, 0)} itens</span>
-                                    </div>
-                                    <span className={`text-sm font-semibold tabular-nums ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(itemsRatio, 1)}%</span>
-                                  </div>
-                                  <p className={`text-[10px] ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {itemsOk ? 'Meta de itens atingida' : `▼ Faltam ${num(itemsGap, 0)} itens (meta 80%)`}
-                                  </p>
+                              <div className="mt-2 flex items-center gap-3">
+                                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                                  <span className="text-xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</span>
+                                  <span className={`rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums ${itemsOk ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{num(itemsRatio, 1)}%</span>
                                 </div>
-                                <div>
-                                  <div className="flex items-baseline justify-between gap-2">
-                                    <div className="flex items-baseline gap-1">
-                                      <span className="text-xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</span>
-                                      <span className="text-xs text-surface-400">/ {num(clientsTarget, 0)} clientes</span>
-                                    </div>
-                                    <span className={`text-sm font-semibold tabular-nums ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(clientsRatio, 1)}%</span>
-                                  </div>
-                                  <p className={`text-[10px] ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {clientsOk ? 'Meta de clientes atingida' : `▼ Faltam ${num(clientsGap, 0)} clientes (meta 40%)`}
-                                  </p>
+                                <div className="h-6 w-px shrink-0 bg-surface-200" />
+                                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                                  <span className="text-xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</span>
+                                  <span className={`rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums ${clientsOk ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{num(clientsRatio, 1)}%</span>
                                 </div>
                               </div>
                             </div>
