@@ -3827,11 +3827,9 @@ export default function MetasWorkspace() {
           const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
           return progress >= 1
         }).length
-        const progressSum = applicableRules.reduce((sum, rule) => {
-          const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-          return sum + Math.max(0, Math.min(progress, 1))
-        }, 0)
-        const avgProgressRatio = total > 0 ? progressSum / total : 0
+        const pointsRatio = row.snapshot.pointsTarget > 0
+          ? Math.min(Math.max(row.snapshot.pointsAchieved / row.snapshot.pointsTarget, 0), 1)
+          : 0
         return {
           sellerId: row.sellerId,
           sellerName: row.sellerName,
@@ -3841,7 +3839,7 @@ export default function MetasWorkspace() {
           total,
           hit,
           pending: Math.max(total - hit, 0),
-          avgProgressRatio,
+          avgProgressRatio: pointsRatio,
         }
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
@@ -3884,6 +3882,11 @@ export default function MetasWorkspace() {
     const totalOrders = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0)
     const totalGrossWeight = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0)
     const totalRevenue = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0)
+    const totalRevenueTarget = scopedSnapshots.reduce((sum, snapshot) => {
+      const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
+      const target = Math.max(Number(block?.monthlyTarget ?? 0), 0)
+      return sum + target
+    }, 0)
     const totalVolumes = scopedSellers.reduce(
       (sum, seller) => sum + seller.orders.reduce((inner, order) => inner + Math.max(Number(order.totalVolumes ?? 0), 0), 0),
       0
@@ -3991,6 +3994,7 @@ export default function MetasWorkspace() {
       totalOrders,
       totalGrossWeight,
       totalRevenue,
+      totalRevenueTarget,
       totalVolumes,
       positivadosSold,
       positivadosTarget,
@@ -8851,7 +8855,11 @@ export default function MetasWorkspace() {
                             : 'text-surface-500'
                         const weightTargetClass = weightTargetPct >= 100 ? 'text-emerald-600' : weightTargetPct >= 85 ? 'text-cyan-600' : 'text-rose-600'
                         const weightBarPct = Math.max(0, Math.min(weightTargetPct, 100))
-                        const revenueDeltaValue = prev ? (kpiGeneralScopedSummary.totalRevenue - prev.totalRevenue) : 0
+                        const revenueTargetPct = kpiGeneralScopedSummary.totalRevenueTarget > 0
+                          ? (kpiGeneralScopedSummary.totalRevenue / kpiGeneralScopedSummary.totalRevenueTarget) * 100
+                          : 0
+                        const revenueTargetClass = revenueTargetPct >= 100 ? 'text-emerald-600' : revenueTargetPct >= 85 ? 'text-cyan-600' : 'text-rose-600'
+                        const revenueBarPct = Math.max(0, Math.min(revenueTargetPct, 100))
                         const metasHitDeltaValue = prev ? (kpiGeneralScopedSummary.metasHit - prev.metasHit) : 0
                         const totalVolumesDeltaValue = prev ? (kpiGeneralScopedSummary.totalVolumes - prev.totalVolumes) : 0
                         const devolucaoOverLimit = devolucaoLimitPct > 0 ? devolucaoPct - devolucaoLimitPct : 0
@@ -8936,14 +8944,29 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
-                                {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
+                                {kpiGeneralScopedSummary.totalRevenueTarget > 0 && (
+                                  <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums ${revenueTargetClass}`}>
+                                    {num(revenueTargetPct, 1)}%
+                                  </span>
+                                )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
-                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Faturamento consolidado no período.</p>
-                              {prev && (
-                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${revenueDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {revenueDeltaValue >= 0 ? '+' : '-'}{currency(Math.abs(revenueDeltaValue))} vs mês anterior
-                                </p>
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
+                                Meta de faturamento: {currency(kpiGeneralScopedSummary.totalRevenueTarget)}
+                              </p>
+                              {kpiGeneralScopedSummary.totalRevenueTarget > 0 ? (
+                                <>
+                                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90">
+                                    <div className={`h-full rounded-full transition-[width] duration-700 ${revenueTargetPct >= 100 ? 'bg-emerald-500' : revenueTargetPct >= 85 ? 'bg-cyan-600' : 'bg-amber-500'}`} style={{ width: `${revenueBarPct}%` }} />
+                                  </div>
+                                  <p className="mt-0.5 text-[9px] text-slate-500">
+                                    {revenueTargetPct >= 100
+                                      ? 'Meta de faturamento atingida.'
+                                      : `${currency(Math.max(kpiGeneralScopedSummary.totalRevenueTarget - kpiGeneralScopedSummary.totalRevenue, 0))} restantes para a meta.`}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="mt-0.5 text-[9px] text-slate-500">Meta de faturamento não parametrizada.</p>
                               )}
                             </div>
                             <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
