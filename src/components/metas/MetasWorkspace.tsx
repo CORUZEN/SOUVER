@@ -8852,6 +8852,8 @@ export default function MetasWorkspace() {
                         const weightTargetClass = weightTargetPct >= 100 ? 'text-emerald-600' : weightTargetPct >= 85 ? 'text-cyan-600' : 'text-rose-600'
                         const weightBarPct = Math.max(0, Math.min(weightTargetPct, 100))
                         const revenueDeltaValue = prev ? (kpiGeneralScopedSummary.totalRevenue - prev.totalRevenue) : 0
+                        const metasHitDeltaValue = prev ? (kpiGeneralScopedSummary.metasHit - prev.metasHit) : 0
+                        const totalVolumesDeltaValue = prev ? (kpiGeneralScopedSummary.totalVolumes - prev.totalVolumes) : 0
                         const devolucaoOverLimit = devolucaoLimitPct > 0 ? devolucaoPct - devolucaoLimitPct : 0
                         const inadimplenciaOverLimit = inadimplenciaLimitPct > 0 ? inadimplenciaPct - inadimplenciaLimitPct : 0
                         const delta = (current: number, previous: number | undefined) => {
@@ -8958,9 +8960,13 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
-                              <p className="mt-1 text-[9px] font-semibold text-slate-600">
-                                {num(kpiGeneralScopedSummary.metasHit, 0)} de {num(kpiGeneralScopedSummary.metasTotal, 0)} metas conquistadas
-                              </p>
+                              {prev ? (
+                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${metasHitDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {metasHitDeltaValue >= 0 ? '+' : '-'}{num(Math.abs(metasHitDeltaValue), 0)} metas vs mês anterior
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-[9px] font-semibold text-slate-600">Sem base comparativa do mês anterior.</p>
+                              )}
                             </div>
                             <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
@@ -8976,9 +8982,13 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalVolumes, 0)}</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Total de volumes nos pedidos do período.</p>
-                              <p className="mt-1 text-[9px] font-semibold text-slate-600">
-                                {num(kpiGeneralScopedSummary.totalOrders, 0)} pedidos considerados
-                              </p>
+                              {prev ? (
+                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${totalVolumesDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {totalVolumesDeltaValue >= 0 ? '+' : '-'}{num(Math.abs(totalVolumesDeltaValue), 0)} volumes vs mês anterior
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-[9px] font-semibold text-slate-600">Sem base comparativa do mês anterior.</p>
+                              )}
                             </div>
                           </div>
                         )
