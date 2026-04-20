@@ -8985,22 +8985,22 @@ export default function MetasWorkspace() {
                           return (
                             <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Distribuição de itens</p>
-                                <div className="flex gap-1">
-                                  <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700">80% itens</span>
-                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">40% base</span>
+                              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                                <p className="truncate whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Distribuição de itens</p>
+                                <div className="flex items-center gap-1.5 whitespace-nowrap pl-1">
+                                  <span className="inline-flex whitespace-nowrap rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-sky-700">80% itens</span>
+                                  <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
                                 </div>
                               </div>
                               <div className="mt-1.5 flex items-baseline gap-0">
                                 <div className="flex flex-1 items-baseline gap-2">
                                   <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</p>
-                                  <span className={`text-sm font-semibold tabular-nums ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(itemsRatio, 1)}%</span>
+                                  <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${itemsOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(itemsRatio, 1)}%</span>
                                 </div>
                                 <div className="mx-3 self-stretch w-px bg-surface-200" />
                                 <div className="flex flex-1 items-baseline gap-2">
                                   <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</p>
-                                  <span className={`text-sm font-semibold tabular-nums ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(clientsRatio, 1)}%</span>
+                                  <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${clientsOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(clientsRatio, 1)}%</span>
                                 </div>
                               </div>
                             </div>
@@ -9018,7 +9018,7 @@ export default function MetasWorkspace() {
                                 <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}</span>
                               )}
                             </p>
-                            {clientePct > 0 && <span className="text-sm font-semibold tabular-nums text-indigo-600">{num(clientePct, 1)}%</span>}
+                            {clientePct > 0 && <span className="text-[12px] font-semibold tabular-nums tracking-tight text-indigo-700">{num(clientePct, 1)}%</span>}
                           </div>
                         </div>
                         <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
@@ -9038,7 +9038,7 @@ export default function MetasWorkspace() {
                               {num(kpiGeneralScopedSummary.metasHit, 0)}
                               <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.metasTotal, 0)}</span>
                             </p>
-                            {metasPct > 0 && <span className="text-sm font-semibold tabular-nums text-emerald-600">{num(metasPct, 1)}%</span>}
+                            {metasPct > 0 && <span className="text-[12px] font-semibold tabular-nums tracking-tight text-emerald-700">{num(metasPct, 1)}%</span>}
                           </div>
                         </div>
                       </div>
