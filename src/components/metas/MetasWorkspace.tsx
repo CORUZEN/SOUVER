@@ -8794,8 +8794,8 @@ export default function MetasWorkspace() {
                         const baseCoveragePct = kpiGeneralScopedSummary.totalBaseClients > 0
                           ? (kpiGeneralScopedSummary.uniqueClients / kpiGeneralScopedSummary.totalBaseClients) * 100
                           : 0
-                        const prevBaseCoveragePct = prev && prev.totalBaseClients > 0
-                          ? (prev.uniqueClients / prev.totalBaseClients) * 100
+                        const weightTargetPct = kpiGeneralScopedSummary.volumeTargetKg > 0
+                          ? (kpiGeneralScopedSummary.totalGrossWeight / kpiGeneralScopedSummary.volumeTargetKg) * 100
                           : 0
                         const volumePct = kpiGeneralScopedSummary.volumeRatio * 100
                         const devolucaoPct = kpiGeneralScopedSummary.devolucaoRatePct
@@ -8811,6 +8811,7 @@ export default function MetasWorkspace() {
                           inadimplenciaLimitPct > 0
                             ? (inadimplenciaPct <= inadimplenciaLimitPct ? 'text-emerald-600' : 'text-rose-600')
                             : 'text-surface-500'
+                        const weightTargetClass = weightTargetPct >= 100 ? 'text-emerald-600' : weightTargetPct >= 85 ? 'text-cyan-600' : 'text-rose-600'
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
@@ -8830,10 +8831,16 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-cyan-400 transition-all duration-300 group-hover:from-cyan-600 group-hover:to-cyan-500" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
-                                {prev && delta(kpiGeneralScopedSummary.totalGrossWeight, prev.totalGrossWeight)}
+                                {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
+                                  <span className={`inline-flex shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums ${weightTargetClass}`}>
+                                    {num(weightTargetPct, 1)}%
+                                  </span>
+                                )}
                               </div>
                               <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">Peso bruto consolidado no período.</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
+                                Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
+                              </p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-300 group-hover:from-emerald-600 group-hover:to-emerald-500" />
@@ -8848,11 +8855,15 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-400 transition-all duration-300 group-hover:from-indigo-600 group-hover:to-indigo-500" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Base de clientes</p>
-                                {prev && delta(baseCoveragePct, prevBaseCoveragePct)}
+                                <span className="inline-flex shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums text-indigo-600">
+                                  {num(baseCoveragePct, 1)}%
+                                </span>
                               </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">
+                                {num(kpiGeneralScopedSummary.uniqueClients, 0)} / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}
+                              </p>
                               <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
-                                Cobertura atual: {num(kpiGeneralScopedSummary.uniqueClients, 0)} clientes ({num(baseCoveragePct, 1)}%)
+                                Cobertura atual da base no período selecionado.
                               </p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
@@ -8888,7 +8899,7 @@ export default function MetasWorkspace() {
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-rose-500 to-pink-500 transition-all duration-300 group-hover:from-rose-600 group-hover:to-pink-600" />
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência acumulativa</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência</p>
                                 <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
                                   inadimplenciaClass === 'text-emerald-600'
                                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
