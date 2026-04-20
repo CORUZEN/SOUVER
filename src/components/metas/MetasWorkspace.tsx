@@ -9011,15 +9011,15 @@ export default function MetasWorkspace() {
                                   <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">40% base</span>
                                 </div>
                               </div>
-                              <div className="mt-2 flex items-center gap-3">
-                                <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                                  <span className="text-xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</span>
-                                  <span className={`rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums ${itemsOk ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{num(itemsRatio, 1)}%</span>
+                              <div className="mt-1.5 flex items-baseline gap-0">
+                                <div className="flex flex-1 items-baseline gap-2">
+                                  <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</p>
+                                  <span className={`text-sm font-semibold tabular-nums ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(itemsRatio, 1)}%</span>
                                 </div>
-                                <div className="h-6 w-px shrink-0 bg-surface-200" />
-                                <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                                  <span className="text-xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</span>
-                                  <span className={`rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums ${clientsOk ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{num(clientsRatio, 1)}%</span>
+                                <div className="mx-3 self-stretch w-px bg-surface-200" />
+                                <div className="flex flex-1 items-baseline gap-2">
+                                  <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</p>
+                                  <span className={`text-sm font-semibold tabular-nums ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(clientsRatio, 1)}%</span>
                                 </div>
                               </div>
                             </div>
