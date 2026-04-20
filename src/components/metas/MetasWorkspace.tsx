@@ -1067,7 +1067,10 @@ export default function MetasWorkspace() {
   const [previousSellersData, setPreviousSellersData] = useState<Array<{
     id: string
     supervisorCode: string
+    pointsAchieved: number
+    pointsTarget: number
     totalOrders: number
+    totalVolumes: number
     totalGrossWeight: number
     totalRevenue: number
     clientCodes: string[]
@@ -3818,7 +3821,7 @@ export default function MetasWorkspace() {
       .map((row) => {
         const block = row.block
         if (!block) return null
-        const applicableRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
+        const applicableRules = block.rules
         const total = applicableRules.length
         const hit = applicableRules.filter((rule) => {
           const progress = row.snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
@@ -3874,7 +3877,6 @@ export default function MetasWorkspace() {
 
   const kpiGeneralScopedSummary = useMemo(() => {
     const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
-    const scopedPerformanceRows = kpiGeneralSellerPerformanceRows.filter((row) => scopedSellerIds.has(row.sellerId))
     const scopedSnapshots = snapshots.filter((snapshot) => scopedSellerIds.has(snapshot.seller.id))
     const scopedSellers = sellers.filter((seller) => scopedSellerIds.has(seller.id))
     const scopedWeightRows = sellerWeightPerformanceRows.filter((row) => scopedSellerIds.has(row.sellerId))
@@ -3909,7 +3911,7 @@ export default function MetasWorkspace() {
       (acc, snapshot) => {
         const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
         if (!block) return acc
-        const applicableRules = block.rules.filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) !== 'VOLUME')
+        const applicableRules = block.rules
         acc.total += applicableRules.length
         acc.hit += applicableRules.filter((rule) => {
           const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
@@ -3919,6 +3921,14 @@ export default function MetasWorkspace() {
       },
       { hit: 0, total: 0 }
     )
+    const averageOverallPct = scopedSnapshots.length > 0
+      ? (
+        scopedSnapshots.reduce((sum, snapshot) => {
+          const ratio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+          return sum + Math.min(Math.max(ratio, 0), 1)
+        }, 0) / scopedSnapshots.length
+      ) * 100
+      : 0
 
     const kpiLimits = scopedSnapshots.reduce(
       (acc, snapshot) => {
@@ -3975,10 +3985,7 @@ export default function MetasWorkspace() {
 
     return {
       sellerCount: scopedSnapshots.length,
-      averageOverallPct:
-        scopedPerformanceRows.length > 0
-          ? (scopedPerformanceRows.reduce((sum, row) => sum + row.avgProgressRatio, 0) / scopedPerformanceRows.length) * 100
-          : 0,
+      averageOverallPct,
       uniqueClients: uniqueClients.size,
       totalBaseClients,
       totalOrders,
@@ -4001,7 +4008,7 @@ export default function MetasWorkspace() {
       inadimplenciaLimitPct,
       inadimplenciaLimitDays,
     }
-  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, kpiGeneralSellerPerformanceRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
+  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -4019,9 +4026,18 @@ export default function MetasWorkspace() {
     }
     const activeProductsCount = Math.max(productAllowlist.filter((p) => p.active).length, 0)
     return {
+      averageOverallPct: filtered.length > 0
+        ? (
+          filtered.reduce((sum, s) => {
+            const ratio = s.pointsTarget > 0 ? s.pointsAchieved / s.pointsTarget : 0
+            return sum + Math.min(Math.max(ratio, 0), 1)
+          }, 0) / filtered.length
+        ) * 100
+        : 0,
       totalOrders: filtered.reduce((sum, s) => sum + s.totalOrders, 0),
       totalGrossWeight: filtered.reduce((sum, s) => sum + s.totalGrossWeight, 0),
       totalRevenue: filtered.reduce((sum, s) => sum + s.totalRevenue, 0),
+      totalVolumes: filtered.reduce((sum, s) => sum + s.totalVolumes, 0),
       uniqueClients: uniqueClients.size,
       totalBaseClients: filtered.reduce((sum, s) => sum + s.baseClientCount, 0),
       positivadosSold: filtered.reduce((sum, s) => sum + s.positivadosSold, 0),
@@ -4300,7 +4316,7 @@ export default function MetasWorkspace() {
           focusTargetKg?: number
           focusTargetBasePct?: number
           monthlyTarget?: number
-          rules?: Array<{ id: string; stage: StageKey; kpi: string; kpiType?: KpiType; targetText: string }>
+          rules?: Array<{ id: string; stage: StageKey; kpi: string; kpiType?: KpiType; targetText: string; points?: number }>
         }>
 
         const previousCycleWeeksRaw = (Array.isArray(summaryPayload?.cycleWeeks) ? summaryPayload.cycleWeeks : []) as Array<{
@@ -4515,6 +4531,7 @@ export default function MetasWorkspace() {
 
         const previousByType = new Map<KpiType, { total: number; hit: number }>()
         const perSellerMetas = new Map<string, { hit: number; total: number }>()
+        const perSellerPoints = new Map<string, { pointsAchieved: number; pointsTarget: number }>()
         for (const seller of previousSellers) {
           const sellerCode = toSellerCodeFromId(seller.id)
           const sellerNameLookup = normalizeSellerNameForLookup(seller.name)
@@ -4612,9 +4629,10 @@ export default function MetasWorkspace() {
 
           const rules = Array.isArray(summarySeller.rules) ? summarySeller.rules : []
           const sellerMetasObj = { hit: 0, total: 0 }
+          let pointsTarget = 0
+          let pointsAchieved = 0
           for (const rule of rules) {
             const kpiType = (rule.kpiType ?? inferKpiType(rule.kpi)) as KpiType
-            if (kpiType === 'VOLUME') continue
             if (!stageStarted.has(rule.stage)) continue
 
             const rawNumber = parseTargetNumber(rule.targetText) ?? 0
@@ -4731,13 +4749,19 @@ export default function MetasWorkspace() {
                 break
             }
 
+            const clampedProgress = Math.max(0, Math.min(progress, 1))
+            const rulePoints = Math.max(Number((rule as { points?: number }).points ?? 0), 0)
+            pointsTarget += rulePoints
+            pointsAchieved += rulePoints * clampedProgress
+
             const bucket = previousByType.get(kpiType) ?? { total: 0, hit: 0 }
             bucket.total += 1
             sellerMetasObj.total += 1
-            if (Math.max(0, Math.min(progress, 1)) >= 1) { bucket.hit += 1; sellerMetasObj.hit += 1 }
+            if (clampedProgress >= 1) { bucket.hit += 1; sellerMetasObj.hit += 1 }
             previousByType.set(kpiType, bucket)
           }
           perSellerMetas.set(seller.id, sellerMetasObj)
+          perSellerPoints.set(seller.id, { pointsAchieved, pointsTarget })
         }
 
         if (cancelled) return
@@ -4756,10 +4780,14 @@ export default function MetasWorkspace() {
           const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
           const positivadosSold = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
           const metas = perSellerMetas.get(s.id) ?? { hit: 0, total: 0 }
+          const points = perSellerPoints.get(s.id) ?? { pointsAchieved: 0, pointsTarget: 0 }
           return {
             id: s.id,
             supervisorCode: String(s.supervisorCode ?? '').trim(),
+            pointsAchieved: points.pointsAchieved,
+            pointsTarget: points.pointsTarget,
             totalOrders: s.totalOrders,
+            totalVolumes: s.orders.reduce((sum, order) => sum + Math.max(Number(order.totalVolumes ?? 0), 0), 0),
             totalGrossWeight: s.totalGrossWeight,
             totalRevenue: s.totalValue,
             clientCodes: s.orders.map((o) => String(o.clientCode ?? '').trim()).filter(Boolean),
@@ -8221,7 +8249,7 @@ export default function MetasWorkspace() {
                   <p className="mt-0.5 text-[10px] text-surface-400">
                     {strategicMetricsPanelMode === 'WEIGHT'
                       ? `Visão geral, por vendedor e por supervisor — ${MONTHS[month]} ${year}`
-                      : `Consolidação corporativa de metas (exceto Volume) por período — ${MONTHS[month]} ${year}`}
+                      : `Consolidação corporativa de metas por período — ${MONTHS[month]} ${year}`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -8784,7 +8812,7 @@ export default function MetasWorkspace() {
                         </select>
                         {kpiGeneralPanelView === 'GENERAL' ? (
                           <span className="text-[10px] text-cyan-700">
-                            {num(kpiConsolidatedHighlights.overallAdherenceRatio * 100, 1)}% de aderência média
+                            {num(kpiGeneralScopedSummary.averageOverallPct, 1)}% de aderência média
                           </span>
                         ) : kpiGeneralPanelView === 'SELLER' ? (
                           (() => {
@@ -8841,7 +8869,7 @@ export default function MetasWorkspace() {
                         }
                         return (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2 text-[10px]">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
@@ -8852,7 +8880,7 @@ export default function MetasWorkspace() {
                                 )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
                                 Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
                               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90">
@@ -8862,21 +8890,7 @@ export default function MetasWorkspace() {
                                 {weightTargetPct >= 100 ? 'Meta de peso atingida.' : `${num(Math.max(kpiGeneralScopedSummary.volumeTargetKg - kpiGeneralScopedSummary.totalGrossWeight, 0), 2)} kg restantes para a meta.`}
                               </p>
                             </div>
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
-                                {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
-                              </div>
-                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Faturamento consolidado no período.</p>
-                              {prev && (
-                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${revenueDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                  {revenueDeltaValue >= 0 ? '+' : '-'}{currency(Math.abs(revenueDeltaValue))} vs mês anterior
-                                </p>
-                              )}
-                            </div>
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Devolução</p>
@@ -8889,14 +8903,14 @@ export default function MetasWorkspace() {
                                 }`}>{num(devolucaoPct, 3)}%</span>
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
                                 Limite da meta: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
                               <p className={`mt-1 text-[9px] font-semibold ${devolucaoOverLimit <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                                 {devolucaoOverLimit <= 0 ? `${num(Math.abs(devolucaoOverLimit), 3)} p.p abaixo do limite` : `${num(devolucaoOverLimit, 3)} p.p acima do limite`}
                               </p>
                             </div>
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência</p>
@@ -8909,43 +8923,61 @@ export default function MetasWorkspace() {
                                 }`}>{num(inadimplenciaPct, 3)}%</span>
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
                                 {num(kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount, 0)} títulos &gt; {inadimplenciaLimitDays} dias · limite {inadimplenciaLimitPct > 0 ? `${num(inadimplenciaLimitPct, 2)}%` : 'n/a'}
                               </p>
                               <p className={`mt-1 text-[9px] font-semibold ${inadimplenciaOverLimit <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                                 {inadimplenciaOverLimit <= 0 ? `${num(Math.abs(inadimplenciaOverLimit), 3)} p.p abaixo do limite` : `${num(inadimplenciaOverLimit, 3)} p.p acima do limite`}
                               </p>
                             </div>
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
+                                {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
+                              </div>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Faturamento consolidado no período.</p>
+                              {prev && (
+                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${revenueDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {revenueDeltaValue >= 0 ? '+' : '-'}{currency(Math.abs(revenueDeltaValue))} vs mês anterior
+                                </p>
+                              )}
+                            </div>
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
-                                <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
-                                  kpiGeneralScopedSummary.averageOverallPct >= 85
-                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                                    : kpiGeneralScopedSummary.averageOverallPct >= 65
-                                      ? 'border-cyan-100 bg-cyan-50 text-cyan-700'
-                                      : 'border-amber-100 bg-amber-50 text-amber-700'
-                                }`}>{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</span>
+                                {prev ? (
+                                  delta(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct)
+                                ) : (
+                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
+                                    sem base
+                                  </span>
+                                )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Atingimento médio dos vendedores no escopo.</p>
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
                               <p className="mt-1 text-[9px] font-semibold text-slate-600">
                                 {num(kpiGeneralScopedSummary.metasHit, 0)} de {num(kpiGeneralScopedSummary.metasTotal, 0)} metas conquistadas
                               </p>
                             </div>
-                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Qtd. Volumes</p>
-                                <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
-                                  {kpiGeneralScopedSummary.totalOrders > 0 ? num(kpiGeneralScopedSummary.totalVolumes / kpiGeneralScopedSummary.totalOrders, 1) : '0'} / pedido
-                                </span>
+                                {prev ? (
+                                  delta(kpiGeneralScopedSummary.totalVolumes, prev.totalVolumes)
+                                ) : (
+                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
+                                    sem base
+                                  </span>
+                                )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalVolumes, 0)}</p>
-                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Total de volumes nos pedidos do período.</p>
+                              <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Total de volumes nos pedidos do período.</p>
                               <p className="mt-1 text-[9px] font-semibold text-slate-600">
-                                {num(kpiGeneralScopedSummary.totalOrders, 0)} pedidos considerados no escopo
+                                {num(kpiGeneralScopedSummary.totalOrders, 0)} pedidos considerados
                               </p>
                             </div>
                           </div>
