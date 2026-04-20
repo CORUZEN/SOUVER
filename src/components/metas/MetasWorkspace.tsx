@@ -104,6 +104,7 @@ interface SellerOrder {
   negotiatedAt: string
   totalValue: number
   grossWeight: number
+  totalVolumes: number
   clientCode: string
 }
 
@@ -1850,7 +1851,7 @@ export default function MetasWorkspace() {
           totalOpenTitlesValue?: number
           totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; totalVolumes?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
           openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
@@ -1863,6 +1864,7 @@ export default function MetasWorkspace() {
               negotiatedAt: String(order.negotiatedAt).slice(0, 10),
               totalValue: Number(order.totalValue ?? 0),
               grossWeight: Number(order.grossWeight ?? 0),
+              totalVolumes: Number(order.totalVolumes ?? 0),
               clientCode: String(order.clientCode ?? ''),
             }))
           const normalizedReturns = (seller.returns ?? [])
@@ -2248,7 +2250,7 @@ export default function MetasWorkspace() {
           totalOpenTitlesValue?: number
           totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; totalVolumes?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
           openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
@@ -2261,6 +2263,7 @@ export default function MetasWorkspace() {
                 negotiatedAt: String(order.negotiatedAt).slice(0, 10),
                 totalValue: Number(order.totalValue ?? 0),
                 grossWeight: Number(order.grossWeight ?? 0),
+                totalVolumes: Number(order.totalVolumes ?? 0),
                 clientCode: String(order.clientCode ?? ''),
               }))
             const normalizedReturns = (seller.returns ?? [])
@@ -3871,6 +3874,7 @@ export default function MetasWorkspace() {
 
   const kpiGeneralScopedSummary = useMemo(() => {
     const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
+    const scopedPerformanceRows = kpiGeneralSellerPerformanceRows.filter((row) => scopedSellerIds.has(row.sellerId))
     const scopedSnapshots = snapshots.filter((snapshot) => scopedSellerIds.has(snapshot.seller.id))
     const scopedSellers = sellers.filter((seller) => scopedSellerIds.has(seller.id))
     const scopedWeightRows = sellerWeightPerformanceRows.filter((row) => scopedSellerIds.has(row.sellerId))
@@ -3878,6 +3882,10 @@ export default function MetasWorkspace() {
     const totalOrders = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0)
     const totalGrossWeight = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0)
     const totalRevenue = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0)
+    const totalVolumes = scopedSellers.reduce(
+      (sum, seller) => sum + seller.orders.reduce((inner, order) => inner + Math.max(Number(order.totalVolumes ?? 0), 0), 0),
+      0
+    )
 
     const uniqueClients = new Set<string>()
     for (const seller of sellers) {
@@ -3967,11 +3975,16 @@ export default function MetasWorkspace() {
 
     return {
       sellerCount: scopedSnapshots.length,
+      averageOverallPct:
+        scopedPerformanceRows.length > 0
+          ? (scopedPerformanceRows.reduce((sum, row) => sum + row.avgProgressRatio, 0) / scopedPerformanceRows.length) * 100
+          : 0,
       uniqueClients: uniqueClients.size,
       totalBaseClients,
       totalOrders,
       totalGrossWeight,
       totalRevenue,
+      totalVolumes,
       positivadosSold,
       positivadosTarget,
       metasHit: metas.hit,
@@ -3988,7 +4001,7 @@ export default function MetasWorkspace() {
       inadimplenciaLimitPct,
       inadimplenciaLimitDays,
     }
-  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
+  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, kpiGeneralSellerPerformanceRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -4416,7 +4429,7 @@ export default function MetasWorkspace() {
           totalValue?: number
           totalGrossWeight?: number
           totalOrders?: number
-          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; clientCode?: string }>
+          orders?: Array<{ orderNumber?: string; negotiatedAt?: string; totalValue?: number; grossWeight?: number; totalVolumes?: number; clientCode?: string }>
           returns?: Array<{ negotiatedAt?: string; totalValue?: number }>
           openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
@@ -4429,6 +4442,7 @@ export default function MetasWorkspace() {
               negotiatedAt: String(order.negotiatedAt).slice(0, 10),
               totalValue: Number(order.totalValue ?? 0),
               grossWeight: Number(order.grossWeight ?? 0),
+              totalVolumes: Number(order.totalVolumes ?? 0),
               clientCode: String(order.clientCode ?? ''),
             }))
           const normalizedReturns = (seller.returns ?? [])
@@ -8826,7 +8840,7 @@ export default function MetasWorkspace() {
                           )
                         }
                         return (
-                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2 text-[10px]">
@@ -8900,6 +8914,38 @@ export default function MetasWorkspace() {
                               </p>
                               <p className={`mt-1 text-[9px] font-semibold ${inadimplenciaOverLimit <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                                 {inadimplenciaOverLimit <= 0 ? `${num(Math.abs(inadimplenciaOverLimit), 3)} p.p abaixo do limite` : `${num(inadimplenciaOverLimit, 3)} p.p acima do limite`}
+                              </p>
+                            </div>
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
+                                <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
+                                  kpiGeneralScopedSummary.averageOverallPct >= 85
+                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                                    : kpiGeneralScopedSummary.averageOverallPct >= 65
+                                      ? 'border-cyan-100 bg-cyan-50 text-cyan-700'
+                                      : 'border-amber-100 bg-amber-50 text-amber-700'
+                                }`}>{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</span>
+                              </div>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Atingimento médio dos vendedores no escopo.</p>
+                              <p className="mt-1 text-[9px] font-semibold text-slate-600">
+                                {num(kpiGeneralScopedSummary.metasHit, 0)} de {num(kpiGeneralScopedSummary.metasTotal, 0)} metas conquistadas
+                              </p>
+                            </div>
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Qtd. Volumes</p>
+                                <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
+                                  {kpiGeneralScopedSummary.totalOrders > 0 ? num(kpiGeneralScopedSummary.totalVolumes / kpiGeneralScopedSummary.totalOrders, 1) : '0'} / pedido
+                                </span>
+                              </div>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalVolumes, 0)}</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Total de volumes nos pedidos do período.</p>
+                              <p className="mt-1 text-[9px] font-semibold text-slate-600">
+                                {num(kpiGeneralScopedSummary.totalOrders, 0)} pedidos considerados no escopo
                               </p>
                             </div>
                           </div>

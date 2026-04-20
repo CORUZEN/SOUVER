@@ -15,6 +15,7 @@ type SankhyaOrder = {
   negotiatedAt: string
   totalValue: number
   grossWeight: number
+  totalVolumes: number
   statusNota: string
   companyCode: string
 }
@@ -326,6 +327,7 @@ function toOrder(record: RawRecord): SankhyaOrder | null {
     negotiatedAt,
     totalValue: parseNumber(record.VLRNOTA),
     grossWeight: parseNumber(record.PESOBRUTO),
+    totalVolumes: parseNumber(record.QTDVOL ?? record.QTDVOLUMES),
     statusNota: String(record.STATUSNOTA ?? 'L').trim(),
     companyCode: String(record.CODEMP ?? '').trim(),
   }
@@ -437,6 +439,7 @@ SELECT
   TO_CHAR(CAB.NUNOTA) AS NUNOTA,
   NVL(CAB.VLRNOTA, 0) AS VLRNOTA,
   NVL(CAB.PESOBRUTO, 0) AS PESOBRUTO,
+  NVL(CAB.QTDVOL, 0) AS QTDVOL,
   NVL(CAB.STATUSNOTA, 'L') AS STATUSNOTA,
   TO_CHAR(CAB.CODEMP) AS CODEMP
 FROM TGFCAB CAB
@@ -842,7 +845,7 @@ export async function GET(req: NextRequest) {
       id: string
       name: string
       login: string
-      orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; clientCode: string }>
+      orders: Array<{ orderNumber: string; negotiatedAt: string; totalValue: number; grossWeight: number; totalVolumes: number; clientCode: string }>
       returns: Array<{ negotiatedAt: string; totalValue: number }>
       openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
       supervisorCode: string | null
@@ -886,6 +889,7 @@ export async function GET(req: NextRequest) {
         negotiatedAt: order.negotiatedAt,
         totalValue: order.totalValue,
         grossWeight: order.grossWeight,
+        totalVolumes: order.totalVolumes,
         clientCode: order.partnerCode,
       })
       seller.totalValue += order.totalValue
