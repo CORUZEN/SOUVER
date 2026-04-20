@@ -8852,6 +8852,7 @@ export default function MetasWorkspace() {
                 <div className="mt-4 space-y-4">
                   {(() => {
                     const prev = previousPeriodScopedTotals
+                    // Para contagens/valores: variação relativa (ex: +4,72% a mais de pedidos)
                     const delta = (current: number, previous: number | undefined) => {
                       if (previous === undefined || previous === null) return null
                       if (previous === 0) {
@@ -8879,6 +8880,19 @@ export default function MetasWorkspace() {
                         </span>
                       )
                     }
+                    // Para métricas que já são percentuais: diferença absoluta em p.p.
+                    const deltaPp = (current: number, previous: number | undefined) => {
+                      if (previous === undefined || previous === null) return null
+                      const diff = current - previous
+                      const up = diff >= 0
+                      return (
+                        <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
+                          up ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {up ? '▲' : '▼'} {num(Math.abs(diff), 2)} p.p.
+                        </span>
+                      )
+                    }
                     const positivadosPct = kpiGeneralScopedSummary.positivadosTarget > 0
                       ? (kpiGeneralScopedSummary.positivadosSold / kpiGeneralScopedSummary.positivadosTarget) * 100
                       : 0
@@ -8888,13 +8902,22 @@ export default function MetasWorkspace() {
                     const metasPct = kpiGeneralScopedSummary.metasTotal > 0
                       ? (kpiGeneralScopedSummary.metasHit / kpiGeneralScopedSummary.metasTotal) * 100
                       : 0
+                    const prevPositivadosPct = prev && prev.positivadosTarget > 0
+                      ? (prev.positivadosSold / prev.positivadosTarget) * 100
+                      : undefined
+                    const prevClientePct = prev && prev.totalBaseClients > 0
+                      ? (prev.uniqueClients / prev.totalBaseClients) * 100
+                      : undefined
+                    const prevMetasPct = prev && prev.metasTotal > 0
+                      ? (prev.metasHit / prev.metasTotal) * 100
+                      : undefined
                     return (
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
-                            {prev && delta(kpiGeneralScopedSummary.positivadosSold, prev.positivadosSold)}
+                            {prev && deltaPp(positivadosPct, prevPositivadosPct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -8908,7 +8931,7 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
-                            {prev && delta(kpiGeneralScopedSummary.uniqueClients, prev.uniqueClients)}
+                            {prev && deltaPp(clientePct, prevClientePct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -8932,7 +8955,7 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
-                            {prev && prev.metasTotal > 0 && delta(kpiGeneralScopedSummary.metasHit, prev.metasHit)}
+                            {prev && prev.metasTotal > 0 && deltaPp(metasPct, prevMetasPct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -9001,7 +9024,7 @@ export default function MetasWorkspace() {
                         </select>
                         {kpiGeneralPanelView === 'GENERAL' ? (
                           <span className="text-[10px] text-cyan-700">
-                            {num(kpiGeneralScopedSummary.averageOverallPct, 1)}% de aderência média
+                            {num(kpiGeneralScopedSummary.averageOverallPct, 2)}% de aderência média
                           </span>
                         ) : kpiGeneralPanelView === 'SELLER' ? (
                           (() => {
@@ -9049,6 +9072,7 @@ export default function MetasWorkspace() {
                         const totalVolumesDeltaValue = prev ? (kpiGeneralScopedSummary.totalVolumes - prev.totalVolumes) : 0
                         const devolucaoOverLimit = devolucaoLimitPct > 0 ? devolucaoPct - devolucaoLimitPct : 0
                         const inadimplenciaOverLimit = inadimplenciaLimitPct > 0 ? inadimplenciaPct - inadimplenciaLimitPct : 0
+                        // Para contagens/valores: variação relativa
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
@@ -9059,6 +9083,19 @@ export default function MetasWorkspace() {
                               up ? 'text-emerald-600' : 'text-rose-600'
                             }`}>
                               {up ? '▲' : '▼'} {num(Math.abs(pct), 2)}%
+                            </span>
+                          )
+                        }
+                        // Para métricas que já são percentuais: diferença absoluta em p.p.
+                        const deltaPp = (current: number, previous: number | undefined) => {
+                          if (previous === undefined || previous === null) return null
+                          const diff = current - previous
+                          const up = diff >= 0
+                          return (
+                            <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
+                              up ? 'text-emerald-600' : 'text-rose-600'
+                            }`}>
+                              {up ? '▲' : '▼'} {num(Math.abs(diff), 2)} p.p.
                             </span>
                           )
                         }
@@ -9159,14 +9196,14 @@ export default function MetasWorkspace() {
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
                                 {prev ? (
-                                  delta(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct)
+                                  deltaPp(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct)
                                 ) : (
                                   <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
                                     sem base
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</p>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 2)}%</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
                               {prev && prev.metasTotal > 0 ? (
                                 <p className={`mt-1 text-[9px] font-semibold tabular-nums ${metasHitDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
