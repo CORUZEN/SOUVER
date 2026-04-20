@@ -8875,7 +8875,7 @@ export default function MetasWorkspace() {
                         <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
                           up ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
-                          {up ? '▲' : '▼'} {num(Math.abs(pct), 1)}%
+                          {up ? '▲' : '▼'} {num(Math.abs(pct), 2)}%
                         </span>
                       )
                     }
@@ -9058,7 +9058,7 @@ export default function MetasWorkspace() {
                             <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
                               up ? 'text-emerald-600' : 'text-rose-600'
                             }`}>
-                              {up ? '▲' : '▼'} {num(Math.abs(pct), 1)}%
+                              {up ? '▲' : '▼'} {num(Math.abs(pct), 2)}%
                             </span>
                           )
                         }
