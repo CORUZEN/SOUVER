@@ -4546,12 +4546,10 @@ export default function MetasWorkspace() {
           const sellerSupervisorCode = normalizeEntityCode(
             String(summarySeller.supervisorCode ?? seller.supervisorCode ?? '')
           )
-          if (kpiConsolidatedScope === 'SUPERVISOR') {
-            if (!sellerSupervisorCode) continue
-            if (supervisorScopeKey && sellerSupervisorCode !== supervisorScopeKey) continue
-          } else if (kpiConsolidatedScope !== 'ALL' && sellerProfile !== kpiConsolidatedScope) {
-            continue
-          }
+          const inConsolidatedScope =
+            kpiConsolidatedScope === 'SUPERVISOR'
+              ? Boolean(sellerSupervisorCode) && (!supervisorScopeKey || sellerSupervisorCode === supervisorScopeKey)
+              : (kpiConsolidatedScope === 'ALL' || sellerProfile === kpiConsolidatedScope)
 
           const stageMetrics = STAGES.reduce(
             (acc, stage) => {
@@ -4758,11 +4756,15 @@ export default function MetasWorkspace() {
             pointsTarget += rulePoints
             pointsAchieved += rulePoints * clampedProgress
 
-            const bucket = previousByType.get(kpiType) ?? { total: 0, hit: 0 }
-            bucket.total += 1
             sellerMetasObj.total += 1
-            if (clampedProgress >= 1) { bucket.hit += 1; sellerMetasObj.hit += 1 }
-            previousByType.set(kpiType, bucket)
+            if (clampedProgress >= 1) sellerMetasObj.hit += 1
+
+            if (inConsolidatedScope) {
+              const bucket = previousByType.get(kpiType) ?? { total: 0, hit: 0 }
+              bucket.total += 1
+              if (clampedProgress >= 1) bucket.hit += 1
+              previousByType.set(kpiType, bucket)
+            }
           }
           perSellerMetas.set(seller.id, sellerMetasObj)
           perSellerPoints.set(seller.id, { pointsAchieved, pointsTarget })
