@@ -551,6 +551,11 @@ function num(value: number, max = 2) {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: max }).format(value)
 }
 
+// Formata com casas decimais fixas (min = max), garantindo que o delta bate com os valores exibidos
+function numFixed(value: number, decimals = 2) {
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
+}
+
 function parseDecimal(input: string, fallback = 0) {
   const parsed = Number(input.replace(',', '.'))
   return Number.isFinite(parsed) ? parsed : fallback
@@ -3361,6 +3366,24 @@ export default function MetasWorkspace() {
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
   }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, resolveBlockProfileType, ruleBlocks, sankhyaTargets, sellers])
 
+  // DEBUG: log snapshot scoring for comparison
+  useEffect(() => {
+    if (snapshots.length === 0) return
+    const hit = snapshots.reduce((sum, s) => {
+      const block = ruleBlocks.find((b) => b.id === s.blockId)
+      if (!block) return sum
+      return sum + block.rules.filter((r) => (s.ruleProgress.find((p) => p.ruleId === r.id)?.progress ?? 0) >= 1).length
+    }, 0)
+    const avgPct = snapshots.reduce((sum, s) => sum + (s.pointsTarget > 0 ? s.pointsAchieved / s.pointsTarget : 0), 0) / snapshots.length * 100
+    console.log('[DirectScoring]', year, month + 1, 'metasHit:', hit, 'sellers:', snapshots.length, 'avgPct:', avgPct.toFixed(4))
+    snapshots.forEach((s) => {
+      const block = ruleBlocks.find((b) => b.id === s.blockId)
+      if (!block) return
+      const h = block.rules.filter((r) => (s.ruleProgress.find((p) => p.ruleId === r.id)?.progress ?? 0) >= 1).length
+      if (h > 0) console.log('[DirectScoring]', s.seller.name, 'hit:', h, '/', block.rules.length, 'pts:', s.pointsAchieved.toFixed(4), '/', s.pointsTarget.toFixed(4), 'ratio:', s.pointsTarget > 0 ? (s.pointsAchieved/s.pointsTarget).toFixed(4) : '0')
+    })
+  }, [month, ruleBlocks, snapshots, year])
+
   useEffect(() => {
     if (snapshots.length === 0) {
       if (selectedSellerId !== '') setSelectedSellerId('')
@@ -4017,10 +4040,11 @@ export default function MetasWorkspace() {
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
     if (previousSellersData.length === 0) return null
-    const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
-    if (scopedSellerIds.size === 0) return null
-    let filtered = previousSellersData
-      .filter((s) => scopedSellerIds.has(s.id))
+    // Use all sellers from the previous period without cross-filtering by current month's IDs.
+    // Cross-filtering by kpiGeneralCardSellerRows (current month) would change the denominator
+    // of averageOverallPct when a seller existed in one month but not the other, causing the
+    // displayed delta to diverge from simple subtraction of the two displayed values.
+    let filtered = [...previousSellersData]
     if (kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId) {
       filtered = filtered.filter((s) => s.id === kpiGeneralPanelSellerId)
     } else if (kpiGeneralPanelView === 'SUPERVISOR' && kpiGeneralPanelSupervisorKey) {
@@ -4032,13 +4056,16 @@ export default function MetasWorkspace() {
       for (const code of s.clientCodes) uniqueClients.add(code)
     }
     const activeProductsCount = Math.max(productAllowlist.filter((p) => p.active).length, 0)
+    // Only sellers that were actually scored (have rules matched) contribute to the average,
+    // mirroring direct scoring which only creates snapshots for sellers with a matching block.
+    const scoredFiltered = filtered.filter((s) => s.metasTotal > 0)
     return {
-      averageOverallPct: filtered.length > 0
+      averageOverallPct: scoredFiltered.length > 0
         ? (
-          filtered.reduce((sum, s) => {
+          scoredFiltered.reduce((sum, s) => {
             const ratio = s.pointsTarget > 0 ? s.pointsAchieved / s.pointsTarget : 0
             return sum + Math.min(Math.max(ratio, 0), 1)
-          }, 0) / filtered.length
+          }, 0) / scoredFiltered.length
         ) * 100
         : 0,
       totalOrders: filtered.reduce((sum, s) => sum + s.totalOrders, 0),
@@ -4052,7 +4079,7 @@ export default function MetasWorkspace() {
       metasHit: filtered.reduce((sum, s) => sum + s.metasHit, 0),
       metasTotal: filtered.reduce((sum, s) => sum + s.metasTotal, 0),
     }
-  }, [kpiGeneralCardSellerRows, kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, previousSellersData, productAllowlist])
+  }, [kpiGeneralPanelSellerId, kpiGeneralPanelSupervisorKey, kpiGeneralPanelView, previousSellersData, productAllowlist])
 
   const kpiConsolidatedFilteredSellerRows = useMemo(() => {
     if (kpiGeneralPanelView === 'SUPERVISOR') {
@@ -4937,6 +4964,10 @@ export default function MetasWorkspace() {
           }
           perSellerMetas.set(seller.id, sellerMetasObj)
           perSellerPoints.set(seller.id, { pointsAchieved, pointsTarget })
+          // DEBUG: log sellers where metasHit > 0 to find scoring discrepancies
+          if (sellerMetasObj.hit > 0) {
+            console.log('[PrevConsolidated]', seller.name, 'hit:', sellerMetasObj.hit, '/', sellerMetasObj.total, 'pts:', pointsAchieved.toFixed(4), '/', pointsTarget.toFixed(4), 'ratio:', pointsTarget > 0 ? (pointsAchieved/pointsTarget).toFixed(4) : '0')
+          }
         }
 
         if (cancelled) return
@@ -8881,15 +8912,34 @@ export default function MetasWorkspace() {
                       )
                     }
                     // Para métricas que já são percentuais: diferença absoluta em p.p.
-                    const deltaPp = (current: number, previous: number | undefined) => {
+                    // Arredonda ambos os operandos às mesmas casas exibidas para que
+                    // exibido(A) − exibido(B) = delta exibido (sem surpresa de ponto flutuante).
+                    const deltaPp = (current: number, previous: number | undefined, decimals = 2) => {
                       if (previous === undefined || previous === null) return null
-                      const diff = current - previous
+                      const factor = Math.pow(10, decimals)
+                      const roundedCurrent = Math.round(current * factor) / factor
+                      const roundedPrevious = Math.round(previous * factor) / factor
+                      const diff = roundedCurrent - roundedPrevious
                       const up = diff >= 0
                       return (
                         <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
                           up ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
-                          {up ? '▲' : '▼'} {num(Math.abs(diff), 2)} p.p.
+                          {up ? '▲' : '▼'} {numFixed(Math.abs(diff), decimals)} p.p.
+                        </span>
+                      )
+                    }
+                    // Para contagens (pedidos, volumes): variação relativa, exibida como p.p. para consistência visual
+                    const deltaRel = (current: number, previous: number | undefined) => {
+                      if (previous === undefined || previous === null || previous === 0) return null
+                      const diff = current - previous
+                      const pct = (diff / previous) * 100
+                      const up = diff >= 0
+                      return (
+                        <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
+                          up ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {up ? '▲' : '▼'} {numFixed(Math.abs(pct), 2)} p.p.
                         </span>
                       )
                     }
@@ -8947,7 +8997,7 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
-                            {prev && delta(kpiGeneralScopedSummary.totalOrders, prev.totalOrders)}
+                            {prev && deltaRel(kpiGeneralScopedSummary.totalOrders, prev.totalOrders)}
                           </div>
                           <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
                         </div>
@@ -9024,7 +9074,7 @@ export default function MetasWorkspace() {
                         </select>
                         {kpiGeneralPanelView === 'GENERAL' ? (
                           <span className="text-[10px] text-cyan-700">
-                            {num(kpiGeneralScopedSummary.averageOverallPct, 2)}% de aderência média
+                            {numFixed(kpiGeneralScopedSummary.averageOverallPct, 2)}% de aderência média
                           </span>
                         ) : kpiGeneralPanelView === 'SELLER' ? (
                           (() => {
@@ -9087,15 +9137,32 @@ export default function MetasWorkspace() {
                           )
                         }
                         // Para métricas que já são percentuais: diferença absoluta em p.p.
-                        const deltaPp = (current: number, previous: number | undefined) => {
+                        const deltaPp = (current: number, previous: number | undefined, decimals = 2) => {
                           if (previous === undefined || previous === null) return null
-                          const diff = current - previous
+                          const factor = Math.pow(10, decimals)
+                          const roundedCurrent = Math.round(current * factor) / factor
+                          const roundedPrevious = Math.round(previous * factor) / factor
+                          const diff = roundedCurrent - roundedPrevious
                           const up = diff >= 0
                           return (
                             <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
                               up ? 'text-emerald-600' : 'text-rose-600'
                             }`}>
-                              {up ? '▲' : '▼'} {num(Math.abs(diff), 2)} p.p.
+                              {up ? '▲' : '▼'} {numFixed(Math.abs(diff), decimals)} p.p.
+                            </span>
+                          )
+                        }
+                        // Para contagens (volumes): variação relativa exibida como p.p. para consistência visual
+                        const deltaRel = (current: number, previous: number | undefined) => {
+                          if (previous === undefined || previous === null || previous === 0) return null
+                          const diff = current - previous
+                          const pct = (diff / previous) * 100
+                          const up = diff >= 0
+                          return (
+                            <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
+                              up ? 'text-emerald-600' : 'text-rose-600'
+                            }`}>
+                              {up ? '▲' : '▼'} {numFixed(Math.abs(pct), 2)} p.p.
                             </span>
                           )
                         }
@@ -9196,14 +9263,14 @@ export default function MetasWorkspace() {
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
                                 {prev ? (
-                                  deltaPp(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct)
+                                  deltaPp(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct, 2)
                                 ) : (
                                   <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
                                     sem base
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 2)}%</p>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{numFixed(kpiGeneralScopedSummary.averageOverallPct, 2)}%</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
                               {prev && prev.metasTotal > 0 ? (
                                 <p className={`mt-1 text-[9px] font-semibold tabular-nums ${metasHitDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -9218,7 +9285,7 @@ export default function MetasWorkspace() {
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Qtd. Volumes</p>
                                 {prev ? (
-                                  delta(kpiGeneralScopedSummary.totalVolumes, prev.totalVolumes)
+                                  deltaRel(kpiGeneralScopedSummary.totalVolumes, prev.totalVolumes)
                                 ) : (
                                   <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
                                     sem base
@@ -9400,8 +9467,8 @@ export default function MetasWorkspace() {
                       return sum + (sellerData?.baseClientCount ?? 0)
                     }, 0)
                     const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
-                    const avgOverallPercent = rows.length > 0
-                      ? (rows.reduce((sum, row) => sum + Math.min(Math.max(row.pointsRatio, 0), 1), 0) / rows.length) * 100
+                    const avgOverallPercent = filteredRows.length > 0
+                      ? (filteredRows.reduce((sum, row) => sum + Math.min(Math.max(row.pointsRatio, 0), 1), 0) / filteredRows.length) * 100
                       : 0
                     const avgGapToFull = filteredRows.length > 0
                       ? filteredRows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / filteredRows.length
