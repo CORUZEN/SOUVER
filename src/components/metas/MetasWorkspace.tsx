@@ -9029,7 +9029,6 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
-                            {prev && deltaPp(clientePct, prevClientePct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -9045,7 +9044,6 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
-                            {prev && deltaRel(kpiGeneralScopedSummary.totalOrders, prev.totalOrders)}
                           </div>
                           <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
                         </div>
@@ -9053,7 +9051,6 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas</p>
-                            {prev && prev.metasTotal > 0 && deltaPp(metasPct, prevMetasPct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -9310,13 +9307,6 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
-                                {prev ? (
-                                  deltaPp(kpiGeneralScopedSummary.averageOverallPct, prev.averageOverallPct, 2)
-                                ) : (
-                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
-                                    sem base
-                                  </span>
-                                )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{numFixed(kpiGeneralScopedSummary.averageOverallPct, 2)}%</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
@@ -9332,13 +9322,6 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Qtd. Volumes</p>
-                                {prev ? (
-                                  deltaRel(kpiGeneralScopedSummary.totalVolumes, prev.totalVolumes)
-                                ) : (
-                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-700">
-                                    sem base
-                                  </span>
-                                )}
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalVolumes, 0)}</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Total de volumes nos pedidos do período.</p>
