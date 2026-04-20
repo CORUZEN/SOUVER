@@ -8985,11 +8985,11 @@ export default function MetasWorkspace() {
                           return (
                             <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
-                              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                                <p className="truncate whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Distribuição de itens</p>
-                                <div className="flex items-center gap-1.5 whitespace-nowrap pl-1">
-                                  <span className="inline-flex whitespace-nowrap rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-sky-700">80% itens</span>
-                                  <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
+                              <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
+                                <p className="whitespace-nowrap pr-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-surface-500">Distribuição de itens</p>
+                                <div className="flex items-center gap-1 whitespace-nowrap">
+                                  <span className="inline-flex whitespace-nowrap rounded bg-sky-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-sky-700">80% itens</span>
+                                  <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
                                 </div>
                               </div>
                               <div className="mt-1.5 flex items-baseline gap-0">
