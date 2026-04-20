@@ -3872,6 +3872,8 @@ export default function MetasWorkspace() {
   const kpiGeneralScopedSummary = useMemo(() => {
     const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
     const scopedSnapshots = snapshots.filter((snapshot) => scopedSellerIds.has(snapshot.seller.id))
+    const scopedSellers = sellers.filter((seller) => scopedSellerIds.has(seller.id))
+    const scopedWeightRows = sellerWeightPerformanceRows.filter((row) => scopedSellerIds.has(row.sellerId))
 
     const totalOrders = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalOrders, 0)
     const totalGrossWeight = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0)
@@ -3910,54 +3912,58 @@ export default function MetasWorkspace() {
       { hit: 0, total: 0 }
     )
 
-    const kpiTypeSummary = scopedSnapshots.reduce(
+    const kpiLimits = scopedSnapshots.reduce(
       (acc, snapshot) => {
         const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
         if (!block) return acc
         for (const rule of block.rules) {
           const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
-          const progressRaw = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-          const progress = Math.max(0, Math.min(progressRaw, 1))
-          switch (kpiType) {
-            case 'BASE_CLIENTES':
-              acc.base.total += 1
-              acc.base.hit += progress >= 1 ? 1 : 0
-              acc.base.progressSum += progress
-              break
-            case 'VOLUME':
-              acc.volume.total += 1
-              acc.volume.hit += progress >= 1 ? 1 : 0
-              acc.volume.progressSum += progress
-              break
-            case 'DEVOLUCAO':
-              acc.devolucao.total += 1
-              acc.devolucao.hit += progress >= 1 ? 1 : 0
-              acc.devolucao.progressSum += progress
-              break
-            case 'INADIMPLENCIA':
-              acc.inadimplencia.total += 1
-              acc.inadimplencia.hit += progress >= 1 ? 1 : 0
-              acc.inadimplencia.progressSum += progress
-              break
-            default:
-              break
+          if (kpiType === 'DEVOLUCAO') {
+            const limitPct = parseTargetNumber(rule.targetText) ?? 0
+            if (limitPct > 0) acc.devolucaoPct.push(limitPct)
+            continue
+          }
+          if (kpiType === 'INADIMPLENCIA') {
+            const { pct, days } = parseInadimplenciaTarget(rule.targetText)
+            if (pct > 0) acc.inadimplenciaPct.push(pct)
+            if (days > 0) acc.inadimplenciaDays.push(days)
           }
         }
         return acc
       },
       {
-        base: { total: 0, hit: 0, progressSum: 0 },
-        volume: { total: 0, hit: 0, progressSum: 0 },
-        devolucao: { total: 0, hit: 0, progressSum: 0 },
-        inadimplencia: { total: 0, hit: 0, progressSum: 0 },
+        devolucaoPct: [] as number[],
+        inadimplenciaPct: [] as number[],
+        inadimplenciaDays: [] as number[],
       }
     )
 
-    const toKpiSummary = (entry: { total: number; hit: number; progressSum: number }) => ({
-      total: entry.total,
-      hit: entry.hit,
-      avgProgressRatio: entry.total > 0 ? entry.progressSum / entry.total : 0,
-    })
+    const average = (values: number[]) =>
+      values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+
+    const volumeTotalKg = scopedWeightRows.reduce((sum, row) => sum + Math.max(row.totalSoldKg, 0), 0)
+    const volumeTargetKg = scopedWeightRows.reduce((sum, row) => sum + Math.max(row.totalTargetKg, 0), 0)
+    const volumeRatio = volumeTargetKg > 0 ? volumeTotalKg / volumeTargetKg : 0
+
+    const devolucaoTotalValue = scopedSellers.reduce((sum, seller) => sum + Math.max(seller.totalReturnedValue ?? 0, 0), 0)
+    const devolucaoRatePct = totalRevenue > 0 ? (devolucaoTotalValue / totalRevenue) * 100 : 0
+    const devolucaoLimitPct = average(kpiLimits.devolucaoPct)
+
+    const inadimplenciaLimitPct = average(kpiLimits.inadimplenciaPct)
+    const inadimplenciaLimitDays = kpiLimits.inadimplenciaDays.length > 0
+      ? Math.round(average(kpiLimits.inadimplenciaDays))
+      : 45
+    let inadimplenciaOpenTitlesValue = 0
+    let inadimplenciaOpenTitlesCount = 0
+    for (const seller of scopedSellers) {
+      for (const title of seller.openTitles ?? []) {
+        if (Number(title.overdueDays ?? 0) <= inadimplenciaLimitDays) continue
+        inadimplenciaOpenTitlesValue += Math.max(Number(title.totalValue ?? 0), 0)
+        inadimplenciaOpenTitlesCount += 1
+      }
+    }
+    const inadimplenciaRatePct = totalRevenue > 0 ? (inadimplenciaOpenTitlesValue / totalRevenue) * 100 : 0
+
 
     return {
       sellerCount: scopedSnapshots.length,
@@ -3970,12 +3976,19 @@ export default function MetasWorkspace() {
       positivadosTarget,
       metasHit: metas.hit,
       metasTotal: metas.total,
-      kpiBaseClientes: toKpiSummary(kpiTypeSummary.base),
-      kpiVolume: toKpiSummary(kpiTypeSummary.volume),
-      kpiDevolucao: toKpiSummary(kpiTypeSummary.devolucao),
-      kpiInadimplencia: toKpiSummary(kpiTypeSummary.inadimplencia),
+      volumeTotalKg,
+      volumeTargetKg,
+      volumeRatio,
+      devolucaoTotalValue,
+      devolucaoRatePct,
+      devolucaoLimitPct,
+      inadimplenciaOpenTitlesValue,
+      inadimplenciaOpenTitlesCount,
+      inadimplenciaRatePct,
+      inadimplenciaLimitPct,
+      inadimplenciaLimitDays,
     }
-  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
+  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -8820,9 +8833,20 @@ export default function MetasWorkspace() {
                         const baseCoveragePct = kpiGeneralScopedSummary.totalBaseClients > 0
                           ? (kpiGeneralScopedSummary.uniqueClients / kpiGeneralScopedSummary.totalBaseClients) * 100
                           : 0
-                        const volumePct = kpiGeneralScopedSummary.kpiVolume.avgProgressRatio * 100
-                        const devolucaoPct = kpiGeneralScopedSummary.kpiDevolucao.avgProgressRatio * 100
-                        const inadimplenciaPct = kpiGeneralScopedSummary.kpiInadimplencia.avgProgressRatio * 100
+                        const volumePct = kpiGeneralScopedSummary.volumeRatio * 100
+                        const devolucaoPct = kpiGeneralScopedSummary.devolucaoRatePct
+                        const devolucaoLimitPct = kpiGeneralScopedSummary.devolucaoLimitPct
+                        const inadimplenciaPct = kpiGeneralScopedSummary.inadimplenciaRatePct
+                        const inadimplenciaLimitPct = kpiGeneralScopedSummary.inadimplenciaLimitPct
+                        const inadimplenciaLimitDays = kpiGeneralScopedSummary.inadimplenciaLimitDays
+                        const devolucaoClass =
+                          devolucaoLimitPct > 0
+                            ? (devolucaoPct <= devolucaoLimitPct ? 'text-emerald-600' : 'text-rose-600')
+                            : 'text-surface-500'
+                        const inadimplenciaClass =
+                          inadimplenciaLimitPct > 0
+                            ? (inadimplenciaPct <= inadimplenciaLimitPct ? 'text-emerald-600' : 'text-rose-600')
+                            : 'text-surface-500'
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
@@ -8838,7 +8862,7 @@ export default function MetasWorkspace() {
                         }
                         return (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-cyan-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Peso total dos pedidos</p>
@@ -8846,7 +8870,7 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Valor total de Pedidos</p>
@@ -8854,58 +8878,51 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Base de clientes</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalBaseClients, prev.totalBaseClients)}
                               </div>
                               <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
-                              <p className="mt-0.5 text-[10px] text-surface-500">
+                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
                                 Cobertura atual: {num(kpiGeneralScopedSummary.uniqueClients, 0)} clientes ({num(baseCoveragePct, 1)}%)
                               </p>
                             </div>
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Volume</p>
-                                {kpiGeneralScopedSummary.kpiVolume.total > 0 && (
+                                {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
                                   <span className="text-[10px] font-semibold tabular-nums text-sky-600">{num(volumePct, 1)}%</span>
                                 )}
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                                {num(kpiGeneralScopedSummary.kpiVolume.hit, 0)}
-                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiVolume.total, 0)}</span>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
+                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                                Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
-                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de volume conquistadas no ciclo</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-amber-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Devolução</p>
-                                {kpiGeneralScopedSummary.kpiDevolucao.total > 0 && (
-                                  <span className="text-[10px] font-semibold tabular-nums text-amber-600">{num(devolucaoPct, 1)}%</span>
-                                )}
+                                <span className={`text-[10px] font-semibold tabular-nums ${devolucaoClass}`}>{num(devolucaoPct, 3)}%</span>
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                                {num(kpiGeneralScopedSummary.kpiDevolucao.hit, 0)}
-                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiDevolucao.total, 0)}</span>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
+                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                                Limite KPI: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
-                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de devolução conquistadas no ciclo</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-rose-500" />
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Inadimplência acumulativa</p>
-                                {kpiGeneralScopedSummary.kpiInadimplencia.total > 0 && (
-                                  <span className="text-[10px] font-semibold tabular-nums text-rose-600">{num(inadimplenciaPct, 1)}%</span>
-                                )}
+                                <span className={`text-[10px] font-semibold tabular-nums ${inadimplenciaClass}`}>{num(inadimplenciaPct, 3)}%</span>
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
-                                {num(kpiGeneralScopedSummary.kpiInadimplencia.hit, 0)}
-                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiInadimplencia.total, 0)}</span>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
+                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                                {num(kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount, 0)} títulos &gt; {inadimplenciaLimitDays} dias · limite {inadimplenciaLimitPct > 0 ? `${num(inadimplenciaLimitPct, 2)}%` : 'n/a'}
                               </p>
-                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de inadimplência conquistadas no ciclo</p>
                             </div>
                           </div>
                         )
