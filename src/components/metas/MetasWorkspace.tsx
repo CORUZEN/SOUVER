@@ -3910,6 +3910,55 @@ export default function MetasWorkspace() {
       { hit: 0, total: 0 }
     )
 
+    const kpiTypeSummary = scopedSnapshots.reduce(
+      (acc, snapshot) => {
+        const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
+        if (!block) return acc
+        for (const rule of block.rules) {
+          const kpiType = rule.kpiType ?? inferKpiType(rule.kpi)
+          const progressRaw = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          const progress = Math.max(0, Math.min(progressRaw, 1))
+          switch (kpiType) {
+            case 'BASE_CLIENTES':
+              acc.base.total += 1
+              acc.base.hit += progress >= 1 ? 1 : 0
+              acc.base.progressSum += progress
+              break
+            case 'VOLUME':
+              acc.volume.total += 1
+              acc.volume.hit += progress >= 1 ? 1 : 0
+              acc.volume.progressSum += progress
+              break
+            case 'DEVOLUCAO':
+              acc.devolucao.total += 1
+              acc.devolucao.hit += progress >= 1 ? 1 : 0
+              acc.devolucao.progressSum += progress
+              break
+            case 'INADIMPLENCIA':
+              acc.inadimplencia.total += 1
+              acc.inadimplencia.hit += progress >= 1 ? 1 : 0
+              acc.inadimplencia.progressSum += progress
+              break
+            default:
+              break
+          }
+        }
+        return acc
+      },
+      {
+        base: { total: 0, hit: 0, progressSum: 0 },
+        volume: { total: 0, hit: 0, progressSum: 0 },
+        devolucao: { total: 0, hit: 0, progressSum: 0 },
+        inadimplencia: { total: 0, hit: 0, progressSum: 0 },
+      }
+    )
+
+    const toKpiSummary = (entry: { total: number; hit: number; progressSum: number }) => ({
+      total: entry.total,
+      hit: entry.hit,
+      avgProgressRatio: entry.total > 0 ? entry.progressSum / entry.total : 0,
+    })
+
     return {
       sellerCount: scopedSnapshots.length,
       uniqueClients: uniqueClients.size,
@@ -3921,6 +3970,10 @@ export default function MetasWorkspace() {
       positivadosTarget,
       metasHit: metas.hit,
       metasTotal: metas.total,
+      kpiBaseClientes: toKpiSummary(kpiTypeSummary.base),
+      kpiVolume: toKpiSummary(kpiTypeSummary.volume),
+      kpiDevolucao: toKpiSummary(kpiTypeSummary.devolucao),
+      kpiInadimplencia: toKpiSummary(kpiTypeSummary.inadimplencia),
     }
   }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellers, snapshots])
 
@@ -8764,6 +8817,12 @@ export default function MetasWorkspace() {
 
                       {(() => {
                         const prev = previousPeriodScopedTotals
+                        const baseCoveragePct = kpiGeneralScopedSummary.totalBaseClients > 0
+                          ? (kpiGeneralScopedSummary.uniqueClients / kpiGeneralScopedSummary.totalBaseClients) * 100
+                          : 0
+                        const volumePct = kpiGeneralScopedSummary.kpiVolume.avgProgressRatio * 100
+                        const devolucaoPct = kpiGeneralScopedSummary.kpiDevolucao.avgProgressRatio * 100
+                        const inadimplenciaPct = kpiGeneralScopedSummary.kpiInadimplencia.avgProgressRatio * 100
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
@@ -8778,7 +8837,7 @@ export default function MetasWorkspace() {
                           )
                         }
                         return (
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-cyan-500" />
                               <div className="flex items-start justify-between gap-2">
@@ -8794,6 +8853,59 @@ export default function MetasWorkspace() {
                                 {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
                               </div>
                               <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                            </div>
+                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Base de clientes</p>
+                                {prev && delta(kpiGeneralScopedSummary.totalBaseClients, prev.totalBaseClients)}
+                              </div>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
+                              <p className="mt-0.5 text-[10px] text-surface-500">
+                                Cobertura atual: {num(kpiGeneralScopedSummary.uniqueClients, 0)} clientes ({num(baseCoveragePct, 1)}%)
+                              </p>
+                            </div>
+                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Volume</p>
+                                {kpiGeneralScopedSummary.kpiVolume.total > 0 && (
+                                  <span className="text-[10px] font-semibold tabular-nums text-sky-600">{num(volumePct, 1)}%</span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                                {num(kpiGeneralScopedSummary.kpiVolume.hit, 0)}
+                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiVolume.total, 0)}</span>
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de volume conquistadas no ciclo</p>
+                            </div>
+                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-amber-500" />
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Devolução</p>
+                                {kpiGeneralScopedSummary.kpiDevolucao.total > 0 && (
+                                  <span className="text-[10px] font-semibold tabular-nums text-amber-600">{num(devolucaoPct, 1)}%</span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                                {num(kpiGeneralScopedSummary.kpiDevolucao.hit, 0)}
+                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiDevolucao.total, 0)}</span>
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de devolução conquistadas no ciclo</p>
+                            </div>
+                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
+                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-rose-500" />
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Inadimplência acumulativa</p>
+                                {kpiGeneralScopedSummary.kpiInadimplencia.total > 0 && (
+                                  <span className="text-[10px] font-semibold tabular-nums text-rose-600">{num(inadimplenciaPct, 1)}%</span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">
+                                {num(kpiGeneralScopedSummary.kpiInadimplencia.hit, 0)}
+                                <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.kpiInadimplencia.total, 0)}</span>
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-surface-500">Metas de inadimplência conquistadas no ciclo</p>
                             </div>
                           </div>
                         )
