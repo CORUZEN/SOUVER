@@ -7993,45 +7993,6 @@ export default function MetasWorkspace() {
             </Card>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
-              <span className="absolute inset-y-0 left-0 w-1 bg-sky-500/70" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Vendedores monitorados</p>
-              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">{snapshots.length}</p>
-              <p className="text-[10px] text-surface-500">Visão geral no período selecionado</p>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
-              <span className="absolute inset-y-0 left-0 w-1 bg-indigo-500/70" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Clientes únicos atendidos</p>
-              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">
-                {num(corporateUniqueClients, 0)}
-                {corporateTotalBaseClients > 0 && (
-                  <span className="text-surface-500"> / {num(corporateTotalBaseClients, 0)}</span>
-                )}
-              </p>
-              <p className="text-[10px] text-surface-500">Total em visão geral</p>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
-              <span className="absolute inset-y-0 left-0 w-1 bg-cyan-500/70" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Produtos positivados</p>
-              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">
-                {num(corporatePositivacaoSoldItems, 0)} / {num(corporatePositivacaoTargetItems, 0)}
-              </p>
-              <p className="text-[10px] text-surface-500">Total positivado dos vendedores monitorados</p>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border border-surface-200 bg-white px-3.5 py-3.5 shadow-sm">
-              <span className="absolute inset-y-0 left-0 w-1 bg-emerald-500/70" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-surface-500">Metas conquistadas no ciclo</p>
-              <p className="mt-1 text-2xl font-semibold text-surface-900 tabular-nums">
-                {num(corporateKpiSummary.hit, 0)}
-                <span className="text-surface-500"> / {num(corporateKpiSummary.total, 0)}</span>
-              </p>
-              <p className="text-[10px] text-surface-500">
-                {corporatePeriodClosed ? `Gap médio para 1,00 pt: ${num(corporateAvgGapToFull, 2)} pts` : 'Parcial até a data atual'}
-              </p>
-            </div>
-          </div>
-
           <div className="grid gap-4 md:grid-cols-2">
             <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500" />
@@ -8833,6 +8794,9 @@ export default function MetasWorkspace() {
                         const baseCoveragePct = kpiGeneralScopedSummary.totalBaseClients > 0
                           ? (kpiGeneralScopedSummary.uniqueClients / kpiGeneralScopedSummary.totalBaseClients) * 100
                           : 0
+                        const prevBaseCoveragePct = prev && prev.totalBaseClients > 0
+                          ? (prev.uniqueClients / prev.totalBaseClients) * 100
+                          : 0
                         const volumePct = kpiGeneralScopedSummary.volumeRatio * 100
                         const devolucaoPct = kpiGeneralScopedSummary.devolucaoRatePct
                         const devolucaoLimitPct = kpiGeneralScopedSummary.devolucaoLimitPct
@@ -8869,6 +8833,7 @@ export default function MetasWorkspace() {
                                 {prev && delta(kpiGeneralScopedSummary.totalGrossWeight, prev.totalGrossWeight)}
                               </div>
                               <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">Consolidado de peso bruto dos pedidos no período.</p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-300 group-hover:from-emerald-600 group-hover:to-emerald-500" />
@@ -8877,12 +8842,13 @@ export default function MetasWorkspace() {
                                 {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
                               </div>
                               <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">Faturamento consolidado dos pedidos no período.</p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-400 transition-all duration-300 group-hover:from-indigo-600 group-hover:to-indigo-500" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Base de clientes</p>
-                                {prev && delta(kpiGeneralScopedSummary.totalBaseClients, prev.totalBaseClients)}
+                                {prev && delta(baseCoveragePct, prevBaseCoveragePct)}
                               </div>
                               <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
                               <p className="mt-1 truncate text-[10px] text-slate-500">
@@ -8916,7 +8882,7 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
                               <p className="mt-1 truncate text-[10px] text-slate-500">
-                                Limite KPI: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
+                                Limite da meta: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
@@ -9183,7 +9149,6 @@ export default function MetasWorkspace() {
                             </p>
                           </div>
                         </div>
-
                       <div className="space-y-1.5">
                         <div className="grid grid-cols-[44px_2.15fr_0.9fr_1fr_1fr_repeat(4,0.82fr)_24px] items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-surface-500">
                           <span className="text-center">#</span>
