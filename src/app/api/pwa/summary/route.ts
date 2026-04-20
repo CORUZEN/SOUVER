@@ -116,13 +116,25 @@ export async function GET(req: NextRequest) {
     void profileType // profileType stored per seller, used by PWA for display formatting
     const maxReward: number = (block?.rules ?? []).reduce((sum: number, r: { rewardValue?: number }) => sum + (r.rewardValue ?? 0), 0)
 
+    // Resolve the monthly target for the specific period being requested.
+    // Priority: manualFinancialByPeriod[YYYY-MM] → legacy block.monthlyTarget.
+    // This matches the same priority used by MetasWorkspace snapshot scoring so that
+    // the comparison panel (loadPreviousConsolidated) uses the correct base target.
+    const resolvedMonthlyTarget = (() => {
+      const manualMap = (block as { manualFinancialByPeriod?: Record<string, number> } | null)?.manualFinancialByPeriod ?? {}
+      const periodKey = `${year}-${String(month).padStart(2, '0')}`
+      const exact = Number(manualMap[periodKey] ?? 0)
+      if (exact > 0) return exact
+      return Number(block?.monthlyTarget ?? 0)
+    })()
+
     return {
       code,
       name: seller.name,
       profileType: seller.profileType,
       supervisorCode: seller.supervisorCode ?? null,
       supervisorName: seller.supervisorName ?? null,
-      monthlyTarget: block?.monthlyTarget ?? 0,
+      monthlyTarget: resolvedMonthlyTarget,
       blockId: block?.id ?? null,
       blockName: block?.name ?? null,
       focusProductCode: String(block?.focusProductCode ?? '').trim(),

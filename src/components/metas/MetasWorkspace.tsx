@@ -4299,12 +4299,26 @@ export default function MetasWorkspace() {
         const previousYear = previousMonthDate.getFullYear()
         const previousMonth = previousMonthDate.getMonth() + 1
 
-        const [summaryRes, perfRes] = await Promise.all([
+        const [summaryRes, perfRes, sankhyaTargetsRes, brandWeightRes] = await Promise.all([
           fetch(`/api/pwa/summary?year=${previousYear}&month=${previousMonth}`, { signal: controller.signal }),
           fetch(`/api/metas/sellers-performance?year=${previousYear}&month=${previousMonth}&companyScope=${companyScopeFilter}`, { signal: controller.signal }),
+          fetch(`/api/metas/sankhya-targets?year=${previousYear}&month=${previousMonth}`, { signal: controller.signal }).catch(() => null),
+          fetch(`/api/metas/sellers-performance/brand-weight?year=${previousYear}&month=${previousMonth}&companyScope=${companyScopeFilter}`, { signal: controller.signal }).catch(() => null),
         ])
         const summaryPayload = await summaryRes.json().catch(() => ({}))
         const perfPayload = await perfRes.json().catch(() => ({}))
+        const sankhyaTargetsPayload = sankhyaTargetsRes?.ok ? await sankhyaTargetsRes.json().catch(() => ({})) : {}
+        const brandWeightPayload = brandWeightRes?.ok ? await brandWeightRes.json().catch(() => ({})) : {}
+        const previousSankhyaTargets = (Array.isArray(sankhyaTargetsPayload?.sellers) ? sankhyaTargetsPayload.sellers : []) as Array<{
+          sellerCode: string
+          financialTarget: number
+          weightTargets?: Array<{ brand: string; targetKg: number }>
+        }>
+        const previousBrandWeightRows = (Array.isArray(brandWeightPayload?.rows) ? brandWeightPayload.rows : []) as Array<{
+          sellerCode: string
+          brand: string
+          totalKg: number
+        }>
 
         if (!summaryRes.ok) {
           throw new Error(typeof summaryPayload?.message === 'string' ? summaryPayload.message : 'Falha ao carregar resumo do mês anterior.')
@@ -4333,7 +4347,7 @@ export default function MetasWorkspace() {
           businessDays?: string[]
         }>
 
-        const previousCycleWeeks: CycleWeek[] = previousCycleWeeksRaw
+        const previousCycleWeeksFromApi: CycleWeek[] = previousCycleWeeksRaw
           .filter((week) => week.key === 'W1' || week.key === 'W2' || week.key === 'W3' || week.key === 'CLOSING')
           .map((week) => ({
             key: week.key,
@@ -4342,6 +4356,45 @@ export default function MetasWorkspace() {
             end: week.end ? String(week.end).slice(0, 10) : null,
             businessDays: Array.isArray(week.businessDays) ? week.businessDays.map((date) => String(date).slice(0, 10)) : [],
           }))
+
+        const previousCycleWeeks: CycleWeek[] = (() => {
+          if (previousCycleWeeksFromApi.length > 0) return previousCycleWeeksFromApi
+
+          // Fallback when summary endpoint has no cycleWeeks for the previous month:
+          // reconstruct operational windows over the calendar month to keep
+          // "vs mês anterior" metrics consistent.
+          const monthStart = new Date(previousYear, previousMonth - 1, 1)
+          const monthEnd = new Date(previousYear, previousMonth, 0)
+          const makeIso = (date: Date) => toIsoDate(date) ?? ''
+          const addDays = (date: Date, days: number) => {
+            const next = new Date(date)
+            next.setDate(next.getDate() + days)
+            return next
+          }
+          const clampEnd = (date: Date) => (date > monthEnd ? monthEnd : date)
+          const stages: Array<{ key: StageKey; startOffset: number; durationDays: number | null }> = [
+            { key: 'W1', startOffset: 0, durationDays: 5 },
+            { key: 'W2', startOffset: 7, durationDays: 5 },
+            { key: 'W3', startOffset: 14, durationDays: 5 },
+            { key: 'CLOSING', startOffset: 21, durationDays: null },
+          ]
+          const result: CycleWeek[] = []
+          for (const stage of stages) {
+            const stageStartDate = addDays(monthStart, stage.startOffset)
+            if (stageStartDate > monthEnd) continue
+            const stageEndDate = stage.durationDays == null
+              ? monthEnd
+              : clampEnd(addDays(stageStartDate, stage.durationDays - 1))
+            result.push({
+              key: stage.key,
+              label: STAGES.find((item) => item.key === stage.key)?.label ?? stage.key,
+              start: makeIso(stageStartDate),
+              end: makeIso(stageEndDate),
+              businessDays: [],
+            })
+          }
+          return result
+        })()
 
         const firstStart = [...previousCycleWeeks]
           .map((week) => week.start)
@@ -4352,13 +4405,15 @@ export default function MetasWorkspace() {
           .filter((value): value is string => Boolean(value))
           .sort()
           .slice(-1)[0] ?? null
+        const fallbackMonthStart = toIsoDate(new Date(previousYear, previousMonth - 1, 1))
+        const fallbackMonthEnd = toIsoDate(new Date(previousYear, previousMonth, 0))
         const previousCycleWeeksWithFull: CycleWeek[] = [
           ...previousCycleWeeks,
           {
             key: 'FULL',
             label: STAGES.find((stage) => stage.key === 'FULL')?.label ?? 'Todo o período',
-            start: firstStart,
-            end: lastEnd,
+            start: firstStart ?? fallbackMonthStart,
+            end: lastEnd ?? fallbackMonthEnd,
             businessDays: [],
           },
         ]
@@ -4568,6 +4623,7 @@ export default function MetasWorkspace() {
           for (const order of seller.orders) {
             if (order.clientCode) allMonthClientCodes.add(order.clientCode)
             const stage = findStageForDate(order.negotiatedAt, previousCycleWeeksWithFull)
+              ?? findStageForIncludedDate(order.negotiatedAt, previousCycleWeeksWithFull)
             if (!stage) continue
             stageMetrics[stage].orderCount += 1
             stageMetrics[stage].totalValue += order.totalValue
@@ -4623,18 +4679,72 @@ export default function MetasWorkspace() {
 
           const totalDistinctClients = allMonthClientCodes.size
           const officialBaseClients = Math.max(seller.baseClientCount ?? 0, 0)
-          const monthlyTarget = Number(summarySeller.monthlyTarget ?? 0)
-          const monthlyTargetSafe = monthlyTarget > 0 ? monthlyTarget : teamAverageValueSafe
-          const focusCode = String(summarySeller.focusProductCode ?? '').trim()
+
+          // Resolve financial target with same priority as main snapshot scoring:
+          // 1) Sankhya live data for previous period, 2) manualFinancialByPeriod (via summarySeller.monthlyTarget
+          // which the summary API now resolves from manualFinancialByPeriod), 3) team average fallback.
+          const previousSankhyaEntry = previousSankhyaTargets.find(
+            (t) => normalizeEntityCode(String(t.sellerCode ?? '')) === sellerCode
+          )
+          const previousSankhyaFinancial = Number(previousSankhyaEntry?.financialTarget ?? 0)
+          const summaryMonthlyTarget = Number(summarySeller.monthlyTarget ?? 0)
+
+          // When previous month has no rules saved, fall back to current ruleBlocks for comparison scoring.
+          const candidateFallbackIds = new Set([seller.id, sellerCode, `sankhya-${sellerCode}`])
+          const fallbackBlock = (() => {
+            const hasPrevRules = Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
+            if (hasPrevRules) return null
+            return (
+              ruleBlocks.find((block) =>
+                (block.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
+              ) ?? ruleBlocks[0] ?? null
+            )
+          })()
+
+          const resolvedMonthlyTarget = previousSankhyaFinancial > 0
+            ? previousSankhyaFinancial
+            : summaryMonthlyTarget > 0
+              ? summaryMonthlyTarget
+              : Number(fallbackBlock?.monthlyTarget ?? 0)
+          const monthlyTargetSafe = resolvedMonthlyTarget > 0 ? resolvedMonthlyTarget : teamAverageValueSafe
+
+          const focusCode = (String(summarySeller.focusProductCode ?? '').trim() || String(fallbackBlock?.focusProductCode ?? '').trim())
           const focusRows = focusCode ? (focusRowsByCode[focusCode] ?? []) : []
           const focusRow = focusRows.find((row) => row.sellerCode === sellerCode)
           const focusSoldKg = Number(focusRow?.soldKg ?? 0)
           const focusSoldClients = Number(focusRow?.soldClients ?? 0)
-          const focusMode: FocusTargetMode = summarySeller.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG'
-          const focusTargetKg = Math.max(Number(summarySeller.focusTargetKg ?? 0), 0)
-          const focusTargetBasePct = Math.max(Number(summarySeller.focusTargetBasePct ?? 0), 0)
+          const rawFocusTargetMode = summarySeller.focusTargetMode ?? fallbackBlock?.focusTargetMode
+          const focusMode: FocusTargetMode = rawFocusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG'
+          const focusTargetKg = Math.max(Number(summarySeller.focusTargetKg ?? 0) || Number(fallbackBlock?.focusTargetKg ?? 0), 0)
+          const focusTargetBasePct = Math.max(Number(summarySeller.focusTargetBasePct ?? 0) || Number(fallbackBlock?.focusTargetBasePct ?? 0), 0)
 
-          const rules = Array.isArray(summarySeller.rules) ? summarySeller.rules : []
+          // Resolve effective weight targets for VOLUME KPI (same priority as main scoring)
+          const previousPeriodKey = `${previousYear}-${String(previousMonth).padStart(2, '0')}`
+          const activeBlock = fallbackBlock ?? (
+            ruleBlocks.find((b) =>
+              (b.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
+            ) ?? ruleBlocks[0] ?? null
+          )
+          const prevWeightTargets = (activeBlock?.weightTargets ?? []).map((wt) => {
+            if (!wt.brand) return { brand: '', targetKg: 0 }
+            const skEntry = previousSankhyaEntry
+            if (skEntry && Array.isArray((skEntry as { weightTargets?: Array<{ brand: string; targetKg: number }> }).weightTargets)) {
+              const sk = ((skEntry as { weightTargets?: Array<{ brand: string; targetKg: number }> }).weightTargets ?? []).find(
+                (w) => w.brand.toUpperCase() === wt.brand.toUpperCase()
+              )
+              if (sk) return { brand: wt.brand, targetKg: sk.targetKg }
+            }
+            if (sankhyaConnected) {
+              const manualVal = (wt as { manualKgByPeriod?: Record<string, number> }).manualKgByPeriod?.[previousPeriodKey] ?? 0
+              return { brand: wt.brand, targetKg: manualVal }
+            }
+            return { brand: wt.brand, targetKg: wt.targetKg }
+          })
+          const previousWeightTargetRatios = getSellerWeightTargetRatios(prevWeightTargets as WeightTarget[], previousBrandWeightRows, sellerCode)
+
+          const rules = Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
+            ? summarySeller.rules
+            : (fallbackBlock?.rules ?? [])
           const sellerMetasObj = { hit: 0, total: 0 }
           let pointsTarget = 0
           let pointsAchieved = 0
@@ -4672,6 +4782,15 @@ export default function MetasWorkspace() {
                 }
                 break
               }
+              case 'VOLUME': {
+                if (rawNumber > 0) {
+                  const requiredGroups = Math.max(Math.floor(rawNumber), 1)
+                  progress = getVolumeProgressByClosestTargets(previousWeightTargetRatios, requiredGroups)
+                } else {
+                  progress = 0
+                }
+                break
+              }
               case 'DISTRIBUICAO': {
                 const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
                 const baseTotalClients = Math.max(officialBaseClients > 0 ? officialBaseClients : totalDistinctClients, 0)
@@ -4681,7 +4800,7 @@ export default function MetasWorkspace() {
                 const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
                 const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
                 const soldItemsStage = getDistribuicaoItemsByStage(sellerItemsRow, rule.stage)
-                const clientsWithAnyItems = sellerRows.reduce((sum, row) => {
+                const clientsWithAnyItems = sellerRows.reduce((sum: number, row: SellerDistributionRow) => {
                   const productsByStage = getDistribuicaoProductsByStage(row, rule.stage)
                   return sum + (productsByStage >= 1 ? 1 : 0)
                 }, 0)
@@ -4821,7 +4940,7 @@ export default function MetasWorkspace() {
       cancelled = true
       controller.abort()
     }
-  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, year])
+  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, productAllowlist, ruleBlocks, year])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
@@ -8768,7 +8887,7 @@ export default function MetasWorkspace() {
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
-                            {prev && delta(kpiGeneralScopedSummary.metasHit, prev.metasHit)}
+                            {prev && prev.metasTotal > 0 && delta(kpiGeneralScopedSummary.metasHit, prev.metasHit)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
                             <p className="text-2xl font-semibold tabular-nums text-surface-900">
@@ -9004,7 +9123,7 @@ export default function MetasWorkspace() {
                               </div>
                               <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.averageOverallPct, 1)}%</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">Atingimento médio dos vendedores.</p>
-                              {prev ? (
+                              {prev && prev.metasTotal > 0 ? (
                                 <p className={`mt-1 text-[9px] font-semibold tabular-nums ${metasHitDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                                   {metasHitDeltaValue >= 0 ? '+' : '-'}{num(Math.abs(metasHitDeltaValue), 0)} metas vs mês anterior
                                 </p>
