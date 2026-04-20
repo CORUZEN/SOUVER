@@ -4503,9 +4503,11 @@ export default function MetasWorkspace() {
         const summaryByCode = new Map<string, (typeof previousSummarySellers)[number]>()
         const summaryByName = new Map<string, (typeof previousSummarySellers)[number]>()
         for (const seller of previousSummarySellers) {
-          const code = normalizeEntityCode(String(seller.code ?? '').trim())
+          const rawCode = normalizeEntityCode(String(seller.code ?? '').trim())
+          const codeWithoutPrefix = normalizeEntityCode(rawCode.replace(/^sankhya-/, ''))
           const nameKey = normalizeSellerNameForLookup(String(seller.name ?? ''))
-          if (code) summaryByCode.set(code, seller)
+          if (rawCode) summaryByCode.set(rawCode, seller)
+          if (codeWithoutPrefix) summaryByCode.set(codeWithoutPrefix, seller)
           if (nameKey) summaryByName.set(nameKey, seller)
         }
 
@@ -8687,7 +8689,21 @@ export default function MetasWorkspace() {
                   {(() => {
                     const prev = previousPeriodScopedTotals
                     const delta = (current: number, previous: number | undefined) => {
-                      if (previous === undefined || previous === null || previous === 0) return null
+                      if (previous === undefined || previous === null) return null
+                      if (previous === 0) {
+                        if (current === 0) {
+                          return (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums text-slate-500">
+                              • 0%
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums text-emerald-600">
+                            ▲ novo
+                          </span>
+                        )
+                      }
                       const diff = current - previous
                       const pct = (diff / previous) * 100
                       const up = diff >= 0
