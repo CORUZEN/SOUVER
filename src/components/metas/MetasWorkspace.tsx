@@ -8862,65 +8862,77 @@ export default function MetasWorkspace() {
                         }
                         return (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-cyan-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Peso total dos pedidos</p>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-cyan-400 transition-all duration-300 group-hover:from-cyan-600 group-hover:to-cyan-500" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalGrossWeight, prev.totalGrossWeight)}
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
                             </div>
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Valor total de Pedidos</p>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-300 group-hover:from-emerald-600 group-hover:to-emerald-500" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
                             </div>
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Base de clientes</p>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-400 transition-all duration-300 group-hover:from-indigo-600 group-hover:to-indigo-500" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Base de clientes</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalBaseClients, prev.totalBaseClients)}
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
-                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">
                                 Cobertura atual: {num(kpiGeneralScopedSummary.uniqueClients, 0)} clientes ({num(baseCoveragePct, 1)}%)
                               </p>
                             </div>
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Volume</p>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-sky-500 to-sky-400 transition-all duration-300 group-hover:from-sky-600 group-hover:to-sky-500" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Volume</p>
                                 {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
-                                  <span className="text-[10px] font-semibold tabular-nums text-sky-600">{num(volumePct, 1)}%</span>
+                                  <span className="inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-sky-700 transition-colors duration-200 group-hover:bg-sky-100">{num(volumePct, 1)}%</span>
                                 )}
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
-                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">
                                 Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
                             </div>
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-amber-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Devolução</p>
-                                <span className={`text-[10px] font-semibold tabular-nums ${devolucaoClass}`}>{num(devolucaoPct, 3)}%</span>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-amber-500 to-amber-400 transition-all duration-300 group-hover:from-amber-600 group-hover:to-amber-500" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Devolução</p>
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                  devolucaoClass === 'text-emerald-600'
+                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                                    : devolucaoClass === 'text-rose-600'
+                                      ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                      : 'border-slate-200 bg-slate-100 text-slate-600'
+                                }`}>{num(devolucaoPct, 3)}%</span>
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
-                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">
                                 Limite KPI: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
                             </div>
-                            <div className="relative min-h-[120px] overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3 shadow-sm">
-                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-rose-500" />
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Inadimplência acumulativa</p>
-                                <span className={`text-[10px] font-semibold tabular-nums ${inadimplenciaClass}`}>{num(inadimplenciaPct, 3)}%</span>
+                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-rose-500 to-pink-500 transition-all duration-300 group-hover:from-rose-600 group-hover:to-pink-600" />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência acumulativa</p>
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                  inadimplenciaClass === 'text-emerald-600'
+                                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                                    : inadimplenciaClass === 'text-rose-600'
+                                      ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                      : 'border-slate-200 bg-slate-100 text-slate-600'
+                                }`}>{num(inadimplenciaPct, 3)}%</span>
                               </div>
-                              <p className="mt-1 text-xl font-semibold tabular-nums text-surface-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
-                              <p className="mt-0.5 truncate text-[10px] text-surface-500">
+                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
+                              <p className="mt-1 truncate text-[10px] text-slate-500">
                                 {num(kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount, 0)} títulos &gt; {inadimplenciaLimitDays} dias · limite {inadimplenciaLimitPct > 0 ? `${num(inadimplenciaLimitPct, 2)}%` : 'n/a'}
                               </p>
                             </div>
