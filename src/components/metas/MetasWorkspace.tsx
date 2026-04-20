@@ -3366,24 +3366,6 @@ export default function MetasWorkspace() {
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
   }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, resolveBlockProfileType, ruleBlocks, sankhyaTargets, sellers])
 
-  // DEBUG: log snapshot scoring for comparison
-  useEffect(() => {
-    if (snapshots.length === 0) return
-    const hit = snapshots.reduce((sum, s) => {
-      const block = ruleBlocks.find((b) => b.id === s.blockId)
-      if (!block) return sum
-      return sum + block.rules.filter((r) => (s.ruleProgress.find((p) => p.ruleId === r.id)?.progress ?? 0) >= 1).length
-    }, 0)
-    const avgPct = snapshots.reduce((sum, s) => sum + (s.pointsTarget > 0 ? s.pointsAchieved / s.pointsTarget : 0), 0) / snapshots.length * 100
-    console.log('[DirectScoring]', year, month + 1, 'metasHit:', hit, 'sellers:', snapshots.length, 'avgPct:', avgPct.toFixed(4))
-    snapshots.forEach((s) => {
-      const block = ruleBlocks.find((b) => b.id === s.blockId)
-      if (!block) return
-      const h = block.rules.filter((r) => (s.ruleProgress.find((p) => p.ruleId === r.id)?.progress ?? 0) >= 1).length
-      if (h > 0) console.log('[DirectScoring]', s.seller.name, 'hit:', h, '/', block.rules.length, 'pts:', s.pointsAchieved.toFixed(4), '/', s.pointsTarget.toFixed(4), 'ratio:', s.pointsTarget > 0 ? (s.pointsAchieved/s.pointsTarget).toFixed(4) : '0')
-    })
-  }, [month, ruleBlocks, snapshots, year])
-
   useEffect(() => {
     if (snapshots.length === 0) {
       if (selectedSellerId !== '') setSelectedSellerId('')
@@ -3933,6 +3915,17 @@ export default function MetasWorkspace() {
       return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
     }, 0)
 
+    // Distribuição de itens aggregate: 80% items / 40% base clients rule
+    const distribuicaoItemsTarget80pct = Math.ceil(activeProductsCount * 0.8) * scopedSnapshots.length
+    const distribuicaoClientsWithAnyItems = scopedSnapshots.reduce((sum, snapshot) => {
+      const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+      return sum + sellerRows.reduce((c, row) => c + (getDistribuicaoProductsByStage(row, 'FULL') >= 1 ? 1 : 0), 0)
+    }, 0)
+    const distribuicaoClientsTarget40pct = scopedSnapshots.reduce((sum, snapshot) => {
+      return sum + Math.ceil(Math.max(snapshot.seller.baseClientCount ?? 0, 0) * 0.4)
+    }, 0)
+
     const metas = scopedSnapshots.reduce(
       (acc, snapshot) => {
         const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
@@ -4021,6 +4014,9 @@ export default function MetasWorkspace() {
       totalVolumes,
       positivadosSold,
       positivadosTarget,
+      distribuicaoItemsTarget80pct,
+      distribuicaoClientsWithAnyItems,
+      distribuicaoClientsTarget40pct,
       metasHit: metas.hit,
       metasTotal: metas.total,
       volumeTotalKg,
@@ -4035,7 +4031,7 @@ export default function MetasWorkspace() {
       inadimplenciaLimitPct,
       inadimplenciaLimitDays,
     }
-  }, [distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
+  }, [distributionBySellerProduct, distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -4744,14 +4740,17 @@ export default function MetasWorkspace() {
 
           // When previous month has no rules saved, fall back to current ruleBlocks for comparison scoring.
           const candidateFallbackIds = new Set([seller.id, sellerCode, `sankhya-${sellerCode}`])
+          // Always resolve the current block so we can use its pointsTarget as denominator
+          // (mirrors blockPointsTarget in direct scoring — includes rules added after the historical period)
+          const currentBlock = (
+            ruleBlocks.find((block) =>
+              (block.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
+            ) ?? ruleBlocks[0] ?? null
+          )
           const fallbackBlock = (() => {
             const hasPrevRules = Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
             if (hasPrevRules) return null
-            return (
-              ruleBlocks.find((block) =>
-                (block.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
-              ) ?? ruleBlocks[0] ?? null
-            )
+            return currentBlock
           })()
 
           const resolvedMonthlyTarget = (() => {
@@ -4804,9 +4803,14 @@ export default function MetasWorkspace() {
           })
           const previousWeightTargetRatios = getSellerWeightTargetRatios(prevWeightTargets as WeightTarget[], previousBrandWeightRows, sellerCode)
 
-          const rules = Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
-            ? summarySeller.rules
-            : (fallbackBlock?.rules ?? [])
+          // Use current block's rule definitions (same as direct scoring when navigating to a past month).
+          // Progress is still computed from historical order data below — only the rule set is aligned.
+          // If currentBlock is unavailable, fall back to historical rules.
+          const rules = (currentBlock?.rules?.length ?? 0) > 0
+            ? currentBlock!.rules
+            : (Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
+                ? summarySeller.rules
+                : (fallbackBlock?.rules ?? []))
           const sellerMetasObj = { hit: 0, total: 0 }
           let pointsTarget = 0
           let pointsAchieved = 0
@@ -4962,12 +4966,16 @@ export default function MetasWorkspace() {
               previousByType.set(kpiType, bucket)
             }
           }
+          // Use current block's total points as denominator to match direct scoring's blockPointsTarget.
+          // Historical rules may be a subset of current rules (rules added after the period are missing
+          // from summarySeller.rules but present in currentBlock.rules with points contribution = 0).
           perSellerMetas.set(seller.id, sellerMetasObj)
-          perSellerPoints.set(seller.id, { pointsAchieved, pointsTarget })
-          // DEBUG: log sellers where metasHit > 0 to find scoring discrepancies
-          if (sellerMetasObj.hit > 0) {
-            console.log('[PrevConsolidated]', seller.name, 'hit:', sellerMetasObj.hit, '/', sellerMetasObj.total, 'pts:', pointsAchieved.toFixed(4), '/', pointsTarget.toFixed(4), 'ratio:', pointsTarget > 0 ? (pointsAchieved/pointsTarget).toFixed(4) : '0')
-          }
+          // pointsTarget is now accumulated over currentBlock.rules (same as blockPointsTarget in direct scoring).
+          // Fall back to the accumulated value if currentBlock had no rules.
+          const effectivePointsTarget = pointsTarget > 0 ? pointsTarget : (currentBlock?.rules ?? []).reduce(
+            (sum, r) => sum + Math.max(Number((r as { points?: number }).points ?? 0), 0), 0
+          )
+          perSellerPoints.set(seller.id, { pointsAchieved, pointsTarget: effectivePointsTarget })
         }
 
         if (cancelled) return
@@ -8963,20 +8971,75 @@ export default function MetasWorkspace() {
                       : undefined
                     return (
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
-                          <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
-                            {prev && deltaPp(positivadosPct, prevPositivadosPct)}
-                          </div>
-                          <div className="mt-1.5 flex items-baseline gap-2">
-                            <p className="text-2xl font-semibold tabular-nums text-surface-900">
-                              {num(kpiGeneralScopedSummary.positivadosSold, 0)}
-                              <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}</span>
-                            </p>
-                            <span className="text-sm font-semibold tabular-nums text-sky-600">{num(positivadosPct, 1)}%</span>
-                          </div>
-                        </div>
+                        {(() => {
+                          const isSellerView = kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId !== ''
+                          if (isSellerView) {
+                            return (
+                              <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                                <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
+                                  {prev && deltaPp(positivadosPct, prevPositivadosPct)}
+                                </div>
+                                <div className="mt-1.5 flex items-baseline gap-2">
+                                  <p className="text-2xl font-semibold tabular-nums text-surface-900">
+                                    {num(kpiGeneralScopedSummary.positivadosSold, 0)}
+                                    <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}</span>
+                                  </p>
+                                  <span className="text-sm font-semibold tabular-nums text-sky-600">{num(positivadosPct, 1)}%</span>
+                                </div>
+                              </div>
+                            )
+                          }
+                          const itemsTarget = kpiGeneralScopedSummary.distribuicaoItemsTarget80pct
+                          const itemsSold = kpiGeneralScopedSummary.positivadosSold
+                          const itemsRatio = itemsTarget > 0 ? Math.min((itemsSold / itemsTarget) * 100, 999) : 0
+                          const itemsOk = itemsRatio >= 100
+                          const itemsGap = Math.max(itemsTarget - itemsSold, 0)
+                          const clientsWithItems = kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems
+                          const clientsTarget = kpiGeneralScopedSummary.distribuicaoClientsTarget40pct
+                          const clientsRatio = clientsTarget > 0 ? Math.min((clientsWithItems / clientsTarget) * 100, 999) : 0
+                          const clientsOk = clientsRatio >= 100
+                          const clientsGap = Math.max(clientsTarget - clientsWithItems, 0)
+                          return (
+                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                              <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Distribuição de itens</p>
+                                <div className="flex gap-1">
+                                  <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700">80% itens</span>
+                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">40% base</span>
+                                </div>
+                              </div>
+                              <div className="mt-2 space-y-1.5">
+                                <div>
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="text-xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</span>
+                                      <span className="text-xs text-surface-400">/ {num(itemsTarget, 0)} itens</span>
+                                    </div>
+                                    <span className={`text-sm font-semibold tabular-nums ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(itemsRatio, 1)}%</span>
+                                  </div>
+                                  <p className={`text-[10px] ${itemsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {itemsOk ? 'Meta de itens atingida' : `▼ Faltam ${num(itemsGap, 0)} itens (meta 80%)`}
+                                  </p>
+                                </div>
+                                <div>
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="text-xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</span>
+                                      <span className="text-xs text-surface-400">/ {num(clientsTarget, 0)} clientes</span>
+                                    </div>
+                                    <span className={`text-sm font-semibold tabular-nums ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>{num(clientsRatio, 1)}%</span>
+                                  </div>
+                                  <p className={`text-[10px] ${clientsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {clientsOk ? 'Meta de clientes atingida' : `▼ Faltam ${num(clientsGap, 0)} clientes (meta 40%)`}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
                         <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
                           <div className="flex items-start justify-between gap-2">
@@ -9004,7 +9067,7 @@ export default function MetasWorkspace() {
                         <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas no ciclo</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas</p>
                             {prev && prev.metasTotal > 0 && deltaPp(metasPct, prevMetasPct)}
                           </div>
                           <div className="mt-1.5 flex items-baseline gap-2">
@@ -9539,7 +9602,7 @@ export default function MetasWorkspace() {
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Metas conquistadas no ciclo</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Metas conquistadas</p>
                             <p className="mt-1 text-2xl font-bold text-emerald-900 tabular-nums">
                               {num(kpiSummary.hit, 0)}
                               <span className="font-bold text-emerald-700/80"> / {num(kpiSummary.total, 0)}</span>
