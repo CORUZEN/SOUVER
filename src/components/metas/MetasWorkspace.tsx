@@ -8791,13 +8791,9 @@ export default function MetasWorkspace() {
 
                       {(() => {
                         const prev = previousPeriodScopedTotals
-                        const baseCoveragePct = kpiGeneralScopedSummary.totalBaseClients > 0
-                          ? (kpiGeneralScopedSummary.uniqueClients / kpiGeneralScopedSummary.totalBaseClients) * 100
-                          : 0
                         const weightTargetPct = kpiGeneralScopedSummary.volumeTargetKg > 0
                           ? (kpiGeneralScopedSummary.totalGrossWeight / kpiGeneralScopedSummary.volumeTargetKg) * 100
                           : 0
-                        const volumePct = kpiGeneralScopedSummary.volumeRatio * 100
                         const devolucaoPct = kpiGeneralScopedSummary.devolucaoRatePct
                         const devolucaoLimitPct = kpiGeneralScopedSummary.devolucaoLimitPct
                         const inadimplenciaPct = kpiGeneralScopedSummary.inadimplenciaRatePct
@@ -8812,6 +8808,10 @@ export default function MetasWorkspace() {
                             ? (inadimplenciaPct <= inadimplenciaLimitPct ? 'text-emerald-600' : 'text-rose-600')
                             : 'text-surface-500'
                         const weightTargetClass = weightTargetPct >= 100 ? 'text-emerald-600' : weightTargetPct >= 85 ? 'text-cyan-600' : 'text-rose-600'
+                        const weightBarPct = Math.max(0, Math.min(weightTargetPct, 100))
+                        const revenueDeltaValue = prev ? (kpiGeneralScopedSummary.totalRevenue - prev.totalRevenue) : 0
+                        const devolucaoOverLimit = devolucaoLimitPct > 0 ? devolucaoPct - devolucaoLimitPct : 0
+                        const inadimplenciaOverLimit = inadimplenciaLimitPct > 0 ? inadimplenciaPct - inadimplenciaLimitPct : 0
                         const delta = (current: number, previous: number | undefined) => {
                           if (previous === undefined || previous === null || previous === 0) return null
                           const diff = current - previous
@@ -8826,91 +8826,80 @@ export default function MetasWorkspace() {
                           )
                         }
                         return (
-                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-cyan-400 transition-all duration-300 group-hover:from-cyan-600 group-hover:to-cyan-500" />
-                              <div className="flex items-center justify-between gap-2">
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                              <div className="flex items-center justify-between gap-2 text-[10px]">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
                                 {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
-                                  <span className={`inline-flex shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums ${weightTargetClass}`}>
+                                  <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums ${weightTargetClass}`}>
                                     {num(weightTargetPct, 1)}%
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
                                 Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
+                              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90">
+                                <div className={`h-full rounded-full transition-[width] duration-700 ${weightTargetPct >= 100 ? 'bg-emerald-500' : weightTargetPct >= 85 ? 'bg-cyan-600' : 'bg-amber-500'}`} style={{ width: `${weightBarPct}%` }} />
+                              </div>
+                              <p className="mt-0.5 text-[9px] text-slate-500">
+                                {weightTargetPct >= 100 ? 'Meta de peso atingida.' : `${num(Math.max(kpiGeneralScopedSummary.volumeTargetKg - kpiGeneralScopedSummary.totalGrossWeight, 0), 2)} kg restantes para a meta.`}
+                              </p>
                             </div>
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-300 group-hover:from-emerald-600 group-hover:to-emerald-500" />
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
                               </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">Faturamento consolidado no período.</p>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">Faturamento consolidado no período.</p>
+                              {prev && (
+                                <p className={`mt-1 text-[9px] font-semibold tabular-nums ${revenueDeltaValue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  {revenueDeltaValue >= 0 ? '+' : '-'}{currency(Math.abs(revenueDeltaValue))} vs mês anterior
+                                </p>
+                              )}
                             </div>
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-400 transition-all duration-300 group-hover:from-indigo-600 group-hover:to-indigo-500" />
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Base de clientes</p>
-                                <span className="inline-flex shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums text-indigo-600">
-                                  {num(baseCoveragePct, 1)}%
-                                </span>
-                              </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">
-                                {num(kpiGeneralScopedSummary.uniqueClients, 0)} / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}
-                              </p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
-                                Cobertura atual da base no período selecionado.
-                              </p>
-                            </div>
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-sky-500 to-sky-400 transition-all duration-300 group-hover:from-sky-600 group-hover:to-sky-500" />
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Volume</p>
-                                {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
-                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-sky-700 transition-colors duration-200 group-hover:bg-sky-100">{num(volumePct, 1)}%</span>
-                                )}
-                              </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
-                                Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
-                              </p>
-                            </div>
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-amber-500 to-amber-400 transition-all duration-300 group-hover:from-amber-600 group-hover:to-amber-500" />
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Devolução</p>
                                 <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
                                   devolucaoClass === 'text-emerald-600'
                                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                                     : devolucaoClass === 'text-rose-600'
-                                      ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                      ? 'border-amber-100 bg-amber-50 text-amber-700'
                                       : 'border-slate-200 bg-slate-100 text-slate-600'
                                 }`}>{num(devolucaoPct, 3)}%</span>
                               </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
                                 Limite da meta: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
+                              <p className={`mt-1 text-[9px] font-semibold ${devolucaoOverLimit <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {devolucaoOverLimit <= 0 ? `${num(Math.abs(devolucaoOverLimit), 3)} p.p abaixo do limite` : `${num(devolucaoOverLimit, 3)} p.p acima do limite`}
+                              </p>
                             </div>
-                            <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-rose-500 to-pink-500 transition-all duration-300 group-hover:from-rose-600 group-hover:to-pink-600" />
+                            <div className="group relative min-h-[116px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência</p>
                                 <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
                                   inadimplenciaClass === 'text-emerald-600'
                                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                                     : inadimplenciaClass === 'text-rose-600'
-                                      ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                      ? 'border-amber-100 bg-amber-50 text-amber-700'
                                       : 'border-slate-200 bg-slate-100 text-slate-600'
                                 }`}>{num(inadimplenciaPct, 3)}%</span>
                               </div>
-                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
-                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
+                              <p className="mt-0.5 text-[9px] leading-[1.25] text-slate-500">
                                 {num(kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount, 0)} títulos &gt; {inadimplenciaLimitDays} dias · limite {inadimplenciaLimitPct > 0 ? `${num(inadimplenciaLimitPct, 2)}%` : 'n/a'}
+                              </p>
+                              <p className={`mt-1 text-[9px] font-semibold ${inadimplenciaOverLimit <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {inadimplenciaOverLimit <= 0 ? `${num(Math.abs(inadimplenciaOverLimit), 3)} p.p abaixo do limite` : `${num(inadimplenciaOverLimit, 3)} p.p acima do limite`}
                               </p>
                             </div>
                           </div>
