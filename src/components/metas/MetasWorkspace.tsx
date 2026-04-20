@@ -8817,7 +8817,7 @@ export default function MetasWorkspace() {
                           const pct = (diff / previous) * 100
                           const up = diff >= 0
                           return (
-                            <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
+                            <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
                               up ? 'text-emerald-600' : 'text-rose-600'
                             }`}>
                               {up ? '▲' : '▼'} {num(Math.abs(pct), 1)}%
@@ -8832,8 +8832,8 @@ export default function MetasWorkspace() {
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalGrossWeight, prev.totalGrossWeight)}
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">Consolidado de peso bruto dos pedidos no período.</p>
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">Peso bruto consolidado no período.</p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-300 group-hover:from-emerald-600 group-hover:to-emerald-500" />
@@ -8841,8 +8841,8 @@ export default function MetasWorkspace() {
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
                                 {prev && delta(kpiGeneralScopedSummary.totalRevenue, prev.totalRevenue)}
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">Faturamento consolidado dos pedidos no período.</p>
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.totalRevenue)}</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">Faturamento consolidado no período.</p>
                             </div>
                             <div className="group relative min-h-[118px] overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5)]">
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-400 transition-all duration-300 group-hover:from-indigo-600 group-hover:to-indigo-500" />
@@ -8850,8 +8850,8 @@ export default function MetasWorkspace() {
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Base de clientes</p>
                                 {prev && delta(baseCoveragePct, prevBaseCoveragePct)}
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalBaseClients, 0)}</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
                                 Cobertura atual: {num(kpiGeneralScopedSummary.uniqueClients, 0)} clientes ({num(baseCoveragePct, 1)}%)
                               </p>
                             </div>
@@ -8860,11 +8860,11 @@ export default function MetasWorkspace() {
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Volume</p>
                                 {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
-                                  <span className="inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-sky-700 transition-colors duration-200 group-hover:bg-sky-100">{num(volumePct, 1)}%</span>
+                                  <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-sky-700 transition-colors duration-200 group-hover:bg-sky-100">{num(volumePct, 1)}%</span>
                                 )}
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
                                 Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
                             </div>
@@ -8872,7 +8872,7 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-amber-500 to-amber-400 transition-all duration-300 group-hover:from-amber-600 group-hover:to-amber-500" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Devolução</p>
-                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
                                   devolucaoClass === 'text-emerald-600'
                                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                                     : devolucaoClass === 'text-rose-600'
@@ -8880,8 +8880,8 @@ export default function MetasWorkspace() {
                                       : 'border-slate-200 bg-slate-100 text-slate-600'
                                 }`}>{num(devolucaoPct, 3)}%</span>
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.devolucaoTotalValue)}</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
                                 Limite da meta: {devolucaoLimitPct > 0 ? `${num(devolucaoLimitPct, 2)}%` : 'não parametrizado'}
                               </p>
                             </div>
@@ -8889,7 +8889,7 @@ export default function MetasWorkspace() {
                               <span className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-rose-500 to-pink-500 transition-all duration-300 group-hover:from-rose-600 group-hover:to-pink-600" />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência acumulativa</p>
-                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
                                   inadimplenciaClass === 'text-emerald-600'
                                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                                     : inadimplenciaClass === 'text-rose-600'
@@ -8897,8 +8897,8 @@ export default function MetasWorkspace() {
                                       : 'border-slate-200 bg-slate-100 text-slate-600'
                                 }`}>{num(inadimplenciaPct, 3)}%</span>
                               </div>
-                              <p className="mt-2 text-[clamp(1.45rem,1.65vw,1.95rem)] leading-[1.1] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
-                              <p className="mt-1 truncate text-[10px] text-slate-500">
+                              <p className="mt-2 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{currency(kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue)}</p>
+                              <p className="mt-1 text-[9px] leading-[1.25] text-slate-500">
                                 {num(kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount, 0)} títulos &gt; {inadimplenciaLimitDays} dias · limite {inadimplenciaLimitPct > 0 ? `${num(inadimplenciaLimitPct, 2)}%` : 'n/a'}
                               </p>
                             </div>
