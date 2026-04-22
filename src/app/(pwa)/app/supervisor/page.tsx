@@ -1238,6 +1238,7 @@ export default function SupervisorPwaDashboard() {
     const profileType = profileTypes[code] ?? profileTypes[normalizedCode] ?? 'NOVATO'
     const maxReward = maxRewards[code] ?? maxRewards[normalizedCode] ?? 0
     const wTargets = weightTargetsBySeller[code] ?? weightTargetsBySeller[normalizedCode] ?? []
+    const weightTargetKg = wTargets.reduce((sum, row) => sum + Math.max(row.targetKg ?? 0, 0), 0)
     const focusConfig = focusConfigBySeller[code] ?? focusConfigBySeller[normalizedCode] ?? null
     const earnedReward = computeEarnedReward(
       sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
@@ -1284,7 +1285,7 @@ export default function SupervisorPwaDashboard() {
     const cyclePct = pointsTarget > 0 ? (pointsAchieved / pointsTarget) * 100 : 0
     const status = inferStatus(cyclePct)
 
-    return { seller, code, target, financialPct, cyclePct, status, clients, profileType, maxReward, earnedReward, kpiProgress, pointsAchieved }
+    return { seller, code, target, financialPct, cyclePct, status, clients, profileType, maxReward, earnedReward, kpiProgress, pointsAchieved, weightTargetKg }
   }).sort((a, b) => {
     if (b.cyclePct !== a.cyclePct) return b.cyclePct - a.cyclePct
     if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
@@ -1534,7 +1535,7 @@ export default function SupervisorPwaDashboard() {
                 <span className="ml-auto text-xs font-semibold tabular-nums text-surface-300">{sellers.length}</span>
               </div>
 
-              {sellerCards.map(({ seller, target, cyclePct, financialPct, status, clients, profileType, maxReward, earnedReward, kpiProgress }, idx) => {
+              {sellerCards.map(({ seller, target, cyclePct, financialPct, status, clients, kpiProgress, weightTargetKg }, idx) => {
                 const cfg = STATUS_CONFIG[status]
                 const isExpanded = expandedSeller === seller.id
 
@@ -1595,11 +1596,11 @@ export default function SupervisorPwaDashboard() {
                           <MetricCell icon={<ShoppingCart className="h-3.5 w-3.5" />} label="Pedidos" value={fmt(seller.totalOrders)} />
                           <MetricCell icon={<Users className="h-3.5 w-3.5" />} label="Clientes" value={`${fmt(clients)}/${fmt(seller.baseClientCount)}`} />
                           <MetricCell icon={<Weight className="h-3.5 w-3.5" />} label="Peso Bruto" value={fmtKg(seller.totalGrossWeight)} />
-                          <PremioCell
-                            pct={cyclePct}
-                            profileType={profileType}
-                            earnedReward={earnedReward}
-                            maxReward={maxReward}
+                          <MetricCell
+                            icon={<Weight className="h-3.5 w-3.5" />}
+                            label="Meta de Peso"
+                            value={weightTargetKg > 0 ? fmtKg(weightTargetKg) : '—'}
+                            highlight={weightTargetKg > 0 && seller.totalGrossWeight >= weightTargetKg ? 'success' : 'none'}
                           />
                         </div>
 
@@ -1617,7 +1618,7 @@ export default function SupervisorPwaDashboard() {
                           <div className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2">
                             <p className="text-[10px] text-emerald-300">
                               <span className="font-semibold">{fmtBrl(seller.totalValue - target)}</span>
-                              {' '}acima da meta 🎯
+                              {' '}acima da meta
                             </p>
                           </div>
                         )}
