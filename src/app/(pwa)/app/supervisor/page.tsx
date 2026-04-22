@@ -1811,9 +1811,42 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const volumeQuantidadeAtingida = kpi.kpiType === 'VOLUME'
                   ? kpi.details.rows.find((row) => row.label === 'Quantidade atingida')?.value
                   : null
-                const detailRows = kpi.kpiType === 'VOLUME'
-                  ? kpi.details.rows.filter((row) => row.label !== 'Meta definida' && row.label !== 'Quantidade atingida')
-                  : kpi.details.rows
+                const baseTotal = kpi.kpiType === 'BASE_CLIENTES'
+                  ? kpi.details.rows.find((row) => row.label === 'Base total')?.value
+                  : null
+                const baseMetaClientes = kpi.kpiType === 'BASE_CLIENTES'
+                  ? kpi.details.rows.find((row) => row.label === 'Meta de clientes')?.value
+                  : null
+                const baseClientesAtendidos = kpi.kpiType === 'BASE_CLIENTES'
+                  ? kpi.details.rows.find((row) => row.label === 'Clientes atendidos')?.value
+                  : null
+                const financeiroMetaEtapa = kpi.kpiType === 'META_FINANCEIRA'
+                  ? kpi.details.rows.find((row) => row.label === 'Meta da etapa')?.value
+                  : null
+                const financeiroRealizado = kpi.kpiType === 'META_FINANCEIRA'
+                  ? kpi.details.rows.find((row) => row.label === 'Realizado')?.value
+                  : null
+                const financeiroFalta = kpi.kpiType === 'META_FINANCEIRA'
+                  ? kpi.details.rows.find((row) => row.label === 'Falta para bater')?.value
+                  : null
+                const financeiroDiasRestantes = kpi.kpiType === 'META_FINANCEIRA'
+                  ? kpi.details.rows.find((row) => row.label === 'Dias úteis restantes')?.value
+                  : null
+                const financeiroMediaDia = kpi.kpiType === 'META_FINANCEIRA'
+                  ? kpi.details.rows.find((row) => row.label === 'Venda média necessária/dia')?.value
+                  : null
+                const detailRows = kpi.details.rows.filter((row) => {
+                  if (kpi.kpiType === 'VOLUME') {
+                    return row.label !== 'Meta definida' && row.label !== 'Quantidade atingida'
+                  }
+                  if (kpi.kpiType === 'BASE_CLIENTES') {
+                    return !['Base total', 'Meta de clientes', 'Clientes atendidos', 'Faltantes'].includes(row.label)
+                  }
+                  if (kpi.kpiType === 'META_FINANCEIRA') {
+                    return !['Meta da etapa', 'Realizado', 'Falta para bater', 'Dias úteis restantes', 'Venda média necessária/dia'].includes(row.label)
+                  }
+                  return true
+                })
 
                 const barColor = !kpi.isComputable || isPending
                   ? 'bg-linear-to-r from-surface-500 to-surface-400'
@@ -1888,6 +1921,54 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                                 <p className="text-[9px] uppercase tracking-wider text-cyan-100/90">Quantidade atingida</p>
                                 <p className="text-sm font-bold text-cyan-200">{volumeQuantidadeAtingida}</p>
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {kpi.kpiType === 'BASE_CLIENTES' && baseTotal !== null && baseMetaClientes !== null && baseClientesAtendidos !== null && (
+                          <div className="mb-2 rounded-md border border-sky-500/25 bg-linear-to-r from-sky-500/10 via-cyan-500/10 to-sky-500/10 px-2.5 py-2">
+                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-sky-100/90">Resumo da cobertura de clientes</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-sky-100/80">Base total</p>
+                                <p className="text-[11px] font-bold text-white">{baseTotal}</p>
+                              </div>
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-sky-100/80">Meta de clientes</p>
+                                <p className="text-[11px] font-bold text-white">{baseMetaClientes}</p>
+                              </div>
+                            </div>
+                            <div className="mt-1.5 rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1.5">
+                              <p className="text-[9px] uppercase tracking-wide text-cyan-100/85">Clientes atendidos</p>
+                              <p className="text-[11px] font-bold text-cyan-100">{baseClientesAtendidos}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {kpi.kpiType === 'META_FINANCEIRA' && financeiroMetaEtapa !== null && financeiroRealizado !== null && financeiroFalta !== null && financeiroDiasRestantes !== null && financeiroMediaDia !== null && (
+                          <div className="mb-2 rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/11 via-teal-500/10 to-emerald-500/11 px-2.5 py-2">
+                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-100/90">Resumo da meta financeira</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Meta da etapa</p>
+                                <p className="text-[11px] font-bold text-white">{financeiroMetaEtapa}</p>
+                              </div>
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Realizado</p>
+                                <p className="text-[11px] font-bold text-emerald-200">{financeiroRealizado}</p>
+                              </div>
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Falta para bater</p>
+                                <p className="text-[11px] font-bold text-amber-200">{financeiroFalta}</p>
+                              </div>
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Dias úteis restantes</p>
+                                <p className="text-[11px] font-bold text-white">{financeiroDiasRestantes}</p>
+                              </div>
+                            </div>
+                            <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
+                              <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Venda média necessária/dia</p>
+                              <p className="text-[11px] font-bold text-emerald-100">{financeiroMediaDia}</p>
                             </div>
                           </div>
                         )}
