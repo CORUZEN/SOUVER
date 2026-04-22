@@ -9215,10 +9215,77 @@ export default function MetasWorkspace() {
                             </span>
                           )
                         }
+                        type ProgressTone = {
+                          border: string
+                          background: string
+                          topBar: string
+                          hoverBorder: string
+                        }
+                        const toneSuccess: ProgressTone = {
+                          border: 'border-emerald-200',
+                          background: 'bg-emerald-50/35',
+                          topBar: 'bg-emerald-500',
+                          hoverBorder: 'hover:border-emerald-300',
+                        }
+                        const toneInfo: ProgressTone = {
+                          border: 'border-cyan-200',
+                          background: 'bg-cyan-50/30',
+                          topBar: 'bg-cyan-500',
+                          hoverBorder: 'hover:border-cyan-300',
+                        }
+                        const toneWarning: ProgressTone = {
+                          border: 'border-amber-200',
+                          background: 'bg-amber-50/35',
+                          topBar: 'bg-amber-500',
+                          hoverBorder: 'hover:border-amber-300',
+                        }
+                        const toneDanger: ProgressTone = {
+                          border: 'border-rose-200',
+                          background: 'bg-rose-50/30',
+                          topBar: 'bg-rose-500',
+                          hoverBorder: 'hover:border-rose-300',
+                        }
+                        const weightTone: ProgressTone =
+                          weightTargetPct >= 100 ? toneSuccess : weightTargetPct >= 85 ? toneInfo : weightTargetPct >= 60 ? toneWarning : toneDanger
+                        const revenueTone: ProgressTone =
+                          revenueTargetPct >= 100 ? toneSuccess : revenueTargetPct >= 85 ? toneInfo : revenueTargetPct >= 60 ? toneWarning : toneDanger
+                        const devolucaoTone: ProgressTone =
+                          devolucaoLimitPct <= 0
+                            ? toneInfo
+                            : devolucaoPct <= devolucaoLimitPct
+                              ? toneSuccess
+                              : devolucaoPct <= devolucaoLimitPct * 1.25
+                                ? toneWarning
+                                : toneDanger
+                        const inadimplenciaTone: ProgressTone =
+                          inadimplenciaLimitPct <= 0
+                            ? toneInfo
+                            : inadimplenciaPct <= inadimplenciaLimitPct
+                              ? toneSuccess
+                              : inadimplenciaPct <= inadimplenciaLimitPct * 1.25
+                                ? toneWarning
+                                : toneDanger
+                        const mediaTone: ProgressTone =
+                          kpiGeneralScopedSummary.averageOverallPct >= 85
+                            ? toneSuccess
+                            : kpiGeneralScopedSummary.averageOverallPct >= 70
+                              ? toneInfo
+                              : kpiGeneralScopedSummary.averageOverallPct >= 50
+                                ? toneWarning
+                                : toneDanger
+                        const volumesTone: ProgressTone = !prev
+                          ? toneInfo
+                          : totalVolumesDeltaValue > 0
+                            ? toneSuccess
+                            : totalVolumesDeltaValue === 0
+                              ? toneInfo
+                              : totalVolumesDeltaValue >= -Math.max((prev.totalVolumes ?? 0) * 0.05, 1)
+                                ? toneWarning
+                                : toneDanger
                         return (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${weightTone.border} ${weightTone.background} ${weightTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${weightTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2 text-[10px]">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Peso total dos pedidos</p>
                                 {kpiGeneralScopedSummary.volumeTargetKg > 0 && (
@@ -9238,8 +9305,8 @@ export default function MetasWorkspace() {
                                 {weightTargetPct >= 100 ? 'Meta de peso atingida.' : `${num(Math.max(kpiGeneralScopedSummary.volumeTargetKg - kpiGeneralScopedSummary.totalGrossWeight, 0), 2)} kg restantes para a meta.`}
                               </p>
                             </div>
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${devolucaoTone.border} ${devolucaoTone.background} ${devolucaoTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${devolucaoTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Devolução</p>
                                 <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
@@ -9258,8 +9325,8 @@ export default function MetasWorkspace() {
                                 {devolucaoOverLimit <= 0 ? `${num(Math.abs(devolucaoOverLimit), 3)} p.p abaixo do limite` : `${num(devolucaoOverLimit, 3)} p.p acima do limite`}
                               </p>
                             </div>
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${inadimplenciaTone.border} ${inadimplenciaTone.background} ${inadimplenciaTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${inadimplenciaTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Inadimplência</p>
                                 <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tabular-nums ${
@@ -9278,8 +9345,8 @@ export default function MetasWorkspace() {
                                 {inadimplenciaOverLimit <= 0 ? `${num(Math.abs(inadimplenciaOverLimit), 3)} p.p abaixo do limite` : `${num(inadimplenciaOverLimit, 3)} p.p acima do limite`}
                               </p>
                             </div>
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${revenueTone.border} ${revenueTone.background} ${revenueTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${revenueTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Valor total de pedidos</p>
                                 {kpiGeneralScopedSummary.totalRevenueTarget > 0 && (
@@ -9307,8 +9374,8 @@ export default function MetasWorkspace() {
                                 <p className="mt-0.5 text-[9px] text-slate-500">Meta de faturamento não parametrizada.</p>
                               )}
                             </div>
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${mediaTone.border} ${mediaTone.background} ${mediaTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${mediaTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Média geral</p>
                               </div>
@@ -9322,8 +9389,8 @@ export default function MetasWorkspace() {
                                 <p className="mt-1 text-[9px] font-semibold text-slate-600">Sem base comparativa do mês anterior.</p>
                               )}
                             </div>
-                            <div className="group relative min-h-29 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-                              <span className="absolute inset-x-0 top-0 h-1 bg-slate-300 transition-colors duration-300 group-hover:bg-slate-400" />
+                            <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${volumesTone.border} ${volumesTone.background} ${volumesTone.hoverBorder}`}>
+                              <span className={`absolute inset-x-0 top-0 h-1 transition-colors duration-300 ${volumesTone.topBar}`} />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">Qtd. Volumes</p>
                               </div>
