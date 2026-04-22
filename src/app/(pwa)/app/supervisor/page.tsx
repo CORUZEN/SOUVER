@@ -1665,10 +1665,7 @@ function MetricCell({ icon, label, value, highlight = 'none' }: { icon: React.Re
     highlight === 'success' ? 'text-emerald-400' :
     highlight === 'warn'    ? 'text-amber-400'   :
     'text-white'
-  const borderAccent =
-    highlight === 'success' ? 'border border-emerald-500/25 bg-emerald-500/5' :
-    highlight === 'warn'    ? 'border border-amber-500/25 bg-amber-500/5'     :
-    'bg-surface-800/60'
+  const borderAccent = 'border border-surface-700/50 bg-surface-800/60'
   return (
     <div className={`rounded-lg px-2.5 py-2 ${borderAccent}`}>
       <div className="flex items-center gap-1 text-surface-400">
