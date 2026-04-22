@@ -4121,21 +4121,28 @@ export default function MetasWorkspace() {
       return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
     }, 0)
 
-    // Distribuição de itens aggregate: 80% items / 40% base clients rule
+    // Distribuição de itens (regra consolidada): clientes únicos com >=80% dos itens
+    // sobre a meta de 40% da base geral selecionada.
     const distribuicaoItemsTarget80pct = Math.ceil(activeProductsCount * 0.8) * scopedSnapshots.length
-    const distribuicaoClientsWithAnyItems = scopedSnapshots.reduce((sum, snapshot) => {
+    const distribuicaoItemsThresholdPerClient80pct = activeProductsCount > 0 ? Math.ceil(activeProductsCount * 0.8) : 0
+    const distribuicaoClientProductsMaxByCode = new Map<string, number>()
+    for (const snapshot of scopedSnapshots) {
       const sellerCode = toSellerCodeFromId(snapshot.seller.id)
       const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
-      return sum + sellerRows.reduce((c, row) => c + (getDistribuicaoProductsByStage(row, 'FULL') >= 1 ? 1 : 0), 0)
-    }, 0)
-    // Consolidated target must reflect 40% of the whole selected base (not the sum of per-seller ceilings).
+      for (const row of sellerRows) {
+        const clientCode = normalizeEntityCode(String(row.clientCode ?? '').trim())
+        if (!clientCode) continue
+        const productsMonth = Math.max(getDistribuicaoProductsByStage(row, 'FULL'), 0)
+        const current = distribuicaoClientProductsMaxByCode.get(clientCode) ?? 0
+        if (productsMonth > current) distribuicaoClientProductsMaxByCode.set(clientCode, productsMonth)
+      }
+    }
+    const distribuicaoClientsWithAnyItems = Array.from(distribuicaoClientProductsMaxByCode.values()).filter((products) => products >= 1).length
+    // Consolidated target must reflect 40% of the whole selected base.
     const distribuicaoClientsTarget40pct = Math.ceil(totalBaseClients * 0.4)
-    const distribuicaoClientItemsPositivatedTotal = scopedSnapshots.reduce((sum, snapshot) => {
-      const sellerCode = toSellerCodeFromId(snapshot.seller.id)
-      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
-      return sum + sellerRows.reduce((inner, row) => inner + Math.max(getDistribuicaoProductsByStage(row, 'FULL'), 0), 0)
-    }, 0)
-    const distribuicaoTargetItemsPerClient80pct = Math.max(activeProductsCount * 0.8, 0)
+    const distribuicaoClientsReached80Items = distribuicaoItemsThresholdPerClient80pct > 0
+      ? Array.from(distribuicaoClientProductsMaxByCode.values()).filter((products) => products >= distribuicaoItemsThresholdPerClient80pct).length
+      : 0
     const stageRank: Record<StageKey, number> = { W1: 1, W2: 2, W3: 3, CLOSING: 4, FULL: 5 }
     const distribuicaoBySeller = scopedSnapshots.reduce(
       (acc, snapshot) => {
@@ -4259,8 +4266,8 @@ export default function MetasWorkspace() {
       distribuicaoItemsTarget80pct,
       distribuicaoClientsWithAnyItems,
       distribuicaoClientsTarget40pct,
-      distribuicaoClientItemsPositivatedTotal,
-      distribuicaoTargetItemsPerClient80pct,
+      distribuicaoClientsReached80Items,
+      distribuicaoItemsThresholdPerClient80pct,
       distribuicaoBySellerTotal: distribuicaoBySeller.total,
       distribuicaoBySellerHit: distribuicaoBySeller.hit,
       distribuicaoConsolidatedPct,
@@ -9334,14 +9341,11 @@ export default function MetasWorkspace() {
                             ? (distribuicaoHit / distribuicaoTotal) * 100
                             : 0
                           const distribuicaoBaseTarget = kpiGeneralScopedSummary.distribuicaoClientsTarget40pct
-                          const distribuicaoBaseClientsComItens = kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems
-                          const distribuicaoItensMediaNaBase = distribuicaoBaseTarget > 0
-                            ? kpiGeneralScopedSummary.distribuicaoClientItemsPositivatedTotal / distribuicaoBaseTarget
+                          const distribuicaoClientesComItens = kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems
+                          const distribuicaoCoberturaClientesPct = distribuicaoBaseTarget > 0
+                            ? (distribuicaoClientesComItens / distribuicaoBaseTarget) * 100
                             : 0
-                          const distribuicaoItensMeta80PorCliente = kpiGeneralScopedSummary.distribuicaoTargetItemsPerClient80pct
-                          const distribuicaoItensMediaPct = distribuicaoItensMeta80PorCliente > 0
-                            ? (distribuicaoItensMediaNaBase / distribuicaoItensMeta80PorCliente) * 100
-                            : 0
+                          const distribuicaoCoberturaExcedente = Math.max(distribuicaoClientesComItens - distribuicaoBaseTarget, 0)
                           return (
                             <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
@@ -9352,29 +9356,33 @@ export default function MetasWorkspace() {
                                   <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
                                 </div>
                               </div>
-                              <div className="mt-1.5 grid grid-cols-2 gap-3">
+                              <div className="mt-1.5 grid grid-cols-[38%_62%] gap-3">
                                 <div className="min-w-0 border-r border-surface-100 pr-3">
                                   <p className="text-[9px] font-semibold uppercase tracking-widest text-surface-400">Consolidado</p>
                                   <div className="mt-0.5 flex items-baseline gap-2">
                                     <p className="truncate text-2xl font-semibold tabular-nums text-surface-900">
                                       {num(distribuicaoHit, 0)}
-                                      <span className="text-surface-400"> / {num(distribuicaoTotal, 0)}</span>
+                                      <span className="mx-0.5 text-surface-400">/</span>
+                                      <span className="text-xl font-semibold text-surface-400">{num(distribuicaoTotal, 0)}</span>
                                     </p>
                                     <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoPct)}`}>{num(distribuicaoPct, 1)}%</span>
                                   </div>
                                 </div>
                                 <div className="min-w-0 pl-0.5">
-                                  <p className="text-[9px] font-semibold uppercase tracking-widest text-surface-400">Média geral dos itens</p>
+                                  <p className="text-[9px] font-semibold uppercase tracking-widest text-surface-400">Cobertura da base</p>
                                   <div className="mt-0.5 flex items-baseline gap-2">
-                                    <p className="truncate text-lg font-semibold tabular-nums text-surface-900">
-                                      {num(distribuicaoItensMediaNaBase, 1)}
-                                      <span className="text-surface-400"> / {num(distribuicaoItensMeta80PorCliente, 1)}</span>
+                                    <p className="text-lg font-semibold tabular-nums text-surface-900">
+                                      {num(distribuicaoClientesComItens, 0)}
+                                      <span className="mx-0.5 text-surface-400">/</span>
+                                      <span className="text-base font-semibold text-surface-400">{num(distribuicaoBaseTarget, 0)}</span>
                                     </p>
-                                    <span className={`text-[11px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoItensMediaPct)}`}>{num(distribuicaoItensMediaPct, 1)}%</span>
+                                    <span className={`text-[11px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoCoberturaClientesPct)}`}>{num(distribuicaoCoberturaClientesPct, 1)}%</span>
                                   </div>
-                                  <p className="mt-0.5 truncate text-[10px] text-surface-500">
-                                    {num(distribuicaoBaseClientsComItens, 0)} clientes com itens · meta 40%: {num(distribuicaoBaseTarget, 0)}
-                                  </p>
+                                  {distribuicaoCoberturaExcedente > 0 && (
+                                    <p className="mt-1 inline-flex rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                      +{num(distribuicaoCoberturaExcedente, 0)} acima da meta
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>

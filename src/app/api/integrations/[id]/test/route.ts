@@ -47,7 +47,7 @@ function mapGatewayCodeToMessage(code: string) {
   if (code.startsWith('GTW2510') || code.startsWith('GTW2511')) return 'Authorization Bearer ausente ou em formato invalido.'
   if (code.startsWith('GTW3403')) return 'Bearer token invalido ou expirado. Refaca autenticacao.'
   if (code.startsWith('GTW3503')) return 'Tempo maximo da requisicao do gateway excedido.'
-  if (code.startsWith('GTW2509')) return 'Erro de paginacao/parametros no serviço de consulta.'
+  if (code.startsWith('GTW2509')) return 'Erro de paginacao/parametros no servico de consulta.'
   if (code.startsWith('GTW3407')) return 'Nao foi possivel realizar login no ERP. Verifique ambiente e credenciais.'
   if (code.startsWith('CORE_')) return 'Erro de regra de negocio do Sankhya retornado pelo ERP.'
   return 'Erro retornado pelo gateway Sankhya.'
@@ -92,44 +92,49 @@ async function authenticateOAuth(config: SankhyaConfig, baseUrl: string) {
 
   for (const origin of authOrigins) {
     const authUrl = `${origin}/authenticate`
-    const response = await fetch(authUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Token': config.token,
-      },
-      body,
-      signal: AbortSignal.timeout(7000),
-    })
+    try {
+      const response = await fetch(authUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Token': config.token,
+        },
+        body,
+        signal: AbortSignal.timeout(12_000),
+      })
 
-    const payload = await response.json().catch(() => null)
-    if (response.ok) {
-      const bearerToken = extractBearerToken(payload)
-      if (!bearerToken) {
-        attemptMessages.push(`${authUrl} (200 sem access_token)`)
-        continue
+      const payload = await response.json().catch(() => null)
+      if (response.ok) {
+        const bearerToken = extractBearerToken(payload)
+        if (!bearerToken) {
+          attemptMessages.push(`${authUrl} (200 sem access_token)`)
+          continue
+        }
+
+        return {
+          ok: true,
+          message: 'Autenticacao OAuth2 validada com sucesso.',
+          bearerToken,
+        }
       }
 
-      return {
-        ok: true,
-        message: 'Autenticação OAuth2 validada com sucesso.',
-        bearerToken,
-      }
+      const code = extractGatewayCode(payload)
+      const reason = code ? `${mapGatewayCodeToMessage(code)} (${code})` : `HTTP ${response.status}`
+      attemptMessages.push(`${authUrl} (${reason})`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'falha de rede'
+      const normalized = /timeout/i.test(errorMessage) ? 'tempo limite excedido' : errorMessage
+      attemptMessages.push(`${authUrl} (${normalized})`)
     }
-
-    const code = extractGatewayCode(payload)
-    const reason = code ? `${mapGatewayCodeToMessage(code)} (${code})` : `HTTP ${response.status}`
-    attemptMessages.push(`${authUrl} (${reason})`)
   }
 
   const formattedAttempts = attemptMessages.slice(0, 3).join(' | ')
   return {
     ok: false,
-    message: `Falha na autenticação OAuth2. Verifique token/client_id/client_secret e ambiente do Gateway. Tentativas: ${formattedAttempts}`,
+    message: `Falha na autenticacao OAuth2. Verifique token/client_id/client_secret e ambiente do Gateway. Tentativas: ${formattedAttempts}`,
     bearerToken: null as string | null,
   }
 }
-
 function buildProbeHeaders(config: SankhyaConfig, bearerToken: string | null): HeadersInit {
   const headers: Record<string, string> = {
     Accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
@@ -157,7 +162,7 @@ async function runConnectionProbe(id: string, baseUrl: string, headers: HeadersI
         return fetch(baseUrl, {
           method: 'GET',
           headers,
-          signal: AbortSignal.timeout(7000),
+          signal: AbortSignal.timeout(12_000),
         })
       }),
     { maxAttempts: 2, initialDelayMs: 250 }
@@ -251,3 +256,4 @@ export async function POST(
 
   return NextResponse.json({ status: testStatus, message: testMessage, durationMs, log })
 }
+
