@@ -9503,6 +9503,7 @@ export default function MetasWorkspace() {
                             </p>
                             {clientePct > 0 && <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(clientePct)}`}>{num(clientePct, 1)}%</span>}
                           </div>
+                          <p className="mt-1.5 text-[10px] text-surface-500">Cobertura de clientes no período selecionado.</p>
                         </div>
                         <div className="order-3 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
@@ -9510,6 +9511,7 @@ export default function MetasWorkspace() {
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
                           </div>
                           <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
+                          <p className="mt-1.5 text-[10px] text-surface-500">Quantidade de pedidos acumulados no ciclo.</p>
                         </div>
                         <div className="order-2 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
@@ -9523,6 +9525,7 @@ export default function MetasWorkspace() {
                             </p>
                             {metasPct > 0 && <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(metasPct)}`}>{num(metasPct, 1)}%</span>}
                           </div>
+                          <p className="mt-1.5 text-[10px] text-surface-500">Indicador consolidado de metas estratégicas.</p>
                         </div>
                       </div>
                     )
