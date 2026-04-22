@@ -1059,6 +1059,52 @@ function normalizeMaintenanceBlocks(
   return normalized
 }
 
+function resolveGlobalMaintenanceBlocksFromMetaConfigs(
+  configs: Record<string, MetaConfig>
+): Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }> {
+  const resolved: Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }> = {}
+  const updatedAtRank = new Map<string, number>()
+
+  for (const [key, config] of Object.entries(configs)) {
+    if (!parseMonthKeyToYearMonth(key)) continue
+    const blocks = normalizeMaintenanceBlocks(config.maintenanceBlocks)
+    for (const [blockKey, state] of Object.entries(blocks)) {
+      const candidateRank = typeof state.updatedAt === 'string' ? Date.parse(state.updatedAt) : Number.NaN
+      const normalizedRank = Number.isFinite(candidateRank) ? candidateRank : -1
+      const currentRank = updatedAtRank.get(blockKey)
+      const shouldReplaceByDate = currentRank === undefined || normalizedRank > currentRank
+      const shouldReplaceByEnabledFallback =
+        currentRank !== undefined &&
+        normalizedRank === currentRank &&
+        Boolean(state.enabled) &&
+        !Boolean(resolved[blockKey]?.enabled)
+
+      if (shouldReplaceByDate || shouldReplaceByEnabledFallback) {
+        resolved[blockKey] = state
+        updatedAtRank.set(blockKey, normalizedRank)
+      }
+    }
+  }
+
+  return resolved
+}
+
+function applyMaintenanceBlocksToMonthMetaConfigs(
+  configs: Record<string, MetaConfig>,
+  maintenance: Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }>
+): Record<string, MetaConfig> {
+  const normalizedMaintenance = normalizeMaintenanceBlocks(maintenance)
+  const next: Record<string, MetaConfig> = {}
+  for (const [key, config] of Object.entries(configs)) {
+    if (!parseMonthKeyToYearMonth(key)) {
+      next[key] = config
+      continue
+    }
+    next[key] = { ...config, maintenanceBlocks: normalizedMaintenance }
+  }
+  return next
+}
+
 export default function MetasWorkspace() {
   const now = new Date()
   const [view, setView] = useState<'dashboard' | 'config' | 'sellers' | 'products'>('dashboard')
@@ -1469,6 +1515,7 @@ export default function MetasWorkspace() {
   const resolveKpiApplyMonthKeys = useCallback((scope: KpiApplyMonthScope): string[] => {
     if (scope === 'CURRENT') return [activeKey]
     const monthsWithData = Object.entries(metaConfigs)
+      .filter(([key]) => parseMonthKeyToYearMonth(key) !== null)
       .filter(([, cfg]) => Array.isArray(cfg?.ruleBlocks) && cfg.ruleBlocks.length > 0)
       .map(([key]) => key)
     const uniqueKeys = new Set(monthsWithData)
@@ -1678,12 +1725,14 @@ export default function MetasWorkspace() {
               },
             ])
           )
-          setMetaConfigs(normalized)
+          const globalMaintenance = resolveGlobalMaintenanceBlocksFromMetaConfigs(normalized)
+          const synchronizedMaintenanceConfigs = applyMaintenanceBlocksToMonthMetaConfigs(normalized, globalMaintenance)
+          setMetaConfigs(synchronizedMaintenanceConfigs)
+          setMaintenanceBlocks(globalMaintenance)
           const key = monthKey(year, month)
-          const cfg = normalized[key]
+          const cfg = synchronizedMaintenanceConfigs[key]
           if (cfg) {
             setRuleBlocks(cfg.ruleBlocks)
-            setMaintenanceBlocks(normalizeMaintenanceBlocks(cfg.maintenanceBlocks))
             setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
             setIncludeNational(cfg.includeNational ?? true)
             setSalaryBase(cfg.salaryBase ?? 1612.44)
@@ -1693,11 +1742,13 @@ export default function MetasWorkspace() {
             setExtraMinPointsInput(num(cfg.extraMinPoints ?? 0.6, 2))
           } else {
             // Inherit from the closest configured month (prefer previous, fallback to next)
-            const source = findClosestMonthConfigKey(Object.keys(normalized), monthKey(year, month))
+            const source = findClosestMonthConfigKey(
+              Object.keys(synchronizedMaintenanceConfigs).filter((candidateKey) => parseMonthKeyToYearMonth(candidateKey) !== null),
+              monthKey(year, month)
+            )
             if (source) {
-              const src = normalized[source]
+              const src = synchronizedMaintenanceConfigs[source]
               setRuleBlocks(src.ruleBlocks)
-              setMaintenanceBlocks(normalizeMaintenanceBlocks(src.maintenanceBlocks))
               setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
               setIncludeNational(src.includeNational ?? true)
               setSalaryBase(src.salaryBase ?? 1612.44)
@@ -1719,10 +1770,14 @@ export default function MetasWorkspace() {
   }, [])
 
   const mergedMetaConfigs = useMemo<Record<string, MetaConfig>>(
-    () => ({
-      ...metaConfigs,
-      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
-    }),
+    () =>
+      applyMaintenanceBlocksToMonthMetaConfigs(
+        {
+          ...metaConfigs,
+          [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
+        },
+        maintenanceBlocks
+      ),
     [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, maintenanceBlocks, metaConfigs, prizes, ruleBlocks, salaryBase]
   )
 
@@ -1813,16 +1868,15 @@ export default function MetasWorkspace() {
 
     // Save current working state into the old month
     setMetaConfigs((prev) => {
-      const updated = {
+      const updated = applyMaintenanceBlocksToMonthMetaConfigs({
         ...prev,
         [oldKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
-      }
+      }, maintenanceBlocks)
 
       // Load new month's config
       const cfg = updated[activeKey]
       if (cfg) {
         setRuleBlocks(cfg.ruleBlocks)
-        setMaintenanceBlocks(normalizeMaintenanceBlocks(cfg.maintenanceBlocks))
         setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
         setIncludeNational(cfg.includeNational)
         setSalaryBase(cfg.salaryBase)
@@ -1832,11 +1886,13 @@ export default function MetasWorkspace() {
         setExtraMinPointsInput(num(cfg.extraMinPoints, 2))
       } else {
         // Inherit from the closest configured month (prefer previous, fallback to next)
-        const source = findClosestMonthConfigKey(Object.keys(updated), activeKey)
+        const source = findClosestMonthConfigKey(
+          Object.keys(updated).filter((candidateKey) => parseMonthKeyToYearMonth(candidateKey) !== null),
+          activeKey
+        )
         if (source) {
           const src = updated[source]
           setRuleBlocks(src.ruleBlocks)
-          setMaintenanceBlocks(normalizeMaintenanceBlocks(src.maintenanceBlocks))
           setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
           setIncludeNational(src.includeNational)
           setSalaryBase(src.salaryBase)
@@ -1924,7 +1980,7 @@ export default function MetasWorkspace() {
       },
     }
     const nextMetaConfigs = {
-      ...metaConfigs,
+      ...applyMaintenanceBlocksToMonthMetaConfigs(metaConfigs, nextMaintenance),
       [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks: nextMaintenance },
     }
     const nextPayload = { scope: '1', metaConfigs: nextMetaConfigs, monthConfigs }
