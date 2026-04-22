@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { APP_VERSION } from '@/generated/app-version'
 import './globals.css'
 
 const inter = Inter({
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
     template: '%s | OURO VERDE | Café pra vida inteira!',
   },
   description: 'Plataforma Corporativa Integrada — Fábrica Café Ouro Verde',
-  manifest: '/manifest.json',
+  manifest: `/manifest.json?v=${APP_VERSION}`,
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -41,7 +42,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#10b981" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href={`/manifest.json?v=${APP_VERSION}`} />
       </head>
       <body>
         {children}
@@ -74,7 +75,7 @@ export default function RootLayout({
                     }
                     return;
                   }
-                  navigator.serviceWorker.register('/sw.js').catch(function () {});
+                  navigator.serviceWorker.register('/sw.js?v=${APP_VERSION}').catch(function () {});
                 });
               })();
             `,
@@ -84,4 +85,5 @@ export default function RootLayout({
     </html>
   )
 }
+
 
