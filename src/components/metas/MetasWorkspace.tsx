@@ -1319,6 +1319,8 @@ export default function MetasWorkspace() {
   const canRemoveProducts = metasPermissions?.products.remove ?? false
   const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
   const isDeveloperUser = currentUserRoleCode === 'DEVELOPER'
+  const isItAnalystUser = currentUserRoleCode === 'IT_ANALYST' || currentUserRoleCode === 'ANALISTA_TI'
+  const canAccessDistributionDiagnostics = isDeveloperUser || isItAnalystUser
   const strategicPanelMaintenance = maintenanceBlocks[STRATEGIC_METRICS_PANEL_BLOCK_KEY] ?? { enabled: false }
   const trendPanelMaintenance = maintenanceBlocks[TREND_EVOLUTION_PANEL_BLOCK_KEY] ?? { enabled: false }
   const weeklyAdherencePanelMaintenance = maintenanceBlocks[WEEKLY_ADHERENCE_PANEL_BLOCK_KEY] ?? { enabled: false }
@@ -1857,6 +1859,7 @@ export default function MetasWorkspace() {
   }
 
   function openDistribuicaoMetricModal() {
+    if (!canAccessDistributionDiagnostics) return
     setDistribuicaoMetricDraft({
       basePct: String(num(distribuicaoBasePct, 2)).replace(',', '.'),
       itemsPct: String(num(distribuicaoItemsPct, 2)).replace(',', '.'),
@@ -8985,7 +8988,7 @@ export default function MetasWorkspace() {
                         ? 'Metas de peso por grupo de produto'
                         : 'Metas gerais consolidadas'}
                     </p>
-                    {strategicMetricsPanelMode === 'KPI_GENERAL' && (
+                    {strategicMetricsPanelMode === 'KPI_GENERAL' && canAccessDistributionDiagnostics && (
                       <button
                         type="button"
                         onClick={() => {
@@ -9545,16 +9548,24 @@ export default function MetasWorkspace() {
                           const distribuicaoCoberturaExcedente = Math.max(distribuicaoClientesComItens - distribuicaoBaseTarget, 0)
                           return (
                             <div
-                              className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50/20 cursor-pointer"
-                              role="button"
-                              tabIndex={0}
-                              onClick={openDistribuicaoMetricModal}
+                              className={`order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm transition-colors ${
+                                canAccessDistributionDiagnostics
+                                  ? 'cursor-pointer hover:border-sky-200 hover:bg-sky-50/20'
+                                  : ''
+                              }`}
+                              role={canAccessDistributionDiagnostics ? 'button' : undefined}
+                              tabIndex={canAccessDistributionDiagnostics ? 0 : -1}
+                              onClick={() => {
+                                if (!canAccessDistributionDiagnostics) return
+                                openDistribuicaoMetricModal()
+                              }}
                               onKeyDown={(event) => {
+                                if (!canAccessDistributionDiagnostics) return
                                 if (event.key !== 'Enter' && event.key !== ' ') return
                                 event.preventDefault()
                                 openDistribuicaoMetricModal()
                               }}
-                              aria-label="Abrir configuração da métrica de distribuição de itens"
+                              aria-label={canAccessDistributionDiagnostics ? 'Abrir configuração da métrica de distribuição de itens' : undefined}
                             >
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                               <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
@@ -11031,7 +11042,7 @@ export default function MetasWorkspace() {
 
       {/* ── Distribuição metric config modal ─────────────────────── */} 
       <Modal
-        open={distribuicaoMetricModalOpen}
+        open={distribuicaoMetricModalOpen && canAccessDistributionDiagnostics}
         onClose={() => setDistribuicaoMetricModalOpen(false)}
         title="Configurar distribuição de itens"
         description="Defina os percentuais da métrica consolidada para cobertura da base e positivação de itens."
@@ -11105,7 +11116,7 @@ export default function MetasWorkspace() {
 
       {/* ── Coverage diagnostic modal ────────────────────────────── */}
       <Modal
-        open={coverageDiagnosticModalOpen}
+        open={coverageDiagnosticModalOpen && canAccessDistributionDiagnostics}
         onClose={() => setCoverageDiagnosticModalOpen(false)}
         title="Diagnóstico de cobertura da base"
         description="Clientes atendidos no período que não entraram no cálculo de cobertura da base (positivação)."
