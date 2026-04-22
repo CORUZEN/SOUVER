@@ -8975,6 +8975,12 @@ export default function MetasWorkspace() {
                     const metasPct = kpiGeneralScopedSummary.metasTotal > 0
                       ? (kpiGeneralScopedSummary.metasHit / kpiGeneralScopedSummary.metasTotal) * 100
                       : 0
+                    const pctToneClass = (pct: number) => {
+                      if (pct >= 100) return 'text-emerald-700'
+                      if (pct >= 75) return 'text-cyan-700'
+                      if (pct >= 60) return 'text-amber-700'
+                      return 'text-rose-700'
+                    }
                     const prevPositivadosPct = prev && prev.positivadosTarget > 0
                       ? (prev.positivadosSold / prev.positivadosTarget) * 100
                       : undefined
@@ -9000,7 +9006,7 @@ export default function MetasWorkspace() {
                                     {num(kpiGeneralScopedSummary.positivadosSold, 0)}
                                     <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.positivadosTarget, 0)}</span>
                                   </p>
-                                  <span className="text-sm font-semibold tabular-nums text-sky-600">{num(positivadosPct, 1)}%</span>
+                                  <span className={`text-sm font-semibold tabular-nums ${pctToneClass(positivadosPct)}`}>{num(positivadosPct, 1)}%</span>
                                 </div>
                               </div>
                             )
@@ -9010,7 +9016,6 @@ export default function MetasWorkspace() {
                           const distribuicaoPct = distribuicaoTotal > 0
                             ? (distribuicaoHit / distribuicaoTotal) * 100
                             : 0
-                          const distribuicaoOk = distribuicaoHit >= distribuicaoTotal && distribuicaoTotal > 0
                           return (
                             <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
@@ -9026,7 +9031,7 @@ export default function MetasWorkspace() {
                                   {num(distribuicaoHit, 0)}
                                   <span className="text-surface-400"> / {num(distribuicaoTotal, 0)}</span>
                                 </p>
-                                <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${distribuicaoOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(distribuicaoPct, 1)}%</span>
+                                <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoPct)}`}>{num(distribuicaoPct, 1)}%</span>
                               </div>
                             </div>
                           )
@@ -9043,7 +9048,7 @@ export default function MetasWorkspace() {
                                 <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.totalBaseClients, 0)}</span>
                               )}
                             </p>
-                            {clientePct > 0 && <span className="text-[12px] font-semibold tabular-nums tracking-tight text-indigo-700">{num(clientePct, 1)}%</span>}
+                            {clientePct > 0 && <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(clientePct)}`}>{num(clientePct, 1)}%</span>}
                           </div>
                         </div>
                         <div className="order-3 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
@@ -9063,7 +9068,7 @@ export default function MetasWorkspace() {
                               {num(kpiGeneralScopedSummary.metasHit, 0)}
                               <span className="text-surface-400"> / {num(kpiGeneralScopedSummary.metasTotal, 0)}</span>
                             </p>
-                            {metasPct > 0 && <span className="text-[12px] font-semibold tabular-nums tracking-tight text-emerald-700">{num(metasPct, 1)}%</span>}
+                            {metasPct > 0 && <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(metasPct)}`}>{num(metasPct, 1)}%</span>}
                           </div>
                         </div>
                       </div>
