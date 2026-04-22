@@ -1290,10 +1290,10 @@ export default function MetasWorkspace() {
     [getMaintenanceMetaText, individualPerformancePanelMaintenance]
   )
   const maintenanceControlButtonClass = (enabled: boolean) =>
-    `inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200 ${
+    `inline-flex h-9 w-9 items-center justify-center rounded-xl border ring-1 transition-all duration-200 ${
       enabled
-        ? 'border-amber-300 bg-amber-50 text-amber-700 shadow-[0_6px_18px_rgba(245,158,11,0.22)] hover:-translate-y-0.5 hover:bg-amber-100'
-        : 'border-slate-200 bg-white text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:border-cyan-300 hover:text-cyan-700 hover:shadow-[0_6px_18px_rgba(6,182,212,0.18)]'
+        ? 'border-amber-300 ring-amber-200/70 bg-linear-to-br from-amber-50 to-amber-100/70 text-amber-700 shadow-[0_10px_24px_rgba(217,119,6,0.22)] hover:-translate-y-0.5 hover:from-amber-100 hover:to-amber-100'
+        : 'border-slate-200 ring-slate-200/70 bg-white/95 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.10)] hover:-translate-y-0.5 hover:border-cyan-300 hover:ring-cyan-200/80 hover:text-cyan-700 hover:shadow-[0_10px_24px_rgba(8,145,178,0.18)]'
     }`
   const sellerProfileByCode = useMemo(() => {
     const map = new Map<string, SellerProfileType>()
@@ -9734,36 +9734,52 @@ export default function MetasWorkspace() {
                   Clique no card do vendedor para expandir os detalhes completos no próprio bloco.
                 </p>
               </div>
-              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
-                {SELLER_PERFORMANCE_SCOPE_OPTIONS.map((option) => (
+              <div className="flex items-center gap-2">
+                <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-surface-200 bg-white text-[10px] font-semibold uppercase tracking-widest text-surface-500">
+                  {SELLER_PERFORMANCE_SCOPE_OPTIONS.map((option) => (
+                    <button
+                      key={`seller-performance-scope-${option.value}`}
+                      type="button"
+                      className={`border-l border-surface-200 px-3 py-1.5 transition-colors first:border-l-0 ${
+                        sellerPerformanceScope === option.value ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'
+                      }`}
+                      onClick={() => setSellerPerformanceScope(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {isDeveloperUser && (
                   <button
-                    key={`seller-performance-scope-${option.value}`}
                     type="button"
-                    className={`border-l border-surface-200 px-3 py-1.5 transition-colors first:border-l-0 ${
-                      sellerPerformanceScope === option.value ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-surface-50'
-                    }`}
-                    onClick={() => setSellerPerformanceScope(option.value)}
+                    className={maintenanceControlButtonClass(individualPerformancePanelMaintenance.enabled)}
+                    onClick={() => openMaintenanceToggleConfirm(INDIVIDUAL_SELLER_PERFORMANCE_BLOCK_KEY)}
+                    disabled={isTogglingMaintenance}
+                    title={individualPerformancePanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                    aria-label={individualPerformancePanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
                   >
-                    {option.label}
+                    <Wrench size={14} />
                   </button>
-                ))}
+                )}
               </div>
             </div>
-            {sellersLoading ? (
-              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                Carregando vendedores...
-              </div>
-            ) : sellersError ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-sm text-rose-700">
-                {sellersError}
-              </div>
-            ) : snapshots.length === 0 ? (
-              <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
-                Nenhum vendedor ativo encontrado.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {(() => {
+            <div className="relative mt-3">
+              <div className={individualPerformancePanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+                {sellersLoading ? (
+                  <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                    Carregando vendedores...
+                  </div>
+                ) : sellersError ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-4 text-sm text-rose-700">
+                    {sellersError}
+                  </div>
+                ) : snapshots.length === 0 ? (
+                  <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
+                    Nenhum vendedor ativo encontrado.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(() => {
                   const rows = sellerWeeklyHeatmap
                     .map((row) => {
                       const snapshot = snapshots.find((s) => s.seller.id === row.seller.id)
@@ -9853,8 +9869,8 @@ export default function MetasWorkspace() {
                         : SELLER_PROFILE_LABEL[sellerPerformanceScope]
                     const activeMetaProductsCount = productAllowlist.filter((product) => product.active).length
 
-                    return (
-                      <>
+                      return (
+                        <>
                         {sellerPerformanceScope === 'SUPERVISOR' && (
                           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2.5">
                             <label className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Supervisor</label>
@@ -10134,12 +10150,32 @@ export default function MetasWorkspace() {
                             </div>
                           )
                         })}
-                      </div>
-                    </>
-                  )
-                })()}
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
               </div>
-            )}
+              {individualPerformancePanelMaintenance.enabled && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
+                  <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
+                    <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
+                      <Wrench size={22} />
+                    </div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-700">Em manutenção</p>
+                    <h3 className="mt-2 text-xl font-semibold text-surface-900">Bloco temporariamente indisponível</h3>
+                    <p className="mt-2 text-sm text-surface-600">
+                      Estamos realizando ajustes neste bloco para garantir consistência e qualidade dos dados.
+                      O conteúdo ficará visível novamente ao concluir a manutenção.
+                    </p>
+                    {individualPerformancePanelMaintenanceMeta && (
+                      <p className="mt-3 text-xs font-medium text-surface-500">{individualPerformancePanelMaintenanceMeta}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </Card>
 
           <Card className="border-surface-200">
