@@ -8990,7 +8990,7 @@ export default function MetasWorkspace() {
                           const isSellerView = kpiGeneralPanelView === 'SELLER' && kpiGeneralPanelSellerId !== ''
                           if (isSellerView) {
                             return (
-                              <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                              <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                                 <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Produtos positivados</p>
@@ -9010,7 +9010,7 @@ export default function MetasWorkspace() {
                           const distribuicaoPct = Math.min(kpiGeneralScopedSummary.distribuicaoConsolidatedPct, 999)
                           const distribuicaoOk = distribuicaoPct >= 100
                           return (
-                            <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                            <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                               <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
                                 <p className="whitespace-nowrap pr-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-surface-500">Distribuição de itens</p>
@@ -9029,7 +9029,7 @@ export default function MetasWorkspace() {
                             </div>
                           )
                         })()}
-                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                        <div className="order-1 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-indigo-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes únicos atendidos</p>
@@ -9044,14 +9044,14 @@ export default function MetasWorkspace() {
                             {clientePct > 0 && <span className="text-[12px] font-semibold tabular-nums tracking-tight text-indigo-700">{num(clientePct, 1)}%</span>}
                           </div>
                         </div>
-                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                        <div className="order-3 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Pedidos no mês</p>
                           </div>
                           <p className="mt-1.5 text-2xl font-semibold tabular-nums text-surface-900">{num(kpiGeneralScopedSummary.totalOrders, 0)}</p>
                         </div>
-                        <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                        <div className="order-2 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500" />
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Metas conquistadas</p>
