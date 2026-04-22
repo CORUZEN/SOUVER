@@ -9962,7 +9962,9 @@ export default function MetasWorkspace() {
                         if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
                         return a.fullName.localeCompare(b.fullName, 'pt-BR')
                       })
-                    const filteredSellerIds = new Set(filteredRows.map((row) => row.id))
+                    const expandedSellerRow = filteredRows.find((row) => row.id === selectedSellerId) ?? null
+                    const summaryRows = expandedSellerRow ? [expandedSellerRow] : filteredRows
+                    const filteredSellerIds = new Set(summaryRows.map((row) => row.id))
                     const filteredUniqueClientsSet = new Set<string>()
                     for (const seller of sellers) {
                       if (!filteredSellerIds.has(seller.id)) continue
@@ -9972,18 +9974,18 @@ export default function MetasWorkspace() {
                       }
                     }
                     const filteredUniqueClients = filteredUniqueClientsSet.size
-                    const filteredTotalBaseClients = filteredRows.reduce((sum, row) => {
+                    const filteredTotalBaseClients = summaryRows.reduce((sum, row) => {
                       const sellerData = sellers.find((s) => s.id === row.id)
                       return sum + (sellerData?.baseClientCount ?? 0)
                     }, 0)
                     const periodClosed = hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && Boolean(cycle.lastBusinessDate)
-                    const avgOverallPercent = filteredRows.length > 0
-                      ? (filteredRows.reduce((sum, row) => sum + Math.min(Math.max(row.pointsRatio, 0), 1), 0) / filteredRows.length) * 100
+                    const avgOverallPercent = summaryRows.length > 0
+                      ? (summaryRows.reduce((sum, row) => sum + Math.min(Math.max(row.pointsRatio, 0), 1), 0) / summaryRows.length) * 100
                       : 0
-                    const avgGapToFull = filteredRows.length > 0
-                      ? filteredRows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / filteredRows.length
+                    const avgGapToFull = summaryRows.length > 0
+                      ? summaryRows.reduce((sum, row) => sum + Math.max(1 - row.pointsAchieved, 0), 0) / summaryRows.length
                       : 0
-                    const kpiSummary = filteredRows.reduce(
+                    const kpiSummary = summaryRows.reduce(
                       (acc, row) => {
                         const block = findBlockForSeller(row.id, ruleBlocks)
                         const total = block.rules.length
@@ -10000,6 +10002,7 @@ export default function MetasWorkspace() {
                       : sellerPerformanceScope === 'SUPERVISOR'
                         ? (performanceSupervisorOptions.find((o) => o.key === performanceSupervisorKey)?.name ?? 'Supervisor')
                         : SELLER_PROFILE_LABEL[sellerPerformanceScope]
+                    const summaryScopeLabel = expandedSellerRow ? expandedSellerRow.nameShort : scopeLabel
                     const activeMetaProductsCount = productAllowlist.filter((product) => product.active).length
 
                       return (
@@ -10027,8 +10030,8 @@ export default function MetasWorkspace() {
                           <div className="relative overflow-hidden rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-sky-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">Vendedores monitorados</p>
-                            <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{filteredRows.length}</p>
-                            <p className="text-[10px] text-sky-700">{scopeLabel} no período selecionado</p>
+                            <p className="mt-1 text-2xl font-bold text-sky-900 tabular-nums">{summaryRows.length}</p>
+                            <p className="text-[10px] text-sky-700">{summaryScopeLabel} no período selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-indigo-500" />
@@ -10039,13 +10042,13 @@ export default function MetasWorkspace() {
                                 <span className="font-bold text-indigo-700/80"> / {num(filteredTotalBaseClients, 0)}</span>
                               )}
                             </p>
-                            <p className="text-[10px] text-indigo-700">Total em {scopeLabel.toLowerCase()}</p>
+                            <p className="text-[10px] text-indigo-700">Total em {summaryScopeLabel.toLowerCase()}</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-linear-to-br from-cyan-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-cyan-500" />
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">Média geral de atingimento</p>
                             <p className="mt-1 text-2xl font-bold text-cyan-900 tabular-nums">{num(avgOverallPercent, 1)}%</p>
-                            <p className="text-[10px] text-cyan-700">Percentual médio dos vendedores monitorados</p>
+                            <p className="text-[10px] text-cyan-700">Percentual médio no escopo selecionado</p>
                           </div>
                           <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white px-3 py-2.5 shadow-sm">
                             <div className="absolute inset-x-0 top-0 h-0.75 bg-emerald-500" />
