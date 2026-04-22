@@ -97,6 +97,7 @@ interface MetaConfig {
   basePremiation: number
   extraBonus: number
   extraMinPoints: number
+  maintenanceBlocks?: Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }>
 }
 
 interface SellerOrder {
@@ -1034,15 +1035,38 @@ function hasMonthEnded(year: number, month: number, closingEndIso: string) {
   return new Date().getTime() > cycleEnd.getTime()
 }
 
+const STRATEGIC_METRICS_PANEL_BLOCK_KEY = 'strategic-metrics-panel'
+
+function normalizeMaintenanceBlocks(
+  raw: unknown
+): Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const source = raw as Record<string, unknown>
+  const normalized: Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const state = value as Record<string, unknown>
+    normalized[key] = {
+      enabled: Boolean(state.enabled),
+      ...(typeof state.updatedAt === 'string' && state.updatedAt ? { updatedAt: state.updatedAt } : {}),
+      ...(typeof state.updatedBy === 'string' && state.updatedBy ? { updatedBy: state.updatedBy } : {}),
+    }
+  }
+  return normalized
+}
+
 export default function MetasWorkspace() {
   const now = new Date()
   const [view, setView] = useState<'dashboard' | 'config' | 'sellers' | 'products'>('dashboard')
   const [metasPermissions, setMetasPermissions] = useState<MetasUiPermissions | null>(null)
+  const [currentUserRoleCode, setCurrentUserRoleCode] = useState('')
+  const [currentUserName, setCurrentUserName] = useState('')
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
   const [includeNational, setIncludeNational] = useState(true)
   const [monthConfigs, setMonthConfigs] = useState<Record<string, MonthConfig>>({})
   const [metaConfigs, setMetaConfigs] = useState<Record<string, MetaConfig>>({})
+  const [maintenanceBlocks, setMaintenanceBlocks] = useState<Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }>>({})
   const [ruleBlocks, setRuleBlocks] = useState<RuleBlock[]>(DEFAULT_RULE_BLOCKS)
   const [selectedBlockId, setSelectedBlockId] = useState<string>(DEFAULT_RULE_BLOCKS[0].id)
   const rules = useMemo(() => ruleBlocks.flatMap((b) => b.rules), [ruleBlocks])
@@ -1207,6 +1231,7 @@ export default function MetasWorkspace() {
   const shouldRebaselineAfterAutoMonthInitRef = useRef(false)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false)
   const [configSaveError, setConfigSaveError] = useState('')
   const [configSaveSuccess, setConfigSaveSuccess] = useState('')
   const [lastSavedConfigSignature, setLastSavedConfigSignature] = useState<string | null>(null)
@@ -1230,6 +1255,17 @@ export default function MetasWorkspace() {
   const canSaveProducts = metasPermissions?.products.save ?? false
   const canRemoveProducts = metasPermissions?.products.remove ?? false
   const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
+  const isDeveloperUser = currentUserRoleCode === 'DEVELOPER'
+  const strategicPanelMaintenance = maintenanceBlocks[STRATEGIC_METRICS_PANEL_BLOCK_KEY] ?? { enabled: false }
+  const strategicPanelMaintenanceMeta = useMemo(() => {
+    if (!strategicPanelMaintenance.updatedAt) return ''
+    const formattedDate = new Date(strategicPanelMaintenance.updatedAt).toLocaleString('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+    const updatedBy = strategicPanelMaintenance.updatedBy ? ` por ${strategicPanelMaintenance.updatedBy}` : ''
+    return `Atualizado em ${formattedDate}${updatedBy}`
+  }, [strategicPanelMaintenance.updatedAt, strategicPanelMaintenance.updatedBy])
   const sellerProfileByCode = useMemo(() => {
     const map = new Map<string, SellerProfileType>()
     for (const seller of allowlist) {
@@ -1502,6 +1538,9 @@ export default function MetasWorkspace() {
   useEffect(() => {
     fetchAuthMeCached()
       .then((data) => {
+        const roleCode = String(data?.user?.roleCode ?? '').toUpperCase()
+        setCurrentUserRoleCode(roleCode)
+        setCurrentUserName(String(data?.user?.name ?? ''))
         const perms = data?.user?.metasPermissions as MetasUiPermissions | undefined
         if (!perms) {
           setMetasPermissions({
@@ -1533,6 +1572,8 @@ export default function MetasWorkspace() {
         })
       })
       .catch(() => {
+        setCurrentUserRoleCode('')
+        setCurrentUserName('')
         setMetasPermissions({
           config: { view: false, edit: false, save: false, remove: false },
           sellers: { view: false, edit: false, save: false, remove: false },
@@ -1599,13 +1640,21 @@ export default function MetasWorkspace() {
         if (data.metaConfigs && typeof data.metaConfigs === 'object' && !Array.isArray(data.metaConfigs)) {
           const mc = data.metaConfigs as Record<string, MetaConfig>
           const normalized = Object.fromEntries(
-            Object.entries(mc).map(([k, v]) => [k, { ...v, ruleBlocks: migrateBlocks(v.ruleBlocks) }])
+            Object.entries(mc).map(([k, v]) => [
+              k,
+              {
+                ...v,
+                ruleBlocks: migrateBlocks(v.ruleBlocks),
+                maintenanceBlocks: normalizeMaintenanceBlocks(v.maintenanceBlocks),
+              },
+            ])
           )
           setMetaConfigs(normalized)
           const key = monthKey(year, month)
           const cfg = normalized[key]
           if (cfg) {
             setRuleBlocks(cfg.ruleBlocks)
+            setMaintenanceBlocks(normalizeMaintenanceBlocks(cfg.maintenanceBlocks))
             setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
             setIncludeNational(cfg.includeNational ?? true)
             setSalaryBase(cfg.salaryBase ?? 1612.44)
@@ -1619,6 +1668,7 @@ export default function MetasWorkspace() {
             if (source) {
               const src = normalized[source]
               setRuleBlocks(src.ruleBlocks)
+              setMaintenanceBlocks(normalizeMaintenanceBlocks(src.maintenanceBlocks))
               setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
               setIncludeNational(src.includeNational ?? true)
               setSalaryBase(src.salaryBase ?? 1612.44)
@@ -1642,9 +1692,9 @@ export default function MetasWorkspace() {
   const mergedMetaConfigs = useMemo<Record<string, MetaConfig>>(
     () => ({
       ...metaConfigs,
-      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
     }),
-    [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, metaConfigs, prizes, ruleBlocks, salaryBase]
+    [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, maintenanceBlocks, metaConfigs, prizes, ruleBlocks, salaryBase]
   )
 
   const currentConfigPayload = useMemo(
@@ -1736,13 +1786,14 @@ export default function MetasWorkspace() {
     setMetaConfigs((prev) => {
       const updated = {
         ...prev,
-        [oldKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints },
+        [oldKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
       }
 
       // Load new month's config
       const cfg = updated[activeKey]
       if (cfg) {
         setRuleBlocks(cfg.ruleBlocks)
+        setMaintenanceBlocks(normalizeMaintenanceBlocks(cfg.maintenanceBlocks))
         setPrizes((cfg.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
         setIncludeNational(cfg.includeNational)
         setSalaryBase(cfg.salaryBase)
@@ -1756,6 +1807,7 @@ export default function MetasWorkspace() {
         if (source) {
           const src = updated[source]
           setRuleBlocks(src.ruleBlocks)
+          setMaintenanceBlocks(normalizeMaintenanceBlocks(src.maintenanceBlocks))
           setPrizes((src.prizes ?? DEFAULT_PRIZES).map(normalizePrize))
           setIncludeNational(src.includeNational)
           setSalaryBase(src.salaryBase)
@@ -1825,6 +1877,54 @@ export default function MetasWorkspace() {
       setConfigSaveError(error instanceof Error ? error.message : 'Falha ao salvar edições do painel de metas.')
     } finally {
       setIsSavingConfig(false)
+    }
+  }
+
+  async function handleToggleMaintenanceBlock(blockKey: string) {
+    if (!isDeveloperUser || isTogglingMaintenance) return
+    const previousMaintenance = maintenanceBlocks
+    const previousMetaConfigs = metaConfigs
+    const previousSignature = lastSavedConfigSignature
+    const nextEnabled = !(maintenanceBlocks[blockKey]?.enabled ?? false)
+    const nextMaintenance = {
+      ...maintenanceBlocks,
+      [blockKey]: {
+        enabled: nextEnabled,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUserName || 'Desenvolvedor',
+      },
+    }
+    const nextMetaConfigs = {
+      ...metaConfigs,
+      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks: nextMaintenance },
+    }
+    const nextPayload = { scope: '1', metaConfigs: nextMetaConfigs, monthConfigs }
+    const nextSignature = stableSerialize(nextPayload)
+
+    setMaintenanceBlocks(nextMaintenance)
+    setMetaConfigs(nextMetaConfigs)
+    setConfigSaveError('')
+    setConfigSaveSuccess('')
+    setIsTogglingMaintenance(true)
+    try {
+      const response = await fetch('/api/metas/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextPayload),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao atualizar modo manutenção.')
+      }
+      setLastSavedConfigSignature(nextSignature)
+      setConfigSaveSuccess(nextEnabled ? 'Modo manutenção ativado para o bloco.' : 'Modo manutenção desativado para o bloco.')
+    } catch (error) {
+      setMaintenanceBlocks(previousMaintenance)
+      setMetaConfigs(previousMetaConfigs)
+      setLastSavedConfigSignature(previousSignature)
+      setConfigSaveError(error instanceof Error ? error.message : 'Falha ao atualizar modo manutenção.')
+    } finally {
+      setIsTogglingMaintenance(false)
     }
   }
 
@@ -8571,9 +8671,27 @@ export default function MetasWorkspace() {
                       Por supervisor
                     </button>
                   </div>
+                  {isDeveloperUser && (
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                        strategicPanelMaintenance.enabled
+                          ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                          : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'
+                      }`}
+                      onClick={() => void handleToggleMaintenanceBlock(STRATEGIC_METRICS_PANEL_BLOCK_KEY)}
+                      disabled={isTogglingMaintenance}
+                      title={strategicPanelMaintenance.enabled ? 'Desativar manutenção do bloco' : 'Ativar manutenção do bloco'}
+                    >
+                      <Settings2 size={14} />
+                      {isTogglingMaintenance ? 'Atualizando...' : 'Ferramenta'}
+                    </button>
+                  )}
                 </div>
               </div>
 
+              <div className="relative mt-4">
+                <div className={strategicPanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
               {strategicMetricsPanelMode === 'WEIGHT' ? (
                 <>
 
@@ -9469,6 +9587,26 @@ export default function MetasWorkspace() {
 
                 </div>
               )}
+                </div>
+                {strategicPanelMaintenance.enabled && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
+                    <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
+                      <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
+                        <Settings2 size={22} />
+                      </div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-700">Em manutenção</p>
+                      <h3 className="mt-2 text-xl font-semibold text-surface-900">Bloco temporariamente indisponível</h3>
+                      <p className="mt-2 text-sm text-surface-600">
+                        Estamos realizando ajustes neste bloco para garantir consistência e qualidade dos dados.
+                        O conteúdo ficará visível novamente ao concluir a manutenção.
+                      </p>
+                      {strategicPanelMaintenanceMeta && (
+                        <p className="mt-3 text-xs font-medium text-surface-500">{strategicPanelMaintenanceMeta}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </Card>
 
           <Card className={executivePanelCardClass}>
