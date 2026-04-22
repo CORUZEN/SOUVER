@@ -9007,8 +9007,10 @@ export default function MetasWorkspace() {
                           }
                           const distribuicaoHit = kpiGeneralScopedSummary.distribuicaoBySellerHit
                           const distribuicaoTotal = kpiGeneralScopedSummary.distribuicaoBySellerTotal
-                          const distribuicaoPct = Math.min(kpiGeneralScopedSummary.distribuicaoConsolidatedPct, 999)
-                          const distribuicaoOk = distribuicaoPct >= 100
+                          const distribuicaoPct = distribuicaoTotal > 0
+                            ? (distribuicaoHit / distribuicaoTotal) * 100
+                            : 0
+                          const distribuicaoOk = distribuicaoHit >= distribuicaoTotal && distribuicaoTotal > 0
                           return (
                             <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
@@ -9223,25 +9225,25 @@ export default function MetasWorkspace() {
                         }
                         const toneSuccess: ProgressTone = {
                           border: 'border-emerald-200',
-                          background: 'bg-emerald-50/35',
+                          background: 'bg-white',
                           topBar: 'bg-emerald-500',
                           hoverBorder: 'hover:border-emerald-300',
                         }
                         const toneInfo: ProgressTone = {
                           border: 'border-cyan-200',
-                          background: 'bg-cyan-50/30',
+                          background: 'bg-white',
                           topBar: 'bg-cyan-500',
                           hoverBorder: 'hover:border-cyan-300',
                         }
                         const toneWarning: ProgressTone = {
                           border: 'border-amber-200',
-                          background: 'bg-amber-50/35',
+                          background: 'bg-white',
                           topBar: 'bg-amber-500',
                           hoverBorder: 'hover:border-amber-300',
                         }
                         const toneDanger: ProgressTone = {
                           border: 'border-rose-200',
-                          background: 'bg-rose-50/30',
+                          background: 'bg-white',
                           topBar: 'bg-rose-500',
                           hoverBorder: 'hover:border-rose-300',
                         }
