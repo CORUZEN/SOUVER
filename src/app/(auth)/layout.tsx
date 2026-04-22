@@ -33,7 +33,7 @@ export default function AuthLayout({
                     <div className="relative h-36 w-full sm:h-40">
                       <Image
                         src="/branding/graoverde.png"
-                        alt="Logo GrÃ£o Verde"
+                        alt="Logo Grão Verde"
                         fill
                         priority
                         sizes="(max-width: 640px) 80vw, 520px"
@@ -63,7 +63,7 @@ export default function AuthLayout({
               <div className="relative z-10 w-full max-w-md animate-[authFadeUp_580ms_ease-out]">
                 {children}
                 <p className="mt-8 text-center text-xs text-slate-500">
-                  Sistema Ouro Verde Â© {new Date().getFullYear()}. Todos os direitos reservados.
+                  Sistema Ouro Verde © {new Date().getFullYear()}. Todos os direitos reservados.
                 </p>
               </div>
             </section>
