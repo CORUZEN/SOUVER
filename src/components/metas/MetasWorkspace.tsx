@@ -3922,9 +3922,39 @@ export default function MetasWorkspace() {
       const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
       return sum + sellerRows.reduce((c, row) => c + (getDistribuicaoProductsByStage(row, 'FULL') >= 1 ? 1 : 0), 0)
     }, 0)
-    const distribuicaoClientsTarget40pct = scopedSnapshots.reduce((sum, snapshot) => {
-      return sum + Math.ceil(Math.max(snapshot.seller.baseClientCount ?? 0, 0) * 0.4)
-    }, 0)
+    // Consolidated target must reflect 40% of the whole selected base (not the sum of per-seller ceilings).
+    const distribuicaoClientsTarget40pct = Math.ceil(totalBaseClients * 0.4)
+    const stageRank: Record<StageKey, number> = { W1: 1, W2: 2, W3: 3, CLOSING: 4, FULL: 5 }
+    const distribuicaoBySeller = scopedSnapshots.reduce(
+      (acc, snapshot) => {
+        const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
+        if (!block) return acc
+        const candidateRule = block.rules
+          .filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'DISTRIBUICAO')
+          .map((rule) => {
+            const parsed = parseDistribuicaoTarget(rule.targetText, activeProductsCount)
+            return { rule, parsed }
+          })
+          .filter(({ parsed }) => parsed.resolvedItems > 0 && parsed.clientsPct > 0)
+          .sort((a, b) => {
+            const byStage = (stageRank[b.rule.stage] ?? 0) - (stageRank[a.rule.stage] ?? 0)
+            if (byStage !== 0) return byStage
+            if (b.parsed.clientsPct !== a.parsed.clientsPct) return b.parsed.clientsPct - a.parsed.clientsPct
+            return b.parsed.resolvedItems - a.parsed.resolvedItems
+          })[0]
+
+        if (!candidateRule) return acc
+        const progress = snapshot.ruleProgress.find((item) => item.ruleId === candidateRule.rule.id)?.progress ?? 0
+        acc.total += 1
+        acc.hit += progress >= 1 ? 1 : 0
+        acc.progressSum += Math.max(0, Math.min(progress, 1.4))
+        return acc
+      },
+      { total: 0, hit: 0, progressSum: 0 }
+    )
+    const distribuicaoConsolidatedPct = distribuicaoBySeller.total > 0
+      ? (distribuicaoBySeller.progressSum / distribuicaoBySeller.total) * 100
+      : 0
 
     const metas = scopedSnapshots.reduce(
       (acc, snapshot) => {
@@ -4017,6 +4047,9 @@ export default function MetasWorkspace() {
       distribuicaoItemsTarget80pct,
       distribuicaoClientsWithAnyItems,
       distribuicaoClientsTarget40pct,
+      distribuicaoBySellerTotal: distribuicaoBySeller.total,
+      distribuicaoBySellerHit: distribuicaoBySeller.hit,
+      distribuicaoConsolidatedPct,
       metasHit: metas.hit,
       metasTotal: metas.total,
       volumeTotalKg,
@@ -8972,16 +9005,10 @@ export default function MetasWorkspace() {
                               </div>
                             )
                           }
-                          const itemsTarget = kpiGeneralScopedSummary.distribuicaoItemsTarget80pct
-                          const itemsSold = kpiGeneralScopedSummary.positivadosSold
-                          const itemsRatio = itemsTarget > 0 ? Math.min((itemsSold / itemsTarget) * 100, 999) : 0
-                          const itemsOk = itemsRatio >= 100
-                          const itemsGap = Math.max(itemsTarget - itemsSold, 0)
-                          const clientsWithItems = kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems
-                          const clientsTarget = kpiGeneralScopedSummary.distribuicaoClientsTarget40pct
-                          const clientsRatio = clientsTarget > 0 ? Math.min((clientsWithItems / clientsTarget) * 100, 999) : 0
-                          const clientsOk = clientsRatio >= 100
-                          const clientsGap = Math.max(clientsTarget - clientsWithItems, 0)
+                          const distribuicaoHit = kpiGeneralScopedSummary.distribuicaoBySellerHit
+                          const distribuicaoTotal = kpiGeneralScopedSummary.distribuicaoBySellerTotal
+                          const distribuicaoPct = Math.min(kpiGeneralScopedSummary.distribuicaoConsolidatedPct, 999)
+                          const distribuicaoOk = distribuicaoPct >= 100
                           return (
                             <div className="relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
@@ -8992,16 +9019,12 @@ export default function MetasWorkspace() {
                                   <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
                                 </div>
                               </div>
-                              <div className="mt-1.5 flex items-baseline gap-0">
-                                <div className="flex flex-1 items-baseline gap-2">
-                                  <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(itemsSold, 0)}</p>
-                                  <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${itemsOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(itemsRatio, 1)}%</span>
-                                </div>
-                                <div className="mx-3 self-stretch w-px bg-surface-200" />
-                                <div className="flex flex-1 items-baseline gap-2">
-                                  <p className="text-2xl font-semibold tabular-nums text-surface-900">{num(clientsWithItems, 0)}</p>
-                                  <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${clientsOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(clientsRatio, 1)}%</span>
-                                </div>
+                              <div className="mt-1.5 flex items-baseline gap-2">
+                                <p className="text-2xl font-semibold tabular-nums text-surface-900">
+                                  {num(distribuicaoHit, 0)}
+                                  <span className="text-surface-400"> / {num(distribuicaoTotal, 0)}</span>
+                                </p>
+                                <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${distribuicaoOk ? 'text-emerald-700' : 'text-amber-700'}`}>{num(distribuicaoPct, 1)}%</span>
                               </div>
                             </div>
                           )
