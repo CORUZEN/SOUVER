@@ -223,7 +223,7 @@ async function queryRows(baseUrl: string, headers: Record<string, string>, sql: 
     }
   }
 
-  throw new Error(`Falha ao consultar detalhes de positivacao no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
+  throw new Error(`Falha ao consultar detalhes de positivação no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
 }
 
 function buildPositivationSql(
@@ -385,7 +385,7 @@ export async function GET(req: NextRequest) {
       pendingProducts,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha ao consultar detalhes de positivacao no Sankhya.'
+    const message = error instanceof Error ? error.message : 'Falha ao consultar detalhes de positivação no Sankhya.'
     return NextResponse.json({ message }, { status: 502 })
   }
 }

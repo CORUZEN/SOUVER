@@ -2745,7 +2745,7 @@ export default function MetasWorkspace() {
     if (!positivationDetailsModal.open) return
     const sellerCode = toSellerCodeFromId(positivationDetailsModal.sellerId)
     if (!sellerCode) {
-      setPositivationDetailsError('Vendedor sem codigo para consultar detalhes de positivacao.')
+      setPositivationDetailsError('Vendedor sem código para consultar detalhes de positivação.')
       setPositivationDetailsData(null)
       return
     }
@@ -2763,7 +2763,7 @@ export default function MetasWorkspace() {
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}))
         if (!response.ok) {
-          throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar detalhes de positivacao.')
+          throw new Error(typeof payload?.message === 'string' ? payload.message : 'Falha ao carregar detalhes de positivação.')
         }
         return payload as PositivationDetailsPayload
       })
@@ -2775,7 +2775,7 @@ export default function MetasWorkspace() {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao carregar detalhes de positivacao.')
+        setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao carregar detalhes de positivação.')
       })
       .finally(() => {
         if (!controller.signal.aborted) setPositivationDetailsLoading(false)
@@ -2953,7 +2953,7 @@ export default function MetasWorkspace() {
       const sellerSlug = (positivationDetailsModal.sellerName || 'vendedor').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
       doc.save(`positivacao-${sellerSlug}-${year}-${String(month + 1).padStart(2, '0')}.pdf`)
     } catch (error) {
-      setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao exportar PDF de positivacao.')
+      setPositivationDetailsError(error instanceof Error ? error.message : 'Falha ao exportar PDF de positivação.')
     } finally {
       setPositivationPdfExporting(false)
     }
@@ -10180,9 +10180,9 @@ export default function MetasWorkspace() {
                     <span className="absolute inset-0 rounded-2xl border border-cyan-300/70 [animation-duration:1.8s] animate-ping" />
                     <RefreshCw className="relative h-6 w-6 animate-spin text-cyan-700" />
                   </div>
-                  <p className="text-base font-semibold text-slate-800">Carregando detalhes da positivacao</p>
+                  <p className="text-base font-semibold text-slate-800">Carregando detalhes da positivação</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    Estamos consolidando os dados do vendedor no periodo selecionado.
+                    Estamos consolidando os dados do vendedor no período selecionado.
                   </p>
                 </div>
 
