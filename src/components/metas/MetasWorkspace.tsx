@@ -25,6 +25,7 @@ import {
   TrendingUp,
   UserPlus,
   Users,
+  Wrench,
   X,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
@@ -1036,6 +1037,9 @@ function hasMonthEnded(year: number, month: number, closingEndIso: string) {
 }
 
 const STRATEGIC_METRICS_PANEL_BLOCK_KEY = 'strategic-metrics-panel'
+const TREND_EVOLUTION_PANEL_BLOCK_KEY = 'trend-evolution-panel'
+const WEEKLY_ADHERENCE_PANEL_BLOCK_KEY = 'weekly-adherence-panel'
+const INDIVIDUAL_SELLER_PERFORMANCE_BLOCK_KEY = 'individual-seller-performance-panel'
 
 function normalizeMaintenanceBlocks(
   raw: unknown
@@ -1257,15 +1261,40 @@ export default function MetasWorkspace() {
   const canMutateProducts = canEditProducts || canSaveProducts || canRemoveProducts
   const isDeveloperUser = currentUserRoleCode === 'DEVELOPER'
   const strategicPanelMaintenance = maintenanceBlocks[STRATEGIC_METRICS_PANEL_BLOCK_KEY] ?? { enabled: false }
-  const strategicPanelMaintenanceMeta = useMemo(() => {
-    if (!strategicPanelMaintenance.updatedAt) return ''
-    const formattedDate = new Date(strategicPanelMaintenance.updatedAt).toLocaleString('pt-BR', {
+  const trendPanelMaintenance = maintenanceBlocks[TREND_EVOLUTION_PANEL_BLOCK_KEY] ?? { enabled: false }
+  const weeklyAdherencePanelMaintenance = maintenanceBlocks[WEEKLY_ADHERENCE_PANEL_BLOCK_KEY] ?? { enabled: false }
+  const individualPerformancePanelMaintenance = maintenanceBlocks[INDIVIDUAL_SELLER_PERFORMANCE_BLOCK_KEY] ?? { enabled: false }
+  const getMaintenanceMetaText = useCallback((state: { updatedAt?: string; updatedBy?: string }) => {
+    if (!state.updatedAt) return ''
+    const formattedDate = new Date(state.updatedAt).toLocaleString('pt-BR', {
       dateStyle: 'short',
       timeStyle: 'short',
     })
-    const updatedBy = strategicPanelMaintenance.updatedBy ? ` por ${strategicPanelMaintenance.updatedBy}` : ''
+    const updatedBy = state.updatedBy ? ` por ${state.updatedBy}` : ''
     return `Atualizado em ${formattedDate}${updatedBy}`
-  }, [strategicPanelMaintenance.updatedAt, strategicPanelMaintenance.updatedBy])
+  }, [])
+  const strategicPanelMaintenanceMeta = useMemo(
+    () => getMaintenanceMetaText(strategicPanelMaintenance),
+    [getMaintenanceMetaText, strategicPanelMaintenance]
+  )
+  const trendPanelMaintenanceMeta = useMemo(
+    () => getMaintenanceMetaText(trendPanelMaintenance),
+    [getMaintenanceMetaText, trendPanelMaintenance]
+  )
+  const weeklyAdherencePanelMaintenanceMeta = useMemo(
+    () => getMaintenanceMetaText(weeklyAdherencePanelMaintenance),
+    [getMaintenanceMetaText, weeklyAdherencePanelMaintenance]
+  )
+  const individualPerformancePanelMaintenanceMeta = useMemo(
+    () => getMaintenanceMetaText(individualPerformancePanelMaintenance),
+    [getMaintenanceMetaText, individualPerformancePanelMaintenance]
+  )
+  const maintenanceControlButtonClass = (enabled: boolean) =>
+    `inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200 ${
+      enabled
+        ? 'border-amber-300 bg-amber-50 text-amber-700 shadow-[0_6px_18px_rgba(245,158,11,0.22)] hover:-translate-y-0.5 hover:bg-amber-100'
+        : 'border-slate-200 bg-white text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:border-cyan-300 hover:text-cyan-700 hover:shadow-[0_6px_18px_rgba(6,182,212,0.18)]'
+    }`
   const sellerProfileByCode = useMemo(() => {
     const map = new Map<string, SellerProfileType>()
     for (const seller of allowlist) {
@@ -1926,6 +1955,23 @@ export default function MetasWorkspace() {
     } finally {
       setIsTogglingMaintenance(false)
     }
+  }
+
+  function openMaintenanceToggleConfirm(blockKey: string) {
+    if (!isDeveloperUser || isTogglingMaintenance) return
+    const nextEnabled = !(maintenanceBlocks[blockKey]?.enabled ?? false)
+    setConfirmModal({
+      open: true,
+      title: nextEnabled ? 'Ativar modo manutenção?' : 'Desativar modo manutenção?',
+      message: nextEnabled
+        ? 'Ao ativar, este bloco ficará indisponível para os usuários e será exibido com status de manutenção até nova liberação.'
+        : 'Ao desativar, este bloco voltará a exibir os dados normalmente para todos os usuários.',
+      confirmLabel: nextEnabled ? 'Ativar manutenção' : 'Desativar manutenção',
+      variant: 'primary',
+      onConfirm: () => {
+        void handleToggleMaintenanceBlock(blockKey)
+      },
+    })
   }
 
   useEffect(() => {
@@ -8463,9 +8509,24 @@ export default function MetasWorkspace() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                   Tendência de evolução
                 </p>
-                <p className="text-[9px] text-surface-400">% de KPIs conquistados por etapa</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] text-surface-400">% de KPIs conquistados por etapa</p>
+                  {isDeveloperUser && (
+                    <button
+                      type="button"
+                      className={maintenanceControlButtonClass(trendPanelMaintenance.enabled)}
+                      onClick={() => openMaintenanceToggleConfirm(TREND_EVOLUTION_PANEL_BLOCK_KEY)}
+                      disabled={isTogglingMaintenance}
+                      title={trendPanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                      aria-label={trendPanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                    >
+                      <Wrench size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="mt-3">
+              <div className="relative mt-3">
+                <div className={trendPanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
                 <svg viewBox={`0 0 ${lineChartData.W} ${lineChartData.H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
                   <defs>
                     <linearGradient id="trend-area-grad" x1="0" x2="0" y1="0" y2="1">
@@ -8538,15 +8599,52 @@ export default function MetasWorkspace() {
                     )
                   })}
                 </svg>
+                <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalStageKpis} KPIs monitorados nas etapas · {MONTHS[month]} {year}</p>
+                </div>
+                {trendPanelMaintenance.enabled && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
+                    <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
+                      <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
+                        <Wrench size={22} />
+                      </div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-700">Em manutenção</p>
+                      <h3 className="mt-2 text-xl font-semibold text-surface-900">Bloco temporariamente indisponível</h3>
+                      <p className="mt-2 text-sm text-surface-600">
+                        Estamos realizando ajustes neste bloco para garantir consistência e qualidade dos dados.
+                        O conteúdo ficará visível novamente ao concluir a manutenção.
+                      </p>
+                      {trendPanelMaintenanceMeta && (
+                        <p className="mt-3 text-xs font-medium text-surface-500">{trendPanelMaintenanceMeta}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalStageKpis} KPIs monitorados nas etapas · {MONTHS[month]} {year}</p>
             </Card>
 
             <Card className={executivePanelCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
-              <p className="mt-0.5 text-[10px] text-surface-400">KPIs conquistados em cada etapa do ciclo</p>
-              <div className="mt-4 space-y-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
+                  <p className="mt-0.5 text-[10px] text-surface-400">KPIs conquistados em cada etapa do ciclo</p>
+                </div>
+                {isDeveloperUser && (
+                  <button
+                    type="button"
+                    className={maintenanceControlButtonClass(weeklyAdherencePanelMaintenance.enabled)}
+                    onClick={() => openMaintenanceToggleConfirm(WEEKLY_ADHERENCE_PANEL_BLOCK_KEY)}
+                    disabled={isTogglingMaintenance}
+                    title={weeklyAdherencePanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                    aria-label={weeklyAdherencePanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                  >
+                    <Wrench size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="relative mt-4">
+                <div className={weeklyAdherencePanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+              <div className="space-y-2.5">
                 {(() => {
                   const stageHex: Record<string, string> = {
                     W1: '#06b6d4', W2: '#3b82f6', W3: '#6366f1', CLOSING: '#10b981', FULL: '#10b981',
@@ -8580,6 +8678,26 @@ export default function MetasWorkspace() {
                     )
                   })
                 })()}
+              </div>
+                </div>
+                {weeklyAdherencePanelMaintenance.enabled && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
+                    <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
+                      <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
+                        <Wrench size={22} />
+                      </div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-700">Em manutenção</p>
+                      <h3 className="mt-2 text-xl font-semibold text-surface-900">Bloco temporariamente indisponível</h3>
+                      <p className="mt-2 text-sm text-surface-600">
+                        Estamos realizando ajustes neste bloco para garantir consistência e qualidade dos dados.
+                        O conteúdo ficará visível novamente ao concluir a manutenção.
+                      </p>
+                      {weeklyAdherencePanelMaintenanceMeta && (
+                        <p className="mt-3 text-xs font-medium text-surface-500">{weeklyAdherencePanelMaintenanceMeta}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
@@ -8674,17 +8792,13 @@ export default function MetasWorkspace() {
                   {isDeveloperUser && (
                     <button
                       type="button"
-                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors ${
-                        strategicPanelMaintenance.enabled
-                          ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
-                          : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'
-                      }`}
-                      onClick={() => void handleToggleMaintenanceBlock(STRATEGIC_METRICS_PANEL_BLOCK_KEY)}
+                      className={maintenanceControlButtonClass(strategicPanelMaintenance.enabled)}
+                      onClick={() => openMaintenanceToggleConfirm(STRATEGIC_METRICS_PANEL_BLOCK_KEY)}
                       disabled={isTogglingMaintenance}
-                      title={strategicPanelMaintenance.enabled ? 'Desativar manutenção do bloco' : 'Ativar manutenção do bloco'}
+                      title={strategicPanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
+                      aria-label={strategicPanelMaintenance.enabled ? 'Modo manutenção ativo' : 'Gerenciar modo manutenção'}
                     >
-                      <Settings2 size={14} />
-                      {isTogglingMaintenance ? 'Atualizando...' : 'Ferramenta'}
+                      <Wrench size={14} />
                     </button>
                   )}
                 </div>
@@ -9592,7 +9706,7 @@ export default function MetasWorkspace() {
                   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
                     <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
                       <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
-                        <Settings2 size={22} />
+                        <Wrench size={22} />
                       </div>
                       <p className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-700">Em manutenção</p>
                       <h3 className="mt-2 text-xl font-semibold text-surface-900">Bloco temporariamente indisponível</h3>
