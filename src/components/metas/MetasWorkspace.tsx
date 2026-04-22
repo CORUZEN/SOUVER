@@ -98,6 +98,8 @@ interface MetaConfig {
   basePremiation: number
   extraBonus: number
   extraMinPoints: number
+  distribuicaoBasePct?: number
+  distribuicaoItemsPct?: number
   maintenanceBlocks?: Record<string, { enabled: boolean; updatedAt?: string; updatedBy?: string }>
 }
 
@@ -324,6 +326,8 @@ const STAGES: Array<{ key: StageKey; label: string }> = [
 ]
 
 const OPERATIONAL_STAGE_KEYS: OperationalStageKey[] = ['W1', 'W2', 'W3', 'CLOSING']
+const DEFAULT_DISTRIBUICAO_BASE_PCT = 40
+const DEFAULT_DISTRIBUICAO_ITEMS_PCT = 80
 
 const KPI_CATALOG: Array<{ type: KpiType; label: string; defaultDescription: string }> = [
   { type: 'BASE_CLIENTES', label: 'Base de clientes', defaultDescription: 'Cobertura da base de clientes no período.' },
@@ -1242,6 +1246,13 @@ export default function MetasWorkspace() {
   const [distributionLoading, setDistributionLoading] = useState(false)
   const [distributionError, setDistributionError] = useState('')
   const [distributionDiagnostics, setDistributionDiagnostics] = useState<DistributionDiagnostics | null>(null)
+  const [distribuicaoBasePct, setDistribuicaoBasePct] = useState(DEFAULT_DISTRIBUICAO_BASE_PCT)
+  const [distribuicaoItemsPct, setDistribuicaoItemsPct] = useState(DEFAULT_DISTRIBUICAO_ITEMS_PCT)
+  const [distribuicaoMetricModalOpen, setDistribuicaoMetricModalOpen] = useState(false)
+  const [distribuicaoMetricDraft, setDistribuicaoMetricDraft] = useState<{ basePct: string; itemsPct: string }>({
+    basePct: String(DEFAULT_DISTRIBUICAO_BASE_PCT),
+    itemsPct: String(DEFAULT_DISTRIBUICAO_ITEMS_PCT),
+  })
   const [positivationDetailsModal, setPositivationDetailsModal] = useState<{
     open: boolean
     sellerId: string
@@ -1725,6 +1736,8 @@ export default function MetasWorkspace() {
               {
                 ...v,
                 ruleBlocks: migrateBlocks(v.ruleBlocks),
+                distribuicaoBasePct: Math.min(Math.max(Number(v.distribuicaoBasePct ?? DEFAULT_DISTRIBUICAO_BASE_PCT) || 0, 0), 100),
+                distribuicaoItemsPct: Math.min(Math.max(Number(v.distribuicaoItemsPct ?? DEFAULT_DISTRIBUICAO_ITEMS_PCT) || 0, 0), 100),
                 maintenanceBlocks: normalizeMaintenanceBlocks(v.maintenanceBlocks),
               },
             ])
@@ -1744,6 +1757,8 @@ export default function MetasWorkspace() {
             setExtraBonus(cfg.extraBonus ?? 400)
             setExtraMinPoints(cfg.extraMinPoints ?? 0.6)
             setExtraMinPointsInput(num(cfg.extraMinPoints ?? 0.6, 2))
+            setDistribuicaoBasePct(Math.min(Math.max(Number(cfg.distribuicaoBasePct ?? DEFAULT_DISTRIBUICAO_BASE_PCT) || 0, 0), 100))
+            setDistribuicaoItemsPct(Math.min(Math.max(Number(cfg.distribuicaoItemsPct ?? DEFAULT_DISTRIBUICAO_ITEMS_PCT) || 0, 0), 100))
           } else {
             // Inherit from the closest configured month (prefer previous, fallback to next)
             const source = findClosestMonthConfigKey(
@@ -1760,6 +1775,8 @@ export default function MetasWorkspace() {
               setExtraBonus(src.extraBonus ?? 400)
               setExtraMinPoints(src.extraMinPoints ?? 0.6)
               setExtraMinPointsInput(num(src.extraMinPoints ?? 0.6, 2))
+              setDistribuicaoBasePct(Math.min(Math.max(Number(src.distribuicaoBasePct ?? DEFAULT_DISTRIBUICAO_BASE_PCT) || 0, 0), 100))
+              setDistribuicaoItemsPct(Math.min(Math.max(Number(src.distribuicaoItemsPct ?? DEFAULT_DISTRIBUICAO_ITEMS_PCT) || 0, 0), 100))
             }
           }
         }
@@ -1778,11 +1795,35 @@ export default function MetasWorkspace() {
       applyMaintenanceBlocksToMonthMetaConfigs(
         {
           ...metaConfigs,
-          [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
+          [activeKey]: {
+            ruleBlocks,
+            prizes,
+            includeNational,
+            salaryBase,
+            basePremiation,
+            extraBonus,
+            extraMinPoints,
+            distribuicaoBasePct,
+            distribuicaoItemsPct,
+            maintenanceBlocks,
+          },
         },
         maintenanceBlocks
       ),
-    [activeKey, basePremiation, extraBonus, extraMinPoints, includeNational, maintenanceBlocks, metaConfigs, prizes, ruleBlocks, salaryBase]
+    [
+      activeKey,
+      basePremiation,
+      distribuicaoBasePct,
+      distribuicaoItemsPct,
+      extraBonus,
+      extraMinPoints,
+      includeNational,
+      maintenanceBlocks,
+      metaConfigs,
+      prizes,
+      ruleBlocks,
+      salaryBase,
+    ]
   )
 
   const currentConfigPayload = useMemo(
@@ -1811,6 +1852,22 @@ export default function MetasWorkspace() {
     pendingBeforePeriodChangeRef.current = hasPendingConfigChanges
     setYear(nextYear)
     setMonth(nextMonth)
+  }
+
+  function openDistribuicaoMetricModal() {
+    setDistribuicaoMetricDraft({
+      basePct: String(num(distribuicaoBasePct, 2)).replace(',', '.'),
+      itemsPct: String(num(distribuicaoItemsPct, 2)).replace(',', '.'),
+    })
+    setDistribuicaoMetricModalOpen(true)
+  }
+
+  function applyDistribuicaoMetricConfig() {
+    const parsedBasePct = Math.min(Math.max(parseDecimal(distribuicaoMetricDraft.basePct, distribuicaoBasePct), 0), 100)
+    const parsedItemsPct = Math.min(Math.max(parseDecimal(distribuicaoMetricDraft.itemsPct, distribuicaoItemsPct), 0), 100)
+    setDistribuicaoBasePct(parsedBasePct)
+    setDistribuicaoItemsPct(parsedItemsPct)
+    setDistribuicaoMetricModalOpen(false)
   }
 
   useEffect(() => {
@@ -1874,7 +1931,18 @@ export default function MetasWorkspace() {
     setMetaConfigs((prev) => {
       const updated = applyMaintenanceBlocksToMonthMetaConfigs({
         ...prev,
-        [oldKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks },
+        [oldKey]: {
+          ruleBlocks,
+          prizes,
+          includeNational,
+          salaryBase,
+          basePremiation,
+          extraBonus,
+          extraMinPoints,
+          distribuicaoBasePct,
+          distribuicaoItemsPct,
+          maintenanceBlocks,
+        },
       }, maintenanceBlocks)
 
       // Load new month's config
@@ -1888,6 +1956,8 @@ export default function MetasWorkspace() {
         setExtraBonus(cfg.extraBonus)
         setExtraMinPoints(cfg.extraMinPoints)
         setExtraMinPointsInput(num(cfg.extraMinPoints, 2))
+        setDistribuicaoBasePct(Math.min(Math.max(Number(cfg.distribuicaoBasePct ?? DEFAULT_DISTRIBUICAO_BASE_PCT) || 0, 0), 100))
+        setDistribuicaoItemsPct(Math.min(Math.max(Number(cfg.distribuicaoItemsPct ?? DEFAULT_DISTRIBUICAO_ITEMS_PCT) || 0, 0), 100))
       } else {
         // Inherit from the closest configured month (prefer previous, fallback to next)
         const source = findClosestMonthConfigKey(
@@ -1904,6 +1974,8 @@ export default function MetasWorkspace() {
           setExtraBonus(src.extraBonus)
           setExtraMinPoints(src.extraMinPoints)
           setExtraMinPointsInput(num(src.extraMinPoints, 2))
+          setDistribuicaoBasePct(Math.min(Math.max(Number(src.distribuicaoBasePct ?? DEFAULT_DISTRIBUICAO_BASE_PCT) || 0, 0), 100))
+          setDistribuicaoItemsPct(Math.min(Math.max(Number(src.distribuicaoItemsPct ?? DEFAULT_DISTRIBUICAO_ITEMS_PCT) || 0, 0), 100))
         }
         // If no previous month exists, keep current defaults
       }
@@ -1985,7 +2057,18 @@ export default function MetasWorkspace() {
     }
     const nextMetaConfigs = {
       ...applyMaintenanceBlocksToMonthMetaConfigs(metaConfigs, nextMaintenance),
-      [activeKey]: { ruleBlocks, prizes, includeNational, salaryBase, basePremiation, extraBonus, extraMinPoints, maintenanceBlocks: nextMaintenance },
+      [activeKey]: {
+        ruleBlocks,
+        prizes,
+        includeNational,
+        salaryBase,
+        basePremiation,
+        extraBonus,
+        extraMinPoints,
+        distribuicaoBasePct,
+        distribuicaoItemsPct,
+        maintenanceBlocks: nextMaintenance,
+      },
     }
     const nextPayload = { scope: '1', metaConfigs: nextMetaConfigs, monthConfigs }
     const nextSignature = stableSerialize(nextPayload)
@@ -4121,10 +4204,11 @@ export default function MetasWorkspace() {
       return sum + getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
     }, 0)
 
-    // Distribuição de itens (regra consolidada): clientes únicos com >=80% dos itens
-    // sobre a meta de 40% da base geral selecionada.
-    const distribuicaoItemsTarget80pct = Math.ceil(activeProductsCount * 0.8) * scopedSnapshots.length
-    const distribuicaoItemsThresholdPerClient80pct = activeProductsCount > 0 ? Math.ceil(activeProductsCount * 0.8) : 0
+    // Distribuição de itens (configurável): % de itens positivados + % da base de clientes.
+    const distribuicaoItemsThresholdPerSeller = activeProductsCount > 0
+      ? Math.ceil(activeProductsCount * (distribuicaoItemsPct / 100))
+      : 0
+    const distribuicaoItemsTargetConfigured = distribuicaoItemsThresholdPerSeller * scopedSnapshots.length
     const distribuicaoClientProductsMaxByCode = new Map<string, number>()
     for (const snapshot of scopedSnapshots) {
       const sellerCode = toSellerCodeFromId(snapshot.seller.id)
@@ -4138,32 +4222,31 @@ export default function MetasWorkspace() {
       }
     }
     const distribuicaoClientsWithAnyItems = Array.from(distribuicaoClientProductsMaxByCode.values()).filter((products) => products >= 1).length
-    // Consolidated target must reflect 40% of the whole selected base.
-    const distribuicaoClientsTarget40pct = Math.ceil(totalBaseClients * 0.4)
-    const distribuicaoClientsReached80Items = distribuicaoItemsThresholdPerClient80pct > 0
-      ? Array.from(distribuicaoClientProductsMaxByCode.values()).filter((products) => products >= distribuicaoItemsThresholdPerClient80pct).length
-      : 0
-    const stageRank: Record<StageKey, number> = { W1: 1, W2: 2, W3: 3, CLOSING: 4, FULL: 5 }
+    // Consolidated target reflects the configured base percentage.
+    const distribuicaoClientsTarget40pct = Math.ceil(totalBaseClients * (distribuicaoBasePct / 100))
     const distribuicaoBySeller = scopedSnapshots.reduce(
       (acc, snapshot) => {
-        const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
-        if (!block) return acc
-        const candidateRule = block.rules
-          .filter((rule) => (rule.kpiType ?? inferKpiType(rule.kpi)) === 'DISTRIBUICAO')
-          .map((rule) => {
-            const parsed = parseDistribuicaoTarget(rule.targetText, activeProductsCount)
-            return { rule, parsed }
-          })
-          .filter(({ parsed }) => parsed.resolvedItems > 0 && parsed.clientsPct > 0)
-          .sort((a, b) => {
-            const byStage = (stageRank[b.rule.stage] ?? 0) - (stageRank[a.rule.stage] ?? 0)
-            if (byStage !== 0) return byStage
-            if (b.parsed.clientsPct !== a.parsed.clientsPct) return b.parsed.clientsPct - a.parsed.clientsPct
-            return b.parsed.resolvedItems - a.parsed.resolvedItems
-          })[0]
-
-        if (!candidateRule) return acc
-        const progress = snapshot.ruleProgress.find((item) => item.ruleId === candidateRule.rule.id)?.progress ?? 0
+        const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+        const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+        const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+        const soldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+        const clientsWithItems = sellerRows.reduce((sum, row) => {
+          const productsByStage = getDistribuicaoProductsByStage(row, 'FULL')
+          return sum + (productsByStage >= 1 ? 1 : 0)
+        }, 0)
+        const baseTotalClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
+        const requiredClients = baseTotalClients > 0
+          ? Math.ceil(baseTotalClients * (distribuicaoBasePct / 100))
+          : 0
+        const itemsProgress = distribuicaoItemsThresholdPerSeller > 0
+          ? soldItems / Math.max(distribuicaoItemsThresholdPerSeller, 1)
+          : 0
+        const clientsProgress = requiredClients > 0
+          ? clientsWithItems / Math.max(requiredClients, 1)
+          : 0
+        const progress = requiredClients > 0 && distribuicaoItemsThresholdPerSeller > 0
+          ? Math.min(itemsProgress, clientsProgress)
+          : 0
         acc.total += 1
         acc.hit += progress >= 1 ? 1 : 0
         acc.progressSum += Math.max(0, Math.min(progress, 1.4))
@@ -4263,11 +4346,11 @@ export default function MetasWorkspace() {
       totalVolumes,
       positivadosSold,
       positivadosTarget,
-      distribuicaoItemsTarget80pct,
+      distribuicaoItemsTarget80pct: distribuicaoItemsTargetConfigured,
       distribuicaoClientsWithAnyItems,
       distribuicaoClientsTarget40pct,
-      distribuicaoClientsReached80Items,
-      distribuicaoItemsThresholdPerClient80pct,
+      distribuicaoClientsReached80Items: 0,
+      distribuicaoItemsThresholdPerClient80pct: distribuicaoItemsThresholdPerSeller,
       distribuicaoBySellerTotal: distribuicaoBySeller.total,
       distribuicaoBySellerHit: distribuicaoBySeller.hit,
       distribuicaoConsolidatedPct,
@@ -4285,7 +4368,18 @@ export default function MetasWorkspace() {
       inadimplenciaLimitPct,
       inadimplenciaLimitDays,
     }
-  }, [distributionBySellerProduct, distributionItemsBySeller, kpiGeneralCardSellerRows, productAllowlist, ruleBlocks, sellerWeightPerformanceRows, sellers, snapshots])
+  }, [
+    distribuicaoBasePct,
+    distribuicaoItemsPct,
+    distributionBySellerProduct,
+    distributionItemsBySeller,
+    kpiGeneralCardSellerRows,
+    productAllowlist,
+    ruleBlocks,
+    sellerWeightPerformanceRows,
+    sellers,
+    snapshots,
+  ])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -9347,23 +9441,35 @@ export default function MetasWorkspace() {
                             : 0
                           const distribuicaoCoberturaExcedente = Math.max(distribuicaoClientesComItens - distribuicaoBaseTarget, 0)
                           return (
-                            <div className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
+                            <div
+                              className="order-4 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50/20 cursor-pointer"
+                              role="button"
+                              tabIndex={0}
+                              onClick={openDistribuicaoMetricModal}
+                              onKeyDown={(event) => {
+                                if (event.key !== 'Enter' && event.key !== ' ') return
+                                event.preventDefault()
+                                openDistribuicaoMetricModal()
+                              }}
+                              aria-label="Abrir configuração da métrica de distribuição de itens"
+                            >
                               <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-sky-500" />
                               <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
                                 <p className="whitespace-nowrap pr-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-surface-500">Distribuição de itens</p>
-                                <div className="flex items-center gap-1 whitespace-nowrap">
-                                  <span className="inline-flex whitespace-nowrap rounded bg-sky-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-sky-700">80% itens</span>
-                                  <span className="inline-flex whitespace-nowrap rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-indigo-700">40% base</span>
-                                </div>
+                                {distribuicaoCoberturaExcedente > 0 && (
+                                  <span className="inline-flex rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                    +{num(distribuicaoCoberturaExcedente, 0)} acima da meta
+                                  </span>
+                                )}
                               </div>
                               <div className="mt-1.5 grid grid-cols-[38%_62%] gap-3">
-                                <div className="min-w-0 border-r border-surface-100 pr-3">
-                                  <p className="text-[9px] font-semibold uppercase tracking-widest text-surface-400">Consolidado</p>
-                                  <div className="mt-0.5 flex items-baseline gap-2">
-                                    <p className="truncate text-2xl font-semibold tabular-nums text-surface-900">
+                                <div className="min-w-0 border-r border-surface-100 pr-2">
+                                  <p className="text-[9px] font-semibold uppercase tracking-widest text-surface-400">Vendedores</p>
+                                  <div className="mt-0.5 flex items-baseline gap-1">
+                                    <p className="whitespace-nowrap text-xl font-semibold tabular-nums text-surface-900">
                                       {num(distribuicaoHit, 0)}
                                       <span className="mx-0.5 text-surface-400">/</span>
-                                      <span className="text-xl font-semibold text-surface-400">{num(distribuicaoTotal, 0)}</span>
+                                      <span className="text-lg font-semibold text-surface-400">{num(distribuicaoTotal, 0)}</span>
                                     </p>
                                     <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoPct)}`}>{num(distribuicaoPct, 1)}%</span>
                                   </div>
@@ -9378,11 +9484,6 @@ export default function MetasWorkspace() {
                                     </p>
                                     <span className={`text-[11px] font-semibold tabular-nums tracking-tight ${pctToneClass(distribuicaoCoberturaClientesPct)}`}>{num(distribuicaoCoberturaClientesPct, 1)}%</span>
                                   </div>
-                                  {distribuicaoCoberturaExcedente > 0 && (
-                                    <p className="mt-1 inline-flex rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                      +{num(distribuicaoCoberturaExcedente, 0)} acima da meta
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -10819,6 +10920,80 @@ export default function MetasWorkspace() {
               Nenhum dado disponivel para o vendedor selecionado.
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* ── Distribuição metric config modal ─────────────────────── */} 
+      <Modal
+        open={distribuicaoMetricModalOpen}
+        onClose={() => setDistribuicaoMetricModalOpen(false)}
+        title="Configurar distribuição de itens"
+        description="Defina os percentuais da métrica consolidada para cobertura da base e positivação de itens."
+        size="sm"
+        footer={(
+          <div className="flex justify-end gap-2 border-t border-surface-100 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => setDistribuicaoMetricModalOpen(false)}
+              className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={applyDistribuicaoMetricConfig}
+              disabled={!canMutateConfig}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Aplicar métrica
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-4 px-6 py-4">
+          {!canMutateConfig && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Seu perfil está em modo leitura. Para persistir esta configuração, solicite permissão de edição/salvamento.
+            </p>
+          )}
+          <div>
+            <p className={label}>Percentual da base de clientes</p>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                max={100}
+                value={distribuicaoMetricDraft.basePct}
+                onChange={(event) => setDistribuicaoMetricDraft((prev) => ({ ...prev, basePct: event.target.value }))}
+                disabled={!canMutateConfig}
+                className={input}
+              />
+              <span className="text-sm font-semibold text-surface-500">%</span>
+            </div>
+            <p className="mt-1 text-[11px] text-surface-500">
+              Meta de cobertura da base no card (ex.: 40% da base geral).
+            </p>
+          </div>
+          <div>
+            <p className={label}>Percentual de itens positivados</p>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                max={100}
+                value={distribuicaoMetricDraft.itemsPct}
+                onChange={(event) => setDistribuicaoMetricDraft((prev) => ({ ...prev, itemsPct: event.target.value }))}
+                disabled={!canMutateConfig}
+                className={input}
+              />
+              <span className="text-sm font-semibold text-surface-500">%</span>
+            </div>
+            <p className="mt-1 text-[11px] text-surface-500">
+              Referência usada no consolidado por vendedor para positivação de itens.
+            </p>
+          </div>
         </div>
       </Modal>
 
