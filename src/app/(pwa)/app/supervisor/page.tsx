@@ -601,7 +601,7 @@ function computeAllKpiProgress(
               { label: 'Realizado', value: fmtBrl(accumulated) },
               { label: 'Falta para bater', value: fmtBrl(missingValue) },
               { label: 'Dias úteis restantes', value: fmt(remainingDays.length) },
-              { label: 'Venda necessária por dia', value: fmtBrl(requiredPerDay) },
+              { label: 'Recomendado para vender hoje', value: fmtBrl(requiredPerDay) },
             ],
             dailyPlan: remainingDays.map((date) => ({ date, value: requiredPerDay })),
           }
@@ -1908,7 +1908,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                   ? kpi.details.rows.find((row) => row.label === 'Dias úteis restantes')?.value
                   : null
                 const financeiroMediaDia = kpi.kpiType === 'META_FINANCEIRA'
-                  ? kpi.details.rows.find((row) => row.label === 'Venda necessária por dia')?.value
+                  ? kpi.details.rows.find((row) => row.label === 'Recomendado para vender hoje')?.value
                   : null
                 const parseLocaleNumber = (value: string | null | undefined) => {
                   if (!value) return 0
@@ -1921,7 +1921,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 }
                 const showFinanceFalta = parseLocaleNumber(financeiroFalta) > 0
                 const showFinanceDiasRestantes = parseLocaleNumber(financeiroDiasRestantes) > 0
-                const showFinanceMediaDia = parseLocaleNumber(financeiroMediaDia) > 0
+                const showFinanceMediaDia = parseLocaleNumber(financeiroMediaDia) > 0 && isActive
                 const detailRows = kpi.details.rows.filter((row) => {
                   if (kpi.kpiType === 'VOLUME') {
                     return row.label !== 'Meta definida' && row.label !== 'Quantidade atingida'
@@ -1944,11 +1944,15 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                       'Falta para meta extra',
                       'Falta para bater',
                       'Dias úteis restantes',
-                      'Venda necessária por dia',
+                      'Recomendado para vender hoje',
                     ].includes(row.label)
                   }
                   return true
                 })
+                const detailPairs: Array<Array<{ label: string; value: string }>> = []
+                for (let i = 0; i < detailRows.length; i += 2) {
+                  detailPairs.push(detailRows.slice(i, i + 2))
+                }
 
                 const barColor = !kpi.isComputable || isPending
                   ? 'bg-linear-to-r from-surface-500 to-surface-400'
@@ -2033,28 +2037,28 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                           distribuicaoClientesExigidos !== null &&
                           distribuicaoClientesComItem !== null && (
                           <div className="space-y-1.5">
-                            <div className="rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
+                            <div className="rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/12 via-sky-500/10 to-cyan-500/12 px-2 py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
-                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Itens exigidos</p>
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Itens exigidos</p>
                                   <p className="text-sm font-bold text-white">{distribuicaoItensExigidos}</p>
                                 </div>
                                 <div className="h-7 w-px shrink-0 bg-cyan-300/25" />
                                 <div className="min-w-0 text-right">
-                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Itens positivados</p>
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Itens positivados</p>
                                   <p className="text-sm font-bold text-cyan-200">{distribuicaoItensVendidos}</p>
                                 </div>
                               </div>
                             </div>
-                            <div className="rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
+                            <div className="rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/12 via-sky-500/10 to-cyan-500/12 px-2 py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
-                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Clientes exigidos</p>
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Clientes exigidos</p>
                                   <p className="text-sm font-bold text-white">{distribuicaoClientesExigidos}</p>
                                 </div>
                                 <div className="h-7 w-px shrink-0 bg-cyan-300/25" />
                                 <div className="min-w-0 text-right">
-                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Clientes com item positivado</p>
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Clientes com item positivado</p>
                                   <p className="text-sm font-bold text-cyan-200">{distribuicaoClientesComItem}</p>
                                 </div>
                               </div>
@@ -2064,68 +2068,93 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
 
                         {kpi.kpiType === 'BASE_CLIENTES' && baseTotal !== null && baseMetaClientes !== null && baseClientesAtendidos !== null && (
                           <div className="space-y-1.5">
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-sky-100/80">Base total</p>
-                                <p className="text-[11px] font-bold text-white">{baseTotal}</p>
-                              </div>
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-sky-100/80">Meta de clientes</p>
-                                <p className="text-[11px] font-bold text-white">{baseMetaClientes}</p>
+                            <div className="rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/12 via-sky-500/10 to-cyan-500/12 px-2 py-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Base total</p>
+                                  <p className="text-sm font-bold text-white">{baseTotal}</p>
+                                </div>
+                                <div className="h-7 w-px shrink-0 bg-cyan-300/25" />
+                                <div className="min-w-0 text-right">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Meta de clientes</p>
+                                  <p className="text-sm font-bold text-cyan-200">{baseMetaClientes}</p>
+                                </div>
                               </div>
                             </div>
-                            <div className="rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1.5">
-                              <p className="text-[9px] uppercase tracking-wide text-cyan-100/85">Clientes atendidos</p>
-                              <p className="text-[11px] font-bold text-cyan-100">{baseClientesAtendidos}</p>
+                            <div className="rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/12 via-sky-500/10 to-cyan-500/12 px-2 py-1.5">
+                              <p className="text-[9px] uppercase tracking-wider text-cyan-200/90">Clientes atendidos</p>
+                              <p className="text-sm font-bold text-cyan-100">{baseClientesAtendidos}</p>
                             </div>
                           </div>
                         )}
 
                         {kpi.kpiType === 'META_FINANCEIRA' && financeiroMetaEtapa !== null && financeiroRealizado !== null && financeiroFalta !== null && financeiroDiasRestantes !== null && financeiroMediaDia !== null && (
                           <div className="space-y-1.5">
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroMetaLabel}</p>
-                                <p className="text-[11px] font-bold text-white">{financeiroMetaEtapa}</p>
-                              </div>
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroRealizadoLabel}</p>
-                                <p className="text-[11px] font-bold text-emerald-200">{financeiroRealizado}</p>
+                            <div className="rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-teal-500/10 to-emerald-500/12 px-2.5 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">{financeiroMetaLabel}</p>
+                                  <p className="text-sm font-bold text-white">{financeiroMetaEtapa}</p>
+                                </div>
+                                <div className="h-7 w-px shrink-0 bg-emerald-300/25" />
+                                <div className="min-w-0 text-right">
+                                  <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">{financeiroRealizadoLabel}</p>
+                                  <p className="text-sm font-bold text-cyan-200">{financeiroRealizado}</p>
+                                </div>
                               </div>
                             </div>
                             {financeiroExtraDelta && financeiroExtraDeltaLabel && (
-                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroExtraDeltaLabel}</p>
-                                <p className="text-[11px] font-bold text-emerald-100">{financeiroExtraDelta}</p>
+                              <div className="rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-teal-500/10 to-emerald-500/12 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">{financeiroExtraDeltaLabel}</p>
+                                <p className="text-sm font-bold text-emerald-100">{financeiroExtraDelta}</p>
                               </div>
                             )}
                             {showFinanceFalta && (
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1.5">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Falta para bater</p>
-                                <p className="text-[11px] font-bold text-amber-200">{financeiroFalta}</p>
+                              <div className="rounded-md border border-emerald-500/20 bg-linear-to-r from-emerald-500/10 via-teal-500/9 to-emerald-500/10 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">Falta para bater</p>
+                                <p className="text-sm font-bold text-amber-200">{financeiroFalta}</p>
                               </div>
                             )}
                             {showFinanceMediaDia && (
-                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Venda necessária por dia</p>
-                                <p className="text-[11px] font-bold text-emerald-100">{financeiroMediaDia}</p>
+                              <div className="rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-teal-500/10 to-emerald-500/12 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">Recomendado para vender hoje</p>
+                                <p className="text-sm font-bold text-emerald-100">{financeiroMediaDia}</p>
                               </div>
                             )}
                             {showFinanceDiasRestantes && (
-                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/8 px-2 py-1.5">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Dias úteis restantes</p>
-                                <p className="text-[11px] font-bold text-white">{financeiroDiasRestantes}</p>
+                              <div className="rounded-md border border-emerald-500/20 bg-linear-to-r from-emerald-500/9 via-teal-500/8 to-emerald-500/9 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">Dias úteis restantes</p>
+                                <p className="text-sm font-bold text-white">{financeiroDiasRestantes}</p>
                               </div>
                             )}
                           </div>
                         )}
 
                         {detailRows.length > 0 && (
-                          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                            {detailRows.map((row, index) => (
-                              <div key={`${kpi.ruleId}-detail-${index}`} className="rounded-md bg-surface-800/55 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-surface-500">{row.label}</p>
-                                <p className="text-[10px] font-semibold text-surface-100">{row.value}</p>
+                          <div className="space-y-1.5">
+                            {detailPairs.map((pair, pairIndex) => (
+                              <div
+                                key={`${kpi.ruleId}-detail-pair-${pairIndex}`}
+                                className="rounded-md border border-emerald-400/25 bg-linear-to-r from-emerald-500/11 via-teal-500/10 to-emerald-500/11 px-2 py-1.5"
+                              >
+                                {pair.length === 2 ? (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-[9px] uppercase tracking-wider text-emerald-100/80">{pair[0]?.label}</p>
+                                      <p className="text-sm font-bold text-white">{pair[0]?.value}</p>
+                                    </div>
+                                    <div className="h-7 w-px shrink-0 bg-emerald-300/25" />
+                                    <div className="min-w-0 text-right">
+                                      <p className="text-[9px] uppercase tracking-wider text-emerald-100/80">{pair[1]?.label}</p>
+                                      <p className="text-sm font-bold text-emerald-100">{pair[1]?.value}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="min-w-0">
+                                    <p className="text-[9px] uppercase tracking-wider text-emerald-100/80">{pair[0]?.label}</p>
+                                    <p className="text-sm font-bold text-emerald-100">{pair[0]?.value}</p>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -2168,5 +2197,6 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     </div>
   )
 }
+
 
 
