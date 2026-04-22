@@ -1310,6 +1310,10 @@ export default function MetasWorkspace() {
   const trendPanelMaintenance = maintenanceBlocks[TREND_EVOLUTION_PANEL_BLOCK_KEY] ?? { enabled: false }
   const weeklyAdherencePanelMaintenance = maintenanceBlocks[WEEKLY_ADHERENCE_PANEL_BLOCK_KEY] ?? { enabled: false }
   const individualPerformancePanelMaintenance = maintenanceBlocks[INDIVIDUAL_SELLER_PERFORMANCE_BLOCK_KEY] ?? { enabled: false }
+  const shouldMaskStrategicPanel = strategicPanelMaintenance.enabled && !isDeveloperUser
+  const shouldMaskTrendPanel = trendPanelMaintenance.enabled && !isDeveloperUser
+  const shouldMaskWeeklyAdherencePanel = weeklyAdherencePanelMaintenance.enabled && !isDeveloperUser
+  const shouldMaskIndividualPerformancePanel = individualPerformancePanelMaintenance.enabled && !isDeveloperUser
   const getMaintenanceMetaText = useCallback((state: { updatedAt?: string; updatedBy?: string }) => {
     if (!state.updatedAt) return ''
     const formattedDate = new Date(state.updatedAt).toLocaleString('pt-BR', {
@@ -5404,21 +5408,14 @@ export default function MetasWorkspace() {
     })
   }, [weightBrandOrderIndex, weightPanelDrilledSellerDetails])
 
-  const weightFocusProgressRows = useMemo(() => {
+  const allFocusProgressRows = useMemo(() => {
     const sellerRankById = new Map<string, number>()
     sellerWeightPerformanceRows.forEach((row, index) => {
       sellerRankById.set(row.sellerId, index)
     })
 
-    const scopedSellerIds = new Set(
-      weightPanelDrilledSellerDetails
-        ? [weightPanelDrilledSellerDetails.sellerId]
-        : snapshots.map((snapshot) => snapshot.seller.id)
-    )
-
     return snapshots
       .flatMap((snapshot) => {
-        if (!scopedSellerIds.has(snapshot.seller.id)) return []
         const sellerId = snapshot.seller.id
         const block =
           ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
@@ -5503,10 +5500,14 @@ export default function MetasWorkspace() {
     focusProductRows,
     productAllowlist,
     ruleBlocks,
-    weightPanelDrilledSellerDetails,
     sellerWeightPerformanceRows,
     snapshots,
   ])
+
+  const weightFocusProgressRows = useMemo(() => {
+    if (!weightPanelDrilledSellerDetails) return allFocusProgressRows
+    return allFocusProgressRows.filter((row) => row.sellerId === weightPanelDrilledSellerDetails.sellerId)
+  }, [allFocusProgressRows, weightPanelDrilledSellerDetails])
 
   const weightFocusCodesInScope = useMemo(
     () => Array.from(new Set(weightFocusProgressRows.map((row) => row.focusCode))),
@@ -5521,6 +5522,26 @@ export default function MetasWorkspace() {
   const weightFocusSectionErrors = useMemo(
     () => weightFocusCodesInScope.map((code) => focusProductError[code]).filter((msg): msg is string => Boolean(msg && msg.trim())),
     [focusProductError, weightFocusCodesInScope]
+  )
+
+  const kpiGeneralFocusProgressRows = useMemo(() => {
+    if (kpiGeneralPanelView !== 'SELLER' || !kpiGeneralPanelSellerId) return []
+    return allFocusProgressRows.filter((row) => row.sellerId === kpiGeneralPanelSellerId)
+  }, [allFocusProgressRows, kpiGeneralPanelSellerId, kpiGeneralPanelView])
+
+  const kpiGeneralFocusCodesInScope = useMemo(
+    () => Array.from(new Set(kpiGeneralFocusProgressRows.map((row) => row.focusCode))),
+    [kpiGeneralFocusProgressRows]
+  )
+
+  const kpiGeneralFocusSectionLoading = useMemo(
+    () => kpiGeneralFocusCodesInScope.some((code) => Boolean(focusProductLoading[code])),
+    [focusProductLoading, kpiGeneralFocusCodesInScope]
+  )
+
+  const kpiGeneralFocusSectionErrors = useMemo(
+    () => kpiGeneralFocusCodesInScope.map((code) => focusProductError[code]).filter((msg): msg is string => Boolean(msg && msg.trim())),
+    [focusProductError, kpiGeneralFocusCodesInScope]
   )
 
   useEffect(() => {
@@ -8582,7 +8603,7 @@ export default function MetasWorkspace() {
                 </div>
               </div>
               <div className="relative mt-3">
-                <div className={trendPanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+                <div className={shouldMaskTrendPanel ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
                 <svg viewBox={`0 0 ${lineChartData.W} ${lineChartData.H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
                   <defs>
                     <linearGradient id="trend-area-grad" x1="0" x2="0" y1="0" y2="1">
@@ -8657,7 +8678,7 @@ export default function MetasWorkspace() {
                 </svg>
                 <p className="mt-1 text-[9px] text-surface-400">{lineChartData.totalStageKpis} KPIs monitorados nas etapas · {MONTHS[month]} {year}</p>
                 </div>
-                {trendPanelMaintenance.enabled && (
+                {shouldMaskTrendPanel && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
                     <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
                       <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
@@ -8699,7 +8720,7 @@ export default function MetasWorkspace() {
                 )}
               </div>
               <div className="relative mt-4">
-                <div className={weeklyAdherencePanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+                <div className={shouldMaskWeeklyAdherencePanel ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
               <div className="space-y-2.5">
                 {(() => {
                   const stageHex: Record<string, string> = {
@@ -8736,7 +8757,7 @@ export default function MetasWorkspace() {
                 })()}
               </div>
                 </div>
-                {weeklyAdherencePanelMaintenance.enabled && (
+                {shouldMaskWeeklyAdherencePanel && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
                     <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
                       <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
@@ -8861,7 +8882,7 @@ export default function MetasWorkspace() {
               </div>
 
               <div className="relative mt-4">
-                <div className={strategicPanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+                <div className={shouldMaskStrategicPanel ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
               {strategicMetricsPanelMode === 'WEIGHT' ? (
                 <>
 
@@ -9755,10 +9776,66 @@ export default function MetasWorkspace() {
                     </div>
                   </div>
 
+                  {kpiGeneralPanelView === 'SELLER' && (
+                    <>
+                      {kpiGeneralFocusSectionLoading ? (
+                        <p className="px-1 py-1 text-[11px] text-surface-500">Carregando progresso de item foco...</p>
+                      ) : kpiGeneralFocusSectionErrors.length > 0 ? (
+                        <div className="space-y-1 px-1 py-1">
+                          {kpiGeneralFocusSectionErrors.map((message, index) => (
+                            <p key={`kpi-general-focus-error-${index}`} className="text-[11px] text-rose-700">{message}</p>
+                          ))}
+                        </div>
+                      ) : kpiGeneralFocusProgressRows.length === 0 ? (
+                        <p className="px-1 py-2 text-center text-xs text-surface-400">
+                          Item foco nao definido para o vendedor selecionado.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {kpiGeneralFocusProgressRows.map((row) => {
+                            const progressRatio = Math.max(row.progressPct / 100, 0)
+                            const barPct = Math.min(row.progressPct, 100)
+                            const progressClass =
+                              progressRatio >= 1 ? 'bg-emerald-500' : progressRatio >= 0.8 ? 'bg-cyan-500' : progressRatio >= 0.5 ? 'bg-amber-400' : 'bg-rose-500'
+                            const metaLabel = row.focusTargetMode === 'BASE_CLIENTS'
+                              ? `${num(row.focusTargetBasePct, 1)}% da base (${row.requiredBaseClients} clientes)`
+                              : `${num(row.focusTargetKg, 2)} kg`
+                            const realizedLabel = row.focusTargetMode === 'BASE_CLIENTS'
+                              ? `${num(row.soldClients, 0)} clientes (${num(row.baseCoveragePct, 1)}%)`
+                              : `${num(row.soldKg, 2)} kg`
+                            return (
+                              <div key={`kpi-general-focus-compact-${row.sellerId}`} className="rounded-lg border border-surface-200 bg-surface-50/50 px-4 py-2.5">
+                                <div className="grid gap-y-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400 md:grid-cols-[minmax(240px,2.1fr)_minmax(210px,1.35fr)_minmax(210px,1.35fr)_minmax(250px,1.7fr)_minmax(120px,0.95fr)] md:items-center md:gap-x-2.5">
+                                  <span>Item foco</span>
+                                  <span>Meta</span>
+                                  <span>Realizado</span>
+                                  <span>Progresso</span>
+                                  <span className="text-right">Status</span>
+                                </div>
+                                <div className="mt-1.5 grid gap-y-2 md:grid-cols-[minmax(240px,2.1fr)_minmax(210px,1.35fr)_minmax(210px,1.35fr)_minmax(250px,1.7fr)_minmax(120px,0.95fr)] md:items-center md:gap-x-2.5">
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold leading-snug text-surface-800">{row.focusProductLabel}</p>
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold tabular-nums leading-snug text-surface-700">{metaLabel}</p>
+                                  <p className="truncate whitespace-nowrap text-sm font-semibold tabular-nums leading-snug text-surface-700">{realizedLabel}</p>
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-100">
+                                      <div className={`h-full transition-[width] duration-700 ${progressClass}`} style={{ width: `${barPct}%` }} />
+                                    </div>
+                                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-surface-700">{num(row.progressPct, 1)}%</span>
+                                  </div>
+                                  <span className={`text-right text-[10px] font-semibold uppercase tracking-wide ${row.statusClass}`}>{row.statusLabel}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+
                 </div>
               )}
                 </div>
-                {strategicPanelMaintenance.enabled && (
+                {shouldMaskStrategicPanel && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
                     <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
                       <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
@@ -9820,7 +9897,7 @@ export default function MetasWorkspace() {
               </div>
             </div>
             <div className="relative mt-3">
-              <div className={individualPerformancePanelMaintenance.enabled ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
+              <div className={shouldMaskIndividualPerformancePanel ? 'pointer-events-none select-none blur-[2px] opacity-60' : ''}>
                 {sellersLoading ? (
                   <div className="rounded-xl border border-surface-200 bg-surface-50 px-3 py-4 text-sm text-surface-500">
                     Carregando vendedores...
@@ -10213,7 +10290,7 @@ export default function MetasWorkspace() {
                 </div>
               )}
               </div>
-              {individualPerformancePanelMaintenance.enabled && (
+              {shouldMaskIndividualPerformancePanel && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-amber-200 bg-white/80 backdrop-blur-[2px]">
                   <div className="mx-4 max-w-xl rounded-2xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-lg">
                     <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700">
