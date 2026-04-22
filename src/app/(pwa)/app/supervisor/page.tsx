@@ -1805,6 +1805,15 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const pctDisplay = Math.min(kpi.progress * 100, 100)
                 const isHit = kpi.isComputable && kpi.progress >= 1
                 const isDetailOpen = Boolean(expandedKpiIds[kpi.ruleId])
+                const volumeMetaDefinida = kpi.kpiType === 'VOLUME'
+                  ? kpi.details.rows.find((row) => row.label === 'Meta definida')?.value
+                  : null
+                const volumeQuantidadeAtingida = kpi.kpiType === 'VOLUME'
+                  ? kpi.details.rows.find((row) => row.label === 'Quantidade atingida')?.value
+                  : null
+                const detailRows = kpi.kpiType === 'VOLUME'
+                  ? kpi.details.rows.filter((row) => row.label !== 'Meta definida' && row.label !== 'Quantidade atingida')
+                  : kpi.details.rows
 
                 const barColor = !kpi.isComputable || isPending
                   ? 'bg-linear-to-r from-surface-500 to-surface-400'
@@ -1867,14 +1876,32 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                     )}
                     {isDetailOpen && (
                       <div className="mt-2 rounded-lg border border-surface-700/50 bg-surface-900/60 p-2">
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                          {kpi.details.rows.map((row, index) => (
-                            <div key={`${kpi.ruleId}-detail-${index}`} className="rounded-md bg-surface-800/55 px-2 py-1">
-                              <p className="text-[9px] uppercase tracking-wide text-surface-500">{row.label}</p>
-                              <p className="text-[10px] font-semibold text-surface-100">{row.value}</p>
+                        {kpi.kpiType === 'VOLUME' && volumeMetaDefinida !== null && volumeQuantidadeAtingida !== null && (
+                          <div className="mb-2 rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-cyan-500/10 to-emerald-500/12 px-2.5 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">Meta definida</p>
+                                <p className="text-sm font-bold text-white">{volumeMetaDefinida}</p>
+                              </div>
+                              <div className="h-7 w-px shrink-0 bg-emerald-300/25" />
+                              <div className="min-w-0 text-right">
+                                <p className="text-[9px] uppercase tracking-wider text-cyan-100/90">Quantidade atingida</p>
+                                <p className="text-sm font-bold text-cyan-200">{volumeQuantidadeAtingida}</p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
+
+                        {detailRows.length > 0 && (
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                            {detailRows.map((row, index) => (
+                              <div key={`${kpi.ruleId}-detail-${index}`} className="rounded-md bg-surface-800/55 px-2 py-1">
+                                <p className="text-[9px] uppercase tracking-wide text-surface-500">{row.label}</p>
+                                <p className="text-[10px] font-semibold text-surface-100">{row.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {kpi.details.dailyPlan && kpi.details.dailyPlan.length > 0 && (
                           <div className="mt-2 rounded-md border border-emerald-500/20 bg-emerald-500/8 p-2">
