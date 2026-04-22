@@ -567,7 +567,7 @@ function computeAllKpiProgress(
           { label: 'Realizado', value: fmtBrl(accumulated) },
           { label: 'Falta para bater', value: fmtBrl(missingValue) },
           { label: 'Dias úteis restantes', value: fmt(remainingDays.length) },
-          { label: 'Venda média necessária/dia', value: fmtBrl(requiredPerDay) },
+          { label: 'Venda necessária por dia', value: fmtBrl(requiredPerDay) },
         ],
         dailyPlan: remainingDays.map((date) => ({ date, value: requiredPerDay })),
       }
@@ -1811,6 +1811,18 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const volumeQuantidadeAtingida = kpi.kpiType === 'VOLUME'
                   ? kpi.details.rows.find((row) => row.label === 'Quantidade atingida')?.value
                   : null
+                const distribuicaoItensExigidos = kpi.kpiType === 'DISTRIBUICAO'
+                  ? kpi.details.rows.find((row) => row.label === 'Itens exigidos')?.value
+                  : null
+                const distribuicaoItensVendidos = kpi.kpiType === 'DISTRIBUICAO'
+                  ? kpi.details.rows.find((row) => row.label === 'Itens vendidos')?.value
+                  : null
+                const distribuicaoClientesExigidos = kpi.kpiType === 'DISTRIBUICAO'
+                  ? kpi.details.rows.find((row) => row.label === 'Clientes exigidos')?.value
+                  : null
+                const distribuicaoClientesComItem = kpi.kpiType === 'DISTRIBUICAO'
+                  ? kpi.details.rows.find((row) => row.label === 'Clientes com item')?.value
+                  : null
                 const baseTotal = kpi.kpiType === 'BASE_CLIENTES'
                   ? kpi.details.rows.find((row) => row.label === 'Base total')?.value
                   : null
@@ -1833,17 +1845,32 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                   ? kpi.details.rows.find((row) => row.label === 'Dias úteis restantes')?.value
                   : null
                 const financeiroMediaDia = kpi.kpiType === 'META_FINANCEIRA'
-                  ? kpi.details.rows.find((row) => row.label === 'Venda média necessária/dia')?.value
+                  ? kpi.details.rows.find((row) => row.label === 'Venda necessária por dia')?.value
                   : null
+                const parseLocaleNumber = (value: string | null | undefined) => {
+                  if (!value) return 0
+                  const normalized = value
+                    .replace(/[^\d,.-]/g, '')
+                    .replace(/\./g, '')
+                    .replace(',', '.')
+                  const parsed = Number(normalized)
+                  return Number.isFinite(parsed) ? parsed : 0
+                }
+                const showFinanceFalta = parseLocaleNumber(financeiroFalta) > 0
+                const showFinanceDiasRestantes = parseLocaleNumber(financeiroDiasRestantes) > 0
+                const showFinanceMediaDia = parseLocaleNumber(financeiroMediaDia) > 0
                 const detailRows = kpi.details.rows.filter((row) => {
                   if (kpi.kpiType === 'VOLUME') {
                     return row.label !== 'Meta definida' && row.label !== 'Quantidade atingida'
+                  }
+                  if (kpi.kpiType === 'DISTRIBUICAO') {
+                    return !['Itens exigidos', 'Itens vendidos', 'Clientes exigidos', 'Clientes com item'].includes(row.label)
                   }
                   if (kpi.kpiType === 'BASE_CLIENTES') {
                     return !['Base total', 'Meta de clientes', 'Clientes atendidos', 'Faltantes'].includes(row.label)
                   }
                   if (kpi.kpiType === 'META_FINANCEIRA') {
-                    return !['Meta da etapa', 'Realizado', 'Falta para bater', 'Dias úteis restantes', 'Venda média necessária/dia'].includes(row.label)
+                    return !['Meta da etapa', 'Realizado', 'Falta para bater', 'Dias úteis restantes', 'Venda necessária por dia'].includes(row.label)
                   }
                   return true
                 })
@@ -1925,6 +1952,42 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                           </div>
                         )}
 
+                        {kpi.kpiType === 'DISTRIBUICAO' &&
+                          distribuicaoItensExigidos !== null &&
+                          distribuicaoItensVendidos !== null &&
+                          distribuicaoClientesExigidos !== null &&
+                          distribuicaoClientesComItem !== null && (
+                          <div className="mb-2 rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/11 via-sky-500/10 to-cyan-500/11 px-2.5 py-2">
+                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-cyan-100/90">Resumo da distribuição</p>
+                            <div className="rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Itens exigidos</p>
+                                  <p className="text-sm font-bold text-white">{distribuicaoItensExigidos}</p>
+                                </div>
+                                <div className="h-7 w-px shrink-0 bg-cyan-300/25" />
+                                <div className="min-w-0 text-right">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Itens positivados</p>
+                                  <p className="text-sm font-bold text-cyan-200">{distribuicaoItensVendidos}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-1.5 rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Clientes exigidos</p>
+                                  <p className="text-sm font-bold text-white">{distribuicaoClientesExigidos}</p>
+                                </div>
+                                <div className="h-7 w-px shrink-0 bg-cyan-300/25" />
+                                <div className="min-w-0 text-right">
+                                  <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Clientes com item positivado</p>
+                                  <p className="text-sm font-bold text-cyan-200">{distribuicaoClientesComItem}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {kpi.kpiType === 'BASE_CLIENTES' && baseTotal !== null && baseMetaClientes !== null && baseClientesAtendidos !== null && (
                           <div className="mb-2 rounded-md border border-sky-500/25 bg-linear-to-r from-sky-500/10 via-cyan-500/10 to-sky-500/10 px-2.5 py-2">
                             <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-sky-100/90">Resumo da cobertura de clientes</p>
@@ -1957,19 +2020,25 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Realizado</p>
                                 <p className="text-[11px] font-bold text-emerald-200">{financeiroRealizado}</p>
                               </div>
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                            </div>
+                            {showFinanceFalta && (
+                              <div className="mt-1.5 rounded-md bg-surface-900/45 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Falta para bater</p>
                                 <p className="text-[11px] font-bold text-amber-200">{financeiroFalta}</p>
                               </div>
-                              <div className="rounded-md bg-surface-900/45 px-2 py-1">
+                            )}
+                            {showFinanceMediaDia && (
+                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Venda necessária por dia</p>
+                                <p className="text-[11px] font-bold text-emerald-100">{financeiroMediaDia}</p>
+                              </div>
+                            )}
+                            {showFinanceDiasRestantes && (
+                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/8 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Dias úteis restantes</p>
                                 <p className="text-[11px] font-bold text-white">{financeiroDiasRestantes}</p>
                               </div>
-                            </div>
-                            <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
-                              <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Venda média necessária/dia</p>
-                              <p className="text-[11px] font-bold text-emerald-100">{financeiroMediaDia}</p>
-                            </div>
+                            )}
                           </div>
                         )}
 
@@ -1981,22 +2050,6 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                                 <p className="text-[10px] font-semibold text-surface-100">{row.value}</p>
                               </div>
                             ))}
-                          </div>
-                        )}
-
-                        {kpi.details.dailyPlan && kpi.details.dailyPlan.length > 0 && (
-                          <div className="mt-2 rounded-md border border-emerald-500/20 bg-emerald-500/8 p-2">
-                            <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-300">Plano diário da etapa</p>
-                            <div className="mt-1 space-y-1">
-                              {kpi.details.dailyPlan.map((planRow) => (
-                                <div key={`${kpi.ruleId}-day-${planRow.date}`} className="flex items-center justify-between text-[10px]">
-                                  <span className="text-surface-300">
-                                    {new Date(`${planRow.date}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
-                                  </span>
-                                  <span className="font-semibold text-emerald-200">{fmtBrl(planRow.value)}</span>
-                                </div>
-                              ))}
-                            </div>
                           </div>
                         )}
 
