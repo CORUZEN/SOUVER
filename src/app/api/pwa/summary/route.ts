@@ -75,6 +75,17 @@ export async function GET(req: NextRequest) {
     return 'VOLUME'
   }
 
+  function normalizeSellerIdentifier(value: string): string {
+    const trimmed = String(value ?? '').trim()
+    if (!trimmed) return ''
+    const withoutPrefix = trimmed.replace(/^sankhya-/i, '')
+    if (/^\d+$/.test(withoutPrefix)) {
+      const normalized = String(Number(withoutPrefix))
+      return normalized === 'NaN' ? withoutPrefix : normalized
+    }
+    return withoutPrefix
+  }
+
   // ── Extract rule blocks for targets ───────────────────────────────────────
   type RuleBlock = {
     id: string
@@ -101,15 +112,25 @@ export async function GET(req: NextRequest) {
   const sellerSummaries = scopedSellers.map((seller) => {
     const code = String(seller.code ?? '').trim()
     const normalizedCode = code.replace(/^sankhya-/, '')
+    const canonicalCode = normalizeSellerIdentifier(code)
     const sellerCandidates = new Set([
       code,
       normalizedCode,
+      canonicalCode,
       normalizedCode ? `sankhya-${normalizedCode}` : '',
+      canonicalCode ? `sankhya-${canonicalCode}` : '',
     ].filter(Boolean))
     // Find the block that covers this seller
     const block = ruleBlocks.find((b) => {
       if (!b.sellerIds || b.sellerIds.length === 0) return false
-      return b.sellerIds.some((rawSellerId) => sellerCandidates.has(String(rawSellerId ?? '').trim()))
+      return b.sellerIds.some((rawSellerId) => {
+        const raw = String(rawSellerId ?? '').trim()
+        if (!raw) return false
+        if (sellerCandidates.has(raw)) return true
+        const normalizedRaw = normalizeSellerIdentifier(raw)
+        if (!normalizedRaw) return false
+        return sellerCandidates.has(normalizedRaw) || sellerCandidates.has(`sankhya-${normalizedRaw}`)
+      })
     }) ?? ruleBlocks[0] ?? null
 
     const profileType = seller.profileType as string
@@ -122,8 +143,15 @@ export async function GET(req: NextRequest) {
     // the comparison panel (loadPreviousConsolidated) uses the correct base target.
     const resolvedMonthlyTarget = (() => {
       const manualMap = (block as { manualFinancialByPeriod?: Record<string, number> } | null)?.manualFinancialByPeriod ?? {}
-      const periodKey = `${year}-${String(month).padStart(2, '0')}`
-      const exact = Number(manualMap[periodKey] ?? 0)
+      const periodKeyPadded = `${year}-${String(month).padStart(2, '0')}`
+      const periodKeyUnpadded = `${year}-${month}`
+      const periodKeySlash = `${year}/${String(month).padStart(2, '0')}`
+      const periodKeySlashUnpadded = `${year}/${month}`
+      const exact =
+        Number(manualMap[periodKeyPadded] ?? 0) ||
+        Number(manualMap[periodKeyUnpadded] ?? 0) ||
+        Number(manualMap[periodKeySlash] ?? 0) ||
+        Number(manualMap[periodKeySlashUnpadded] ?? 0)
       if (exact > 0) return exact
       return Number(block?.monthlyTarget ?? 0)
     })()

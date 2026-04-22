@@ -134,6 +134,25 @@ function parseDecimal(value: string, fallback = 0) {
   const n = Number(normalized)
   return Number.isFinite(n) ? n : fallback
 }
+function parseFinancialThresholdPercent(targetText: string) {
+  const pctMatches = [...targetText.matchAll(/(\d+(?:[.,]\d+)?)\s*%/g)]
+    .map((match) => parseDecimal(match[1] ?? '0', 0))
+    .filter((value) => value > 0)
+
+  if (pctMatches.length > 0) {
+    if (targetText.includes('+') && pctMatches.length >= 2) {
+      return pctMatches.reduce((sum, value) => sum + value, 0)
+    }
+    return Math.max(...pctMatches)
+  }
+
+  const numericMatches = targetText.match(/(\d+(?:[.,]\d+)?)/g) ?? []
+  const numericValues = numericMatches
+    .map((value) => parseDecimal(value, 0))
+    .filter((value) => value > 0)
+  if (numericValues.length > 0) return Math.max(...numericValues)
+  return 100
+}
 function normalizeCode(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
@@ -272,9 +291,11 @@ function computeEarnedReward(
     let progress = 0
 
     if (kpiType === 'META_FINANCEIRA') {
-      const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
-      const threshold = rawNum > 0 ? rawNum / 100 : 1
-      const accumulated = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const thresholdPct = parseFinancialThresholdPercent(rule.targetText)
+      const threshold = thresholdPct > 0 ? thresholdPct / 100 : 1
+      const isExtraFinancialTarget = thresholdPct > 100
+      const financialOrders = isExtraFinancialTarget ? orders : ordersUpToStage
+      const accumulated = financialOrders.reduce((s, o) => s + o.totalValue, 0)
       progress = accumulated / (monthlyTarget * threshold)
     } else if (kpiType === 'BASE_CLIENTES') {
       const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
@@ -553,24 +574,37 @@ function computeAllKpiProgress(
     }
 
     if (kpiType === 'META_FINANCEIRA') {
-      const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
-      const threshold = rawNum > 0 ? rawNum / 100 : 1
-      const accumulated = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
+      const thresholdPct = parseFinancialThresholdPercent(rule.targetText)
+      const threshold = thresholdPct > 0 ? thresholdPct / 100 : 1
+      const isExtraFinancialTarget = thresholdPct > 100
+      const financialOrders = isExtraFinancialTarget ? orders : ordersUpToStage
+      const accumulated = financialOrders.reduce((s, o) => s + o.totalValue, 0)
       progress = monthlyTarget > 0 ? accumulated / (monthlyTarget * threshold) : 0
       const stageTargetValue = monthlyTarget > 0 ? monthlyTarget * threshold : 0
       const missingValue = Math.max(stageTargetValue - accumulated, 0)
       const remainingDays = resolveRemainingBusinessDates(week)
       const requiredPerDay = remainingDays.length > 0 ? missingValue / remainingDays.length : missingValue
-      details = {
-        rows: [
-          { label: 'Meta da etapa', value: fmtBrl(stageTargetValue) },
-          { label: 'Realizado', value: fmtBrl(accumulated) },
-          { label: 'Falta para bater', value: fmtBrl(missingValue) },
-          { label: 'Dias úteis restantes', value: fmt(remainingDays.length) },
-          { label: 'Venda necessária por dia', value: fmtBrl(requiredPerDay) },
-        ],
-        dailyPlan: remainingDays.map((date) => ({ date, value: requiredPerDay })),
-      }
+      details = isExtraFinancialTarget
+        ? {
+            rows: [
+              { label: 'Meta 120%', value: fmtBrl(stageTargetValue) },
+              { label: 'Atingido total', value: fmtBrl(accumulated) },
+              {
+                label: accumulated >= stageTargetValue ? 'Excedente da meta' : 'Falta para meta extra',
+                value: fmtBrl(Math.abs(accumulated - stageTargetValue)),
+              },
+            ],
+          }
+        : {
+            rows: [
+              { label: 'Meta da etapa', value: fmtBrl(stageTargetValue) },
+              { label: 'Realizado', value: fmtBrl(accumulated) },
+              { label: 'Falta para bater', value: fmtBrl(missingValue) },
+              { label: 'Dias úteis restantes', value: fmt(remainingDays.length) },
+              { label: 'Venda necessária por dia', value: fmtBrl(requiredPerDay) },
+            ],
+            dailyPlan: remainingDays.map((date) => ({ date, value: requiredPerDay })),
+          }
     } else if (kpiType === 'BASE_CLIENTES') {
       const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
       const threshold = rawNum > 0 ? rawNum / 100 : 1
@@ -1833,10 +1867,39 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                   ? kpi.details.rows.find((row) => row.label === 'Clientes atendidos')?.value
                   : null
                 const financeiroMetaEtapa = kpi.kpiType === 'META_FINANCEIRA'
-                  ? kpi.details.rows.find((row) => row.label === 'Meta da etapa')?.value
+                  ? (kpi.details.rows.find((row) => row.label === 'Meta da etapa')?.value
+                    ?? kpi.details.rows.find((row) => row.label === 'Meta total')?.value
+                    ?? kpi.details.rows.find((row) => row.label === 'Meta 120%')?.value)
                   : null
+                const financeiroMetaLabel = kpi.kpiType === 'META_FINANCEIRA'
+                  ? (kpi.details.rows.find((row) => row.label === 'Meta 120%')
+                    ? 'Meta 120%'
+                    : kpi.details.rows.find((row) => row.label === 'Meta total')
+                      ? 'Meta total'
+                      : 'Meta da etapa')
+                  : 'Meta da etapa'
                 const financeiroRealizado = kpi.kpiType === 'META_FINANCEIRA'
-                  ? kpi.details.rows.find((row) => row.label === 'Realizado')?.value
+                  ? (kpi.details.rows.find((row) => row.label === 'Realizado')?.value
+                    ?? kpi.details.rows.find((row) => row.label === 'Atingido')?.value
+                    ?? kpi.details.rows.find((row) => row.label === 'Atingido total')?.value)
+                  : null
+                const financeiroRealizadoLabel = kpi.kpiType === 'META_FINANCEIRA'
+                  ? (kpi.details.rows.find((row) => row.label === 'Atingido total')
+                    ? 'Atingido total'
+                    : kpi.details.rows.find((row) => row.label === 'Atingido')
+                      ? 'Atingido'
+                      : 'Realizado')
+                  : 'Realizado'
+                const financeiroExtraDelta = kpi.kpiType === 'META_FINANCEIRA'
+                  ? (kpi.details.rows.find((row) => row.label === 'Excedente da meta')?.value
+                    ?? kpi.details.rows.find((row) => row.label === 'Falta para meta extra')?.value)
+                  : null
+                const financeiroExtraDeltaLabel = kpi.kpiType === 'META_FINANCEIRA'
+                  ? (kpi.details.rows.find((row) => row.label === 'Excedente da meta')
+                    ? 'Excedente da meta'
+                    : kpi.details.rows.find((row) => row.label === 'Falta para meta extra')
+                      ? 'Falta para meta extra'
+                      : null)
                   : null
                 const financeiroFalta = kpi.kpiType === 'META_FINANCEIRA'
                   ? kpi.details.rows.find((row) => row.label === 'Falta para bater')?.value
@@ -1870,7 +1933,19 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                     return !['Base total', 'Meta de clientes', 'Clientes atendidos', 'Faltantes'].includes(row.label)
                   }
                   if (kpi.kpiType === 'META_FINANCEIRA') {
-                    return !['Meta da etapa', 'Realizado', 'Falta para bater', 'Dias úteis restantes', 'Venda necessária por dia'].includes(row.label)
+                    return ![
+                      'Meta da etapa',
+                      'Meta total',
+                      'Meta 120%',
+                      'Realizado',
+                      'Atingido',
+                      'Atingido total',
+                      'Excedente da meta',
+                      'Falta para meta extra',
+                      'Falta para bater',
+                      'Dias úteis restantes',
+                      'Venda necessária por dia',
+                    ].includes(row.label)
                   }
                   return true
                 })
@@ -2013,14 +2088,20 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                             <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-100/90">Resumo da meta financeira</p>
                             <div className="grid grid-cols-2 gap-1.5">
                               <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Meta da etapa</p>
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroMetaLabel}</p>
                                 <p className="text-[11px] font-bold text-white">{financeiroMetaEtapa}</p>
                               </div>
                               <div className="rounded-md bg-surface-900/45 px-2 py-1">
-                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Realizado</p>
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroRealizadoLabel}</p>
                                 <p className="text-[11px] font-bold text-emerald-200">{financeiroRealizado}</p>
                               </div>
                             </div>
+                            {financeiroExtraDelta && financeiroExtraDeltaLabel && (
+                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
+                                <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroExtraDeltaLabel}</p>
+                                <p className="text-[11px] font-bold text-emerald-100">{financeiroExtraDelta}</p>
+                              </div>
+                            )}
                             {showFinanceFalta && (
                               <div className="mt-1.5 rounded-md bg-surface-900/45 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Falta para bater</p>
