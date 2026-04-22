@@ -1246,6 +1246,8 @@ export default function MetasWorkspace() {
   const [distributionLoading, setDistributionLoading] = useState(false)
   const [distributionError, setDistributionError] = useState('')
   const [distributionDiagnostics, setDistributionDiagnostics] = useState<DistributionDiagnostics | null>(null)
+  const [coverageDiagnosticModalOpen, setCoverageDiagnosticModalOpen] = useState(false)
+  const [coverageDiagnosticSearch, setCoverageDiagnosticSearch] = useState('')
   const [distribuicaoBasePct, setDistribuicaoBasePct] = useState(DEFAULT_DISTRIBUICAO_BASE_PCT)
   const [distribuicaoItemsPct, setDistribuicaoItemsPct] = useState(DEFAULT_DISTRIBUICAO_ITEMS_PCT)
   const [distribuicaoMetricModalOpen, setDistribuicaoMetricModalOpen] = useState(false)
@@ -4380,6 +4382,91 @@ export default function MetasWorkspace() {
     sellers,
     snapshots,
   ])
+
+  const coverageBaseDiagnostic = useMemo(() => {
+    const scopedSellerIds = new Set(kpiGeneralCardSellerRows.map((row) => row.sellerId))
+    const attendedByClient = new Map<
+      string,
+      {
+        clientCode: string
+        orderCount: number
+        totalValue: number
+        totalGrossWeight: number
+        lastOrderAt: string
+        sellerNames: Set<string>
+      }
+    >()
+
+    for (const seller of sellers) {
+      if (!scopedSellerIds.has(seller.id)) continue
+      for (const order of seller.orders) {
+        const clientCode = normalizeEntityCode(String(order.clientCode ?? '').trim())
+        if (!clientCode) continue
+        const existing = attendedByClient.get(clientCode) ?? {
+          clientCode,
+          orderCount: 0,
+          totalValue: 0,
+          totalGrossWeight: 0,
+          lastOrderAt: '',
+          sellerNames: new Set<string>(),
+        }
+        existing.orderCount += 1
+        existing.totalValue += Math.max(Number(order.totalValue ?? 0), 0)
+        existing.totalGrossWeight += Math.max(Number(order.grossWeight ?? 0), 0)
+        const negotiatedAt = String(order.negotiatedAt ?? '').trim()
+        if (negotiatedAt && (!existing.lastOrderAt || negotiatedAt > existing.lastOrderAt)) {
+          existing.lastOrderAt = negotiatedAt
+        }
+        existing.sellerNames.add(getSellerShortName(seller.name))
+        attendedByClient.set(clientCode, existing)
+      }
+    }
+
+    const coveredClients = new Set<string>()
+    for (const seller of sellers) {
+      if (!scopedSellerIds.has(seller.id)) continue
+      const sellerCode = toSellerCodeFromId(seller.id)
+      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+      for (const row of sellerRows) {
+        const clientCode = normalizeEntityCode(String(row.clientCode ?? '').trim())
+        if (!clientCode) continue
+        if (getDistribuicaoProductsByStage(row, 'FULL') >= 1) coveredClients.add(clientCode)
+      }
+    }
+
+    const missingRows = Array.from(attendedByClient.values())
+      .filter((row) => !coveredClients.has(row.clientCode))
+      .map((row) => ({
+        clientCode: row.clientCode,
+        orderCount: row.orderCount,
+        totalValue: row.totalValue,
+        totalGrossWeight: row.totalGrossWeight,
+        lastOrderAt: row.lastOrderAt,
+        sellerNames: Array.from(row.sellerNames).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+      }))
+      .sort((a, b) => {
+        if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount
+        if (b.totalValue !== a.totalValue) return b.totalValue - a.totalValue
+        return a.clientCode.localeCompare(b.clientCode, 'pt-BR')
+      })
+
+    return {
+      attendedCount: attendedByClient.size,
+      coveredCount: coveredClients.size,
+      missingCount: missingRows.length,
+      missingRows,
+    }
+  }, [distributionBySellerProduct, kpiGeneralCardSellerRows, sellers])
+
+  const coverageBaseDiagnosticFilteredRows = useMemo(() => {
+    const query = coverageDiagnosticSearch.trim().toUpperCase()
+    if (!query) return coverageBaseDiagnostic.missingRows
+    return coverageBaseDiagnostic.missingRows.filter((row) => {
+      if (row.clientCode.includes(query)) return true
+      if (row.sellerNames.some((sellerName) => sellerName.toUpperCase().includes(query))) return true
+      return false
+    })
+  }, [coverageBaseDiagnostic.missingRows, coverageDiagnosticSearch])
 
   // Previous-period totals scoped to the same seller/supervisor as the current view
   const previousPeriodScopedTotals = useMemo(() => {
@@ -8892,11 +8979,27 @@ export default function MetasWorkspace() {
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 via-teal-500 to-cyan-500" />
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
-                    {strategicMetricsPanelMode === 'WEIGHT'
-                      ? 'Metas de peso por grupo de produto'
-                      : 'Metas gerais consolidadas'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
+                      {strategicMetricsPanelMode === 'WEIGHT'
+                        ? 'Metas de peso por grupo de produto'
+                        : 'Metas gerais consolidadas'}
+                    </p>
+                    {strategicMetricsPanelMode === 'KPI_GENERAL' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoverageDiagnosticSearch('')
+                          setCoverageDiagnosticModalOpen(true)
+                        }}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700 transition-colors hover:bg-cyan-100"
+                        title="Diagnóstico da cobertura da base"
+                        aria-label="Diagnóstico da cobertura da base"
+                      >
+                        <CircleHelp size={13} />
+                      </button>
+                    )}
+                  </div>
                   <p className="mt-0.5 text-[10px] text-surface-400">
                     {strategicMetricsPanelMode === 'WEIGHT'
                       ? `Visão geral, por vendedor e por supervisor — ${MONTHS[month]} ${year}`
@@ -10996,6 +11099,92 @@ export default function MetasWorkspace() {
             <p className="mt-1 text-[11px] text-surface-500">
               Referência usada no consolidado por vendedor para positivação de itens.
             </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Coverage diagnostic modal ────────────────────────────── */}
+      <Modal
+        open={coverageDiagnosticModalOpen}
+        onClose={() => setCoverageDiagnosticModalOpen(false)}
+        title="Diagnóstico de cobertura da base"
+        description="Clientes atendidos no período que não entraram no cálculo de cobertura da base (positivação)."
+        size="xl"
+        footer={(
+          <button
+            type="button"
+            onClick={() => setCoverageDiagnosticModalOpen(false)}
+            className="rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+          >
+            Fechar
+          </button>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-500">Clientes atendidos</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-surface-900">{num(coverageBaseDiagnostic.attendedCount, 0)}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Clientes em cobertura</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-800">{num(coverageBaseDiagnostic.coveredCount, 0)}</p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">Clientes fora da cobertura</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-amber-800">{num(coverageBaseDiagnostic.missingCount, 0)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-surface-200 bg-white p-3">
+            <label className={label}>Buscar cliente (código ou vendedor)</label>
+            <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2">
+              <Search size={14} className="text-surface-400" />
+              <input
+                type="text"
+                value={coverageDiagnosticSearch}
+                onChange={(event) => setCoverageDiagnosticSearch(event.target.value)}
+                placeholder="Ex.: 12345 ou nome do vendedor"
+                className="flex-1 bg-transparent text-sm text-surface-800 placeholder-surface-400 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-surface-200">
+            <div className="max-h-[52vh] overflow-auto">
+              <table className="min-w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-surface-50 text-[10px] uppercase tracking-widest text-surface-500">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Cliente</th>
+                    <th className="px-3 py-2 text-right">Pedidos</th>
+                    <th className="px-3 py-2 text-right">Valor (R$)</th>
+                    <th className="px-3 py-2 text-right">Peso (kg)</th>
+                    <th className="px-3 py-2 text-left">Última compra</th>
+                    <th className="px-3 py-2 text-left">Vendedores</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coverageBaseDiagnosticFilteredRows.length === 0 ? (
+                    <tr className="border-t border-surface-100">
+                      <td colSpan={6} className="px-3 py-8 text-center text-[11px] text-surface-400">
+                        Nenhum cliente fora da cobertura para os filtros aplicados.
+                      </td>
+                    </tr>
+                  ) : (
+                    coverageBaseDiagnosticFilteredRows.map((row) => (
+                      <tr key={row.clientCode} className="border-t border-surface-100">
+                        <td className="px-3 py-2.5 font-semibold tabular-nums text-surface-800">{row.clientCode}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.orderCount, 0)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.totalValue, 2)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-surface-700">{num(row.totalGrossWeight, 2)}</td>
+                        <td className="px-3 py-2.5 text-surface-600">{row.lastOrderAt ? formatDateBr(row.lastOrderAt) : '—'}</td>
+                        <td className="px-3 py-2.5 text-surface-600">{row.sellerNames.join(', ') || '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </Modal>
