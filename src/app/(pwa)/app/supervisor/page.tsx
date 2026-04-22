@@ -2010,9 +2010,9 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                       <p className="mt-0.5 text-[9px] text-surface-600">Requer dados adicionais</p>
                     )}
                     {isDetailOpen && (
-                      <div className="mt-2 rounded-lg border border-surface-700/50 bg-surface-900/60 p-2">
+                      <div className="mt-2 space-y-2">
                         {kpi.kpiType === 'VOLUME' && volumeMetaDefinida !== null && volumeQuantidadeAtingida !== null && (
-                          <div className="mb-2 rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-cyan-500/10 to-emerald-500/12 px-2.5 py-2">
+                          <div className="rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/12 via-cyan-500/10 to-emerald-500/12 px-2.5 py-2">
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-[9px] uppercase tracking-wider text-emerald-200/90">Meta definida</p>
@@ -2032,8 +2032,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                           distribuicaoItensVendidos !== null &&
                           distribuicaoClientesExigidos !== null &&
                           distribuicaoClientesComItem !== null && (
-                          <div className="mb-2 rounded-md border border-cyan-500/25 bg-linear-to-r from-cyan-500/11 via-sky-500/10 to-cyan-500/11 px-2.5 py-2">
-                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-cyan-100/90">Resumo da distribuição</p>
+                          <div className="space-y-1.5">
                             <div className="rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
@@ -2047,7 +2046,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-1.5 rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
+                            <div className="rounded-md border border-cyan-400/20 bg-surface-900/45 px-2 py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
                                   <p className="text-[9px] uppercase tracking-wider text-cyan-100/80">Clientes exigidos</p>
@@ -2064,8 +2063,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                         )}
 
                         {kpi.kpiType === 'BASE_CLIENTES' && baseTotal !== null && baseMetaClientes !== null && baseClientesAtendidos !== null && (
-                          <div className="mb-2 rounded-md border border-sky-500/25 bg-linear-to-r from-sky-500/10 via-cyan-500/10 to-sky-500/10 px-2.5 py-2">
-                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-sky-100/90">Resumo da cobertura de clientes</p>
+                          <div className="space-y-1.5">
                             <div className="grid grid-cols-2 gap-1.5">
                               <div className="rounded-md bg-surface-900/45 px-2 py-1">
                                 <p className="text-[9px] uppercase tracking-wide text-sky-100/80">Base total</p>
@@ -2076,7 +2074,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                                 <p className="text-[11px] font-bold text-white">{baseMetaClientes}</p>
                               </div>
                             </div>
-                            <div className="mt-1.5 rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1.5">
+                            <div className="rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1.5">
                               <p className="text-[9px] uppercase tracking-wide text-cyan-100/85">Clientes atendidos</p>
                               <p className="text-[11px] font-bold text-cyan-100">{baseClientesAtendidos}</p>
                             </div>
@@ -2084,8 +2082,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                         )}
 
                         {kpi.kpiType === 'META_FINANCEIRA' && financeiroMetaEtapa !== null && financeiroRealizado !== null && financeiroFalta !== null && financeiroDiasRestantes !== null && financeiroMediaDia !== null && (
-                          <div className="mb-2 rounded-md border border-emerald-500/25 bg-linear-to-r from-emerald-500/11 via-teal-500/10 to-emerald-500/11 px-2.5 py-2">
-                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-100/90">Resumo da meta financeira</p>
+                          <div className="space-y-1.5">
                             <div className="grid grid-cols-2 gap-1.5">
                               <div className="rounded-md bg-surface-900/45 px-2 py-1">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroMetaLabel}</p>
@@ -2097,25 +2094,25 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                               </div>
                             </div>
                             {financeiroExtraDelta && financeiroExtraDeltaLabel && (
-                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
+                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">{financeiroExtraDeltaLabel}</p>
                                 <p className="text-[11px] font-bold text-emerald-100">{financeiroExtraDelta}</p>
                               </div>
                             )}
                             {showFinanceFalta && (
-                              <div className="mt-1.5 rounded-md bg-surface-900/45 px-2 py-1.5">
+                              <div className="rounded-md bg-surface-900/45 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Falta para bater</p>
                                 <p className="text-[11px] font-bold text-amber-200">{financeiroFalta}</p>
                               </div>
                             )}
                             {showFinanceMediaDia && (
-                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
+                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Venda necessária por dia</p>
                                 <p className="text-[11px] font-bold text-emerald-100">{financeiroMediaDia}</p>
                               </div>
                             )}
                             {showFinanceDiasRestantes && (
-                              <div className="mt-1.5 rounded-md border border-emerald-400/20 bg-emerald-500/8 px-2 py-1.5">
+                              <div className="rounded-md border border-emerald-400/20 bg-emerald-500/8 px-2 py-1.5">
                                 <p className="text-[9px] uppercase tracking-wide text-emerald-100/80">Dias úteis restantes</p>
                                 <p className="text-[11px] font-bold text-white">{financeiroDiasRestantes}</p>
                               </div>
@@ -2135,7 +2132,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                         )}
 
                         {kpi.details.volumeGroups && kpi.details.volumeGroups.length > 0 && (
-                          <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/7 p-2">
+                          <div className="rounded-md border border-cyan-500/20 bg-cyan-500/7 p-2">
                             <p className="text-[9px] font-semibold uppercase tracking-wider text-cyan-200">Progresso por grupo de produto</p>
                             <div className="mt-1.5 space-y-1.5">
                               {kpi.details.volumeGroups.map((group) => (
