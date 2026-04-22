@@ -374,6 +374,11 @@ type KpiProgress = {
   isComputable: boolean
   stageStarted: boolean
   stageEnded: boolean
+  details: {
+    rows: Array<{ label: string; value: string }>
+    volumeGroups?: Array<{ brand: string; targetKg: number; soldKg: number; progressPct: number }>
+    dailyPlan?: Array<{ date: string; value: number }>
+  }
 }
 
 function computeAllKpiProgress(
@@ -437,12 +442,53 @@ function computeAllKpiProgress(
     return sold / Math.max(wt.targetKg, 0.00001)
   })
 
+  const resolveRemainingBusinessDates = (week: CycleWeek): string[] => {
+    const startRef = todayIso > week.start ? todayIso : week.start
+    if (startRef > week.end) return []
+
+    const explicitBusiness = Array.isArray(week.businessDays) ? week.businessDays : []
+    if (explicitBusiness.length > 0) {
+      return explicitBusiness.filter((iso) => iso >= startRef && iso <= week.end).sort()
+    }
+
+    const dates: string[] = []
+    let cursor = new Date(`${startRef}T00:00:00`)
+    const end = new Date(`${week.end}T00:00:00`)
+    while (cursor <= end) {
+      const day = cursor.getDay()
+      if (day >= 1 && day <= 5) {
+        dates.push(cursor.toISOString().slice(0, 10))
+      }
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return dates
+  }
+
   return rules.map((rule) => {
     const week = cycleWeeks.find((w) => w.key === rule.stage)
     const stageStarted = !!week && week.start <= todayIso
     const stageEnded = !!week && week.end < todayIso
 
-    if (!week) return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType: rule.kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted: false, stageEnded: false }
+    if (!week) {
+      return {
+        ruleId: rule.id,
+        stage: rule.stage,
+        kpi: rule.kpi,
+        kpiType: rule.kpiType,
+        targetText: rule.targetText,
+        rewardValue: rule.rewardValue,
+        progress: 0,
+        isComputable: false,
+        stageStarted: false,
+        stageEnded: false,
+        details: {
+          rows: [
+            { label: 'Meta', value: rule.targetText || 'Não parametrizada' },
+            { label: 'Status', value: 'Etapa não configurada' },
+          ],
+        },
+      }
+    }
 
     const kpiLabel = (rule.kpi ?? '').toLowerCase()
     const kpiType = rule.kpiType || (
@@ -457,22 +503,74 @@ function computeAllKpiProgress(
 
     const COMPUTABLE = new Set(['META_FINANCEIRA', 'BASE_CLIENTES', 'VOLUME', 'DEVOLUCAO', 'INADIMPLENCIA', 'DISTRIBUICAO', 'ITEM_FOCO'])
     if (!COMPUTABLE.has(kpiType)) {
-      return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: false, stageStarted, stageEnded }
+      return {
+        ruleId: rule.id,
+        stage: rule.stage,
+        kpi: rule.kpi,
+        kpiType,
+        targetText: rule.targetText,
+        rewardValue: rule.rewardValue,
+        progress: 0,
+        isComputable: false,
+        stageStarted,
+        stageEnded,
+        details: {
+          rows: [
+            { label: 'Meta', value: rule.targetText || 'Não parametrizada' },
+            { label: 'Status', value: 'Requer dados adicionais' },
+          ],
+        },
+      }
     }
 
     if (!stageStarted) {
-      return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: 0, isComputable: true, stageStarted, stageEnded }
+      return {
+        ruleId: rule.id,
+        stage: rule.stage,
+        kpi: rule.kpi,
+        kpiType,
+        targetText: rule.targetText,
+        rewardValue: rule.rewardValue,
+        progress: 0,
+        isComputable: true,
+        stageStarted,
+        stageEnded,
+        details: {
+          rows: [
+            { label: 'Meta da etapa', value: rule.targetText || 'Não parametrizada' },
+            { label: 'Período', value: `${week.start} até ${week.end}` },
+            { label: 'Status', value: 'Aguardando início da etapa' },
+          ],
+        },
+      }
     }
 
     const stageEnd = week.end
     const ordersUpToStage = orders.filter((o) => o.negotiatedAt <= stageEnd)
     let progress = 0
+    let details: KpiProgress['details'] = {
+      rows: [{ label: 'Meta da etapa', value: rule.targetText || 'Não parametrizada' }],
+    }
 
     if (kpiType === 'META_FINANCEIRA') {
       const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
       const threshold = rawNum > 0 ? rawNum / 100 : 1
       const accumulated = ordersUpToStage.reduce((s, o) => s + o.totalValue, 0)
       progress = monthlyTarget > 0 ? accumulated / (monthlyTarget * threshold) : 0
+      const stageTargetValue = monthlyTarget > 0 ? monthlyTarget * threshold : 0
+      const missingValue = Math.max(stageTargetValue - accumulated, 0)
+      const remainingDays = resolveRemainingBusinessDates(week)
+      const requiredPerDay = remainingDays.length > 0 ? missingValue / remainingDays.length : missingValue
+      details = {
+        rows: [
+          { label: 'Meta da etapa', value: fmtBrl(stageTargetValue) },
+          { label: 'Realizado', value: fmtBrl(accumulated) },
+          { label: 'Falta para bater', value: fmtBrl(missingValue) },
+          { label: 'Dias úteis restantes', value: fmt(remainingDays.length) },
+          { label: 'Venda média necessária/dia', value: fmtBrl(requiredPerDay) },
+        ],
+        dailyPlan: remainingDays.map((date) => ({ date, value: requiredPerDay })),
+      }
     } else if (kpiType === 'BASE_CLIENTES') {
       const rawNum = parseFloat(rule.targetText.replace('%', '').replace(',', '.')) || 0
       const threshold = rawNum > 0 ? rawNum / 100 : 1
@@ -482,12 +580,39 @@ function computeAllKpiProgress(
         ? cumulativeDistinctClients[stageKey]?.count ?? 0
         : new Set(ordersUpToStage.map((o) => o.clientCode).filter(Boolean)).size
       progress = clients / (base * threshold)
+      const requiredClients = Math.ceil(base * threshold)
+      details = {
+        rows: [
+          { label: 'Base total', value: fmt(base) },
+          { label: 'Meta de clientes', value: fmt(requiredClients) },
+          { label: 'Clientes atendidos', value: fmt(clients) },
+          { label: 'Faltantes', value: fmt(Math.max(requiredClients - clients, 0)) },
+        ],
+      }
     } else if (kpiType === 'VOLUME') {
       const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
+      const volumeGroups = weightTargets.map((wt) => {
+        const soldKg = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
+        const progressPct = wt.targetKg > 0 ? (soldKg / wt.targetKg) * 100 : 0
+        return {
+          brand: wt.brand,
+          targetKg: wt.targetKg,
+          soldKg,
+          progressPct,
+        }
+      }).sort((a, b) => b.progressPct - a.progressPct)
       if (requiredGroups > 0 && weightTargetRatios.length > 0) {
         const topRatios = [...weightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
         const normalized = Array.from({ length: requiredGroups }, (_, i) => Math.min(topRatios[i] ?? 0, 1))
         progress = normalized.reduce((s, v) => s + v, 0) / requiredGroups
+      }
+      const groupsHit = volumeGroups.filter((row) => row.progressPct >= 100).length
+      details = {
+        rows: [
+          { label: 'Meta definida', value: fmt(requiredGroups) },
+          { label: 'Quantidade atingida', value: fmt(groupsHit) },
+        ],
+        volumeGroups,
       }
     } else if (kpiType === 'DEVOLUCAO') {
       const rawNum = parseFloat(rule.targetText.replace(/[^0-9,.]/g, '').replace(',', '.')) || 0
@@ -497,6 +622,14 @@ function computeAllKpiProgress(
       if (financial > 0 && targetPct > 0) {
         const actualPct = returned / financial
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+        details = {
+          rows: [
+            { label: 'Limite da etapa', value: fmtPct(targetPct * 100, 2) },
+            { label: 'Taxa atual', value: fmtPct(actualPct * 100, 2) },
+            { label: 'Valor devolvido', value: fmtBrl(returned) },
+            { label: 'Base faturada', value: fmtBrl(financial) },
+          ],
+        }
       }
     } else if (kpiType === 'INADIMPLENCIA') {
       const { pct: inadPct, days: atrasoDias } = parseInadimplenciaTarget(rule.targetText)
@@ -508,6 +641,14 @@ function computeAllKpiProgress(
       if (financial > 0 && targetPct > 0) {
         const actualPct = overdueValue / financial
         progress = actualPct <= targetPct ? 1 : targetPct / Math.max(actualPct, 0.00001)
+        details = {
+          rows: [
+            { label: 'Limite da etapa', value: `${fmtPct(targetPct * 100, 2)} até ${fmt(atrasoDias)} dias` },
+            { label: 'Taxa atual', value: fmtPct(actualPct * 100, 2) },
+            { label: 'Valor em atraso', value: fmtBrl(overdueValue) },
+            { label: 'Base faturada', value: fmtBrl(financial) },
+          ],
+        }
       }
     } else if (kpiType === 'DISTRIBUICAO') {
       const { resolvedItems, clientsPct } = parseDistribuicaoTarget(rule.targetText, totalActiveProducts)
@@ -535,9 +676,22 @@ function computeAllKpiProgress(
       } else {
         progress = ordersUpToStage.length > 0 ? 1 : 0
       }
+      details = {
+        rows: [
+          { label: 'Itens exigidos', value: fmt(resolvedItems) },
+          { label: 'Itens vendidos', value: fmt(soldItemsStage) },
+          { label: 'Clientes exigidos', value: fmt(requiredClients) },
+          { label: 'Clientes com item', value: fmt(clientsWithAnyItems) },
+        ],
+      }
     } else if (kpiType === 'ITEM_FOCO') {
       if (!focusConfig?.focusProductCode) {
         progress = 0
+        details = {
+          rows: [
+            { label: 'Status', value: 'Item foco não configurado' },
+          ],
+        }
       } else {
         const focusRows = focusRowsByProduct[focusConfig.focusProductCode] ?? []
         const focusRow = focusRows.find((row) => normalizeCode(row.sellerCode) === sellerCode)
@@ -548,18 +702,46 @@ function computeAllKpiProgress(
             ? Math.ceil(baseClientCount * (focusConfig.focusTargetBasePct / 100))
             : 0
           progress = requiredBaseClients > 0 ? soldClients / Math.max(requiredBaseClients, 1) : 0
+          details = {
+            rows: [
+              { label: 'Critério', value: 'Base de clientes' },
+              { label: 'Meta da base', value: `${fmt(focusConfig.focusTargetBasePct, 1)}% (${fmt(requiredBaseClients)} clientes)` },
+              { label: 'Realizado', value: `${fmt(soldClients)} clientes` },
+              { label: 'Faltantes', value: fmt(Math.max(requiredBaseClients - soldClients, 0)) },
+            ],
+          }
         } else {
           const { volumePct } = parseItemFocoTarget(rule.targetText)
           const focusTargetKg = Math.max(focusConfig.focusTargetKg ?? 0, 0)
           if (focusTargetKg > 0 && volumePct > 0) {
             const requiredKg = focusTargetKg * (volumePct / 100)
             progress = requiredKg > 0 ? soldKg / requiredKg : 0
+            details = {
+              rows: [
+                { label: 'Critério', value: 'Volume do item foco' },
+                { label: 'Meta do item', value: `${fmt(focusTargetKg, 2)} kg` },
+                { label: 'Volume exigido', value: `${fmt(requiredKg, 2)} kg` },
+                { label: 'Realizado', value: `${fmt(soldKg, 2)} kg` },
+              ],
+            }
           }
         }
       }
     }
 
-    return { ruleId: rule.id, stage: rule.stage, kpi: rule.kpi, kpiType, targetText: rule.targetText, rewardValue: rule.rewardValue, progress: Math.min(progress, 1.4), isComputable: true, stageStarted, stageEnded }
+    return {
+      ruleId: rule.id,
+      stage: rule.stage,
+      kpi: rule.kpi,
+      kpiType,
+      targetText: rule.targetText,
+      rewardValue: rule.rewardValue,
+      progress: Math.min(progress, 1.4),
+      isComputable: true,
+      stageStarted,
+      stageEnded,
+      details,
+    }
   })
 }
 
@@ -1514,6 +1696,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
   cycleWeeks: CycleWeek[]
   todayIso: string
 }) {
+  const [expandedKpiIds, setExpandedKpiIds] = useState<Record<string, boolean>>({})
   const stages = ['W1', 'W2', 'W3', 'CLOSING'] as const
   const grouped = stages
     .map((key) => ({
@@ -1621,6 +1804,7 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                 const Icon = KPI_TYPE_ICON[kpi.kpiType] ?? Target
                 const pctDisplay = Math.min(kpi.progress * 100, 100)
                 const isHit = kpi.isComputable && kpi.progress >= 1
+                const isDetailOpen = Boolean(expandedKpiIds[kpi.ruleId])
 
                 const barColor = !kpi.isComputable || isPending
                   ? 'bg-linear-to-r from-surface-500 to-surface-400'
@@ -1640,23 +1824,38 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
 
                 return (
                   <div key={kpi.ruleId} className={stageStyle.row}>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <Icon className="h-3 w-3 shrink-0 text-surface-400" />
-                        <span className="truncate text-[11px] font-medium text-surface-200">{kpi.kpi}</span>
-                        <span className="shrink-0 text-[10px] text-surface-500">({kpi.targetText})</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedKpiIds((prev) => ({
+                          ...prev,
+                          [kpi.ruleId]: !prev[kpi.ruleId],
+                        }))
+                      }
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <Icon className="h-3 w-3 shrink-0 text-surface-400" />
+                          <span className="truncate text-[11px] font-medium text-surface-200">{kpi.kpi}</span>
+                          <span className="shrink-0 text-[10px] text-surface-500">({kpi.targetText})</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {isHit && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                          <span className={`text-[11px] font-bold ${pctColor}`}>
+                            {kpi.isComputable && !isPending
+                              ? `${fmt(pctDisplay, 0)}%`
+                              : isPending ? '-' : '?'
+                            }
+                          </span>
+                          {isDetailOpen ? (
+                            <ChevronUp className="h-3.5 w-3.5 text-surface-400" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 text-surface-500" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        {isHit && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
-                        <span className={`text-[11px] font-bold ${pctColor}`}>
-                          {kpi.isComputable && !isPending
-                            ? `${fmt(pctDisplay, 0)}%`
-                            : isPending ? '-' : '?'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                    {/* Progress bar */}
+                    </button>
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-800/95 ring-1 ring-white/10">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${barColor}`}
@@ -1665,6 +1864,60 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
                     </div>
                     {!kpi.isComputable && !isPending && (
                       <p className="mt-0.5 text-[9px] text-surface-600">Requer dados adicionais</p>
+                    )}
+                    {isDetailOpen && (
+                      <div className="mt-2 rounded-lg border border-surface-700/50 bg-surface-900/60 p-2">
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                          {kpi.details.rows.map((row, index) => (
+                            <div key={`${kpi.ruleId}-detail-${index}`} className="rounded-md bg-surface-800/55 px-2 py-1">
+                              <p className="text-[9px] uppercase tracking-wide text-surface-500">{row.label}</p>
+                              <p className="text-[10px] font-semibold text-surface-100">{row.value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {kpi.details.dailyPlan && kpi.details.dailyPlan.length > 0 && (
+                          <div className="mt-2 rounded-md border border-emerald-500/20 bg-emerald-500/8 p-2">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-300">Plano diário da etapa</p>
+                            <div className="mt-1 space-y-1">
+                              {kpi.details.dailyPlan.map((planRow) => (
+                                <div key={`${kpi.ruleId}-day-${planRow.date}`} className="flex items-center justify-between text-[10px]">
+                                  <span className="text-surface-300">
+                                    {new Date(`${planRow.date}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                                  </span>
+                                  <span className="font-semibold text-emerald-200">{fmtBrl(planRow.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {kpi.details.volumeGroups && kpi.details.volumeGroups.length > 0 && (
+                          <div className="mt-2 rounded-md border border-cyan-500/20 bg-cyan-500/7 p-2">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider text-cyan-200">Progresso por grupo de produto</p>
+                            <div className="mt-1.5 space-y-1.5">
+                              {kpi.details.volumeGroups.map((group) => (
+                                <div key={`${kpi.ruleId}-group-${group.brand}`} className="rounded-md bg-surface-800/55 px-2 py-1.5">
+                                  <div className="mb-1 flex items-center justify-between gap-2">
+                                    <span className="truncate text-[10px] font-semibold text-surface-100">{group.brand}</span>
+                                    <span className="text-[10px] font-semibold text-cyan-200">{fmt(group.progressPct, 1)}%</span>
+                                  </div>
+                                  <div className="h-1 overflow-hidden rounded-full bg-surface-700/70">
+                                    <div
+                                      className={`h-full rounded-full ${group.progressPct >= 100 ? 'bg-emerald-400' : group.progressPct >= 75 ? 'bg-cyan-400' : 'bg-amber-300'}`}
+                                      style={{ width: `${Math.max(0, Math.min(group.progressPct, 100))}%` }}
+                                    />
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between text-[9px] text-surface-400">
+                                    <span>Meta: {fmt(group.targetKg, 2)} kg</span>
+                                    <span>Vendido: {fmt(group.soldKg, 2)} kg</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )
