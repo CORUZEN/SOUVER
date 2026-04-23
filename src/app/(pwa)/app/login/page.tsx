@@ -104,8 +104,8 @@ export default function PwaLoginPage() {
       </div>
 
       {/* ── Form card ───────────────────────────────────────────── */}
-      <div className="mx-4 flex flex-1 flex-col">
-        <div className="flex flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-[0_0_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+      <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-4">
+        <div className="flex flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 backdrop-blur-xl">
 
           {/* Title */}
           <div className="mb-8">
@@ -225,7 +225,7 @@ export default function PwaLoginPage() {
             </a>
           </div>
 
-          <div className="flex-1" />
+          <div className="mt-8" />
 
           {/* Footer */}
           <div className="flex justify-center">
