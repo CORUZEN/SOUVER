@@ -7,6 +7,7 @@ import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
+import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
 
 type RawRecord = Record<string, unknown>
 
@@ -205,12 +206,12 @@ async function queryRows(baseUrl: string, headers: Record<string, string>, sql: 
   for (const endpoint of getSqlEndpoints(baseUrl, appKey, /^Bearer\s+/i.test(headers.Authorization ?? ''))) {
     for (const payload of payloadVariants) {
       try {
-        const response = await fetch(endpoint, {
+        const response = await withConcurrencyLimit('sankhya:sql-query', 6, async () => fetch(endpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(25_000),
-        })
+        }))
         const data = await response.json().catch(() => null)
         if (!response.ok) { failures.push(`HTTP ${response.status}`); continue }
         const serviceError = extractServiceError(data)
