@@ -1547,9 +1547,9 @@ export default function SupervisorPwaDashboard() {
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-extrabold tabular-nums tracking-tight ${
                     overallPct >= 100
-                      ? 'text-emerald-400'
+                      ? 'bg-linear-to-r from-emerald-200 to-lime-200 bg-clip-text text-transparent'
                       : overallPct >= 80
-                      ? 'text-cyan-400'
+                      ? 'text-lime-300'
                       : overallPct >= 50
                       ? 'text-amber-300'
                       : 'text-rose-300'
@@ -1561,12 +1561,12 @@ export default function SupervisorPwaDashboard() {
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${
                       overallPct >= 100
-                        ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.30)]'
+                        ? 'bg-emerald-300'
                         : overallPct >= 80
-                        ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.28)]'
+                        ? 'bg-lime-400'
                         : overallPct >= 50
-                        ? 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
-                        : 'bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
+                        ? 'bg-amber-400'
+                        : 'bg-rose-400'
                     }`}
                     style={{ width: `${Math.min(overallPct, 100)}%` }}
                   />
