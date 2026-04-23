@@ -22,8 +22,8 @@ export default function AuthLayout({
 
       <div className="relative z-10 h-full overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-5 lg:px-8 lg:py-6">
         <div className="mx-auto flex min-h-full w-full max-w-360 items-center">
-          <div className="grid w-full overflow-hidden rounded-[28px] border border-white/20 bg-white/6 shadow-[0_24px_70px_rgba(2,8,23,0.45)] backdrop-blur-md lg:grid-cols-[1.08fr_0.92fr]">
-            <section className="order-2 relative min-h-90 overflow-hidden lg:order-1">
+          <div className="grid w-full overflow-hidden rounded-[28px] border border-white/20 bg-white/6 shadow-[0_24px_70px_rgba(2,8,23,0.45)] md:backdrop-blur-md lg:grid-cols-[1.08fr_0.92fr]">
+            <section className="order-2 relative hidden min-h-90 overflow-hidden lg:order-1 lg:block">
               <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(4,14,32,0.9),rgba(6,78,59,0.72))]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.28),transparent_52%),radial-gradient(circle_at_82%_16%,rgba(56,189,248,0.24),transparent_45%)]" />
 

@@ -217,6 +217,14 @@ body {
   transition: background-color 5000s ease-in-out 0s;
 }
 
+/* Lock body scroll on mobile when the dark login overlay is active */
+@media (max-width: 767px) {
+  body:has(.mobile-login-overlay) {
+    overflow: hidden;
+    height: 100dvh;
+  }
+}
+
 .pwa-theme .pwa-shell {
   position: relative;
 }
