@@ -256,24 +256,25 @@ function HeaderInner() {
   })()
 
   return (
-    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-surface-300/60 bg-linear-to-r from-surface-950 via-surface-900 to-[#0f5b55] px-6 text-white">
-      <div className="pointer-events-none absolute inset-0 opacity-50">
-        <div className="absolute -left-16 top-0 h-20 w-72 bg-cyan-400/10 blur-2xl" />
-        <div className="absolute right-0 top-0 h-20 w-80 bg-emerald-400/10 blur-2xl" />
+    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-[#3e6d52]/52 bg-linear-to-r from-[#102218] via-[#153224] to-[#1f4935] px-6 text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_10px_26px_rgba(8,15,10,0.3)]">
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute -left-16 top-0 h-20 w-72 bg-[#86b64b]/14 blur-2xl" />
+        <div className="absolute right-0 top-0 h-20 w-80 bg-[#12a76d]/14 blur-2xl" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-[#b99372]/38 to-transparent" />
       </div>
 
       <div className="relative flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{headerContext.eyebrow}</p>
-          <p className="mt-1 text-lg font-semibold leading-tight">{headerContext.title}</p>
-          <p className="text-xs text-white/75">{headerContext.subtitle}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8d2bd]">{headerContext.eyebrow}</p>
+          <p className="mt-1 text-lg font-semibold leading-tight text-[#edf0e2]">{headerContext.title}</p>
+          <p className="text-xs text-[#b7c3aa]">{headerContext.subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-2 py-1 backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-xl border border-[#b99372]/22 bg-linear-to-b from-[#edf0e2]/7 to-[#edf0e2]/3 px-2 py-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(237,240,226,0.12),0_8px_18px_rgba(8,15,10,0.24)]">
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifs((prev) => !prev)}
-              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[#d2dac8] transition-colors hover:bg-[#edf0e2]/11 hover:text-[#edf0e2]"
               aria-label="Notificações"
             >
               <Bell className="h-4 w-4" />
@@ -357,21 +358,21 @@ function HeaderInner() {
             <button
               type="button"
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex min-w-52.5 cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-1.5 transition-colors hover:bg-white/10"
+              className="flex min-w-52.5 cursor-pointer items-center justify-between gap-2 rounded-lg border border-[#b99372]/20 bg-[#edf0e2]/2 px-3 py-1.5 transition-colors hover:bg-[#edf0e2]/9"
               aria-label="Abrir menu do perfil"
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/10">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#b99372]/30 bg-[#edf0e2]/8">
                 {user?.avatarUrl ? (
                   <img src={user.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-4.5 w-4.5 text-white/75" />
+                  <User className="h-4.5 w-4.5 text-[#d2dac8]" />
                 )}
               </div>
               <div className="min-w-0 text-left">
-                <p className="truncate text-sm font-semibold leading-tight text-white">{displayName}</p>
-                <p className="truncate text-xs leading-tight text-white/70">{displayRole}</p>
+                <p className="truncate text-sm font-semibold leading-tight text-[#edf0e2]">{displayName}</p>
+                <p className="truncate text-xs leading-tight text-[#b7c3aa]">{displayRole}</p>
               </div>
-              <ChevronDown className={cn('h-4 w-4 shrink-0 text-white/70 transition-transform', showProfileMenu && 'rotate-180')} />
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-[#b7c3aa] transition-transform', showProfileMenu && 'rotate-180')} />
             </button>
 
             {showProfileMenu && (
@@ -419,7 +420,7 @@ function HeaderInner() {
 
           <button
             onClick={handleLogout}
-            className="ml-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-red-500/20 hover:text-red-100"
+            className="ml-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[#d2dac8] transition-colors hover:bg-[#694333]/32 hover:text-[#e5b59a]"
             aria-label="Sair do sistema"
             title="Sair"
           >

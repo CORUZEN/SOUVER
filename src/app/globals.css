@@ -314,3 +314,26 @@ body {
     0 0 0 1px rgba(105, 67, 51, 0.2),
     0 6px 14px rgba(8, 15, 10, 0.2);
 }
+
+/* Desktop dashboard theme aligned with Login + PWA identity */
+.dashboard-ov-theme {
+  --dash-dark-1: #102318;
+  --dash-dark-2: #173325;
+  --dash-dark-3: #224a34;
+  --dash-accent: #12a76d;
+  --dash-accent-soft: #86b64b;
+  --dash-warm: #b99372;
+  --dash-ink: #edf0e2;
+  --dash-muted: #b5c1a9;
+  background:
+    radial-gradient(130% 90% at 0% -10%, rgba(134, 182, 75, 0.08) 0%, transparent 62%),
+    radial-gradient(110% 80% at 100% -18%, rgba(185, 147, 114, 0.07) 0%, transparent 64%),
+    linear-gradient(180deg, #eef3ed 0%, #f7faf6 100%);
+}
+
+.dashboard-ov-theme .dashboard-main-bg {
+  background:
+    radial-gradient(95% 65% at 100% -12%, rgba(18, 167, 109, 0.07) 0%, transparent 58%),
+    radial-gradient(120% 75% at -10% 0%, rgba(134, 182, 75, 0.07) 0%, transparent 60%),
+    linear-gradient(180deg, #f3f7f2 0%, #f8fbf7 100%);
+}

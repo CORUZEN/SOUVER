@@ -174,17 +174,33 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
     const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : '(Em breve)'
+    const iconClass = cn(
+      'w-4 h-4 shrink-0 transition-all duration-300',
+      isActive
+        ? 'text-[#edf0e2] drop-shadow-[0_1px_6px_rgba(18,167,109,0.35)]'
+        : 'text-[#aac0a2] group-hover:text-[#dce6d2] group-hover:drop-shadow-[0_1px_4px_rgba(134,182,75,0.28)]'
+    )
+    const labelClass = cn(
+      'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
+      isActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
+    )
+    const badgeClass = cn(
+      'shrink-0 text-[11px] font-medium transition-colors',
+      isActive
+        ? 'text-[#e9efe0]/85'
+        : 'text-[#7ea07d] group-hover:text-[#9db49a]'
+    )
 
     const baseClass = cn(
-      'w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left',
+      'group w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left ring-1 ring-transparent',
       isCollapsed
         ? 'justify-center px-0 py-2.5'
         : isSubmenu
           ? 'gap-3 pl-8 pr-3 py-2.5'
           : 'gap-3 px-3 py-2.5',
       isActive
-        ? 'bg-emerald-500 text-white shadow-[0_6px_18px_rgba(16,185,129,0.35)]'
-        : 'text-surface-400 hover:bg-emerald-500/12 hover:text-emerald-100'
+        ? 'ring-[#21b67c]/40 bg-linear-to-r from-[#12a76d] to-[#139861] text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.18),0_10px_24px_rgba(18,167,109,0.33)]'
+        : 'text-[#b5c1a9] hover:ring-[#b99372]/22 hover:bg-linear-to-r hover:from-[#12a76d]/16 hover:to-[#86b64b]/8 hover:text-[#edf0e2] hover:shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_7px_16px_rgba(8,15,10,0.2)]'
     )
 
     if (isAccessible) {
@@ -202,12 +218,12 @@ export default function Sidebar({ appVersion }: SidebarProps) {
             }
           }}
         >
-          <Icon className="w-4 h-4 shrink-0" />
+          <Icon className={iconClass} />
           {!isCollapsed && (
             <>
-              <span className="flex-1 min-w-0 truncate text-sm font-medium">{modulePlan.label}</span>
+              <span className={labelClass}>{modulePlan.label}</span>
               {badgeLabel && (
-                <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
+                <span className={badgeClass}>
                   {badgeLabel}
                 </span>
               )}
@@ -231,11 +247,11 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         className={baseClass}
         title={modulePlan.label}
       >
-        <Icon className="w-4 h-4 shrink-0" />
+        <Icon className={iconClass} />
         {!isCollapsed && (
           <>
-            <span className="flex-1 min-w-0 truncate text-sm font-medium">{modulePlan.label}</span>
-            <span className={cn('shrink-0 text-[11px] font-medium', isActive ? 'text-white/85' : 'text-surface-500')}>
+            <span className={labelClass}>{modulePlan.label}</span>
+            <span className={badgeClass}>
               {badgeLabel}
             </span>
             {expandable && (
@@ -254,7 +270,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                     onToggleExpand?.()
                   }
                 }}
-                className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-surface-700"
+                className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-md text-[#9fb398] transition-colors hover:bg-[#edf0e2]/10 hover:text-[#edf0e2]"
                 aria-label={expanded ? 'Recolher submenu' : 'Expandir submenu'}
               >
                 {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -273,168 +289,184 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           if (isCollapsed) setIsCollapsed(false)
         }}
         className={cn(
-          'shrink-0 bg-surface-900 flex flex-col h-full border-r border-surface-700/40 transition-[width] duration-300 ease-out',
+          'relative shrink-0 flex flex-col h-full overflow-hidden border-r border-[#3e6d52]/46 bg-linear-to-b from-[#0f2117] via-[#163325] to-[#1f4733] shadow-[inset_0_1px_0_rgba(237,240,226,0.07),inset_-1px_0_0_rgba(185,147,114,0.13),0_16px_34px_rgba(8,15,10,0.34)] transition-[width] duration-300 ease-out',
           isCollapsed && 'cursor-pointer',
           isCollapsed ? 'w-20' : 'w-64'
         )}
       >
-        <div
-          className={cn(
-            'relative flex items-center border-b border-surface-700/50',
-            isCollapsed ? 'h-18 justify-center px-2.5' : 'h-16 px-4'
-          )}
-        >
-          <div className={cn('w-full', isCollapsed ? 'flex justify-center' : 'flex items-center gap-3 pr-8')}>
-            <div className={cn('flex shrink-0', isCollapsed ? 'justify-center' : 'justify-start')}>
-              <div
-                className={cn(
-                  'relative shrink-0 overflow-hidden',
-                  isCollapsed ? 'h-14 w-14 rounded-lg' : 'h-21 w-21 rounded-xl'
-                )}
-              >
-                <Image
-                  src="/branding/ouroverde.png"
-                  alt="Logo Ouro Verde"
-                  fill
-                  priority
-                  sizes={isCollapsed ? '56px' : '84px'}
-                  className="object-contain"
-                />
+        <div className="pointer-events-none absolute inset-0 opacity-70">
+          <div className="absolute -left-20 top-0 h-60 w-72 bg-[#86b64b]/14 blur-3xl" />
+          <div className="absolute -right-20 top-24 h-72 w-80 bg-[#12a76d]/12 blur-3xl" />
+          <div className="absolute inset-y-0 right-0 w-px bg-linear-to-b from-transparent via-[#b99372]/28 to-transparent" />
+        </div>
+
+        <div className="relative z-10 flex h-full flex-col">
+          <div
+            className={cn(
+              'relative flex items-center border-b border-[#b99372]/24 shadow-[0_1px_0_rgba(237,240,226,0.05)]',
+              isCollapsed ? 'h-18 justify-center px-2.5' : 'h-16 px-4'
+            )}
+          >
+            <div className={cn('w-full', isCollapsed ? 'flex justify-center' : 'flex items-center gap-3 pr-8')}>
+              <div className={cn('flex shrink-0', isCollapsed ? 'justify-center' : 'justify-start')}>
+                <div
+                  className={cn(
+                    'relative shrink-0 overflow-hidden',
+                    isCollapsed ? 'h-14 w-14 rounded-lg' : 'h-21 w-21 rounded-xl'
+                  )}
+                >
+                  <Image
+                    src="/branding/ouroverde.png"
+                    alt="Logo Ouro Verde"
+                    fill
+                    priority
+                    sizes={isCollapsed ? '56px' : '84px'}
+                    className="object-contain"
+                  />
+                </div>
               </div>
+
+              {!isCollapsed && (
+                <>
+                  <div
+                    aria-hidden="true"
+                    className="h-8 w-px shrink-0 bg-linear-to-b from-[#b99372]/18 via-[#edf0e2]/55 to-[#b99372]/18"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[#d3dcc8] text-[11.5px] font-semibold tracking-widest uppercase leading-tight break-keep">
+                      Sistema Empresarial
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {!isCollapsed && (
-              <>
-                <div
-                  aria-hidden="true"
-                  className="h-8 w-px shrink-0 bg-linear-to-b from-surface-500/20 via-surface-200/70 to-surface-500/20"
-                />
-                <div className="min-w-0">
-                  <p className="text-surface-300 text-[11.5px] font-semibold tracking-widest uppercase leading-tight break-keep">
-                    Sistema Empresarial
-                  </p>
-                </div>
-              </>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggleSidebar()
+                }}
+                className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#aab89d] transition-colors hover:bg-[#edf0e2]/9 hover:text-[#edf0e2]"
+                aria-label="Recolher menu lateral"
+                title="Recolher menu lateral"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
             )}
           </div>
 
-          {!isCollapsed && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation()
-                toggleSidebar()
-              }}
-              className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-surface-400 transition-colors hover:bg-surface-800 hover:text-white"
-              aria-label="Recolher menu lateral"
-              title="Recolher menu lateral"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+          <nav className={cn('flex-1 overflow-y-auto py-4', isCollapsed ? 'px-2' : 'px-3', 'space-y-4')}>
+            {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => {
+              // Hide entire section if no items are visible
+              const hasVisibleItem = modulePermissionsLoaded && itemKeys.some((key) => {
+                const mk = key as ModuleKey
+                if (mk === 'integracoes' && !canAccessIntegrations) return false
+                return modulePermissions[mk] !== false
+              })
+              if (!hasVisibleItem) return null
 
-        <nav className={cn('flex-1 overflow-y-auto py-4', isCollapsed ? 'px-2' : 'px-3', 'space-y-4')}>
-          {MODULE_MENU_SECTIONS.map(({ label, itemKeys }) => {
-            // Hide entire section if no items are visible
-            const hasVisibleItem = modulePermissionsLoaded && itemKeys.some((key) => {
-              const mk = key as ModuleKey
-              if (mk === 'integracoes' && !canAccessIntegrations) return false
-              return modulePermissions[mk] !== false
-            })
-            if (!hasVisibleItem) return null
+              return (
+              <div key={label}>
+                {!isCollapsed ? (
+                  <p className="text-[10px] font-semibold text-[#8fa084] uppercase tracking-wider px-3 mb-1">{label}</p>
+                ) : (
+                  <div className="mx-2 mb-2 h-px bg-[#2c5840]" />
+                )}
 
-            return (
-            <div key={label}>
-              {!isCollapsed ? (
-                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider px-3 mb-1">{label}</p>
-              ) : (
-                <div className="mx-2 mb-2 h-px bg-surface-800" />
-              )}
+                <div className="space-y-0.5">
+                  {itemKeys.map((itemKey) => {
+                    const moduleKey = itemKey as ModuleKey
+                    if (moduleKey === 'integracoes' && !canAccessIntegrations) return null
 
-              <div className="space-y-0.5">
-                {itemKeys.map((itemKey) => {
-                  const moduleKey = itemKey as ModuleKey
-                  if (moduleKey === 'integracoes' && !canAccessIntegrations) return null
+                    // Hide modules until permissions are loaded, then hide disabled ones
+                    if (!modulePermissionsLoaded) return null
+                    if (modulePermissions[moduleKey] === false) return null
 
-                  // Hide modules until permissions are loaded, then hide disabled ones
-                  if (!modulePermissionsLoaded) return null
-                  if (modulePermissions[moduleKey] === false) return null
+                    if (moduleKey === 'rh') {
+                      return (
+                        <div key={moduleKey} className="space-y-0.5">
+                          {renderMenuItem('rh', {
+                            expandable: true,
+                            expanded: isRhExpanded,
+                            onToggleExpand: () => setIsRhExpanded((prev) => !prev),
+                          })}
+                          {!isCollapsed && isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
+                        </div>
+                      )
+                    }
 
-                  if (moduleKey === 'rh') {
-                    return (
-                      <div key={moduleKey} className="space-y-0.5">
-                        {renderMenuItem('rh', {
-                          expandable: true,
-                          expanded: isRhExpanded,
-                          onToggleExpand: () => setIsRhExpanded((prev) => !prev),
-                        })}
-                        {!isCollapsed && isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
-                      </div>
-                    )
-                  }
+                    if (moduleKey === 'relatorios') {
+                      return (
+                        <div key={moduleKey} className="space-y-0.5">
+                          {renderMenuItem('relatorios', {
+                            expandable: true,
+                            expanded: isReportsExpanded,
+                            onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
+                          })}
+                          {!isCollapsed && isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
+                        </div>
+                      )
+                    }
 
-                  if (moduleKey === 'relatorios') {
-                    return (
-                      <div key={moduleKey} className="space-y-0.5">
-                        {renderMenuItem('relatorios', {
-                          expandable: true,
-                          expanded: isReportsExpanded,
-                          onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
-                        })}
-                        {!isCollapsed && isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
-                      </div>
-                    )
-                  }
+                    if (moduleKey === 'logistica') {
+                      const isFaturamentoActive = pathname === '/logistica/faturamento-diario'
+                      return (
+                        <div key={moduleKey} className="space-y-0.5">
+                          {renderMenuItem('logistica', {
+                            expandable: true,
+                            expanded: isLogisticaExpanded,
+                            onToggleExpand: () => setIsLogisticaExpanded((prev) => !prev),
+                          })}
+                          {!isCollapsed && isLogisticaExpanded && (
+                            <Link
+                              href="/logistica/faturamento-diario"
+                              className={cn(
+                                'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-pointer text-left',
+                                isFaturamentoActive
+                                  ? 'ring-[#21b67c]/40 bg-linear-to-r from-[#12a76d] to-[#139861] text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.18),0_10px_24px_rgba(18,167,109,0.33)]'
+                                  : 'text-[#b5c1a9] hover:ring-[#b99372]/22 hover:bg-linear-to-r hover:from-[#12a76d]/16 hover:to-[#86b64b]/8 hover:text-[#edf0e2] hover:shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_7px_16px_rgba(8,15,10,0.2)]'
+                              )}
+                            >
+                              <ClipboardList className={cn(
+                                'w-4 h-4 shrink-0 transition-all duration-300',
+                                isFaturamentoActive
+                                  ? 'text-[#edf0e2] drop-shadow-[0_1px_6px_rgba(18,167,109,0.35)]'
+                                  : 'text-[#aac0a2] group-hover:text-[#dce6d2] group-hover:drop-shadow-[0_1px_4px_rgba(134,182,75,0.28)]'
+                              )} />
+                              <span className={cn(
+                                'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
+                                isFaturamentoActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
+                              )}>Planejamento de Faturamento</span>
+                            </Link>
+                          )}
+                        </div>
+                      )
+                    }
 
-                  if (moduleKey === 'logistica') {
-                    const isFaturamentoActive = pathname === '/logistica/faturamento-diario'
-                    return (
-                      <div key={moduleKey} className="space-y-0.5">
-                        {renderMenuItem('logistica', {
-                          expandable: true,
-                          expanded: isLogisticaExpanded,
-                          onToggleExpand: () => setIsLogisticaExpanded((prev) => !prev),
-                        })}
-                        {!isCollapsed && isLogisticaExpanded && (
-                          <Link
-                            href="/logistica/faturamento-diario"
-                            className={cn(
-                              'w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer text-left',
-                              isFaturamentoActive
-                                ? 'bg-emerald-500 text-white shadow-[0_6px_18px_rgba(16,185,129,0.35)]'
-                                : 'text-surface-400 hover:bg-emerald-500/12 hover:text-emerald-100'
-                            )}
-                          >
-                            <ClipboardList className="w-4 h-4 shrink-0" />
-                            <span className="flex-1 min-w-0 truncate text-sm font-medium">Planejamento de Faturamento</span>
-                          </Link>
-                        )}
-                      </div>
-                    )
-                  }
-
-                  return renderMenuItem(moduleKey)
-                })}
+                    return renderMenuItem(moduleKey)
+                  })}
+                </div>
               </div>
-            </div>
-            )
-          })}
-        </nav>
+              )
+            })}
+          </nav>
 
-        <div className={cn('border-t border-surface-700/50', isCollapsed ? 'p-2' : 'p-3')}>
-          {isCollapsed ? (
-            <div className="flex h-8 items-center justify-center rounded-lg text-surface-500">
-              <PanelLeftClose className="h-4 w-4" />
-            </div>
-          ) : (
-            <>
-              <p className="text-surface-500 text-[11px] text-center font-semibold tracking-wide uppercase">
-                SISTEMA OURO VERDE {'\u00A9'} 2026
-              </p>
-              <p className="text-surface-600 text-[11px] text-center mt-1">Vers{'\u00E3'}o v{appVersion}</p>
-            </>
-          )}
+          <div className={cn('border-t border-[#b99372]/20 shadow-[inset_0_1px_0_rgba(237,240,226,0.04)]', isCollapsed ? 'p-2' : 'p-3')}>
+            {isCollapsed ? (
+              <div className="flex h-8 items-center justify-center rounded-lg text-[#8fa084]">
+                <PanelLeftClose className="h-4 w-4" />
+              </div>
+            ) : (
+              <>
+                <p className="text-[#9eb09a] text-[11px] text-center font-semibold tracking-wide uppercase">
+                  SISTEMA OURO VERDE {'\u00A9'} 2026
+                </p>
+                <p className="text-[#7f8f7b] text-[11px] text-center mt-1">Vers{'\u00E3'}o v{appVersion}</p>
+              </>
+            )}
+          </div>
         </div>
       </aside>
 

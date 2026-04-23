@@ -6026,10 +6026,10 @@ export default function MetasWorkspace() {
   )
 
   const executiveMetricCardClass =
-    'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+    'group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]'
 
   const executivePanelCardClass =
-    'group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+    'group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]'
 
   const lineChartData = useMemo(() => {
     const W = 500
@@ -6108,13 +6108,13 @@ export default function MetasWorkspace() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
-      <Card className="relative border-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl">
-        <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-primary-500 via-cyan-400 to-emerald-400" />
+      <Card className="relative border border-[#2f5a42]/35 bg-linear-to-br from-[#173325] via-[#1d3d2c] to-[#244a36] shadow-[0_16px_30px_rgba(8,15,10,0.22)]">
+        <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-[#86b64b] via-[#12a76d] to-[#2dc7b6]" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Gestão Comercial · Metas</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#b9c7ae]">Gestão Comercial · Metas</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[#edf0e2]">
               {view === 'config'
                 ? 'Configurações do Painel de Metas'
                 : view === 'sellers'
@@ -6127,16 +6127,16 @@ export default function MetasWorkspace() {
               <button
                 type="button"
                 onClick={() => setShowCompanyModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-white/20 hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#b99372]/20 bg-[#edf0e2]/7 px-2.5 py-1 text-xs font-medium text-[#d2dac8] transition-colors hover:bg-[#edf0e2]/14 hover:text-[#edf0e2]"
               >
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                 {companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'}
               </button>
               {!standby && !sellersLoading && (
-                <span className="text-xs text-slate-500">{MONTHS[month]} {year}</span>
+                <span className="text-xs text-[#aab89d]">{MONTHS[month]} {year}</span>
               )}
               {sellersLoading && (
-                <span className="text-xs text-slate-500 animate-pulse">Carregando dados…</span>
+                <span className="text-xs text-[#aab89d] animate-pulse">Carregando dados…</span>
               )}
             </div>
           </div>
@@ -8868,8 +8868,8 @@ export default function MetasWorkspace() {
         <>
           {/* ── Period selector ────────────────────────────────────── */}
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="group relative overflow-hidden border border-surface-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary-500 to-cyan-400" />
+            <Card className="group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]">
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#86b64b] to-[#12a76d]" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta de faturamento</p>
               {corporateTotalTarget > 0 ? (() => {
                 const pct = Math.min(corporateTotalRevenue / corporateTotalTarget * 100, 100)
@@ -8905,12 +8905,12 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 to-emerald-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#12a76d] to-[#2dc7b6]" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">CUSTO DE PREMIAÇÕES</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{currency(rewardDonut.totalEarned)}</p>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
                 <div
-                  className="h-full rounded-full bg-linear-to-r from-cyan-500 to-emerald-500 transition-[width] duration-700"
+                  className="h-full rounded-full bg-linear-to-r from-[#12a76d] to-[#2dc7b6] transition-[width] duration-700"
                   style={{ width: `${Math.min(rewardDonut.pctCommitted, 100)}%` }}
                 />
               </div>
@@ -8920,7 +8920,7 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-primary-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#12a76d] to-[#86b64b]" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Pedidos no mês</p>
               <p className="mt-2 text-3xl font-semibold text-surface-900">{num(corporateTotalOrders, 0)}</p>
               <p className="mt-2 text-xs text-surface-500">Consolidado dos vendedores monitorados</p>
@@ -8929,7 +8929,7 @@ export default function MetasWorkspace() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-cyan-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#2dc7b6] to-[#12a76d]" />
               <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta de peso consolidada</p>
@@ -8964,7 +8964,7 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className={executiveMetricCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#12a76d] to-[#86b64b]" />
               <div className="grid grid-cols-2 gap-4 divide-x divide-surface-100">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Meta consolidada</p>
@@ -9013,7 +9013,7 @@ export default function MetasWorkspace() {
 
           <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
           <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-500 via-indigo-500 to-violet-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#86b64b] via-[#12a76d] to-[#2dc7b6]" />
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">
                   Tendência de evolução
@@ -9039,15 +9039,15 @@ export default function MetasWorkspace() {
                 <svg viewBox={`0 0 ${lineChartData.W} ${lineChartData.H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
                   <defs>
                     <linearGradient id="trend-area-grad" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                      <stop offset="0%" stopColor="#12a76d" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#12a76d" stopOpacity="0" />
                     </linearGradient>
                     <linearGradient id="trend-line-grad" x1="0" x2="1" y1="0" y2="0">
-                      <stop offset="0%" stopColor="#6366f1" />
-                      <stop offset="100%" stopColor="#06b6d4" />
+                      <stop offset="0%" stopColor="#86b64b" />
+                      <stop offset="100%" stopColor="#12a76d" />
                     </linearGradient>
                     <filter id="trend-dot-glow">
-                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#3b82f6" floodOpacity="0.5" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#12a76d" floodOpacity="0.45" />
                     </filter>
                   </defs>
 
@@ -9132,7 +9132,7 @@ export default function MetasWorkspace() {
             </Card>
 
             <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-teal-400 via-cyan-500 to-sky-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#2dc7b6] via-[#12a76d] to-[#86b64b]" />
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Aderência por Etapa Semanal</p>
@@ -9212,7 +9212,7 @@ export default function MetasWorkspace() {
           </div>
 
             <Card className={executivePanelCardClass}>
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-400 via-teal-500 to-cyan-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#12a76d] via-[#2dc7b6] to-[#86b64b]" />
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -10351,7 +10351,7 @@ export default function MetasWorkspace() {
             </Card>
 
           <Card className={executivePanelCardClass}>
-            <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#2dc7b6] via-[#12a76d] to-[#86b64b]" />
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">

@@ -12,15 +12,15 @@ export default function DashboardLayout({
 }) {
   return (
     <ToastProvider>
-      <div className="flex h-screen overflow-hidden bg-gradient-to-br from-surface-100 via-slate-100 to-cyan-50/60">
-        <Suspense fallback={<div className="w-64 shrink-0 bg-surface-900" />}>
+      <div className="dashboard-ov-theme flex h-screen overflow-hidden">
+        <Suspense fallback={<div className="w-64 shrink-0 bg-linear-to-b from-[#0f2117] via-[#163325] to-[#1f4733]" />}>
           <Sidebar appVersion={APP_VERSION} />
         </Suspense>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Suspense fallback={<div className="h-20 shrink-0 border-b border-surface-300/60 bg-surface-950" />}>
+          <Suspense fallback={<div className="h-20 shrink-0 border-b border-[#3e6d52]/52 bg-linear-to-r from-[#102218] via-[#153224] to-[#1f4935]" />}>
             <Header />
           </Suspense>
-          <main className="flex-1 overflow-y-auto bg-transparent">
+          <main className="dashboard-main-bg flex-1 overflow-y-auto">
             <div className="px-6 pt-4 pb-1">
               <Breadcrumb />
             </div>
