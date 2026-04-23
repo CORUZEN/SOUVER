@@ -927,7 +927,7 @@ export default function SupervisorPwaDashboard() {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR') { router.replace('/app'); return }
-        // Keep continuity between "Validando acesso" and "Carregando metas".
+        // Keep continuity between "Validando acesso" and "Carregando sistema".
         setBootProgress(15)
         setUser({
           name: data.user.name,
@@ -1344,7 +1344,7 @@ export default function SupervisorPwaDashboard() {
   }
 
   if (!hasLoadedInitialData && (loadState === 'idle' || loadState === 'loading')) {
-    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
+    return <PwaLoadingScreen label="Carregando sistema" progress={bootProgress} />
   }
 
   return (

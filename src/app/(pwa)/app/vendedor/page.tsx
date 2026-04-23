@@ -114,7 +114,7 @@ export default function VendedorPwaDashboard() {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'SELLER') { router.replace('/app'); return }
-        // Keep continuity between "Validando acesso" and "Carregando metas".
+        // Keep continuity between "Validando acesso" and "Carregando sistema".
         setBootProgress(15)
         setUser({ name: data.user.name, roleCode, sellerCode: data.user.sellerCode })
       })
@@ -248,7 +248,7 @@ export default function VendedorPwaDashboard() {
   }
 
   if (!hasLoadedInitialData && (loadState === 'idle' || loadState === 'loading')) {
-    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
+    return <PwaLoadingScreen label="Carregando sistema" progress={bootProgress} />
   }
 
   return (

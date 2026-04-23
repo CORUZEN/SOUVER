@@ -30,7 +30,7 @@ function getCommitCount() {
 }
 
 const commitCount = getCommitCount()
-const appVersion = `1.00.${commitCount}`
+const appVersion = `1.01.${commitCount}`
 const generatedAt = new Date().toISOString()
 
 // ── Write app-version.ts ─────────────────────────────────────────────────────
