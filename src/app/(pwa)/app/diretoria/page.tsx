@@ -11,17 +11,16 @@ import {
   CloudOff,
   LayoutDashboard,
   Target,
-  Package,
+  Factory,
   Truck,
   ShieldCheck,
   Users,
   BarChart3,
-  Wallet,
+  Landmark,
   MessageSquare,
   Settings,
   Plug,
   ChevronRight,
-  Clock,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -36,12 +35,14 @@ interface UserInfo {
 interface ModuleBlock {
   id: string
   title: string
-  description: string
   icon: React.ElementType
   href?: string
   soon?: boolean
-  color: string
-  bg: string
+  iconColor: string
+  activeGradient: string
+  inactiveGradient: string
+  activeBorder: string
+  inactiveBorder: string
 }
 
 /* ─────────────────────────────────────────────
@@ -58,101 +59,123 @@ const MODULES: ModuleBlock[] = [
   {
     id: 'executive',
     title: 'Painel Executivo',
-    description: 'Visão estratégica consolidada',
     icon: LayoutDashboard,
     soon: true,
-    color: 'text-sky-400',
-    bg: 'bg-sky-500/10 border-sky-500/20',
+    iconColor: 'text-sky-300/70',
+    activeGradient: 'from-sky-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-sky-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'metas',
     title: 'Metas',
-    description: 'Gestão comercial e performance',
     icon: Target,
     href: '/app/supervisor',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
+    iconColor: 'text-emerald-300',
+    activeGradient: 'from-emerald-900/30 via-emerald-950/20 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-emerald-400/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'producao',
     title: 'Produção',
-    description: 'Acompanhamento industrial',
-    icon: Package,
+    icon: Factory,
     soon: true,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10 border-amber-500/20',
+    iconColor: 'text-amber-300/70',
+    activeGradient: 'from-amber-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-amber-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'logistica',
     title: 'Logística',
-    description: 'Estoque e movimentação',
     icon: Truck,
     soon: true,
-    color: 'text-orange-400',
-    bg: 'bg-orange-500/10 border-orange-500/20',
+    iconColor: 'text-orange-300/70',
+    activeGradient: 'from-orange-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-orange-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'qualidade',
     title: 'Qualidade',
-    description: 'Controle e conformidade',
     icon: ShieldCheck,
     soon: true,
-    color: 'text-teal-400',
-    bg: 'bg-teal-500/10 border-teal-500/20',
+    iconColor: 'text-teal-300/70',
+    activeGradient: 'from-teal-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-teal-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'rh',
     title: 'RH',
-    description: 'Gestão de pessoas',
     icon: Users,
     soon: true,
-    color: 'text-indigo-400',
-    bg: 'bg-indigo-500/10 border-indigo-500/20',
+    iconColor: 'text-indigo-300/70',
+    activeGradient: 'from-indigo-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-indigo-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'relatorios',
     title: 'Relatórios',
-    description: 'Análises e indicadores',
     icon: BarChart3,
     soon: true,
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10 border-violet-500/20',
+    iconColor: 'text-violet-300/70',
+    activeGradient: 'from-violet-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-violet-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'contabilidade',
     title: 'Contabilidade',
-    description: 'Gestão administrativa',
-    icon: Wallet,
+    icon: Landmark,
     soon: true,
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10 border-cyan-500/20',
+    iconColor: 'text-cyan-300/70',
+    activeGradient: 'from-cyan-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-cyan-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'comunicacao',
     title: 'Comunicação',
-    description: 'Mensagens e avisos',
     icon: MessageSquare,
     soon: true,
-    color: 'text-pink-400',
-    bg: 'bg-pink-500/10 border-pink-500/20',
+    iconColor: 'text-pink-300/70',
+    activeGradient: 'from-pink-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-pink-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'configuracoes',
     title: 'Configurações',
-    description: 'Preferências do sistema',
     icon: Settings,
     soon: true,
-    color: 'text-surface-300',
-    bg: 'bg-surface-500/10 border-surface-500/20',
+    iconColor: 'text-surface-300/70',
+    activeGradient: 'from-surface-800/30 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-surface-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
   {
     id: 'integracoes',
     title: 'Integrações',
-    description: 'Sankhya e APIs externas',
     icon: Plug,
     soon: true,
-    color: 'text-lime-400',
-    bg: 'bg-lime-500/10 border-lime-500/20',
+    iconColor: 'text-lime-300/70',
+    activeGradient: 'from-lime-900/20 via-emerald-950/10 to-surface-950',
+    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
+    activeBorder: 'border-lime-500/20',
+    inactiveBorder: 'border-white/[0.04]',
   },
 ]
 
@@ -309,46 +332,45 @@ export default function DiretoriaPwaDashboard() {
           {MODULES.map((mod) => {
             const Icon = mod.icon
             const isClickable = !!mod.href && !mod.soon
+            const gradient = mod.soon ? mod.inactiveGradient : mod.activeGradient
+            const border = mod.soon ? mod.inactiveBorder : mod.activeBorder
+
             const Wrapper = isClickable ? 'button' : 'div'
             const wrapperProps = isClickable
               ? {
                   onClick: () => router.push(mod.href!),
-                  className: `group relative flex flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all active:scale-95 hover:brightness-110 ${mod.bg}`,
+                  className: `group relative flex items-center gap-2.5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} py-4 px-3.5 text-left shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30 active:scale-[0.98]`,
                 }
               : {
-                  className: `group relative flex flex-col items-start gap-3 rounded-2xl border p-4 opacity-70 ${mod.bg}`,
+                  className: `group relative flex items-center gap-2.5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} py-4 px-3.5 shadow-md shadow-black/15 opacity-55`,
                 }
 
             return (
               <Wrapper key={mod.id} {...(wrapperProps as any)}>
-                <div className="flex w-full items-start justify-between">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-surface-950/50 ${mod.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  {mod.soon ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-surface-800/80 px-2 py-0.5 text-[10px] font-medium text-surface-400">
-                      <Clock className="h-3 w-3" />
-                      Em breve
-                    </span>
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-surface-500 group-hover:text-white transition-colors" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{mod.title}</p>
-                  <p className="text-[11px] text-surface-400 leading-snug mt-0.5 line-clamp-2">{mod.description}</p>
-                </div>
+                {/* Icon — clean, no box */}
+                <Icon className={`h-5 w-5 shrink-0 ${mod.iconColor}`} strokeWidth={1.7} />
+
+                {/* Title */}
+                <span className="flex-1 text-[13px] font-bold text-white leading-tight">
+                  {mod.title}
+                </span>
+
+                {/* Active arrow */}
+                {isClickable && (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-emerald-400/60 transition-transform group-hover:translate-x-0.5" />
+                )}
               </Wrapper>
             )
           })}
         </div>
 
-        {/* Footer hint */}
-        <div className="mt-6 text-center">
-          <p className="text-[11px] text-surface-600">
-            SOUVER — Sistema Ouro Verde
+        {/* Footer */}
+        <div className="mt-8 flex flex-col items-center gap-1">
+          <div className="h-px w-12 bg-emerald-500/15" />
+          <p className="mt-3 text-[11px] font-semibold tracking-wide text-surface-400 uppercase">
+            Sistema Ouro Verde © 2026
           </p>
-          <p className="text-[10px] text-surface-700 mt-0.5">
+          <p className="text-[10px] text-surface-600">
             Versão {APP_VERSION_LABEL}
           </p>
         </div>
