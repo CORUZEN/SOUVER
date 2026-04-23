@@ -3015,6 +3015,48 @@ export default function MetasWorkspace() {
   const deferredSankhyaTargets = useDeferredValue(sankhyaTargets)
   const deferredDistributionBySellerProduct = useDeferredValue(distributionBySellerProduct)
   const deferredDistributionItemsBySeller = useDeferredValue(distributionItemsBySeller)
+  const deferredDefaultRuleBlock = useMemo(
+    () => deferredRuleBlocks.find((block) => block.sellerIds.length === 0) ?? deferredRuleBlocks[0],
+    [deferredRuleBlocks]
+  )
+  const deferredRuleBlockBySellerKey = useMemo(() => {
+    const map = new Map<string, RuleBlock>()
+    for (const block of deferredRuleBlocks) {
+      for (const rawId of block.sellerIds) {
+        const normalizedId = String(rawId ?? '').trim()
+        if (!normalizedId) continue
+        const normalizedCode = toSellerCodeFromId(normalizedId)
+        const candidateKeys = [normalizedId, normalizedCode, normalizedCode ? `sankhya-${normalizedCode}` : '']
+        for (const key of candidateKeys) {
+          if (!key || map.has(key)) continue
+          map.set(key, block)
+        }
+      }
+    }
+    return map
+  }, [deferredRuleBlocks])
+  const deferredSankhyaTargetBySellerCode = useMemo(() => {
+    const map = new Map<string, (typeof deferredSankhyaTargets)[number]>()
+    for (const target of deferredSankhyaTargets) {
+      const code = normalizeEntityCode(String(target.sellerCode ?? '').trim())
+      if (!code) continue
+      map.set(code, target)
+    }
+    return map
+  }, [deferredSankhyaTargets])
+  const deferredFocusRowsByCodeAndSeller = useMemo(() => {
+    const byCode = new Map<string, Map<string, { sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>>()
+    for (const [code, rows] of Object.entries(deferredFocusProductRows)) {
+      const sellerMap = new Map<string, { sellerCode: string; sellerName: string; soldKg: number; returnKg: number; soldClients: number }>()
+      for (const row of rows ?? []) {
+        const sellerCode = normalizeEntityCode(String(row.sellerCode ?? '').trim())
+        if (!sellerCode) continue
+        sellerMap.set(sellerCode, row)
+      }
+      byCode.set(code, sellerMap)
+    }
+    return byCode
+  }, [deferredFocusProductRows])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -3316,18 +3358,23 @@ export default function MetasWorkspace() {
 
   const snapshots = useMemo<SellerSnapshot[]>(() => {
     const sellers = deferredSellers
-    const ruleBlocks = deferredRuleBlocks
     const productAllowlist = deferredProductAllowlist
     const brandWeightRows = deferredBrandWeightRows
-    const focusProductRows = deferredFocusProductRows
-    const sankhyaTargets = deferredSankhyaTargets
     const distributionBySellerProduct = deferredDistributionBySellerProduct
     const distributionItemsBySeller = deferredDistributionItemsBySeller
+    const defaultRuleBlock = deferredDefaultRuleBlock
+    const ruleBlockBySellerKey = deferredRuleBlockBySellerKey
+    const sankhyaTargetBySellerCode = deferredSankhyaTargetBySellerCode
+    const focusRowsByCodeAndSeller = deferredFocusRowsByCodeAndSeller
 
     const todayIso = toIsoDate(new Date())
     const stageStarted = new Set<StageKey>(
       cycle.weeks.filter((w) => w.start && w.start <= todayIso).map((w) => w.key)
     )
+    const stageEndDateMap: Partial<Record<StageKey, string>> = {}
+    for (const w of cycle.weeks) {
+      if (w.end) stageEndDateMap[w.key] = w.end
+    }
 
     const teamAverageValue =
       sellers.length > 0 ? sellers.reduce((sum, seller) => sum + seller.totalValue, 0) / sellers.length : 0
@@ -3344,7 +3391,13 @@ export default function MetasWorkspace() {
 
     return sellers
       .map((seller) => {
-        const block = findBlockForSeller(seller.id, ruleBlocks)
+        const sellerCode = toSellerCodeFromId(seller.id)
+        const block =
+          ruleBlockBySellerKey.get(seller.id) ??
+          ruleBlockBySellerKey.get(sellerCode) ??
+          ruleBlockBySellerKey.get(`sankhya-${sellerCode}`) ??
+          defaultRuleBlock
+        if (!block) return null
         const blockProfileType = resolveBlockProfileType(block)
         const rewardMode = getRewardModeFromProfile(blockProfileType)
         const percentRewardCap = getPercentRewardCap(blockProfileType)
@@ -3414,11 +3467,6 @@ export default function MetasWorkspace() {
         // stage", regardless of whether the order day falls on a weekday, weekend,
         // or even before the cycle start.  This ensures the 30% / 60% / 80% / 120%
         // thresholds are evaluated against the true cumulative revenue.
-        const stageEndDateMap: Partial<Record<StageKey, string>> = {}
-        for (const w of cycle.weeks) {
-          if (w.end) stageEndDateMap[w.key] = w.end
-        }
-
         const financialByStageEnd: Partial<Record<StageKey, number>> = {}
         const returnsByStageEnd: Partial<Record<StageKey, number>> = {}
         for (const sk of ['W1', 'W2', 'W3', 'CLOSING', 'FULL'] as StageKey[]) {
@@ -3431,10 +3479,9 @@ export default function MetasWorkspace() {
             : 0
         }
 
-        const sellerCode = seller.id.replace(/^sankhya-/, '')
         // Resolve effective weight targets: Sankhya value when available, manual-by-period when Sankhya connected but no period data, legacy targetKg otherwise
         const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`
-        const sankhyaSellerData = sankhyaTargets.find((t) => t.sellerCode === sellerCode)
+        const sankhyaSellerData = sankhyaTargetBySellerCode.get(sellerCode)
         const effectiveWeightTargets = (block.weightTargets ?? []).map((wt) => {
           if (!wt.brand) return wt
           // Prefer Sankhya live data
@@ -3454,8 +3501,7 @@ export default function MetasWorkspace() {
         const achievedWeightGroups = weightTargetRatios.filter((ratio) => ratio >= 1).length
 
         const focusCode = (block.focusProductCode ?? '').trim()
-        const focusRows = focusCode ? (focusProductRows[focusCode] ?? []) : []
-        const focusRow = focusRows.find((row) => row.sellerCode === sellerCode)
+        const focusRow = focusCode ? focusRowsByCodeAndSeller.get(focusCode)?.get(sellerCode) : undefined
         const focusSoldKg = focusRow?.soldKg ?? 0
         const focusSoldClients = Number(focusRow?.soldClients ?? 0)
 
@@ -3486,6 +3532,7 @@ export default function MetasWorkspace() {
         })()
         const monthlyTargetSafe = resolvedMonthlyTarget > 0 ? resolvedMonthlyTarget : teamAverageValueSafe
 
+        const ruleProgressMap = new Map<string, number>()
         const ruleProgress = blockRules.map((rule) => {
           // Skip rules for stages that haven't started yet
           if (!stageStarted.has(rule.stage)) return { ruleId: rule.id, progress: 0 }
@@ -3642,16 +3689,18 @@ export default function MetasWorkspace() {
               }
           }
 
-          return { ruleId: rule.id, progress: Math.max(0, Math.min(progress, 1.4)) }
+          const clamped = Math.max(0, Math.min(progress, 1.4))
+          ruleProgressMap.set(rule.id, clamped)
+          return { ruleId: rule.id, progress: clamped }
         })
 
         const pointsAchieved = blockRules.reduce((sum, rule) => {
-          const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          const progress = ruleProgressMap.get(rule.id) ?? 0
           return sum + rule.points * Math.min(progress, 1)
         }, 0)
 
         const kpiRewardAchieved = blockRules.reduce((sum, rule) => {
-          const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+          const progress = ruleProgressMap.get(rule.id) ?? 0
           return sum + (progress >= 1 ? rule.rewardValue : 0)
         }, 0)
 
@@ -3684,14 +3733,14 @@ export default function MetasWorkspace() {
         const hasSuperTarget = blockRules.some((rule) => {
           if (rule.kpiType !== 'META_FINANCEIRA') return false
           const pct = parseFloat(rule.targetText.replace('%', ''))
-          return pct > 100 && (ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0) >= 1
+          return pct > 100 && (ruleProgressMap.get(rule.id) ?? 0) >= 1
         })
 
         const activeRulesForStatus = blockRules.filter((r) => stageStarted.has(r.stage))
         const allActiveKpisHit =
           activeRulesForStatus.length > 0 &&
           activeRulesForStatus.every((rule) => {
-            const progress = ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+            const progress = ruleProgressMap.get(rule.id) ?? 0
             return progress >= 1
           })
 
@@ -3722,8 +3771,9 @@ export default function MetasWorkspace() {
           blockId: block.id,
         }
       })
+      .filter((snapshot): snapshot is SellerSnapshot => Boolean(snapshot))
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [activeMonth?.sellerIncludedDates, cycle.weeks, deferredBrandWeightRows, deferredDistributionBySellerProduct, deferredDistributionItemsBySeller, deferredFocusProductRows, deferredProductAllowlist, deferredRuleBlocks, deferredSankhyaTargets, deferredSellers, extraBonus, extraMinPoints, prizes, resolveBlockProfileType, sankhyaConnected, year, month])
+  }, [activeMonth?.sellerIncludedDates, cycle.weeks, deferredBrandWeightRows, deferredDefaultRuleBlock, deferredDistributionBySellerProduct, deferredDistributionItemsBySeller, deferredFocusRowsByCodeAndSeller, deferredProductAllowlist, deferredRuleBlockBySellerKey, deferredRuleBlocks, deferredSankhyaTargetBySellerCode, deferredSellers, extraBonus, extraMinPoints, prizes, resolveBlockProfileType, sankhyaConnected, year, month])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -4849,6 +4899,8 @@ export default function MetasWorkspace() {
   }, [kpiConsolidatedTypeRows])
 
   useEffect(() => {
+    if (sellersLoading) return
+
     const controller = new AbortController()
     let cancelled = false
     let idleHandle: number | null = null
@@ -5598,7 +5650,7 @@ export default function MetasWorkspace() {
       }
       controller.abort()
     }
-  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, monthConfigs, productAllowlist, ruleBlocks, year])
+  }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, monthConfigs, productAllowlist, ruleBlocks, sellersLoading, year])
 
   const weightSupervisorOptions = useMemo(() => {
     const map = new Map<string, { key: string; code: string | null; name: string; sellers: number; sellersWithGoals: number }>()
