@@ -127,6 +127,10 @@ export default function VendedorPwaDashboard() {
     setLoadState('loading')
     setError('')
     setBootProgress(0)
+    // Clear visible data immediately when period changes to avoid stale numbers during loading.
+    setSeller(null)
+    setTarget(0)
+    setLastUpdated(null)
     try {
       let completed = 0
       const total = 2
@@ -212,12 +216,8 @@ export default function VendedorPwaDashboard() {
     return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
   }
 
-  if (loadState === 'loading' && !seller) {
-    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
-  }
-
   return (
-    <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [overscroll-behavior-y:contain] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
+    <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
 
       {/* Top bar */}
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
@@ -282,6 +282,15 @@ export default function VendedorPwaDashboard() {
             <p className="text-sm font-medium text-red-300">Falha ao carregar dados</p>
             <p className="mt-1 text-xs text-red-400/80">{error}</p>
             <button type="button" onClick={() => loadData()} className="mt-3 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-300 hover:bg-red-500/30">Tentar novamente</button>
+          </div>
+        )}
+
+        {loadState === 'loading' && !seller && (
+          <div className="flex min-h-[320px] items-center justify-center">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-surface-700/60 bg-surface-900/70 px-4 py-3">
+              <RefreshCw className="h-4 w-4 animate-spin text-emerald-300" />
+              <span className="text-sm font-semibold text-surface-200">Carregando...</span>
+            </div>
           </div>
         )}
 

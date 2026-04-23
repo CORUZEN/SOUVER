@@ -949,6 +949,23 @@ export default function SupervisorPwaDashboard() {
     setLoadState('loading')
     setError('')
     setBootProgress(0)
+    // Clear visible data immediately when period changes to avoid stale numbers during loading.
+    setSellers([])
+    setMonthlyTargets({})
+    setProfileTypes({})
+    setMaxRewards({})
+    setSellerRules({})
+    setBrandWeightRows([])
+    setWeightTargetsBySeller({})
+    setDistributionRows([])
+    setDistributionSellerItemsRows([])
+    setDistributionProductCount(0)
+    setFocusConfigBySeller({})
+    setFocusRowsByProduct({})
+    setPreviousMonthSellers([])
+    setPreviousMonthTotalTarget(0)
+    setExpandedSeller(null)
+    setLastUpdated(null)
     try {
       let completed = 0
       let total = 0
@@ -1297,12 +1314,8 @@ export default function SupervisorPwaDashboard() {
     return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
   }
 
-  if (loadState === 'loading' && sellers.length === 0) {
-    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
-  }
-
   return (
-    <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [overscroll-behavior-y:contain] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
+    <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
@@ -1394,12 +1407,13 @@ export default function SupervisorPwaDashboard() {
           </div>
         )}
 
-        {/* Loading skeleton */}
+        {/* Loading state */}
         {loadState === 'loading' && sellers.length === 0 && (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface-800" />
-            ))}
+          <div className="flex min-h-[320px] items-center justify-center">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-surface-700/60 bg-surface-900/70 px-4 py-3">
+              <RefreshCw className="h-4 w-4 animate-spin text-emerald-300" />
+              <span className="text-sm font-semibold text-surface-200">Carregando...</span>
+            </div>
           </div>
         )}
 
