@@ -104,8 +104,8 @@ export default function PwaLoginPage() {
       </div>
 
       {/* ── Form card ───────────────────────────────────────────── */}
-      <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-4">
-        <div className="flex flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 backdrop-blur-xl">
+      <div className="mx-auto w-full max-w-md px-4 pb-6 pt-2">
+        <div className="flex flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-[0_8px_40px_rgba(0,0,0,0.55),0_2px_8px_rgba(0,0,0,0.35)] backdrop-blur-xl">
 
           {/* Title */}
           <div className="mb-8">
