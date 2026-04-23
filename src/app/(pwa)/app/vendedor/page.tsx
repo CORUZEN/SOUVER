@@ -217,7 +217,7 @@ export default function VendedorPwaDashboard() {
   }
 
   return (
-    <div className="pwa-shell flex min-h-dvh flex-col bg-surface-950 text-white">
+    <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [overscroll-behavior-y:contain] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
 
       {/* Top bar */}
       <header className="pwa-topbar sticky top-0 z-50 border-b border-surface-800 bg-surface-950/95 backdrop-blur-md">
@@ -275,7 +275,7 @@ export default function VendedorPwaDashboard() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto overscroll-y-contain px-4 pb-8 pt-4 space-y-4">
+      <main className="flex-1 px-4 pb-8 pt-4 space-y-4">
 
         {loadState === 'error' && (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
