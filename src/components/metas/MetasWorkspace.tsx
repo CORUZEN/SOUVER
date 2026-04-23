@@ -608,6 +608,10 @@ function toSellerCodeFromId(sellerId: string) {
   return normalizeEntityCode(sellerId.replace(/^sankhya-/, ''))
 }
 
+async function yieldToMainThread() {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+}
+
 function normalizeSellerNameForLookup(value: string) {
   return value
     .trim()
@@ -2167,7 +2171,7 @@ export default function MetasWorkspace() {
         }
         return payload
       })
-      .then((data) => {
+      .then(async (data) => {
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         const remoteSellers = (data?.sellers ?? []) as Array<{
           id: string
@@ -2186,49 +2190,70 @@ export default function MetasWorkspace() {
           openTitles?: Array<{ titleId?: string; dueDate?: string; overdueDays?: number; totalValue?: number }>
         }>
 
-        const mapped = remoteSellers.map((seller) => {
-          const normalizedOrders = (seller.orders ?? [])
-            .filter((order) => typeof order.negotiatedAt === 'string' && order.negotiatedAt.length >= 10)
-            .map((order) => ({
-              orderNumber: String(order.orderNumber ?? ''),
-              negotiatedAt: String(order.negotiatedAt).slice(0, 10),
-              totalValue: Number(order.totalValue ?? 0),
-              grossWeight: Number(order.grossWeight ?? 0),
-              totalVolumes: Number(order.totalVolumes ?? 0),
-              clientCode: String(order.clientCode ?? ''),
-            }))
-          const normalizedReturns = (seller.returns ?? [])
-            .filter((item) => typeof item.negotiatedAt === 'string' && item.negotiatedAt.length >= 10)
-            .map((item) => ({
-              negotiatedAt: String(item.negotiatedAt).slice(0, 10),
-              totalValue: Number(item.totalValue ?? 0),
-            }))
-          const normalizedOpenTitles = (seller.openTitles ?? [])
-            .filter((item) => typeof item.dueDate === 'string' && item.dueDate.length >= 10)
-            .map((item) => ({
-              titleId: String(item.titleId ?? ''),
-              dueDate: String(item.dueDate).slice(0, 10),
-              overdueDays: Number(item.overdueDays ?? 0),
-              totalValue: Number(item.totalValue ?? 0),
-            }))
+        const mapped: Salesperson[] = []
+        const batchSize = 20
+        for (let i = 0; i < remoteSellers.length; i += batchSize) {
+          if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
+          const batch = remoteSellers.slice(i, i + batchSize)
 
-          return {
-            id: seller.id,
-            name: seller.name,
-            login: seller.login,
-            supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
-            supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
-            totalValue: Number(seller.totalValue ?? 0),
-            totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
-            totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
-            totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
-            totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
-            baseClientCount: Number(seller.baseClientCount ?? 0),
-            orders: normalizedOrders,
-            returns: normalizedReturns,
-            openTitles: normalizedOpenTitles,
+          for (const seller of batch) {
+            const normalizedOrders: SellerOrder[] = []
+            for (const order of seller.orders ?? []) {
+              if (typeof order.negotiatedAt !== 'string' || order.negotiatedAt.length < 10) continue
+              normalizedOrders.push({
+                orderNumber: String(order.orderNumber ?? ''),
+                negotiatedAt: String(order.negotiatedAt).slice(0, 10),
+                totalValue: Number(order.totalValue ?? 0),
+                grossWeight: Number(order.grossWeight ?? 0),
+                totalVolumes: Number(order.totalVolumes ?? 0),
+                clientCode: String(order.clientCode ?? ''),
+              })
+            }
+
+            const normalizedReturns: SellerReturnEntry[] = []
+            for (const item of seller.returns ?? []) {
+              if (typeof item.negotiatedAt !== 'string' || item.negotiatedAt.length < 10) continue
+              normalizedReturns.push({
+                negotiatedAt: String(item.negotiatedAt).slice(0, 10),
+                totalValue: Number(item.totalValue ?? 0),
+              })
+            }
+
+            const normalizedOpenTitles: SellerOpenTitleEntry[] = []
+            for (const item of seller.openTitles ?? []) {
+              if (typeof item.dueDate !== 'string' || item.dueDate.length < 10) continue
+              normalizedOpenTitles.push({
+                titleId: String(item.titleId ?? ''),
+                dueDate: String(item.dueDate).slice(0, 10),
+                overdueDays: Number(item.overdueDays ?? 0),
+                totalValue: Number(item.totalValue ?? 0),
+              })
+            }
+
+            mapped.push({
+              id: seller.id,
+              name: seller.name,
+              login: seller.login,
+              supervisorCode: seller.supervisorCode == null ? null : String(seller.supervisorCode),
+              supervisorName: seller.supervisorName == null ? null : String(seller.supervisorName),
+              totalValue: Number(seller.totalValue ?? 0),
+              totalReturnedValue: Number(seller.totalReturnedValue ?? normalizedReturns.reduce((sum, item) => sum + item.totalValue, 0)),
+              totalOpenTitlesValue: Number(seller.totalOpenTitlesValue ?? normalizedOpenTitles.reduce((sum, item) => sum + item.totalValue, 0)),
+              totalGrossWeight: Number(seller.totalGrossWeight ?? 0),
+              totalOrders: Number(seller.totalOrders ?? normalizedOrders.length),
+              baseClientCount: Number(seller.baseClientCount ?? 0),
+              orders: normalizedOrders,
+              returns: normalizedReturns,
+              openTitles: normalizedOpenTitles,
+            })
           }
-        })
+
+          if (i + batchSize < remoteSellers.length) {
+            await yieldToMainThread()
+          }
+        }
+
+        if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
 
         startTransition(() => {
           setSellers(mapped)
