@@ -215,16 +215,20 @@ export default function PwaLoginPage() {
             )}
           </button>
 
-          <div className="flex-1" />
-
-          {/* Footer */}
-          <div className="mt-8 flex flex-col items-center gap-3">
+          {/* Esqueci minha senha — logo abaixo do botão */}
+          <div className="mt-4 flex justify-center">
             <a
               href="/app/esqueci-senha"
               className="text-xs font-medium text-white/40 transition-colors hover:text-white/70"
             >
               Esqueci minha senha
             </a>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Footer */}
+          <div className="flex justify-center">
             <p className="text-[10px] text-white/20">
               Desenvolvido por Jucélio Verissimo
             </p>

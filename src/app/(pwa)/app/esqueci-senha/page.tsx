@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Mail, ArrowLeft, CheckCircle2, Copy, KeyRound } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle2, Copy } from 'lucide-react'
 
 export default function PwaForgotPasswordPage() {
   const [login, setLogin] = useState('')
@@ -36,24 +36,24 @@ export default function PwaForgotPasswordPage() {
     <div className="flex min-h-dvh flex-col">
 
       {/* ── Header — logos ──────────────────────────────────────── */}
-      <div className="flex flex-col items-center px-6 pb-5 pt-10">
-        <div className="flex items-center justify-center gap-6">
-          <div className="relative h-12 w-28">
+      <div className="flex flex-col items-center px-6 pb-6 pt-12">
+        <div className="flex items-center justify-center gap-5">
+          <div className="relative h-14 w-28">
             <Image src="/branding/ouroverde.webp" alt="Ouro Verde" fill priority sizes="112px" className="object-contain" />
           </div>
-          <div className="h-8 w-px bg-white/15" />
-          <div className="relative h-12 w-28">
+          <div className="h-10 w-px bg-white/20" />
+          <div className="relative h-14 w-28">
             <Image src="/branding/graoverde.webp" alt="Grão Verde" fill priority sizes="112px" className="object-contain" />
           </div>
         </div>
-        <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.2em] text-white/30">
+        <p className="mt-4 text-xs font-medium uppercase tracking-[0.18em] text-white/40">
           Sistema Corporativo
         </p>
       </div>
 
       {/* ── Form card ───────────────────────────────────────────── */}
       <div className="mx-4 flex flex-1 flex-col">
-        <div className="flex flex-1 flex-col rounded-2xl border border-white/8 bg-white/5 px-5 py-7 backdrop-blur-sm">
+        <div className="flex flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-[0_0_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
 
           {sent ? (
             /* ── Success state ────────────────────────────────── */
@@ -104,14 +104,11 @@ export default function PwaForgotPasswordPage() {
             /* ── Form state ───────────────────────────────────── */
             <>
               {/* Title */}
-              <div className="mb-7">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                  <KeyRound className="h-4.5 w-4.5 text-white/50" />
-                </div>
-                <h1 className="text-[22px] font-semibold leading-snug tracking-tight text-white">
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold tracking-tight text-white">
                   Recuperar acesso
                 </h1>
-                <p className="mt-1 text-sm text-white/40">
+                <p className="mt-1 text-sm text-white/50">
                   Informe seu login ou e-mail para receber o link de redefinição de senha.
                 </p>
               </div>
@@ -144,7 +141,7 @@ export default function PwaForgotPasswordPage() {
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={!login.trim() || loading}
-                className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[14px] font-semibold tracking-wide text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-emerald-500"
+                className="mt-8 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-emerald-500"
               >
                 {loading ? (
                   <>
@@ -162,21 +159,22 @@ export default function PwaForgotPasswordPage() {
                 )}
               </button>
 
-              <div className="flex-1" />
-
-              {/* Back link */}
-              <div className="mt-8 flex flex-col items-center gap-3">
+              {/* Back link — logo abaixo do botão */}
+              <div className="mt-4 flex flex-col items-center gap-3">
                 <a
                   href="/app/login"
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-white/35 transition-colors hover:text-white/60"
+                  className="flex items-center gap-1.5 text-xs font-medium text-white/40 transition-colors hover:text-white/70"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   Voltar ao login
                 </a>
-                <p className="text-[10px] text-white/18">
-                  Desenvolvido por Jucélio Verissimo
-                </p>
               </div>
+
+              <div className="flex-1" />
+
+              <p className="text-center text-[10px] text-white/20">
+                Desenvolvido por Jucélio Verissimo
+              </p>
             </>
           )}
         </div>
