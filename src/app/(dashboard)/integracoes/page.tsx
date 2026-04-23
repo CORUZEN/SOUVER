@@ -207,7 +207,7 @@ function IntegrationModal({
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-surface-950/75 backdrop-blur-[3px]">
+    <div className="fixed inset-0 z-100 overflow-hidden bg-surface-950/75 backdrop-blur-[3px]">
       <div className="h-full min-h-[100dvh] w-full overflow-y-auto p-3 sm:p-6">
         <div className="flex min-h-full items-start justify-center py-1 sm:items-center sm:py-0">
           <form

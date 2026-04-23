@@ -1751,7 +1751,7 @@ export default function SupervisorPwaDashboard() {
                       </span>
                     </div>
                     <div className="ml-2 flex shrink-0 items-center gap-1.5">
-                      <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
                         {uniqueSupervisors.length}
                       </span>
                       <ChevronDown className={`h-4 w-4 text-surface-500 transition-transform ${openDropdown === 'supervisor' ? 'rotate-180' : ''}`} />
@@ -1800,7 +1800,7 @@ export default function SupervisorPwaDashboard() {
                       </span>
                     </div>
                     <div className="ml-2 flex shrink-0 items-center gap-1.5">
-                      <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
                         {sellers.length}
                       </span>
                       <ChevronDown className={`h-4 w-4 text-surface-500 transition-transform ${openDropdown === 'seller' ? 'rotate-180' : ''}`} />
@@ -2501,6 +2501,5 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     </div>
   )
 }
-
 
 

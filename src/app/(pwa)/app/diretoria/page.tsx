@@ -258,7 +258,7 @@ export default function DiretoriaPwaDashboard() {
 
       {/* ── Sign-out confirm ─────────────────────────────────────────────── */}
       {showSignOutConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center">
+        <div className="fixed inset-0 z-100 flex items-end justify-center bg-black/60 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-2xl border border-surface-700 bg-surface-900 p-5 shadow-2xl">
             <p className="text-base font-semibold text-white">Sair do sistema?</p>
             <p className="mt-1 text-sm text-surface-400">Você precisará fazer login novamente.</p>
