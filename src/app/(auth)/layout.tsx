@@ -16,9 +16,9 @@ export default function AuthLayout({
 }) {
   return (
     <>
-      <div className={cn(manrope.className, 'relative h-dvh overflow-hidden bg-[#08142a]')}>
-      <div className="pointer-events-none absolute left-[-20%] top-[-20%] h-144 w-xl rounded-full bg-emerald-400/15 blur-[120px]" />
-      <div className="pointer-events-none absolute bottom-[-26%] right-[-12%] h-120 w-120 rounded-full bg-cyan-400/10 blur-[110px]" />
+      <div className={cn(manrope.className, 'relative h-dvh overflow-hidden bg-[#1e3021] md:bg-[#08142a]')}>
+      <div className="pointer-events-none absolute left-[-20%] top-[-20%] h-144 w-xl rounded-full bg-emerald-400/15 blur-[120px] hidden md:block" />
+      <div className="pointer-events-none absolute bottom-[-26%] right-[-12%] h-120 w-120 rounded-full bg-cyan-400/10 blur-[110px] hidden md:block" />
 
       <div className="relative z-10 h-full overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-5 lg:px-8 lg:py-6">
         <div className="mx-auto flex min-h-full w-full max-w-360 items-center">
