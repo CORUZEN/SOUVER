@@ -1,7 +1,7 @@
-/**
+﻿/**
  * GET /api/metas/sankhya-targets/debug?year=YYYY&month=M
  *
- * Returns raw rows from every Sankhya table involved in "Configuração de Performance"
+ * Returns raw rows from every Sankhya table involved in "ConfiguraÃ§Ã£o de Performance"
  * so developers can identify which table / column structure is active in this instance.
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,7 +11,7 @@ import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/i
 
 type RawRecord = Record<string, unknown>
 
-// ─── Auth helpers (duplicated from parent route to keep files independent) ────
+// â”€â”€â”€ Auth helpers (duplicated from parent route to keep files independent) â”€â”€â”€â”€
 
 function extractBearerToken(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
@@ -31,7 +31,9 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const sandbox = 'https://api.sandbox.sankhya.com.br'
   const candidates = host.includes('sandbox.sankhya.com.br')
     ? [sandbox, production, localOrigin]
-    : [production, sandbox, localOrigin]
+    : host.includes('sankhya.com.br')
+      ? [production, sandbox, localOrigin]
+      : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -129,7 +131,7 @@ function extractServiceError(payload: unknown): string | null {
   const statusMessage = String(obj.statusMessage ?? '').trim()
   if (!status && !statusMessage) return null
   if (status === '1' || status.toUpperCase() === 'SUCCESS') return null
-  return statusMessage || `Falha no serviço Sankhya (status ${status || 'desconhecido'}).`
+  return statusMessage || `Falha no serviÃ§o Sankhya (status ${status || 'desconhecido'}).`
 }
 
 function collectRecords(payload: unknown, bucket: RawRecord[]) {
@@ -208,7 +210,7 @@ async function runQuery(
   return { rows: [], error: 'Nenhum endpoint retornou sucesso.' }
 }
 
-// ─── Diagnostic queries ───────────────────────────────────────────────────────
+// â”€â”€â”€ Diagnostic queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface TableResult {
   table: string
@@ -254,10 +256,10 @@ export async function GET(req: NextRequest) {
     select: { id: true, baseUrl: true, configEncrypted: true },
   })
   if (!integration?.baseUrl) {
-    return NextResponse.json({ message: 'Nenhuma integração Sankhya ativa.' }, { status: 412 })
+    return NextResponse.json({ message: 'Nenhuma integraÃ§Ã£o Sankhya ativa.' }, { status: 412 })
   }
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
-  if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya inválida.' }, { status: 412 })
+  if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya invÃ¡lida.' }, { status: 412 })
   const config = parseStoredConfig(integration.configEncrypted)
 
   try {
@@ -289,19 +291,19 @@ export async function GET(req: NextRequest) {
     // Run all 5 table queries in parallel
     const [cfgResult, venResult, drtResult, topResult, proResult] = await Promise.all([
       runQuery(baseUrl, headers, `SELECT * FROM AD_TVDYCFGPFM WHERE ROWNUM <= 20`, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'AD_TVDYCFGPFM', description: 'Config principal por vendedor/mês — PK: NUCFGPFM', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'AD_TVDYCFGPFM', description: 'Config principal por vendedor/mÃªs â€” PK: NUCFGPFM', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
       runQuery(baseUrl, headers, `SELECT * FROM AD_TVDYVEN WHERE ROWNUM <= 20`, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'AD_TVDYVEN', description: 'Vendedores — CODVEN (código), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'AD_TVDYVEN', description: 'Vendedores â€” CODVEN (cÃ³digo), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
       runQuery(baseUrl, headers, `SELECT * FROM AD_TVDYDRTIPT WHERE ROWNUM <= 20`, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'AD_TVDYDRTIPT', description: 'Metas financeiras — META, TIPO (NUMBER), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'AD_TVDYDRTIPT', description: 'Metas financeiras â€” META, TIPO (NUMBER), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
       runQuery(baseUrl, headers, `SELECT * FROM AD_TVDYPFMTOP WHERE ROWNUM <= 20`, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'AD_TVDYPFMTOP', description: 'Tipo de operação — CODTIPOPER, TIPO (VARCHAR2), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'AD_TVDYPFMTOP', description: 'Tipo de operaÃ§Ã£o â€” CODTIPOPER, TIPO (VARCHAR2), NUCFGPFM (FK)', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
       runQuery(baseUrl, headers, `SELECT * FROM AD_TVDYPFMPRO WHERE ROWNUM <= 20`, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'AD_TVDYPFMPRO', description: 'Metas de peso por marca — MARCA, VALOR, NUCFGPFM (FK) ← tabela correta', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'AD_TVDYPFMPRO', description: 'Metas de peso por marca â€” MARCA, VALOR, NUCFGPFM (FK) â† tabela correta', columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
     ])
 
@@ -322,10 +324,10 @@ WHERE ROWNUM <= 20`.trim()
 
     const [joinedFinResult, joinedWgtResult] = await Promise.all([
       runQuery(baseUrl, headers, joinedFinancialSql, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'JOIN financeiro (CFG+VEN+DRTIPT)', description: `JOIN via NUCFGPFM — período ${startDate} a ${endDate}`, columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'JOIN financeiro (CFG+VEN+DRTIPT)', description: `JOIN via NUCFGPFM â€” perÃ­odo ${startDate} a ${endDate}`, columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
       runQuery(baseUrl, headers, joinedWeightSql, appKey).then(r => ({
-        ...r, rowCount: r.rows.length, table: 'JOIN peso (CFG+VEN+PFMPRO)', description: `JOIN via NUCFGPFM com AD_TVDYPFMPRO — período ${startDate} a ${endDate}`, columns: r.rows[0] ? Object.keys(r.rows[0]) : []
+        ...r, rowCount: r.rows.length, table: 'JOIN peso (CFG+VEN+PFMPRO)', description: `JOIN via NUCFGPFM com AD_TVDYPFMPRO â€” perÃ­odo ${startDate} a ${endDate}`, columns: r.rows[0] ? Object.keys(r.rows[0]) : []
       })),
     ])
 
@@ -337,7 +339,8 @@ WHERE ROWNUM <= 20`.trim()
       tables: [cfgResult, venResult, drtResult, topResult, proResult, joinedFinResult, joinedWgtResult],
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha no diagnóstico Sankhya.'
+    const message = error instanceof Error ? error.message : 'Falha no diagnÃ³stico Sankhya.'
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

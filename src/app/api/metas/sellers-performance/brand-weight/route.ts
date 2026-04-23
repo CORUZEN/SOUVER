@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -8,7 +8,7 @@ import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 type RawRecord = Record<string, unknown>
 
 /**
- * Returns aggregated gross weight (kg) by seller × product brand for a given month.
+ * Returns aggregated gross weight (kg) by seller Ã— product brand for a given month.
  *
  * Response shape:
  * {
@@ -43,7 +43,9 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const sandbox = 'https://api.sandbox.sankhya.com.br'
   const candidates = host.includes('sandbox.sankhya.com.br')
     ? [sandbox, production, localOrigin]
-    : [production, sandbox, localOrigin]
+    : host.includes('sankhya.com.br')
+      ? [production, sandbox, localOrigin]
+      : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -246,10 +248,10 @@ function buildBrandWeightSql(
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''
 
-  // ITE.QTDNEG × PRO.PESOBRUTO gives the total gross weight in grams (or kg depending on
-  // how Sankhya is configured — divide by 1000 if needed; we return raw and let the
+  // ITE.QTDNEG Ã— PRO.PESOBRUTO gives the total gross weight in grams (or kg depending on
+  // how Sankhya is configured â€” divide by 1000 if needed; we return raw and let the
   // frontend apply the same factor used elsewhere since order-level PESOBRUTO is already in kg).
-  // We use SUM(ITE.QTDNEG * PRO.PESOBRUTO) / 1000 to convert g→kg if Sankhya stores
+  // We use SUM(ITE.QTDNEG * PRO.PESOBRUTO) / 1000 to convert gâ†’kg if Sankhya stores
   // product weight in grams (TGFPRO.PESOBRUTO is per unit in kg on most installations, so we skip /1000).
   return `
 SELECT
@@ -370,3 +372,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

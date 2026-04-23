@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -27,7 +27,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
       ? [sandbox, production, localOrigin]
       : host.includes('sankhya.com.br')
         ? [production, sandbox, localOrigin]
-        : [production, sandbox, localOrigin]
+        : [localOrigin, production, sandbox]
 
   return [...new Set(candidates)]
 }
@@ -288,7 +288,7 @@ function normalizeSellerName(value: string) {
 
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   // --- Strategy: single combined query with TIPO and ATIVO filters in SQL ---
-  // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) — also accept full-text values
+  // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) â€” also accept full-text values
   // TGFVEN.ATIVO: 'S' (Sim)
   // LEFT JOIN TGFCAB to get the most recent partner code (CODPARC) from orders
   const sqlCombined = `
@@ -452,3 +452,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message }, { status: 502 })
   }
 }
+

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -41,7 +41,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
       ? [sandbox, production, localOrigin]
       : host.includes('sankhya.com.br')
         ? [production, sandbox, localOrigin]
-        : [production, sandbox, localOrigin]
+        : [localOrigin, production, sandbox]
 
   return [...new Set(candidates)]
 }
@@ -330,7 +330,7 @@ function parseProducts(
 async function queryProducts(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   const failures: string[] = []
 
-  // Mobility column candidates — only one will exist in the target database
+  // Mobility column candidates â€” only one will exist in the target database
   const mobilityCandidates = ['AD_MOBILIDADE', 'AD_MOBILIDA', 'MOBILIDADE', 'MOBILIDA']
   // Brand column candidates
   const brandCandidates = ['MARCA', 'AD_MARCA']
@@ -431,7 +431,7 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
       }
       if (unitByProductCode.size > 0) break
     } catch {
-      // tenta próxima coluna
+      // tenta prÃ³xima coluna
     }
   }
 
@@ -478,7 +478,7 @@ WHERE TRIM(P.DESCRPROD) IS NOT NULL`.trim()
       }
       break
     } catch {
-      // tenta próxima coluna
+      // tenta prÃ³xima coluna
     }
   }
 
@@ -575,3 +575,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message }, { status: 502 })
   }
 }
+

@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+﻿import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 
 export interface SankhyaLiveTable {
@@ -105,7 +105,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
       ? [sandbox, production, localOrigin]
       : host.includes('sankhya.com.br')
         ? [production, sandbox, localOrigin]
-        : [production, sandbox, localOrigin]
+        : [localOrigin, production, sandbox]
 
   return [...new Set(candidates)]
 }
@@ -197,7 +197,7 @@ function extractServiceErrorMessage(payload: unknown): string | null {
   const statusMessage = String(obj.statusMessage ?? '').trim()
   if (!status && !statusMessage) return null
   if (status === '1' || status.toUpperCase() === 'SUCCESS') return null
-  return statusMessage || `Falha no serviço Sankhya (status ${status || 'desconhecido'}).`
+  return statusMessage || `Falha no serviÃ§o Sankhya (status ${status || 'desconhecido'}).`
 }
 
 async function runSankhyaSql(
@@ -476,3 +476,4 @@ ORDER BY C.OWNER, C.TABLE_NAME
     tables,
   }
 }
+

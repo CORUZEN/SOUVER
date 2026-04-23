@@ -187,6 +187,7 @@ type CompanyScopeFilter = '1' | '2' | 'all'
 interface PerformanceDiagnostics {
   selectedMonthOrders: number
   queryMode?: string
+  orderQueryErrors?: string[]
   companyScope?: string | null
   byStatus?: Record<string, number>
   byCompany?: Record<string, number>
@@ -2975,11 +2976,11 @@ export default function MetasWorkspace() {
       year: String(year),
       month: String(month + 1),
       companyScope: companyScopeFilter,
-      w1End: stageEnds.w1,
-      w2End: stageEnds.w2,
-      w3End: stageEnds.w3,
-      closingEnd: stageEnds.closing,
     })
+    if (stageEnds.w1) params.set('w1End', stageEnds.w1)
+    if (stageEnds.w2) params.set('w2End', stageEnds.w2)
+    if (stageEnds.w3) params.set('w3End', stageEnds.w3)
+    if (stageEnds.closing) params.set('closingEnd', stageEnds.closing)
 
     fetch(`/api/metas/sellers-performance/item-distribution?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
@@ -3774,8 +3775,41 @@ export default function MetasWorkspace() {
     () => (corporateTotalOrders > 0 ? corporateTotalRevenue / corporateTotalOrders : 0),
     [corporateTotalOrders, corporateTotalRevenue]
   )
+  const focusProductErrors = useMemo(
+    () => Object.values(focusProductError).filter((msg): msg is string => Boolean(msg && msg.trim())),
+    [focusProductError]
+  )
+  const hasConnectionFailure = useMemo(() => {
+    const queryFailed = performanceDiagnostics?.queryMode === 'NONE' && (performanceDiagnostics?.orderQueryErrors?.length ?? 0) > 0
+    const errorBag = [
+      sellersError,
+      brandWeightError,
+      sankhyaTargetsError,
+      distributionError,
+      ...focusProductErrors,
+      ...(performanceDiagnostics?.orderQueryErrors ?? []),
+    ]
+      .map((msg) => String(msg ?? '').toLowerCase())
+      .filter((msg) => msg.length > 0)
+
+    const hasConnectivitySignature = errorBag.some((msg) =>
+      msg.includes('timeout') ||
+      msg.includes('tempo limite') ||
+      msg.includes('conex') ||
+      msg.includes('connection') ||
+      msg.includes('gateway') ||
+      msg.includes('502') ||
+      msg.includes('sankhya') ||
+      msg.includes('econn') ||
+      msg.includes('fetch failed') ||
+      msg.includes('falha ao consultar')
+    )
+
+    return queryFailed || hasConnectivitySignature
+  }, [brandWeightError, distributionError, focusProductErrors, performanceDiagnostics, sankhyaTargetsError, sellersError])
   const showPeriodHint =
     !sellersLoading &&
+    !hasConnectionFailure &&
     !sellersError &&
     corporateTotalOrders === 0 &&
     sellers.length > 0
@@ -4937,17 +4971,20 @@ export default function MetasWorkspace() {
         let previousDistributionRows: SellerDistributionRow[] = []
         let previousDistributionItemsRows: SellerDistributionItemsRow[] = []
         let previousDistributionReady = false
-        const hasAllStageEnds = OPERATIONAL_STAGE_KEYS.every((stageKey) => stageEndByKey.has(stageKey))
+        const hasAllStageEnds = OPERATIONAL_STAGE_KEYS.every((stageKey) => {
+          const value = stageEndByKey.get(stageKey)
+          return typeof value === 'string' && value.length > 0
+        })
         if (hasAllStageEnds) {
           const params = new URLSearchParams({
             year: String(previousYear),
             month: String(previousMonth),
             companyScope: companyScopeFilter,
-            w1End: stageEndByKey.get('W1') ?? '',
-            w2End: stageEndByKey.get('W2') ?? '',
-            w3End: stageEndByKey.get('W3') ?? '',
-            closingEnd: stageEndByKey.get('CLOSING') ?? '',
           })
+          params.set('w1End', stageEndByKey.get('W1') ?? '')
+          params.set('w2End', stageEndByKey.get('W2') ?? '')
+          params.set('w3End', stageEndByKey.get('W3') ?? '')
+          params.set('closingEnd', stageEndByKey.get('CLOSING') ?? '')
           const distributionRes = await fetch(`/api/metas/sellers-performance/item-distribution?${params.toString()}`, { signal: controller.signal })
           const distributionPayload = await distributionRes.json().catch(() => ({}))
           if (distributionRes.ok) {
@@ -8767,6 +8804,16 @@ export default function MetasWorkspace() {
               </div>
             </Card>
           </div>
+
+          {hasConnectionFailure ? (
+            <Card className="border-rose-200 bg-rose-50">
+              <p className="text-sm font-semibold text-rose-900">Instabilidade de conexão com a base comercial</p>
+              <p className="mt-1 text-xs text-rose-800">
+                Detectamos falhas de comunicação com o banco de dados no período selecionado.
+                Tente novamente em alguns minutos.
+              </p>
+            </Card>
+          ) : null}
 
           {showPeriodHint ? (
             <Card className="border-amber-200 bg-amber-50">

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -30,7 +30,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const localOrigin = url.origin.replace(/\/+$/, '')
   const production = 'https://api.sankhya.com.br'
   const sandbox = 'https://api.sandbox.sankhya.com.br'
-  const candidates = host.includes('sandbox.sankhya.com.br') ? [sandbox, production, localOrigin] : [production, sandbox, localOrigin]
+  const candidates = host.includes('sandbox.sankhya.com.br') ? [sandbox, production, localOrigin] : host.includes('sankhya.com.br') ? [production, sandbox, localOrigin] : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -292,3 +292,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

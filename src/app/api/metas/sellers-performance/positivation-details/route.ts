@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -54,7 +54,7 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const localOrigin = url.origin.replace(/\/+$/, '')
   const production = 'https://api.sankhya.com.br'
   const sandbox = 'https://api.sandbox.sankhya.com.br'
-  const candidates = host.includes('sandbox.sankhya.com.br') ? [sandbox, production, localOrigin] : [production, sandbox, localOrigin]
+  const candidates = host.includes('sandbox.sankhya.com.br') ? [sandbox, production, localOrigin] : host.includes('sankhya.com.br') ? [production, sandbox, localOrigin] : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -223,7 +223,7 @@ async function queryRows(baseUrl: string, headers: Record<string, string>, sql: 
     }
   }
 
-  throw new Error(`Falha ao consultar detalhes de positivação no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
+  throw new Error(`Falha ao consultar detalhes de positivaÃ§Ã£o no Sankhya (${failures.join(' | ') || 'sem detalhes'}).`)
 }
 
 function buildPositivationSql(
@@ -385,7 +385,8 @@ export async function GET(req: NextRequest) {
       pendingProducts,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha ao consultar detalhes de positivação no Sankhya.'
+    const message = error instanceof Error ? error.message : 'Falha ao consultar detalhes de positivaÃ§Ã£o no Sankhya.'
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -7,15 +7,15 @@ import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 type RawRecord = Record<string, unknown>
 
 /**
- * Fetches targets configured in Sankhya's "Vidya Force - Configuração de Performance"
+ * Fetches targets configured in Sankhya's "Vidya Force - ConfiguraÃ§Ã£o de Performance"
  * custom screen for a given month/year.
  *
  * Tables:
- *   AD_TVDYCFGPFM   — main config per seller per month
- *   AD_TVDYVEN      — sellers linked to each config
- *   AD_TVDYDRTIPT   — financial (money) targets per config
- *   AD_TVDYPFMTOP   — weight (kg) targets per brand per config (primary)
- *   AD_TVDYPFMPRO   — weight (kg) targets per brand per config (secondary/fallback)
+ *   AD_TVDYCFGPFM   â€” main config per seller per month
+ *   AD_TVDYVEN      â€” sellers linked to each config
+ *   AD_TVDYDRTIPT   â€” financial (money) targets per config
+ *   AD_TVDYPFMTOP   â€” weight (kg) targets per brand per config (primary)
+ *   AD_TVDYPFMPRO   â€” weight (kg) targets per brand per config (secondary/fallback)
  *
  * Response shape:
  * {
@@ -55,7 +55,9 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const sandbox = 'https://api.sandbox.sankhya.com.br'
   const candidates = host.includes('sandbox.sankhya.com.br')
     ? [sandbox, production, localOrigin]
-    : [production, sandbox, localOrigin]
+    : host.includes('sankhya.com.br')
+      ? [production, sandbox, localOrigin]
+      : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -278,7 +280,7 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
       colsByTable[tbl].push(col)
     }
 
-    // Find FK in child tables — prefer NUCFG*, then AD_TVDYCFGPFM*, then NROCONFIGURACAO
+    // Find FK in child tables â€” prefer NUCFG*, then AD_TVDYCFGPFM*, then NROCONFIGURACAO
     const childTables = ['AD_TVDYDRTIPT', 'AD_TVDYPFMPRO', 'AD_TVDYVEN', 'AD_TVDYPFMTOP']
     let childFk = ''
     for (const tbl of childTables) {
@@ -307,7 +309,7 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
     if (!parentPk) parentPk = childFk
 
     return { childFk, parentPk }
-  } catch { /* ALL_TAB_COLUMNS failed — use defaults */ }
+  } catch { /* ALL_TAB_COLUMNS failed â€” use defaults */ }
   return DEFAULT
 }
 
@@ -316,10 +318,10 @@ ORDER BY TABLE_NAME, COLUMN_ID`.trim()
  *
  * Confirmed schema (from Sankhya admin panel):
  *   AD_TVDYCFGPFM  : NUCFGPFM (PK), DTINI, DTFIM, TITULO
- *   AD_TVDYVEN     : CODVEN (seller code — NOT CODVEND), NUCFGPFM (FK), GRUPO
- *   AD_TVDYDRTIPT  : NUCFGPFM (FK), META, TIPO (NUMBER — 1=performance), DIRETRIZ, PESO, PERCACRESC
- *   AD_TVDYPFMPRO  : NUCFGPFM (FK), MARCA, VALOR (weight targets — correct table)
- *   AD_TVDYPFMTOP  : NUCFGPFM (FK), CODTIPOPER, TIPO (VARCHAR2 — NOT a brand-weight table)
+ *   AD_TVDYVEN     : CODVEN (seller code â€” NOT CODVEND), NUCFGPFM (FK), GRUPO
+ *   AD_TVDYDRTIPT  : NUCFGPFM (FK), META, TIPO (NUMBER â€” 1=performance), DIRETRIZ, PESO, PERCACRESC
+ *   AD_TVDYPFMPRO  : NUCFGPFM (FK), MARCA, VALOR (weight targets â€” correct table)
+ *   AD_TVDYPFMTOP  : NUCFGPFM (FK), CODTIPOPER, TIPO (VARCHAR2 â€” NOT a brand-weight table)
  */
 function buildSqlVariants(
   type: 'financial' | 'weight',
@@ -361,19 +363,19 @@ WHERE ${dateExpr}${tipoFilter}  AND VEN.CODVEN > 0
 GROUP BY VEN.CODVEN, CFG.TITULO, PRO.MARCA
 ORDER BY VEN.CODVEN, PRO.MARCA`.trim()
 
-  // Date strategies — DTINI confirmed correct; DTINICIAL kept as legacy fallback
+  // Date strategies â€” DTINI confirmed correct; DTINICIAL kept as legacy fallback
   const dtA = `CFG.DTINI >= TO_DATE('${startDate}', 'YYYY-MM-DD')\n  AND CFG.DTINI < TO_DATE('${endDate}', 'YYYY-MM-DD')\n`
   const dtB = `EXTRACT(YEAR FROM CFG.DTINI) = ${year}\n  AND EXTRACT(MONTH FROM CFG.DTINI) = ${month}\n`
   const dtC = `TO_CHAR(CFG.DTINI, 'YYYY-MM') = '${yyyymm}'\n`
   const dtD = `CFG.DTINICIAL >= TO_DATE('${startDate}', 'YYYY-MM-DD')\n  AND CFG.DTINICIAL < TO_DATE('${endDate}', 'YYYY-MM-DD')\n`
   const dtE = `EXTRACT(YEAR FROM CFG.DTINICIAL) = ${year}\n  AND EXTRACT(MONTH FROM CFG.DTINICIAL) = ${month}\n`
 
-  // TIPO filters — financial TIPO is NUMBER; weight TIPO is VARCHAR2
+  // TIPO filters â€” financial TIPO is NUMBER; weight TIPO is VARCHAR2
   const noTipo = ''
   const numericTipo1 = `  AND DIR.TIPO = 1\n`           // AD_TVDYDRTIPT.TIPO is NUMBER
   const weightTipoPeso = `  AND UPPER(TRIM(NVL(PRO.TIPO, 'PESO'))) = 'PESO'\n`  // AD_TVDYPFMPRO.TIPO is VARCHAR2
 
-  // JOIN strategies — NUCFGPFM confirmed; keep others as fallback
+  // JOIN strategies â€” NUCFGPFM confirmed; keep others as fallback
   const joins: [string, string][] = [
     ['NUCFGPFM', 'NUCFGPFM'],            // confirmed correct
     [childFk, parentPk],                 // discovered via ALL_TAB_COLUMNS
@@ -394,24 +396,24 @@ ORDER BY VEN.CODVEN, PRO.MARCA`.trim()
   }
 
   if (type === 'financial') {
-    // P1: known-correct (NUCFGPFM + DTINI) × no TIPO filter (TIPO may be any numeric value)
+    // P1: known-correct (NUCFGPFM + DTINI) Ã— no TIPO filter (TIPO may be any numeric value)
     for (const dt of [dtA, dtB, dtC]) addFin('NUCFGPFM', 'NUCFGPFM', dt, noTipo)
     // P2: same + explicit numeric TIPO=1 (from observed data)
     for (const dt of [dtA, dtB, dtC]) addFin('NUCFGPFM', 'NUCFGPFM', dt, numericTipo1)
-    // P3: all join fallbacks × DTINI × no TIPO
+    // P3: all join fallbacks Ã— DTINI Ã— no TIPO
     for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addFin(cFk, pPk, dt, noTipo)
-    // P4: all join fallbacks × legacy DTINICIAL × no TIPO
+    // P4: all join fallbacks Ã— legacy DTINICIAL Ã— no TIPO
     for (const [cFk, pPk] of joins) for (const dt of [dtD, dtE]) addFin(cFk, pPk, dt, noTipo)
   } else {
-    // P1: AD_TVDYPFMPRO (confirmed has MARCA+VALOR) + NUCFGPFM + DTINI × no TIPO
+    // P1: AD_TVDYPFMPRO (confirmed has MARCA+VALOR) + NUCFGPFM + DTINI Ã— no TIPO
     for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', 'NUCFGPFM', 'NUCFGPFM', dt, noTipo)
     // P2: same + PESO varchar TIPO filter
     for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', 'NUCFGPFM', 'NUCFGPFM', dt, weightTipoPeso)
-    // P3: all join fallbacks × AD_TVDYPFMPRO × DTINI × no TIPO
+    // P3: all join fallbacks Ã— AD_TVDYPFMPRO Ã— DTINI Ã— no TIPO
     for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMPRO', cFk, pPk, dt, noTipo)
-    // P4: legacy DTINICIAL × fallbacks
+    // P4: legacy DTINICIAL Ã— fallbacks
     for (const [cFk, pPk] of joins) for (const dt of [dtD, dtE]) addWgt('AD_TVDYPFMPRO', cFk, pPk, dt, noTipo)
-    // P5: AD_TVDYPFMTOP last resort (different structure — may not have MARCA/VALOR)
+    // P5: AD_TVDYPFMTOP last resort (different structure â€” may not have MARCA/VALOR)
     for (const [cFk, pPk] of joins) for (const dt of [dtA, dtB, dtC]) addWgt('AD_TVDYPFMTOP', cFk, pPk, dt, noTipo)
   }
 
@@ -484,7 +486,7 @@ export async function GET(req: NextRequest) {
       const probeRows = await queryRows(baseUrl, headers, probeSql, appKey)
       const cnt = probeRows[0] ? parseNumber(probeRows[0].CNT ?? probeRows[0].cnt ?? 0) : 0
       if (cnt === 0) periodHasData = false
-    } catch { /* probe failed — proceed with full query anyway */ }
+    } catch { /* probe failed â€” proceed with full query anyway */ }
 
     if (!periodHasData) {
       return NextResponse.json({ sellers: [], year, month, noDataForPeriod: true })
@@ -592,3 +594,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+

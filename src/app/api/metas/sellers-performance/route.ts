@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
@@ -104,7 +104,9 @@ function getSankhyaAuthOrigins(baseUrl: string) {
   const sandbox = 'https://api.sandbox.sankhya.com.br'
   const candidates = host.includes('sandbox.sankhya.com.br')
     ? [sandbox, production, localOrigin]
-    : [production, sandbox, localOrigin]
+    : host.includes('sankhya.com.br')
+      ? [production, sandbox, localOrigin]
+      : [localOrigin, production, sandbox]
   return [...new Set(candidates)]
 }
 
@@ -407,9 +409,9 @@ function buildOrdersSql(
   companyScope: '1' | '2' | 'all' = '1'
 ) {
   // Regra principal para espelhar o Portal de Vendas:
-  // "Pedido de venda" + Tipo Operação 1001
+  // "Pedido de venda" + Tipo OperaÃ§Ã£o 1001
   // Fallback 1: apenas TIPMOV = 'V'
-  // Fallback 2: sem filtro de tipo (último recurso)
+  // Fallback 2: sem filtro de tipo (Ãºltimo recurso)
   const typeFilter = mode === 'TOP_1001'
     ? "AND CAB.CODTIPOPER = 1001\n  "
     : mode === 'TIPMOV_V'
@@ -423,9 +425,9 @@ function buildOrdersSql(
   }
 
   // companyScope controls which Sankhya company (CODEMP) to include:
-  //   '1'   → Moagem Ouro Verde (empresa 1 apenas)
-  //   '2'   → Moagem Ouro Verde Maceió (empresa 2 apenas)
-  //   'all' → todas as empresas (sem filtro de CODEMP)
+  //   '1'   â†’ Moagem Ouro Verde (empresa 1 apenas)
+  //   '2'   â†’ Moagem Ouro Verde MaceiÃ³ (empresa 2 apenas)
+  //   'all' â†’ todas as empresas (sem filtro de CODEMP)
   const companyFilter = companyScope !== 'all'
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''
@@ -501,7 +503,7 @@ function buildOpenTitlesSqlCandidates(
 
   const pendingStrict = 'FIN.DHBAIXA IS NULL'
   const receitasCond = "(TO_CHAR(NVL(FIN.RECDESP, 0)) = '1' OR UPPER(TO_CHAR(NVL(FIN.RECDESP, ''))) = 'R')"
-  const realCond = "(UPPER(TO_CHAR(NVL(FIN.PROVISAO, 'N'))) IN ('N', '0', 'NAO', 'NÃO'))"
+  const realCond = "(UPPER(TO_CHAR(NVL(FIN.PROVISAO, 'N'))) IN ('N', '0', 'NAO', 'NÃƒO'))"
 
   const buildBaseFilters = (pendingCond: string, withReceitasReal: boolean) => `
 WHERE ${pendingCond}
@@ -555,7 +557,7 @@ ${buildBaseFilters(pendingCond, withReceitasReal)}
       ? overdueByAtrasoInicial
       : overdueByCalc
 
-  // Try to mirror Sankhya "Valor Líquido" when physical columns are available.
+  // Try to mirror Sankhya "Valor LÃ­quido" when physical columns are available.
   // Base oficial do KPI: Valor Liquido (VLRLIQUIDO).
   // VLRDESDOB permanece apenas como fallback tecnico quando a API nao expor VLRLIQUIDO.
   const openValueFromColumns = (() => {
@@ -614,7 +616,7 @@ function buildSellerBaseSqlCandidates(sellerCodes: string[]) {
 
   const clienteCond = "UPPER(TO_CHAR(NVL(PAR.CLIENTE, 'N'))) IN ('S', '1', 'SIM')"
   const ativoCond = "UPPER(TO_CHAR(NVL(PAR.ATIVO, 'S'))) IN ('S', '1', 'SIM')"
-  const notInactiveCond = "UPPER(TO_CHAR(NVL(PAR.INATIVO, 'N'))) IN ('N', '0', 'NAO', 'NÃO')"
+  const notInactiveCond = "UPPER(TO_CHAR(NVL(PAR.INATIVO, 'N'))) IN ('N', '0', 'NAO', 'NÃƒO')"
 
   const q1 = `
 SELECT
@@ -758,15 +760,18 @@ export async function GET(req: NextRequest) {
     // Cascade: CODTIPOPER=1001 -> TIPMOV='V' -> any movement
     let orders: SankhyaOrder[] = []
     let queryMode: 'TOP_1001' | 'TIPMOV_V' | 'ANY_MOVEMENT' | 'NONE' = 'NONE'
+    const orderQueryErrors: string[] = []
 
-    // 1) Primary: CODTIPOPER = 1001 (Pedido de venda — Portal de Vendas)
+    // 1) Primary: CODTIPOPER = 1001 (Pedido de venda â€” Portal de Vendas)
     const sqlTop1001 = buildOrdersSql(startDate, endDateExclusive, sellerCodes, 'TOP_1001', companyScope)
     try {
       const records = await queryRows(baseUrl, headers, sqlTop1001, appKey, { allowEmpty: true })
       orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
       queryMode = 'TOP_1001'
-    } catch {
-      // CODTIPOPER pode divergir no ambiente — tenta apenas TIPMOV='V'
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'erro desconhecido'
+      orderQueryErrors.push(`TOP_1001: ${msg}`)
+      // CODTIPOPER pode divergir no ambiente â€” tenta apenas TIPMOV='V'
     }
 
     // 2) Fallback: TIPMOV = 'V'
@@ -776,7 +781,10 @@ export async function GET(req: NextRequest) {
         const records = await queryRows(baseUrl, headers, sqlTipmov, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
         queryMode = 'TIPMOV_V'
-      } catch { /* next fallback */ }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'erro desconhecido'
+        orderQueryErrors.push(`TIPMOV_V: ${msg}`)
+      }
     }
 
     // 3) Last resort: no type filter
@@ -786,10 +794,17 @@ export async function GET(req: NextRequest) {
         const records = await queryRows(baseUrl, headers, sqlAny, appKey, { allowEmpty: true })
         orders = records.map(toOrder).filter((o): o is SankhyaOrder => o !== null)
         queryMode = 'ANY_MOVEMENT'
-      } catch { /* keep empty */ }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'erro desconhecido'
+        orderQueryErrors.push(`ANY_MOVEMENT: ${msg}`)
+      }
     }
 
-    // --- Devoluções do mês por vendedor ---
+    if (queryMode === 'NONE' && orderQueryErrors.length > 0) {
+      throw new Error('Falha de conexão com a base comercial. Tente novamente em alguns minutos.')
+    }
+
+    // --- DevoluÃ§Ãµes do mÃªs por vendedor ---
     let returns: SankhyaReturn[] = []
     try {
       const sqlReturns = buildReturnsSql(startDate, endDateExclusive, sellerCodes, companyScope)
@@ -1025,6 +1040,7 @@ export async function GET(req: NextRequest) {
           acc[key] = (acc[key] ?? 0) + 1
           return acc
         }, {}),
+        orderQueryErrors: orderQueryErrors.slice(0, 3),
         openTitlesFetched: openTitles.length,
         openTitlesMappedToSeller: mappedOpenTitlesCount,
         sellerBaseFetched: sellerBaseRows.length,
@@ -1054,3 +1070,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message }, { status: 502 })
   }
 }
+
