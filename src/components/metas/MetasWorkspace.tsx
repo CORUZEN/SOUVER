@@ -558,6 +558,31 @@ function num(value: number, max = 2) {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: max }).format(value)
 }
 
+function toCorporateIntegrationErrorMessage(rawMessage: string, fallback: string) {
+  const raw = String(rawMessage ?? '').trim()
+  if (!raw) return fallback
+  const normalized = raw.toLowerCase()
+  const hasConnectivitySignature =
+    normalized.includes('timeout') ||
+    normalized.includes('tempo limite') ||
+    normalized.includes('conex') ||
+    normalized.includes('connection') ||
+    normalized.includes('gateway') ||
+    normalized.includes('502') ||
+    normalized.includes('erro de rede') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('não autorizado') ||
+    normalized.includes('nao autorizado') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('sankhya')
+
+  if (hasConnectivitySignature) {
+    return 'Falha de conexão com a base comercial. Tente novamente em alguns minutos.'
+  }
+
+  return fallback
+}
+
 // Formata com casas decimais fixas (min = max), garantindo que o delta bate com os valores exibidos
 function numFixed(value: number, decimals = 2) {
   return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
@@ -2253,7 +2278,13 @@ export default function MetasWorkspace() {
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
-        setBrandWeightError(err instanceof Error ? err.message : 'Falha ao carregar peso por marca.')
+        const rawMessage = err instanceof Error ? err.message : ''
+        setBrandWeightError(
+          toCorporateIntegrationErrorMessage(
+            rawMessage,
+            'Falha de conexão com a base comercial. Tente novamente em alguns minutos.'
+          )
+        )
       })
       .finally(() => {
         if (!controller.signal.aborted && performanceRequestKeyRef.current === requestKey) setBrandWeightLoading(false)
@@ -2285,7 +2316,13 @@ export default function MetasWorkspace() {
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
-        setSankhyaTargetsError(err instanceof Error ? err.message : 'Falha ao carregar metas configuradas do Sankhya.')
+        const rawMessage = err instanceof Error ? err.message : ''
+        setSankhyaTargetsError(
+          toCorporateIntegrationErrorMessage(
+            rawMessage,
+            'Falha de conexão com a base comercial. Tente novamente em alguns minutos.'
+          )
+        )
       })
       .finally(() => { if (!controller.signal.aborted) setSankhyaTargetsLoading(false) })
     return () => controller.abort()
