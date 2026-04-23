@@ -27,7 +27,7 @@ export default function PwaEntryPage() {
         router.replace('/metas')
       })
       .catch(() => {
-        router.replace('/login')
+        router.replace('/app/login')
       })
   }, [router])
 

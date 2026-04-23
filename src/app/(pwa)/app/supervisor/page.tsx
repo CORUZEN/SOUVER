@@ -924,7 +924,7 @@ export default function SupervisorPwaDashboard() {
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data?.user) { router.replace('/login'); return }
+        if (!data?.user) { router.replace('/app/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR' && roleCode !== 'SELLER') { router.replace('/app'); return }
         // Keep continuity between "Validando acesso" and "Carregando sistema".
@@ -936,7 +936,7 @@ export default function SupervisorPwaDashboard() {
           sellerCode: data.user.sellerCode,
         })
       })
-      .catch(() => router.replace('/login'))
+      .catch(() => router.replace('/app/login'))
   }, [router])
 
   // ── Online status ────────────────────────────────────────────────────────
@@ -1227,7 +1227,7 @@ export default function SupervisorPwaDashboard() {
       await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' }).catch(() => {})
     } finally {
       await clearPwaClientState()
-      window.location.replace('/login')
+      window.location.replace('/app/login')
     }
   }
 
