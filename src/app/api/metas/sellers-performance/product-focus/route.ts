@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
-import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
+import { withRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -257,43 +257,42 @@ export async function GET(req: NextRequest) {
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
   const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
   const cacheKey = `metas:product-focus:v1:${year}-${month}:${companyScope}:${scopeToken}:prod:${productCode}`
-  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
-  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   try {
-    let bearerToken: string | null = null
-    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
-    if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+    const payload = await withRequestCache(cacheKey, 30_000, async () => {
+      let bearerToken: string | null = null
+      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
+      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
 
-    const headers = buildHeaders(config, bearerToken)
-    const appKey = config.appKey ?? config.token ?? null
+      const headers = buildHeaders(config, bearerToken)
+      const appKey = config.appKey ?? config.token ?? null
 
-    const allowlist = await readSellerAllowlist()
-    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
-    const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
-    const allowedSellers = supervisorSellerCode
-      ? allActiveSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
-      : allActiveSellers
-    const sellerCodes = allowedSellers.map((s) => String(s.code ?? '').trim()).filter((c) => c.length > 0)
+      const allowlist = await readSellerAllowlist()
+      const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
+      const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+      const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
+      const allowedSellers = supervisorSellerCode
+        ? allActiveSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+        : allActiveSellers
+      const sellerCodes = allowedSellers.map((s) => String(s.code ?? '').trim()).filter((c) => c.length > 0)
 
-    let records: RawRecord[]
-    try {
-      records = await queryRows(baseUrl, headers, buildSql(startDate, endDateExclusive, sellerCodes, productCode, companyScope, 'STRICT'), appKey)
-    } catch {
-      records = await queryRows(baseUrl, headers, buildSql(startDate, endDateExclusive, sellerCodes, productCode, companyScope, 'FALLBACK_TIPMOV'), appKey)
-    }
+      let records: RawRecord[]
+      try {
+        records = await queryRows(baseUrl, headers, buildSql(startDate, endDateExclusive, sellerCodes, productCode, companyScope, 'STRICT'), appKey)
+      } catch {
+        records = await queryRows(baseUrl, headers, buildSql(startDate, endDateExclusive, sellerCodes, productCode, companyScope, 'FALLBACK_TIPMOV'), appKey)
+      }
 
-    const rows = records.map((r) => ({
-      sellerCode: String(r.CODVEND ?? '').trim(),
-      sellerName: String(r.VENDEDOR ?? '').trim(),
-      soldKg: parseNumber(r.PESO_VENDIDO),
-      returnKg: 0,
-      soldClients: Math.max(Math.floor(parseNumber(r.CLIENTES_ITEM_FOCO)), 0),
-    }))
+      const rows = records.map((r) => ({
+        sellerCode: String(r.CODVEND ?? '').trim(),
+        sellerName: String(r.VENDEDOR ?? '').trim(),
+        soldKg: parseNumber(r.PESO_VENDIDO),
+        returnKg: 0,
+        soldClients: Math.max(Math.floor(parseNumber(r.CLIENTES_ITEM_FOCO)), 0),
+      }))
 
-    const payload = { rows, year, month, productCode }
-    setRequestCache(cacheKey, payload, 30_000)
+      return { rows, year, month, productCode }
+    })
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar item foco no Sankhya.'

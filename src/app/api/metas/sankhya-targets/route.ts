@@ -3,7 +3,7 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
-import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
+import { withRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -469,135 +469,132 @@ export async function GET(req: NextRequest) {
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
   const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
   const cacheKey = `metas:sankhya-targets:v1:${year}-${month}:${scopeToken}`
-  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
-  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   try {
-    let bearerToken: string | null = null
-    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
-      bearerToken = await authenticateOAuth(config, baseUrl)
-    }
-    if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
-    const headers = buildHeaders(config, bearerToken)
-    const appKey = config.appKey ?? config.token ?? null
-
-    // Discover FK/PK column names (queries ALL_TAB_COLUMNS, falls back to Sankhya defaults)
-    const { childFk, parentPk } = await discoverFkColumns(baseUrl, headers, appKey)
-
-    // Fast probe: check if the period has ANY config rows before running expensive JOINs.
-    // This avoids iterating through all SQL variants for months with no data.
-    const probeSql = `SELECT COUNT(*) AS CNT FROM AD_TVDYCFGPFM WHERE DTINI >= TO_DATE('${startDate}', 'YYYY-MM-DD') AND DTINI < TO_DATE('${endDate}', 'YYYY-MM-DD')`
-    let periodHasData = true
-    try {
-      const probeRows = await queryRows(baseUrl, headers, probeSql, appKey)
-      const cnt = probeRows[0] ? parseNumber(probeRows[0].CNT ?? probeRows[0].cnt ?? 0) : 0
-      if (cnt === 0) periodHasData = false
-    } catch { /* probe failed â€” proceed with full query anyway */ }
-
-    if (!periodHasData) {
-      const payload = { sellers: [], year, month, noDataForPeriod: true }
-      setRequestCache(cacheKey, payload, 30_000)
-      return NextResponse.json(payload)
-    }
-
-    // Build cascades of SQL variants and run both in parallel
-    const financialVariants = buildSqlVariants('financial', year, month, startDate, endDate, childFk, parentPk)
-    const weightVariants = buildSqlVariants('weight', year, month, startDate, endDate, childFk, parentPk)
-
-    const [financialResult, weightResult] = await Promise.all([
-      queryWithFallback(baseUrl, headers, financialVariants, appKey),
-      queryWithFallback(baseUrl, headers, weightVariants, appKey),
-    ])
-
-    const financialData = financialResult.rows
-    const weightData = weightResult.rows
-
-    // Build seller map keyed by sellerCode
-    const sellerMap = new Map<string, {
-      sellerCode: string
-      sellerName: string
-      financialTarget: number
-      weightTargets: Array<{ brand: string; targetKg: number }>
-    }>()
-
-    for (const row of financialData) {
-      const code = String(row.CODVEND ?? '').trim()
-      if (!code || code === '0') continue
-      const existing = sellerMap.get(code)
-      if (existing) {
-        existing.financialTarget += parseNumber(row.META_FINANCEIRA)
-      } else {
-        sellerMap.set(code, {
-          sellerCode: code,
-          sellerName: String(row.VENDEDOR ?? '').trim(),
-          financialTarget: parseNumber(row.META_FINANCEIRA),
-          weightTargets: [],
-        })
+    const payload = await withRequestCache(cacheKey, 30_000, async () => {
+      let bearerToken: string | null = null
+      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
+        bearerToken = await authenticateOAuth(config, baseUrl)
       }
-    }
+      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+      const headers = buildHeaders(config, bearerToken)
+      const appKey = config.appKey ?? config.token ?? null
 
-    for (const row of weightData) {
-      const code = String(row.CODVEND ?? '').trim()
-      if (!code || code === '0') continue
-      const brand = String(row.MARCA ?? '').trim()
-      if (!brand) continue
-      const targetKg = parseNumber(row.META_KG)
-      let seller = sellerMap.get(code)
-      if (!seller) {
-        seller = {
-          sellerCode: code,
-          sellerName: String(row.VENDEDOR ?? '').trim(),
-          financialTarget: 0,
-          weightTargets: [],
+      // Discover FK/PK column names (queries ALL_TAB_COLUMNS, falls back to Sankhya defaults)
+      const { childFk, parentPk } = await discoverFkColumns(baseUrl, headers, appKey)
+
+      // Fast probe: check if the period has ANY config rows before running expensive JOINs.
+      // This avoids iterating through all SQL variants for months with no data.
+      const probeSql = `SELECT COUNT(*) AS CNT FROM AD_TVDYCFGPFM WHERE DTINI >= TO_DATE('${startDate}', 'YYYY-MM-DD') AND DTINI < TO_DATE('${endDate}', 'YYYY-MM-DD')`
+      let periodHasData = true
+      try {
+        const probeRows = await queryRows(baseUrl, headers, probeSql, appKey)
+        const cnt = probeRows[0] ? parseNumber(probeRows[0].CNT ?? probeRows[0].cnt ?? 0) : 0
+        if (cnt === 0) periodHasData = false
+      } catch { /* probe failed â€” proceed with full query anyway */ }
+
+      if (!periodHasData) {
+        return { sellers: [], year, month, noDataForPeriod: true }
+      }
+
+      // Build cascades of SQL variants and run both in parallel
+      const financialVariants = buildSqlVariants('financial', year, month, startDate, endDate, childFk, parentPk)
+      const weightVariants = buildSqlVariants('weight', year, month, startDate, endDate, childFk, parentPk)
+
+      const [financialResult, weightResult] = await Promise.all([
+        queryWithFallback(baseUrl, headers, financialVariants, appKey),
+        queryWithFallback(baseUrl, headers, weightVariants, appKey),
+      ])
+
+      const financialData = financialResult.rows
+      const weightData = weightResult.rows
+
+      // Build seller map keyed by sellerCode
+      const sellerMap = new Map<string, {
+        sellerCode: string
+        sellerName: string
+        financialTarget: number
+        weightTargets: Array<{ brand: string; targetKg: number }>
+      }>()
+
+      for (const row of financialData) {
+        const code = String(row.CODVEND ?? '').trim()
+        if (!code || code === '0') continue
+        const existing = sellerMap.get(code)
+        if (existing) {
+          existing.financialTarget += parseNumber(row.META_FINANCEIRA)
+        } else {
+          sellerMap.set(code, {
+            sellerCode: code,
+            sellerName: String(row.VENDEDOR ?? '').trim(),
+            financialTarget: parseNumber(row.META_FINANCEIRA),
+            weightTargets: [],
+          })
         }
-        sellerMap.set(code, seller)
       }
-      const existingBrand = seller.weightTargets.find((w) => w.brand === brand)
-      if (existingBrand) {
-        existingBrand.targetKg += targetKg
-      } else {
-        seller.weightTargets.push({ brand, targetKg })
+
+      for (const row of weightData) {
+        const code = String(row.CODVEND ?? '').trim()
+        if (!code || code === '0') continue
+        const brand = String(row.MARCA ?? '').trim()
+        if (!brand) continue
+        const targetKg = parseNumber(row.META_KG)
+        let seller = sellerMap.get(code)
+        if (!seller) {
+          seller = {
+            sellerCode: code,
+            sellerName: String(row.VENDEDOR ?? '').trim(),
+            financialTarget: 0,
+            weightTargets: [],
+          }
+          sellerMap.set(code, seller)
+        }
+        const existingBrand = seller.weightTargets.find((w) => w.brand === brand)
+        if (existingBrand) {
+          existingBrand.targetKg += targetKg
+        } else {
+          seller.weightTargets.push({ brand, targetKg })
+        }
       }
-    }
 
-    const allSellers = Array.from(sellerMap.values())
-      .sort((a, b) => Number(a.sellerCode) - Number(b.sellerCode))
+      const allSellers = Array.from(sellerMap.values())
+        .sort((a, b) => Number(a.sellerCode) - Number(b.sellerCode))
 
-    // Supervisor scope: filter to only sellers supervised by this user
-    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
-    let sellers = allSellers
-    if (supervisorSellerCode) {
-      const allowlist = await readSellerAllowlist().catch(() => [])
-      const supervisedCodes = new Set(
-        allowlist
-          .filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
-          .map((s) => String(s.code ?? '').trim())
-          .filter((c) => c.length > 0)
-      )
-      if (supervisedCodes.size > 0) {
-        sellers = allSellers.filter((s) => supervisedCodes.has(s.sellerCode))
+      // Supervisor scope: filter to only sellers supervised by this user
+      const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
+      const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+      let sellers = allSellers
+      if (supervisorSellerCode) {
+        const allowlist = await readSellerAllowlist().catch(() => [])
+        const supervisedCodes = new Set(
+          allowlist
+            .filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+            .map((s) => String(s.code ?? '').trim())
+            .filter((c) => c.length > 0)
+        )
+        if (supervisedCodes.size > 0) {
+          sellers = allSellers.filter((s) => supervisedCodes.has(s.sellerCode))
+        }
       }
-    }
 
-    const payload = {
-      sellers,
-      year,
-      month,
-      diagnostics: {
-        childFk,
-        parentPk,
-        financialRows: financialData.length,
-        weightRows: weightData.length,
-        financialSqlIndex: financialResult.sqlIndex,
-        weightSqlIndex: weightResult.sqlIndex,
-        financialErrors: financialResult.errors.slice(-5),
-        weightErrors: weightResult.errors.slice(-5),
-        variantsTriedFinancial: financialVariants.length,
-        variantsTriedWeight: weightVariants.length,
-      },
-    }
-    setRequestCache(cacheKey, payload, 30_000)
+      return {
+        sellers,
+        year,
+        month,
+        diagnostics: {
+          childFk,
+          parentPk,
+          financialRows: financialData.length,
+          weightRows: weightData.length,
+          financialSqlIndex: financialResult.sqlIndex,
+          weightSqlIndex: weightResult.sqlIndex,
+          financialErrors: financialResult.errors.slice(-5),
+          weightErrors: weightResult.errors.slice(-5),
+          variantsTriedFinancial: financialVariants.length,
+          variantsTriedWeight: weightVariants.length,
+        },
+      }
+    })
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar metas de configuracao do Sankhya.'

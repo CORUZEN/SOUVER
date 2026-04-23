@@ -6,7 +6,7 @@ import { getActiveAllowedProductsFromList } from '@/lib/metas/product-allowlist'
 import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
-import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
+import { withRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -349,8 +349,6 @@ export async function GET(req: NextRequest) {
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
   const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
   const cacheKey = `metas:item-distribution:v1:${year}-${month}:${companyScope}:${scopeToken}:${stageEndExclusive.w1}:${stageEndExclusive.w2}:${stageEndExclusive.w3}:${stageEndExclusive.closing}`
-  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
-  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -364,121 +362,122 @@ export async function GET(req: NextRequest) {
   const config = parseStoredConfig(integration.configEncrypted)
 
   try {
-    let bearerToken: string | null = null
-    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
-    if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+    const payload = await withRequestCache(cacheKey, 30_000, async () => {
+      let bearerToken: string | null = null
+      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
+      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
 
-    const headers = buildHeaders(config, bearerToken)
-    const appKey = config.appKey ?? config.token ?? null
+      const headers = buildHeaders(config, bearerToken)
+      const appKey = config.appKey ?? config.token ?? null
 
-    const [sellerAllowlist, productAllowlist] = await Promise.all([
-      readSellerAllowlist(),
-      readProductAllowlist(),
-    ])
-    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
-    const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
-    const scopedSellers = supervisorSellerCode
-      ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
-      : activeSellers
-    const sellerCodes = canonicalizeCodeList(scopedSellers
-      .map((s) => String(s.code ?? '').trim())
-      .filter((c) => c.length > 0))
-    const productCodes = canonicalizeCodeList(getActiveAllowedProductsFromList(productAllowlist)
-      .map((p) => String(p.code ?? '').trim())
-      .filter((c) => c.length > 0))
+      const [sellerAllowlist, productAllowlist] = await Promise.all([
+        readSellerAllowlist(),
+        readProductAllowlist(),
+      ])
+      const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
+      const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+      const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
+      const scopedSellers = supervisorSellerCode
+        ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+        : activeSellers
+      const sellerCodes = canonicalizeCodeList(scopedSellers
+        .map((s) => String(s.code ?? '').trim())
+        .filter((c) => c.length > 0))
+      const productCodes = canonicalizeCodeList(getActiveAllowedProductsFromList(productAllowlist)
+        .map((p) => String(p.code ?? '').trim())
+        .filter((c) => c.length > 0))
 
-    if (productCodes.length === 0) {
-      return NextResponse.json({ rows: [], sellerItems: [], year, month })
-    }
+      if (productCodes.length === 0) {
+        return { rows: [], sellerItems: [], year, month }
+      }
 
-    const attempts: Array<{ mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT'; rows: number; sellerItemsRows: number; error?: string }> = []
-    const tryMode = async (mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT') => {
-      try {
-        const rows = await queryRows(
-          baseUrl,
-          headers,
-          buildSql(startDate, endDateExclusive, sellerCodes, productCodes, companyScope, stageEndExclusive, mode),
-          appKey,
-        )
-        let sellerItemsRows: RawRecord[] = []
+      const attempts: Array<{ mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT'; rows: number; sellerItemsRows: number; error?: string }> = []
+      const tryMode = async (mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT') => {
         try {
-          sellerItemsRows = await queryRows(
+          const rows = await queryRows(
             baseUrl,
             headers,
-            buildSellerItemsSql(startDate, endDateExclusive, sellerCodes, productCodes, companyScope, stageEndExclusive, mode),
+            buildSql(startDate, endDateExclusive, sellerCodes, productCodes, companyScope, stageEndExclusive, mode),
             appKey,
           )
-        } catch {
-          sellerItemsRows = []
+          let sellerItemsRows: RawRecord[] = []
+          try {
+            sellerItemsRows = await queryRows(
+              baseUrl,
+              headers,
+              buildSellerItemsSql(startDate, endDateExclusive, sellerCodes, productCodes, companyScope, stageEndExclusive, mode),
+              appKey,
+            )
+          } catch {
+            sellerItemsRows = []
+          }
+          attempts.push({ mode, rows: rows.length, sellerItemsRows: sellerItemsRows.length })
+          return { rows, sellerItemsRows }
+        } catch (error) {
+          attempts.push({
+            mode,
+            rows: 0,
+            sellerItemsRows: 0,
+            error: error instanceof Error ? error.message : 'erro desconhecido',
+          })
+          return null
         }
-        attempts.push({ mode, rows: rows.length, sellerItemsRows: sellerItemsRows.length })
-        return { rows, sellerItemsRows }
-      } catch (error) {
-        attempts.push({
-          mode,
-          rows: 0,
-          sellerItemsRows: 0,
-          error: error instanceof Error ? error.message : 'erro desconhecido',
-        })
-        return null
       }
-    }
 
-    let records: RawRecord[] = []
-    let sellerItemsRecords: RawRecord[] = []
-    for (const mode of ['STRICT', 'FALLBACK_TIPMOV', 'ANY_MOVEMENT'] as const) {
-      const result = await tryMode(mode)
-      if (result && result.rows.length > 0) {
-        records = result.rows
-        sellerItemsRecords = result.sellerItemsRows
-        break
+      let records: RawRecord[] = []
+      let sellerItemsRecords: RawRecord[] = []
+      for (const mode of ['STRICT', 'FALLBACK_TIPMOV', 'ANY_MOVEMENT'] as const) {
+        const result = await tryMode(mode)
+        if (result && result.rows.length > 0) {
+          records = result.rows
+          sellerItemsRecords = result.sellerItemsRows
+          break
+        }
+        if (result && result.rows.length === 0) {
+          // Keep trying next mode when query succeeded but returned no rows.
+        }
       }
-      if (result && result.rows.length === 0) {
-        // Keep trying next mode when query succeeded but returned no rows.
+
+      const rows = records.map((r) => ({
+        sellerCode: normalizeCode(String(r.CODVEND ?? '').trim()),
+        clientCode: normalizeCode(String(r.CODPARC ?? '').trim()),
+        productsW1: Math.max(Math.floor(parseNumber(r.PRODUTOS_W1)), 0),
+        productsW2: Math.max(Math.floor(parseNumber(r.PRODUTOS_W2)), 0),
+        productsW3: Math.max(Math.floor(parseNumber(r.PRODUTOS_W3)), 0),
+        productsClosing: Math.max(Math.floor(parseNumber(r.PRODUTOS_CLOSING)), 0),
+        productsMonth: Math.max(Math.floor(parseNumber(r.PRODUTOS_MES)), 0),
+      }))
+      const sellerItems = sellerItemsRecords.map((r) => ({
+        sellerCode: normalizeCode(String(r.CODVEND ?? '').trim()),
+        itemsW1: Math.max(Math.floor(parseNumber(r.ITENS_W1)), 0),
+        itemsW2: Math.max(Math.floor(parseNumber(r.ITENS_W2)), 0),
+        itemsW3: Math.max(Math.floor(parseNumber(r.ITENS_W3)), 0),
+        itemsClosing: Math.max(Math.floor(parseNumber(r.ITENS_CLOSING)), 0),
+        itemsMonth: Math.max(Math.floor(parseNumber(r.ITENS_MES)), 0),
+      }))
+
+      const uniqueSellers = new Set(rows.map((r) => r.sellerCode).filter(Boolean)).size
+      const uniqueClients = new Set(rows.map((r) => r.clientCode).filter(Boolean)).size
+      const usedAttempt = attempts.find((x) => !x.error && x.rows > 0) ?? attempts.find((x) => !x.error)
+      const queryModeUsed = usedAttempt?.mode ?? 'NONE'
+
+      return {
+        rows,
+        sellerItems,
+        year,
+        month,
+        diagnostics: {
+          queryModeUsed,
+          attempts,
+          totalRows: rows.length,
+          uniqueSellers,
+          uniqueClients,
+          sellerCodesRequested: sellerCodes.length,
+          productCodesRequested: productCodes.length,
+          companyScope,
+        },
       }
-    }
-
-    const rows = records.map((r) => ({
-      sellerCode: normalizeCode(String(r.CODVEND ?? '').trim()),
-      clientCode: normalizeCode(String(r.CODPARC ?? '').trim()),
-      productsW1: Math.max(Math.floor(parseNumber(r.PRODUTOS_W1)), 0),
-      productsW2: Math.max(Math.floor(parseNumber(r.PRODUTOS_W2)), 0),
-      productsW3: Math.max(Math.floor(parseNumber(r.PRODUTOS_W3)), 0),
-      productsClosing: Math.max(Math.floor(parseNumber(r.PRODUTOS_CLOSING)), 0),
-      productsMonth: Math.max(Math.floor(parseNumber(r.PRODUTOS_MES)), 0),
-    }))
-    const sellerItems = sellerItemsRecords.map((r) => ({
-      sellerCode: normalizeCode(String(r.CODVEND ?? '').trim()),
-      itemsW1: Math.max(Math.floor(parseNumber(r.ITENS_W1)), 0),
-      itemsW2: Math.max(Math.floor(parseNumber(r.ITENS_W2)), 0),
-      itemsW3: Math.max(Math.floor(parseNumber(r.ITENS_W3)), 0),
-      itemsClosing: Math.max(Math.floor(parseNumber(r.ITENS_CLOSING)), 0),
-      itemsMonth: Math.max(Math.floor(parseNumber(r.ITENS_MES)), 0),
-    }))
-
-    const uniqueSellers = new Set(rows.map((r) => r.sellerCode).filter(Boolean)).size
-    const uniqueClients = new Set(rows.map((r) => r.clientCode).filter(Boolean)).size
-    const usedAttempt = attempts.find((x) => !x.error && x.rows > 0) ?? attempts.find((x) => !x.error)
-    const queryModeUsed = usedAttempt?.mode ?? 'NONE'
-
-    const payload = {
-      rows,
-      sellerItems,
-      year,
-      month,
-      diagnostics: {
-        queryModeUsed,
-        attempts,
-        totalRows: rows.length,
-        uniqueSellers,
-        uniqueClients,
-        sellerCodesRequested: sellerCodes.length,
-        productCodesRequested: productCodes.length,
-        companyScope,
-      },
-    }
-    setRequestCache(cacheKey, payload, 30_000)
+    })
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar distribuicao de itens no Sankhya.'
