@@ -921,6 +921,25 @@ export default function SupervisorPwaDashboard() {
     }
   }, [openDropdown])
 
+  // Keep filters consistent: if the selected seller doesn't belong to the selected supervisor, reset the mismatching filter
+  useEffect(() => {
+    if (selectedSupervisor && selectedSellerCode) {
+      const seller = sellers.find((s) => s.id === selectedSellerCode)
+      if (seller && seller.supervisorCode !== selectedSupervisor) {
+        setSelectedSellerCode('')
+      }
+    }
+  }, [selectedSupervisor, sellers])
+
+  useEffect(() => {
+    if (selectedSupervisor && selectedSellerCode) {
+      const seller = sellers.find((s) => s.id === selectedSellerCode)
+      if (seller && seller.supervisorCode !== selectedSupervisor) {
+        setSelectedSupervisor('')
+      }
+    }
+  }, [selectedSellerCode, sellers])
+
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
     for (const row of distributionRows) {
