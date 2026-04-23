@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowDown,
@@ -2230,7 +2230,9 @@ export default function MetasWorkspace() {
           }
         })
 
-        setSellers(mapped)
+        startTransition(() => {
+          setSellers(mapped)
+        })
         const diag = (data?.diagnostics as PerformanceDiagnostics | undefined) ?? {
           selectedMonthOrders: mapped.reduce((sum, seller) => sum + seller.totalOrders, 0),
         }
@@ -2242,7 +2244,9 @@ export default function MetasWorkspace() {
           porStatus: diag.byStatus ?? {},
           porEmpresa: diag.byCompany ?? {},
         })
-        setPerformanceDiagnostics(diag)
+        startTransition(() => {
+          setPerformanceDiagnostics(diag)
+        })
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
@@ -2275,8 +2279,10 @@ export default function MetasWorkspace() {
         const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>
         const brands = (payload.brands ?? []) as string[]
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
-        setBrandWeightRows(rows)
-        setBrandWeightBrands(brands)
+        startTransition(() => {
+          setBrandWeightRows(rows)
+          setBrandWeightBrands(brands)
+        })
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
@@ -3001,6 +3007,14 @@ export default function MetasWorkspace() {
     }
     return bySeller
   }, [distributionSellerItemsRows])
+  const deferredSellers = useDeferredValue(sellers)
+  const deferredRuleBlocks = useDeferredValue(ruleBlocks)
+  const deferredProductAllowlist = useDeferredValue(productAllowlist)
+  const deferredBrandWeightRows = useDeferredValue(brandWeightRows)
+  const deferredFocusProductRows = useDeferredValue(focusProductRows)
+  const deferredSankhyaTargets = useDeferredValue(sankhyaTargets)
+  const deferredDistributionBySellerProduct = useDeferredValue(distributionBySellerProduct)
+  const deferredDistributionItemsBySeller = useDeferredValue(distributionItemsBySeller)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -3052,9 +3066,11 @@ export default function MetasWorkspace() {
           itemsClosing: Math.max(Math.floor(parseDecimal(String(row.itemsClosing ?? 0), 0)), 0),
           itemsMonth: Math.max(Math.floor(parseDecimal(String(row.itemsMonth ?? 0), 0)), 0),
         })) as SellerDistributionItemsRow[]
-        setDistributionRows(mapped)
-        setDistributionSellerItemsRows(mappedSellerItems)
-        setDistributionDiagnostics(((data?.diagnostics as DistributionDiagnostics | undefined) ?? null))
+        startTransition(() => {
+          setDistributionRows(mapped)
+          setDistributionSellerItemsRows(mappedSellerItems)
+          setDistributionDiagnostics(((data?.diagnostics as DistributionDiagnostics | undefined) ?? null))
+        })
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
@@ -3299,6 +3315,15 @@ export default function MetasWorkspace() {
   const standby = !activeMonth?.week1StartDate || (hasMonthEnded(year, month, activeMonth?.closingWeekEndDate ?? '') && !nextConfigured)
 
   const snapshots = useMemo<SellerSnapshot[]>(() => {
+    const sellers = deferredSellers
+    const ruleBlocks = deferredRuleBlocks
+    const productAllowlist = deferredProductAllowlist
+    const brandWeightRows = deferredBrandWeightRows
+    const focusProductRows = deferredFocusProductRows
+    const sankhyaTargets = deferredSankhyaTargets
+    const distributionBySellerProduct = deferredDistributionBySellerProduct
+    const distributionItemsBySeller = deferredDistributionItemsBySeller
+
     const todayIso = toIsoDate(new Date())
     const stageStarted = new Set<StageKey>(
       cycle.weeks.filter((w) => w.start && w.start <= todayIso).map((w) => w.key)
@@ -3698,7 +3723,7 @@ export default function MetasWorkspace() {
         }
       })
       .sort((a, b) => b.pointsAchieved - a.pointsAchieved)
-  }, [activeMonth?.sellerIncludedDates, brandWeightRows, cycle.weeks, extraBonus, extraMinPoints, focusProductRows, prizes, productAllowlist, resolveBlockProfileType, ruleBlocks, sankhyaTargets, sellers])
+  }, [activeMonth?.sellerIncludedDates, cycle.weeks, deferredBrandWeightRows, deferredDistributionBySellerProduct, deferredDistributionItemsBySeller, deferredFocusProductRows, deferredProductAllowlist, deferredRuleBlocks, deferredSankhyaTargets, deferredSellers, extraBonus, extraMinPoints, prizes, resolveBlockProfileType, sankhyaConnected, year, month])
 
   useEffect(() => {
     if (snapshots.length === 0) {
@@ -4826,11 +4851,15 @@ export default function MetasWorkspace() {
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
+    let idleHandle: number | null = null
+    let timerHandle: ReturnType<typeof setTimeout> | null = null
 
     const loadPreviousConsolidated = async () => {
       // Reset immediately so stale data from previous navigation never shows as comparison
-      setPreviousSellersData([])
-      setKpiConsolidatedPreviousByType({})
+      startTransition(() => {
+        setPreviousSellersData([])
+        setKpiConsolidatedPreviousByType({})
+      })
       try {
         const previousMonthDate = new Date(year, month - 1, 1)
         const previousYear = previousMonthDate.getFullYear()
@@ -5500,7 +5529,9 @@ export default function MetasWorkspace() {
             pending: Math.max(values.total - values.hit, 0),
           }
         }
-        setKpiConsolidatedPreviousByType(mapped)
+        startTransition(() => {
+          setKpiConsolidatedPreviousByType(mapped)
+        })
 
         // Build per-seller data for scoped MoM comparison
         const newPreviousSellersData = previousSellers.map((s) => {
@@ -5525,17 +5556,46 @@ export default function MetasWorkspace() {
             metasTotal: metas.total,
           }
         })
-        setPreviousSellersData(newPreviousSellersData)
+        startTransition(() => {
+          setPreviousSellersData(newPreviousSellersData)
+        })
       } catch {
         if (cancelled || controller.signal.aborted) return
-        setKpiConsolidatedPreviousByType({})
-        setPreviousSellersData([])
+        startTransition(() => {
+          setKpiConsolidatedPreviousByType({})
+          setPreviousSellersData([])
+        })
       }
     }
 
-    void loadPreviousConsolidated()
+    const runWhenIdle = () => {
+      if (cancelled || controller.signal.aborted) return
+      void loadPreviousConsolidated()
+    }
+
+    if (typeof window === 'undefined') {
+      runWhenIdle()
+    } else {
+      const idleApi = window as Window & {
+        requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+        cancelIdleCallback?: (handle: number) => void
+      }
+      if (typeof idleApi.requestIdleCallback === 'function') {
+        idleHandle = idleApi.requestIdleCallback(() => runWhenIdle(), { timeout: 1500 })
+      } else {
+        timerHandle = setTimeout(runWhenIdle, 220)
+      }
+    }
+
     return () => {
       cancelled = true
+      if (timerHandle) clearTimeout(timerHandle)
+      if (idleHandle !== null) {
+        const idleApi = window as Window & { cancelIdleCallback?: (handle: number) => void }
+        if (typeof idleApi.cancelIdleCallback === 'function') {
+          idleApi.cancelIdleCallback(idleHandle)
+        }
+      }
       controller.abort()
     }
   }, [companyScopeFilter, kpiConsolidatedComparableStages, kpiConsolidatedScope, kpiConsolidatedSupervisorKey, month, monthConfigs, productAllowlist, ruleBlocks, year])

@@ -926,7 +926,8 @@ export default function SupervisorPwaDashboard() {
       .then((data) => {
         if (!data?.user) { router.replace('/app/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR' && roleCode !== 'SELLER') { router.replace('/app'); return }
+        const ALLOWED_SUPERVISOR_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SALES_SUPERVISOR', 'SELLER', 'DIRECTORATE', 'COMMERCIAL_MANAGER', 'DEVELOPER'])
+        if (!ALLOWED_SUPERVISOR_ROLES.has(roleCode)) { router.replace('/app'); return }
         // Keep continuity between "Validando acesso" and "Carregando sistema".
         setBootProgress(15)
         setUser({
@@ -1420,7 +1421,11 @@ export default function SupervisorPwaDashboard() {
                   ? 'VENDEDOR'
                   : user.roleCode === 'SALES_SUPERVISOR'
                     ? 'SUPERVISOR DE VENDAS'
-                    : 'SUPERVISOR COMERCIAL'}
+                    : user.roleCode === 'DIRECTORATE'
+                      ? 'DIRETORIA'
+                      : user.roleCode === 'COMMERCIAL_MANAGER'
+                        ? 'GERÊNCIA COMERCIAL'
+                        : 'SUPERVISOR COMERCIAL'}
               </p>
             </div>
           </div>

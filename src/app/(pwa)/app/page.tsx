@@ -20,7 +20,12 @@ export default function PwaEntryPage() {
           return
         }
 
-        // Manager / Director / Developer — go to full desktop
+        if (roleCode === 'DIRECTORATE') {
+          window.location.replace('/app/diretoria')
+          return
+        }
+
+        // Manager / Developer — go to full desktop
         window.location.replace('/metas')
       })
       .catch(() => {

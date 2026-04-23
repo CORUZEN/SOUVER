@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
-const MOBILE_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SELLER'])
+const MOBILE_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SELLER', 'DIRECTORATE'])
 
 /**
  * Silently redirects mobile users with supervisor/seller roles to the
