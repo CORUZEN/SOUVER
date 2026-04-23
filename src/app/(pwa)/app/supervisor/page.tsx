@@ -926,7 +926,7 @@ export default function SupervisorPwaDashboard() {
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR') { router.replace('/app'); return }
+        if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR' && roleCode !== 'SELLER') { router.replace('/app'); return }
         // Keep continuity between "Validando acesso" and "Carregando sistema".
         setBootProgress(15)
         setUser({
@@ -954,7 +954,9 @@ export default function SupervisorPwaDashboard() {
 
   // ── Load performance data ─────────────────────────────────────────────────
   const loadData = useCallback(async () => {
-    const loadKey = `${year}-${month}`
+    const loggedSellerCode = normalizeCode(String(user?.sellerCode ?? ''))
+    const isSellerUser = user?.roleCode === 'SELLER'
+    const loadKey = `${year}-${month}-${user?.roleCode ?? ''}-${loggedSellerCode}`
     if (inFlightKeyRef.current === loadKey) return
     inFlightKeyRef.current = loadKey
     const loadId = ++activeLoadIdRef.current
@@ -1128,20 +1130,61 @@ export default function SupervisorPwaDashboard() {
       const [distributionData, focusRowsByProductData] = await Promise.all([distributionPromise, focusRowsPromise])
       if (loadId !== activeLoadIdRef.current) return
 
-      setSellers(perfData.sellers ?? [])
-      setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
-      setPreviousMonthTotalTarget(Number(prevSummaryData?.totalMonthlyTarget ?? 0))
-      setBrandWeightRows(brandWeightData?.rows ?? [])
+      const allCurrentSellers = (perfData.sellers ?? []) as SellerRow[]
+      const allPreviousSellers = (prevPerfData?.sellers ?? []) as SellerRow[]
+      const scopedCurrentSellers = isSellerUser && loggedSellerCode
+        ? allCurrentSellers.filter((seller) => normalizeCode(seller.id.replace(/^sankhya-/, '')) === loggedSellerCode)
+        : allCurrentSellers
+      const scopedPreviousSellers = isSellerUser && loggedSellerCode
+        ? allPreviousSellers.filter((seller) => normalizeCode(seller.id.replace(/^sankhya-/, '')) === loggedSellerCode)
+        : allPreviousSellers
+
+      const scopedPreviousTarget = (() => {
+        if (!isSellerUser || !loggedSellerCode) return Number(prevSummaryData?.totalMonthlyTarget ?? 0)
+        const previousSellersSummary = Array.isArray(prevSummaryData?.sellers) ? prevSummaryData.sellers : []
+        const targetRow = previousSellersSummary.find((row: { code?: string; monthlyTarget?: number }) =>
+          normalizeCode(String(row.code ?? '')) === loggedSellerCode
+        )
+        return Number(targetRow?.monthlyTarget ?? 0)
+      })()
+
+      const scopedBrandWeightRows = ((brandWeightData?.rows ?? []) as BrandWeightRow[]).filter((row) => {
+        if (!isSellerUser || !loggedSellerCode) return true
+        return normalizeCode(String(row.sellerCode ?? '')) === loggedSellerCode
+      })
+
+      const scopedDistributionRows = ((distributionData?.rows ?? []) as SellerDistributionRow[]).filter((row) => {
+        if (!isSellerUser || !loggedSellerCode) return true
+        return normalizeCode(String(row.sellerCode ?? '')) === loggedSellerCode
+      })
+
+      const scopedDistributionSellerItemsRows = ((distributionData?.sellerItems ?? []) as SellerDistributionItemsRow[]).filter((row) => {
+        if (!isSellerUser || !loggedSellerCode) return true
+        return normalizeCode(String(row.sellerCode ?? '')) === loggedSellerCode
+      })
+
+      const scopedFocusRowsByProductData = Object.fromEntries(
+        Object.entries(focusRowsByProductData).map(([productCode, rows]) => {
+          if (!isSellerUser || !loggedSellerCode) return [productCode, rows]
+          const filteredRows = (rows as FocusProductRow[]).filter((row) => normalizeCode(String(row.sellerCode ?? '')) === loggedSellerCode)
+          return [productCode, filteredRows]
+        })
+      )
+
+      setSellers(scopedCurrentSellers)
+      setPreviousMonthSellers(scopedPreviousSellers)
+      setPreviousMonthTotalTarget(scopedPreviousTarget)
+      setBrandWeightRows(scopedBrandWeightRows)
       setMonthlyTargets(targets)
       setProfileTypes(ptypes)
       setMaxRewards(mrewards)
       setSellerRules(srules)
       setWeightTargetsBySeller(swtargets)
       setFocusConfigBySeller(sfocus)
-      setDistributionRows((distributionData?.rows ?? []) as SellerDistributionRow[])
-      setDistributionSellerItemsRows((distributionData?.sellerItems ?? []) as SellerDistributionItemsRow[])
+      setDistributionRows(scopedDistributionRows)
+      setDistributionSellerItemsRows(scopedDistributionSellerItemsRows)
       setDistributionProductCount(Number(distributionData?.diagnostics?.productCodesRequested ?? 0))
-      setFocusRowsByProduct(focusRowsByProductData)
+      setFocusRowsByProduct(scopedFocusRowsByProductData as Record<string, FocusProductRow[]>)
       if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
       setBootProgress(100)
       setLastUpdated(new Date())
@@ -1157,7 +1200,7 @@ export default function SupervisorPwaDashboard() {
     } finally {
       if (inFlightKeyRef.current === loadKey) inFlightKeyRef.current = null
     }
-  }, [year, month])
+  }, [year, month, user])
 
   useEffect(() => {
     if (user) loadData()
@@ -1361,7 +1404,11 @@ export default function SupervisorPwaDashboard() {
             <div>
               <p className="text-[13px] font-semibold leading-tight text-white">{formatHeaderIdentity(user.name)}</p>
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-300 leading-tight">
-                {user.roleCode === 'SALES_SUPERVISOR' ? 'SUPERVISOR DE VENDAS' : 'SUPERVISOR COMERCIAL'}
+                {user.roleCode === 'SELLER'
+                  ? 'VENDEDOR'
+                  : user.roleCode === 'SALES_SUPERVISOR'
+                    ? 'SUPERVISOR DE VENDAS'
+                    : 'SUPERVISOR COMERCIAL'}
               </p>
             </div>
           </div>
