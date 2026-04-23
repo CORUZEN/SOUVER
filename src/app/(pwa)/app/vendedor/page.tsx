@@ -95,6 +95,7 @@ export default function VendedorPwaDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showOrders, setShowOrders] = useState(false)
   const [bootProgress, setBootProgress] = useState(0)
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
@@ -134,9 +135,18 @@ export default function VendedorPwaDashboard() {
     try {
       let completed = 0
       const total = 2
+      let displayedProgress = 0
+      const pushProgress = (rawValue: number) => {
+        const clamped = Math.min(Math.max(rawValue, 0), 95)
+        const next = Math.max(displayedProgress, clamped)
+        if (next !== displayedProgress) {
+          displayedProgress = next
+          setBootProgress(next)
+        }
+      }
       const markDone = () => {
         completed += 1
-        setBootProgress(Math.round((completed / total) * 100))
+        pushProgress(Math.round((completed / total) * 100))
       }
 
       const [perfRes, summaryRes] = await Promise.all([
@@ -165,9 +175,11 @@ export default function VendedorPwaDashboard() {
       }
       setBootProgress(100)
       setLastUpdated(new Date())
+      setHasLoadedInitialData(true)
       setLoadState('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados.')
+      setHasLoadedInitialData(true)
       setLoadState('error')
     }
   }, [year, month, user])
@@ -214,6 +226,10 @@ export default function VendedorPwaDashboard() {
 
   if (!user) {
     return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
+  }
+
+  if (!hasLoadedInitialData && (loadState === 'idle' || loadState === 'loading')) {
+    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
   }
 
   return (
@@ -285,7 +301,7 @@ export default function VendedorPwaDashboard() {
           </div>
         )}
 
-        {loadState === 'loading' && !seller && (
+        {hasLoadedInitialData && loadState === 'loading' && !seller && (
           <div className="flex min-h-[320px] items-center justify-center">
             <div className="inline-flex items-center gap-2 px-2 py-1">
               <RefreshCw className="h-4 w-4 animate-spin text-emerald-300/90" />

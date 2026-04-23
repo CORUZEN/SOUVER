@@ -887,6 +887,7 @@ export default function SupervisorPwaDashboard() {
   const [previousMonthSellers, setPreviousMonthSellers] = useState<SellerRow[]>([])
   const [previousMonthTotalTarget, setPreviousMonthTotalTarget] = useState(0)
   const [bootProgress, setBootProgress] = useState(0)
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
@@ -969,15 +970,24 @@ export default function SupervisorPwaDashboard() {
     try {
       let completed = 0
       let total = 0
+      let displayedProgress = 0
+      const pushProgress = (rawValue: number) => {
+        const clamped = Math.min(Math.max(rawValue, 0), 95)
+        const next = Math.max(displayedProgress, clamped)
+        if (next !== displayedProgress) {
+          displayedProgress = next
+          setBootProgress(next)
+        }
+      }
       const markTotal = (stepCount = 1) => {
         total += stepCount
         const next = total > 0 ? Math.round((completed / total) * 100) : 0
-        setBootProgress(next)
+        pushProgress(next)
       }
       const markDone = () => {
         completed += 1
         const next = total > 0 ? Math.round((completed / total) * 100) : 0
-        setBootProgress(next)
+        pushProgress(next)
       }
       const trackedFetch = (url: string) => {
         markTotal(1)
@@ -1121,9 +1131,11 @@ export default function SupervisorPwaDashboard() {
       if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
       setBootProgress(100)
       setLastUpdated(new Date())
+      setHasLoadedInitialData(true)
       setLoadState('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados.')
+      setHasLoadedInitialData(true)
       setLoadState('error')
     }
   }, [year, month])
@@ -1312,6 +1324,10 @@ export default function SupervisorPwaDashboard() {
     return <PwaLoadingScreen label="Validando acesso" progress={bootProgress} />
   }
 
+  if (!hasLoadedInitialData && (loadState === 'idle' || loadState === 'loading')) {
+    return <PwaLoadingScreen label="Carregando metas" progress={bootProgress} />
+  }
+
   return (
     <div className="pwa-shell flex h-dvh min-h-dvh flex-col overflow-y-auto overscroll-y-contain bg-surface-950 text-white [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
 
@@ -1406,7 +1422,7 @@ export default function SupervisorPwaDashboard() {
         )}
 
         {/* Loading state */}
-        {loadState === 'loading' && sellers.length === 0 && (
+        {hasLoadedInitialData && loadState === 'loading' && sellers.length === 0 && (
           <div className="flex min-h-[320px] items-center justify-center">
             <div className="inline-flex items-center gap-2 px-2 py-1">
               <RefreshCw className="h-4 w-4 animate-spin text-emerald-300/90" />
