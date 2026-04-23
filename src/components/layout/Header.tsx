@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { MODULE_PLANS } from '@/lib/development-modules'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { clearAuthMeCache, fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 interface UserInfo {
   name: string
@@ -169,11 +169,13 @@ function HeaderInner() {
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
+    clearAuthMeCache()
     window.location.href = '/login'
   }
 
   async function handleStopImpersonation() {
     await fetch('/api/auth/impersonate/stop', { method: 'POST' })
+    clearAuthMeCache()
     window.location.reload()
   }
 

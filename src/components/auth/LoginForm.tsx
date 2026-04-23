@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
+import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
 
 export default function LoginForm() {
   const [form, setForm] = useState({ login: '', password: '' })
@@ -69,6 +70,7 @@ export default function LoginForm() {
         return
       }
 
+      clearAuthMeCache()
       window.location.href = '/dashboard'
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
+import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
 
 export default function PwaLoginPage() {
   const router = useRouter()
@@ -70,6 +71,8 @@ export default function PwaLoginPage() {
         window.location.href = '/configuracoes/2fa?setup=required'
         return
       }
+
+      clearAuthMeCache()
 
       // Resolve the target PWA route immediately — avoids any soft-navigation
       // flash through the /app entry page or web routes.

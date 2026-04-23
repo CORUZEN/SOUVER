@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal'
 import Table, { Column } from '@/components/ui/Table'
 import Badge from '@/components/ui/Badge'
 import { ErrorState, Spinner } from '@/components/ui/Skeleton'
+import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
 
 interface UserRow {
   id: string
@@ -256,6 +257,7 @@ export default function GestaoUsuariosPage() {
     })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(d.message ?? 'Falha ao locar como usuário.')
+    clearAuthMeCache()
     window.location.href = '/'
   }
 

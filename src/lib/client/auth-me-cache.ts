@@ -58,3 +58,9 @@ export async function fetchAuthMeCached(options: FetchAuthMeOptions = {}): Promi
   }
   return result
 }
+
+export function clearAuthMeCache() {
+  inFlightAuthMe = null
+  lastAuthMeValue = null
+  lastAuthMeAt = 0
+}

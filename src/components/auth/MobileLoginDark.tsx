@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
+import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
 
 /**
  * Renderiza a versão mobile dark da tela de login (idêntica ao /app/login).
@@ -74,6 +75,7 @@ export default function MobileLoginDark() {
         return
       }
 
+      clearAuthMeCache()
       window.location.href = '/dashboard'
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

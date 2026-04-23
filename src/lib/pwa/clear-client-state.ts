@@ -1,3 +1,5 @@
+import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+
 function deleteIndexedDb(name: string): Promise<void> {
   return new Promise((resolve) => {
     try {
@@ -55,6 +57,7 @@ function clearWebStorage() {
 }
 
 export async function clearPwaClientState() {
+  clearAuthMeCache()
   clearWebStorage()
   await Promise.allSettled([
     clearCachesStorage(),
