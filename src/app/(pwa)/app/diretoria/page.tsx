@@ -21,6 +21,8 @@ import {
   Settings,
   Plug,
   ChevronRight,
+  X,
+  ExternalLink,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -191,6 +193,7 @@ export default function DiretoriaPwaDashboard() {
   const [bootProgress, setBootProgress] = useState(0)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [showVersionInfo, setShowVersionInfo] = useState(false)
   const authCheckStartedRef = useRef(false)
 
   // ── Auth check ────────────────────────────────────────────────────────────
@@ -318,14 +321,35 @@ export default function DiretoriaPwaDashboard() {
         </div>
       </header>
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 px-4 pb-8 pt-5">
-
-        {/* Greeting */}
-        <div className="mb-5">
-          <h1 className="text-lg font-bold text-white">Central de Comando</h1>
-          <p className="text-xs text-surface-400 mt-0.5">Acesse os módulos corporativos do Ouro Verde</p>
+      {/* ── Hero Header ────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 50% at 15% 30%, rgba(16,185,129,0.10) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 85% 20%, rgba(56,189,248,0.06) 0%, transparent 60%)',
+          }}
+        />
+        <div className="relative px-5 pt-7 pb-1">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/20">
+              <LayoutDashboard className="h-5 w-5 text-emerald-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold tracking-tight text-white">
+                Central de Comando
+              </h1>
+            </div>
+          </div>
+          <p className="mt-2 text-[13px] font-medium text-emerald-100/40">
+            Acesse os módulos corporativos do Ouro Verde
+          </p>
+          <div className="mt-5 h-px w-full bg-emerald-500/10" />
         </div>
+      </div>
+
+      {/* ── Content ──────────────────────────────────────────────────────── */}
+      <main className="flex-1 px-4 pb-8 pt-4">
 
         {/* Grid */}
         <div className="grid grid-cols-2 gap-3">
@@ -370,11 +394,94 @@ export default function DiretoriaPwaDashboard() {
           <p className="mt-3 text-[11px] font-semibold tracking-wide text-surface-400 uppercase">
             Sistema Ouro Verde © 2026
           </p>
-          <p className="text-[10px] text-surface-600">
+          <button
+            type="button"
+            onClick={() => setShowVersionInfo(true)}
+            className="text-[10px] text-surface-600 hover:text-emerald-400 transition-colors"
+          >
             Versão {APP_VERSION_LABEL}
-          </p>
+          </button>
         </div>
       </main>
+
+      {/* ── Version Info Modal ───────────────────────────────────────────── */}
+      {showVersionInfo && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
+          onClick={() => setShowVersionInfo(false)}
+        >
+          <div
+            className="w-full max-w-xs rounded-3xl border border-emerald-500/15 bg-[#0f1f14] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Sobre o sistema</p>
+              <button
+                type="button"
+                onClick={() => setShowVersionInfo(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-surface-400 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="my-4 h-px w-full bg-emerald-500/10" />
+
+            {/* Info rows */}
+            <div className="flex flex-col gap-3.5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Software</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-white">Sistema Ouro Verde © 2026</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Versão</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-emerald-300">{APP_VERSION_LABEL}</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Desenvolvedor</p>
+                <a
+                  href="https://instagram.com/jucelio.verissimo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
+                >
+                  Jucélio Verissimo
+                  <ExternalLink className="h-3 w-3 text-surface-500" />
+                </a>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Integrações</p>
+                <a
+                  href="https://coruzen.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
+                >
+                  Coruzen
+                  <ExternalLink className="h-3 w-3 text-surface-500" />
+                </a>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="my-4 h-px w-full bg-emerald-500/10" />
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowVersionInfo(false)}
+              className="w-full rounded-2xl bg-emerald-500/15 py-3 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-500/20 hover:bg-emerald-500/25 active:scale-95 transition-all"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Sign-out confirm ─────────────────────────────────────────────── */}
       {showSignOutConfirm && (
