@@ -205,7 +205,7 @@ export default function DiretoriaPwaDashboard() {
       </header>
 
       {/* ── Page Header ────────────────────────────────────────────────────── */}
-      <div className="pwa-monthbar flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-3">
+      <div className="pwa-monthbar flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-2">
         <div className="w-7" aria-hidden="true" />
         <div className="text-center">
           <p className="text-sm font-semibold text-white">Central de Comando</p>
@@ -226,7 +226,7 @@ export default function DiretoriaPwaDashboard() {
 
             const wrapperProps = isClickable
               ? {
-                  onClick: () => router.push(mod.href!),
+                  onClick: () => router.push('/app/metas-diretoria'),
                   className: 'pwa-card group relative flex items-center gap-2.5 rounded-2xl border border-surface-700/50 bg-surface-900 px-3.5 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]',
                 }
               : {
