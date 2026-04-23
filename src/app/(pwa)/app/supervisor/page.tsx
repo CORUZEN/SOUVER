@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
@@ -888,6 +888,10 @@ export default function SupervisorPwaDashboard() {
   const [previousMonthTotalTarget, setPreviousMonthTotalTarget] = useState(0)
   const [bootProgress, setBootProgress] = useState(0)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+  const hasLoadedInitialDataRef = useRef(false)
+  const authCheckStartedRef = useRef(false)
+  const activeLoadIdRef = useRef(0)
+  const inFlightKeyRef = useRef<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
@@ -914,14 +918,17 @@ export default function SupervisorPwaDashboard() {
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
-    setBootProgress(0)
+    if (authCheckStartedRef.current) return
+    authCheckStartedRef.current = true
+    setBootProgress(5)
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'COMMERCIAL_SUPERVISOR' && roleCode !== 'SALES_SUPERVISOR') { router.replace('/app'); return }
-        setBootProgress(100)
+        // Keep continuity between "Validando acesso" and "Carregando metas".
+        setBootProgress(15)
         setUser({
           name: data.user.name,
           role: data.user.role,
@@ -947,9 +954,14 @@ export default function SupervisorPwaDashboard() {
 
   // ── Load performance data ─────────────────────────────────────────────────
   const loadData = useCallback(async () => {
+    const loadKey = `${year}-${month}`
+    if (inFlightKeyRef.current === loadKey) return
+    inFlightKeyRef.current = loadKey
+    const loadId = ++activeLoadIdRef.current
+
     setLoadState('loading')
     setError('')
-    setBootProgress(0)
+    if (!hasLoadedInitialDataRef.current) setBootProgress((prev) => Math.max(prev, 15))
     // Clear visible data immediately when period changes to avoid stale numbers during loading.
     setSellers([])
     setMonthlyTargets({})
@@ -970,8 +982,9 @@ export default function SupervisorPwaDashboard() {
     try {
       let completed = 0
       let total = 0
-      let displayedProgress = 0
+      let displayedProgress = hasLoadedInitialDataRef.current ? 0 : 15
       const pushProgress = (rawValue: number) => {
+        if (loadId !== activeLoadIdRef.current) return
         const clamped = Math.min(Math.max(rawValue, 0), 95)
         const next = Math.max(displayedProgress, clamped)
         if (next !== displayedProgress) {
@@ -1113,6 +1126,7 @@ export default function SupervisorPwaDashboard() {
       })()
 
       const [distributionData, focusRowsByProductData] = await Promise.all([distributionPromise, focusRowsPromise])
+      if (loadId !== activeLoadIdRef.current) return
 
       setSellers(perfData.sellers ?? [])
       setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
@@ -1131,12 +1145,17 @@ export default function SupervisorPwaDashboard() {
       if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
       setBootProgress(100)
       setLastUpdated(new Date())
+      hasLoadedInitialDataRef.current = true
       setHasLoadedInitialData(true)
       setLoadState('success')
     } catch (err) {
+      if (loadId !== activeLoadIdRef.current) return
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados.')
+      hasLoadedInitialDataRef.current = true
       setHasLoadedInitialData(true)
       setLoadState('error')
+    } finally {
+      if (inFlightKeyRef.current === loadKey) inFlightKeyRef.current = null
     }
   }, [year, month])
 

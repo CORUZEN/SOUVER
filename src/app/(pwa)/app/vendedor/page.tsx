@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
@@ -96,19 +96,26 @@ export default function VendedorPwaDashboard() {
   const [showOrders, setShowOrders] = useState(false)
   const [bootProgress, setBootProgress] = useState(0)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+  const hasLoadedInitialDataRef = useRef(false)
+  const authCheckStartedRef = useRef(false)
+  const activeLoadIdRef = useRef(0)
+  const inFlightKeyRef = useRef<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   // Auth
   useEffect(() => {
-    setBootProgress(0)
+    if (authCheckStartedRef.current) return
+    authCheckStartedRef.current = true
+    setBootProgress(5)
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.user) { router.replace('/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
         if (roleCode !== 'SELLER') { router.replace('/app'); return }
-        setBootProgress(100)
+        // Keep continuity between "Validando acesso" and "Carregando metas".
+        setBootProgress(15)
         setUser({ name: data.user.name, roleCode, sellerCode: data.user.sellerCode })
       })
       .catch(() => router.replace('/login'))
@@ -125,9 +132,14 @@ export default function VendedorPwaDashboard() {
   }, [])
 
   const loadData = useCallback(async () => {
+    const loadKey = `${year}-${month}-${user?.sellerCode ?? ''}`
+    if (inFlightKeyRef.current === loadKey) return
+    inFlightKeyRef.current = loadKey
+    const loadId = ++activeLoadIdRef.current
+
     setLoadState('loading')
     setError('')
-    setBootProgress(0)
+    if (!hasLoadedInitialDataRef.current) setBootProgress((prev) => Math.max(prev, 15))
     // Clear visible data immediately when period changes to avoid stale numbers during loading.
     setSeller(null)
     setTarget(0)
@@ -135,8 +147,9 @@ export default function VendedorPwaDashboard() {
     try {
       let completed = 0
       const total = 2
-      let displayedProgress = 0
+      let displayedProgress = hasLoadedInitialDataRef.current ? 0 : 15
       const pushProgress = (rawValue: number) => {
+        if (loadId !== activeLoadIdRef.current) return
         const clamped = Math.min(Math.max(rawValue, 0), 95)
         const next = Math.max(displayedProgress, clamped)
         if (next !== displayedProgress) {
@@ -161,6 +174,7 @@ export default function VendedorPwaDashboard() {
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
       ])
+      if (loadId !== activeLoadIdRef.current) return
 
       const myRow: SellertRow | undefined = (perfData.sellers ?? []).find(
         (s: SellertRow) => user?.sellerCode && s.id.replace(/^sankhya-/, '') === user.sellerCode
@@ -175,12 +189,17 @@ export default function VendedorPwaDashboard() {
       }
       setBootProgress(100)
       setLastUpdated(new Date())
+      hasLoadedInitialDataRef.current = true
       setHasLoadedInitialData(true)
       setLoadState('success')
     } catch (err) {
+      if (loadId !== activeLoadIdRef.current) return
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados.')
+      hasLoadedInitialDataRef.current = true
       setHasLoadedInitialData(true)
       setLoadState('error')
+    } finally {
+      if (inFlightKeyRef.current === loadKey) inFlightKeyRef.current = null
     }
   }, [year, month, user])
 
