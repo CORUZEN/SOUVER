@@ -1010,36 +1010,7 @@ export default function SupervisorPwaDashboard() {
         ? (summaryData.cycleWeeks as CycleWeek[])
         : []
 
-      // Keep item-distribution in sync with web calculations by sending stage closing dates.
-      const distParams = new URLSearchParams({
-        year: String(year),
-        month: String(month),
-        companyScope: 'all',
-      })
-      const weekByKey = new Map(cycleWeeksFromSummary.map((w) => [String(w.key).toUpperCase(), w]))
-      const w1 = weekByKey.get('W1')?.end
-      const w2 = weekByKey.get('W2')?.end
-      const w3 = weekByKey.get('W3')?.end
-      const closing = weekByKey.get('CLOSING')?.end
-      if (w1) distParams.set('w1End', w1)
-      if (w2) distParams.set('w2End', w2)
-      if (w3) distParams.set('w3End', w3)
-      if (closing) distParams.set('closingEnd', closing)
-
-      let distributionData: { rows?: SellerDistributionRow[]; sellerItems?: SellerDistributionItemsRow[]; diagnostics?: { productCodesRequested?: number } } | null = null
-      try {
-        const distributionRes = await trackedFetch(`/api/metas/sellers-performance/item-distribution?${distParams.toString()}`)
-        distributionData = distributionRes.ok ? await distributionRes.json() : null
-      } catch {
-        distributionData = null
-      }
-
-      setSellers(perfData.sellers ?? [])
-      setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
-      setPreviousMonthTotalTarget(Number(prevSummaryData?.totalMonthlyTarget ?? 0))
-      setBrandWeightRows(brandWeightData?.rows ?? [])
-
-      // Build monthly targets map from summary
+      // Build summary maps first so dependent requests can run in parallel.
       const targets: Record<string, number> = {}
       const ptypes: Record<string, string> = {}
       const mrewards: Record<string, number> = {}
@@ -1085,17 +1056,34 @@ export default function SupervisorPwaDashboard() {
           }
         }
       }
-      setMonthlyTargets(targets)
-      setProfileTypes(ptypes)
-      setMaxRewards(mrewards)
-      setSellerRules(srules)
-      setWeightTargetsBySeller(swtargets)
-      setFocusConfigBySeller(sfocus)
-      setDistributionRows((distributionData?.rows ?? []) as SellerDistributionRow[])
-      setDistributionSellerItemsRows((distributionData?.sellerItems ?? []) as SellerDistributionItemsRow[])
-      setDistributionProductCount(Number(distributionData?.diagnostics?.productCodesRequested ?? 0))
 
-      if (focusCodes.size > 0) {
+      // Keep item-distribution in sync with web calculations by sending stage closing dates.
+      const distParams = new URLSearchParams({
+        year: String(year),
+        month: String(month),
+        companyScope: 'all',
+      })
+      const weekByKey = new Map(cycleWeeksFromSummary.map((w) => [String(w.key).toUpperCase(), w]))
+      const w1 = weekByKey.get('W1')?.end
+      const w2 = weekByKey.get('W2')?.end
+      const w3 = weekByKey.get('W3')?.end
+      const closing = weekByKey.get('CLOSING')?.end
+      if (w1) distParams.set('w1End', w1)
+      if (w2) distParams.set('w2End', w2)
+      if (w3) distParams.set('w3End', w3)
+      if (closing) distParams.set('closingEnd', closing)
+
+      const distributionPromise = (async () => {
+        try {
+          const distributionRes = await trackedFetch(`/api/metas/sellers-performance/item-distribution?${distParams.toString()}`)
+          return distributionRes.ok ? await distributionRes.json() : null
+        } catch {
+          return null
+        }
+      })()
+
+      const focusRowsPromise = (async () => {
+        if (focusCodes.size === 0) return {} as Record<string, FocusProductRow[]>
         markTotal(focusCodes.size)
         const entries = await Promise.all(
           [...focusCodes].map(async (code) => {
@@ -1111,10 +1099,25 @@ export default function SupervisorPwaDashboard() {
             return [code, normalizedRows] as const
           })
         )
-        setFocusRowsByProduct(Object.fromEntries(entries))
-      } else {
-        setFocusRowsByProduct({})
-      }
+        return Object.fromEntries(entries)
+      })()
+
+      const [distributionData, focusRowsByProductData] = await Promise.all([distributionPromise, focusRowsPromise])
+
+      setSellers(perfData.sellers ?? [])
+      setPreviousMonthSellers((prevPerfData?.sellers ?? []) as SellerRow[])
+      setPreviousMonthTotalTarget(Number(prevSummaryData?.totalMonthlyTarget ?? 0))
+      setBrandWeightRows(brandWeightData?.rows ?? [])
+      setMonthlyTargets(targets)
+      setProfileTypes(ptypes)
+      setMaxRewards(mrewards)
+      setSellerRules(srules)
+      setWeightTargetsBySeller(swtargets)
+      setFocusConfigBySeller(sfocus)
+      setDistributionRows((distributionData?.rows ?? []) as SellerDistributionRow[])
+      setDistributionSellerItemsRows((distributionData?.sellerItems ?? []) as SellerDistributionItemsRow[])
+      setDistributionProductCount(Number(distributionData?.diagnostics?.productCodesRequested ?? 0))
+      setFocusRowsByProduct(focusRowsByProductData)
       if (cycleWeeksFromSummary.length > 0) setCycleWeeks(cycleWeeksFromSummary)
       setBootProgress(100)
       setLastUpdated(new Date())
@@ -1246,68 +1249,63 @@ export default function SupervisorPwaDashboard() {
 
   const todayIso = new Date().toISOString().slice(0, 10)
 
-  const sellerCards = sellers.map((seller) => {
-    const code = seller.id.replace(/^sankhya-/, '')
-    const normalizedCode = normalizeCode(code)
-    const target = monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0
-    const financialPct = target > 0 ? (seller.totalValue / target) * 100 : 0
-    const clients = countDistinctClients(seller)
-    const profileType = profileTypes[code] ?? profileTypes[normalizedCode] ?? 'NOVATO'
-    const maxReward = maxRewards[code] ?? maxRewards[normalizedCode] ?? 0
-    const wTargets = weightTargetsBySeller[code] ?? weightTargetsBySeller[normalizedCode] ?? []
-    const weightTargetKg = wTargets.reduce((sum, row) => sum + Math.max(row.targetKg ?? 0, 0), 0)
-    const focusConfig = focusConfigBySeller[code] ?? focusConfigBySeller[normalizedCode] ?? null
-    const earnedReward = computeEarnedReward(
-      sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
-      cycleWeeks,
-      seller.orders,
-      seller.returns ?? [],
-      seller.openTitles ?? [],
-      target,
-      seller.baseClientCount,
-      wTargets,
-      brandWeightRows,
-      distributionBySellerProduct,
-      distributionItemsBySeller,
-      distributionProductCount,
-      focusConfig,
-      focusRowsByProduct,
-      normalizedCode,
-      todayIso,
-    )
-    const kpiProgress = computeAllKpiProgress(
-      sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
-      cycleWeeks,
-      seller.orders,
-      seller.returns ?? [],
-      seller.openTitles ?? [],
-      target,
-      seller.baseClientCount,
-      wTargets,
-      brandWeightRows,
-      distributionBySellerProduct,
-      distributionItemsBySeller,
-      distributionProductCount,
-      focusConfig,
-      focusRowsByProduct,
-      normalizedCode,
-      todayIso,
-    )
-    const rulesForSeller = sellerRules[code] ?? sellerRules[normalizedCode] ?? []
-    const pointsAchieved = rulesForSeller.reduce((sum, rule) => {
-      const progress = kpiProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-      return sum + rule.points * Math.min(Math.max(progress, 0), 1)
-    }, 0)
-    const pointsTarget = rulesForSeller.reduce((sum, rule) => sum + Math.max(rule.points ?? 0, 0), 0)
-    const cyclePct = pointsTarget > 0 ? (pointsAchieved / pointsTarget) * 100 : 0
-    const status = inferStatus(cyclePct)
+  const sellerCards = useMemo(() => {
+    return sellers.map((seller) => {
+      const code = seller.id.replace(/^sankhya-/, '')
+      const normalizedCode = normalizeCode(code)
+      const target = monthlyTargets[code] ?? monthlyTargets[normalizedCode] ?? 0
+      const financialPct = target > 0 ? (seller.totalValue / target) * 100 : 0
+      const clients = countDistinctClients(seller)
+      const wTargets = weightTargetsBySeller[code] ?? weightTargetsBySeller[normalizedCode] ?? []
+      const weightTargetKg = wTargets.reduce((sum, row) => sum + Math.max(row.targetKg ?? 0, 0), 0)
+      const focusConfig = focusConfigBySeller[code] ?? focusConfigBySeller[normalizedCode] ?? null
+      const kpiProgress = computeAllKpiProgress(
+        sellerRules[code] ?? sellerRules[normalizedCode] ?? [],
+        cycleWeeks,
+        seller.orders,
+        seller.returns ?? [],
+        seller.openTitles ?? [],
+        target,
+        seller.baseClientCount,
+        wTargets,
+        brandWeightRows,
+        distributionBySellerProduct,
+        distributionItemsBySeller,
+        distributionProductCount,
+        focusConfig,
+        focusRowsByProduct,
+        normalizedCode,
+        todayIso,
+      )
+      const rulesForSeller = sellerRules[code] ?? sellerRules[normalizedCode] ?? []
+      const pointsAchieved = rulesForSeller.reduce((sum, rule) => {
+        const progress = kpiProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        return sum + rule.points * Math.min(Math.max(progress, 0), 1)
+      }, 0)
+      const pointsTarget = rulesForSeller.reduce((sum, rule) => sum + Math.max(rule.points ?? 0, 0), 0)
+      const cyclePct = pointsTarget > 0 ? (pointsAchieved / pointsTarget) * 100 : 0
+      const status = inferStatus(cyclePct)
 
-    return { seller, code, target, financialPct, cyclePct, status, clients, profileType, maxReward, earnedReward, kpiProgress, pointsAchieved, weightTargetKg }
-  }).sort((a, b) => {
-    if (b.cyclePct !== a.cyclePct) return b.cyclePct - a.cyclePct
-    if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
-    return a.seller.name.localeCompare(b.seller.name, 'pt-BR')
-  })
+      return { seller, code, target, financialPct, cyclePct, status, clients, kpiProgress, pointsAchieved, weightTargetKg }
+    }).sort((a, b) => {
+      if (b.cyclePct !== a.cyclePct) return b.cyclePct - a.cyclePct
+      if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
+      return a.seller.name.localeCompare(b.seller.name, 'pt-BR')
+    })
+  }, [
+    sellers,
+    monthlyTargets,
+    weightTargetsBySeller,
+    focusConfigBySeller,
+    sellerRules,
+    cycleWeeks,
+    brandWeightRows,
+    distributionBySellerProduct,
+    distributionItemsBySeller,
+    distributionProductCount,
+    focusRowsByProduct,
+    todayIso,
+  ])
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
   if (!user) {
