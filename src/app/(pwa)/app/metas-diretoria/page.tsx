@@ -1629,12 +1629,12 @@ export default function SupervisorPwaDashboard() {
                 <div className="mt-1 flex items-end justify-between gap-2">
                   <p className={`text-2xl font-extrabold tabular-nums tracking-tight ${
                     overallPct >= 100
-                      ? 'bg-linear-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent'
-                      : overallPct >= 75
-                      ? 'bg-linear-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent'
-                      : overallPct >= 25
-                      ? 'bg-linear-to-r from-amber-200 to-orange-300 bg-clip-text text-transparent'
-                      : 'bg-linear-to-r from-rose-300 to-red-300 bg-clip-text text-transparent'
+                      ? 'text-emerald-300'
+                      : overallPct >= 80
+                      ? 'text-sky-300'
+                      : overallPct >= 50
+                      ? 'text-amber-300'
+                      : 'text-rose-300'
                   }`}>
                     {overallPctDisplayLabel}
                   </p>
@@ -1643,12 +1643,12 @@ export default function SupervisorPwaDashboard() {
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${
                       overallPct >= 100
-                        ? 'bg-linear-to-r from-emerald-400 to-lime-300 shadow-[0_0_10px_rgba(52,211,153,0.30)]'
-                        : overallPct >= 75
-                        ? 'bg-linear-to-r from-cyan-400 to-teal-300 shadow-[0_0_10px_rgba(34,211,238,0.28)]'
-                        : overallPct >= 25
-                        ? 'bg-linear-to-r from-amber-300 to-orange-300 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
-                        : 'bg-linear-to-r from-rose-400 to-red-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
+                        ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.30)]'
+                        : overallPct >= 80
+                        ? 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.28)]'
+                        : overallPct >= 50
+                        ? 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.26)]'
+                        : 'bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.28)]'
                     }`}
                     style={{ width: `${Math.min(overallPct, 100)}%` }}
                   />
