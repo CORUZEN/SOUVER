@@ -32,14 +32,19 @@ export async function proxy(req: NextRequest) {
 
   const token = req.cookies.get('souver_token')?.value
 
+  // Rotas /app/* sem autenticação vão direto para o login PWA
+  const loginUrl = pathname.startsWith('/app/')
+    ? new URL('/app/login', req.url)
+    : new URL('/login', req.url)
+
   if (!token) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.redirect(loginUrl)
   }
 
   const payload = await verifyTokenEdge(token)
 
   if (!payload) {
-    const response = NextResponse.redirect(new URL('/login', req.url))
+    const response = NextResponse.redirect(loginUrl)
     response.cookies.delete('souver_token')
     return response
   }

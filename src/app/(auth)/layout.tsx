@@ -2,7 +2,6 @@
 import { Manrope } from 'next/font/google'
 import { cn } from '@/lib/utils'
 import PwaInstallBanner from '@/components/ui/PwaInstallBanner'
-import MobileLoginRedirect from '@/components/auth/MobileLoginRedirect'
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -17,7 +16,6 @@ export default function AuthLayout({
 }) {
   return (
     <>
-      <MobileLoginRedirect />
       <div className={cn(manrope.className, 'relative h-dvh overflow-hidden bg-[#08142a]')}>
       <div className="pointer-events-none absolute left-[-20%] top-[-20%] h-144 w-xl rounded-full bg-emerald-400/15 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-26%] right-[-12%] h-120 w-120 rounded-full bg-cyan-400/10 blur-[110px]" />
