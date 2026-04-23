@@ -62,7 +62,7 @@ export default function PwaLoginPage() {
       }
 
       if (data.requiresTwoFactor) {
-        window.location.href = '/login/2fa'
+        window.location.href = '/app/login/2fa'
         return
       }
 
@@ -71,7 +71,24 @@ export default function PwaLoginPage() {
         return
       }
 
-      window.location.replace('/app')
+      // Resolve the target PWA route immediately — avoids any soft-navigation
+      // flash through the /app entry page or web routes.
+      try {
+        const meRes = await fetch('/api/auth/me', { cache: 'no-store' })
+        const me = meRes.ok ? await meRes.json() : null
+        const roleCode: string = me?.user?.roleCode?.toUpperCase() ?? ''
+
+        if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
+          window.location.replace('/app/supervisor')
+        } else if (roleCode === 'SELLER') {
+          window.location.replace('/app/vendedor')
+        } else {
+          // Managers, Directors, Developers — go directly to the web system
+          window.location.replace('/metas')
+        }
+      } catch {
+        window.location.replace('/app')
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         setApiError('A autenticação demorou mais que o esperado. Tente novamente.')

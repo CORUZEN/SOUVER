@@ -1,35 +1,32 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 
 export default function PwaEntryPage() {
-  const router = useRouter()
-
   useEffect(() => {
-    fetchAuthMeCached()
+    fetchAuthMeCached({ force: true })
       .then((data) => {
         const roleCode = data?.user?.roleCode?.toUpperCase() ?? ''
 
         if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
-          router.replace('/app/supervisor')
+          window.location.replace('/app/supervisor')
           return
         }
 
         if (roleCode === 'SELLER') {
-          router.replace('/app/vendedor')
+          window.location.replace('/app/vendedor')
           return
         }
 
         // Manager / Director / Developer — go to full desktop
-        router.replace('/metas')
+        window.location.replace('/metas')
       })
       .catch(() => {
-        router.replace('/app/login')
+        window.location.replace('/app/login')
       })
-  }, [router])
+  }, [])
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface-950">
