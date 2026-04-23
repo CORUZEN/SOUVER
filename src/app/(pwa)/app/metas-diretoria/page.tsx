@@ -20,6 +20,7 @@ import {
   Target,
   ChevronDown,
   ChevronUp,
+  Check,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -899,6 +900,26 @@ export default function SupervisorPwaDashboard() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>('')
   const [selectedSellerCode, setSelectedSellerCode] = useState<string>('')
+  const [openDropdown, setOpenDropdown] = useState<'supervisor' | 'seller' | null>(null)
+  const supervisorDropdownRef = useRef<HTMLDivElement>(null)
+  const sellerDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        supervisorDropdownRef.current &&
+        !supervisorDropdownRef.current.contains(event.target as Node) &&
+        sellerDropdownRef.current &&
+        !sellerDropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdown(null)
+      }
+    }
+    if (openDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdown])
 
   const distributionBySellerProduct = useMemo(() => {
     const bySeller = new Map<string, SellerDistributionRow[]>()
@@ -1694,33 +1715,104 @@ export default function SupervisorPwaDashboard() {
 
             {/* ── Seller cards ───────────────────────────────────────────── */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2 px-1 pb-1">
-                <Users className="h-4 w-4 text-surface-500" />
-                <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Vendedores</p>
-                <span className="ml-auto text-xs font-semibold tabular-nums text-surface-300">{filteredSellerCards.length}</span>
-              </div>
-
               <div className="grid grid-cols-2 gap-2 px-1 pb-2">
-                <select
-                  value={selectedSupervisor}
-                  onChange={(e) => setSelectedSupervisor(e.target.value)}
-                  className="w-full rounded-xl border border-surface-700/50 bg-surface-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/50"
-                >
-                  <option value="">Supervisores</option>
-                  {uniqueSupervisors.map(([code, name]) => (
-                    <option key={code} value={code}>{name}</option>
-                  ))}
-                </select>
-                <select
-                  value={selectedSellerCode}
-                  onChange={(e) => setSelectedSellerCode(e.target.value)}
-                  className="w-full rounded-xl border border-surface-700/50 bg-surface-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/50"
-                >
-                  <option value="">Vendedores</option>
-                  {sellers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                {/* Supervisor filter */}
+                <div ref={supervisorDropdownRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'supervisor' ? null : 'supervisor')}
+                    className="flex w-full items-center justify-between rounded-xl border border-surface-700/50 bg-surface-900 px-3 py-2.5 text-left transition-colors active:bg-surface-800"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Supervisores</span>
+                      <span className="truncate text-sm font-medium text-white">
+                        {selectedSupervisor
+                          ? (uniqueSupervisors.find(([code]) => code === selectedSupervisor)?.[1] ?? selectedSupervisor)
+                          : 'Todos'}
+                      </span>
+                    </div>
+                    <div className="ml-2 flex shrink-0 items-center gap-1.5">
+                      <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
+                        {uniqueSupervisors.length}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-surface-500 transition-transform ${openDropdown === 'supervisor' ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {openDropdown === 'supervisor' && (
+                    <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-surface-700/50 bg-surface-900 shadow-xl shadow-black/40">
+                      <div className="max-h-56 overflow-y-auto py-1">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedSupervisor(''); setOpenDropdown(null) }}
+                          className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors ${selectedSupervisor === '' ? 'bg-emerald-500/10 text-emerald-300' : 'text-white hover:bg-surface-800'}`}
+                        >
+                          <span>Todos</span>
+                          {selectedSupervisor === '' && <Check className="h-4 w-4 text-emerald-400" />}
+                        </button>
+                        {uniqueSupervisors.map(([code, name]) => (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => { setSelectedSupervisor(code); setOpenDropdown(null) }}
+                            className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors ${selectedSupervisor === code ? 'bg-emerald-500/10 text-emerald-300' : 'text-white hover:bg-surface-800'}`}
+                          >
+                            <span className="truncate pr-2">{name}</span>
+                            {selectedSupervisor === code && <Check className="h-4 w-4 shrink-0 text-emerald-400" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Seller filter */}
+                <div ref={sellerDropdownRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'seller' ? null : 'seller')}
+                    className="flex w-full items-center justify-between rounded-xl border border-surface-700/50 bg-surface-900 px-3 py-2.5 text-left transition-colors active:bg-surface-800"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Vendedores</span>
+                      <span className="truncate text-sm font-medium text-white">
+                        {selectedSellerCode
+                          ? (sellers.find((s) => s.id === selectedSellerCode)?.name ?? selectedSellerCode)
+                          : 'Todos'}
+                      </span>
+                    </div>
+                    <div className="ml-2 flex shrink-0 items-center gap-1.5">
+                      <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md bg-surface-800 px-1.5 text-[10px] font-bold tabular-nums text-surface-400">
+                        {sellers.length}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-surface-500 transition-transform ${openDropdown === 'seller' ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {openDropdown === 'seller' && (
+                    <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-surface-700/50 bg-surface-900 shadow-xl shadow-black/40">
+                      <div className="max-h-56 overflow-y-auto py-1">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedSellerCode(''); setOpenDropdown(null) }}
+                          className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors ${selectedSellerCode === '' ? 'bg-emerald-500/10 text-emerald-300' : 'text-white hover:bg-surface-800'}`}
+                        >
+                          <span>Todos</span>
+                          {selectedSellerCode === '' && <Check className="h-4 w-4 text-emerald-400" />}
+                        </button>
+                        {sellers.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => { setSelectedSellerCode(s.id); setOpenDropdown(null) }}
+                            className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors ${selectedSellerCode === s.id ? 'bg-emerald-500/10 text-emerald-300' : 'text-white hover:bg-surface-800'}`}
+                          >
+                            <span className="truncate pr-2">{s.name}</span>
+                            {selectedSellerCode === s.id && <Check className="h-4 w-4 shrink-0 text-emerald-400" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {filteredSellerCards.map(({ seller, target, cyclePct, financialPct, status, clients, kpiProgress, weightTargetKg }, idx) => {
