@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Activity,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -1347,6 +1348,7 @@ export default function MetasWorkspace() {
   const isDeveloperUser = currentUserRoleCode === 'DEVELOPER'
   const isItAnalystUser = currentUserRoleCode === 'IT_ANALYST' || currentUserRoleCode === 'ANALISTA_TI'
   const canAccessDistributionDiagnostics = isDeveloperUser || isItAnalystUser
+  const canViewTelemetry = canAccessDistributionDiagnostics
   const strategicPanelMaintenance = maintenanceBlocks[STRATEGIC_METRICS_PANEL_BLOCK_KEY] ?? { enabled: false }
   const trendPanelMaintenance = maintenanceBlocks[TREND_EVOLUTION_PANEL_BLOCK_KEY] ?? { enabled: false }
   const weeklyAdherencePanelMaintenance = maintenanceBlocks[WEEKLY_ADHERENCE_PANEL_BLOCK_KEY] ?? { enabled: false }
@@ -6134,7 +6136,7 @@ export default function MetasWorkspace() {
                   )}
                 </div>
 
-                {(canViewConfig || canViewSellers || canViewProducts) && (
+                {(canViewConfig || canViewSellers || canViewProducts || canViewTelemetry) && (
                   <div className="h-5 w-px bg-white/20" />
                 )}
 
@@ -6166,6 +6168,16 @@ export default function MetasWorkspace() {
                   >
                     <Boxes size={14} />
                     Produtos
+                  </button>
+                )}
+                {canViewTelemetry && (
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = '/metas/telemetria' }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/40 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-100 backdrop-blur-sm transition-all hover:bg-cyan-500/25"
+                  >
+                    <Activity size={14} />
+                    Telemetria
                   </button>
                 )}
               </>
