@@ -287,9 +287,9 @@ export default function VendedorPwaDashboard() {
 
         {loadState === 'loading' && !seller && (
           <div className="flex min-h-[320px] items-center justify-center">
-            <div className="inline-flex items-center gap-2 rounded-xl border border-surface-700/60 bg-surface-900/70 px-4 py-3">
-              <RefreshCw className="h-4 w-4 animate-spin text-emerald-300" />
-              <span className="text-sm font-semibold text-surface-200">Carregando...</span>
+            <div className="inline-flex items-center gap-2 px-2 py-1">
+              <RefreshCw className="h-4 w-4 animate-spin text-emerald-300/90" />
+              <span className="text-sm font-semibold tracking-[0.01em] text-surface-200/95">Carregando...</span>
             </div>
           </div>
         )}
