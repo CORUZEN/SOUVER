@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -707,6 +708,11 @@ export async function GET(req: NextRequest) {
   if (!baseUrl) return NextResponse.json({ message: 'URL da integracao Sankhya invalida.' }, { status: 412 })
 
   const config = parseStoredConfig(integration.configEncrypted)
+  const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
+  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
+  const cacheKey = `metas:sellers-performance:v1:${year}-${month}:${companyScope}:${scopeToken}`
+  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
+  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   try {
     // --- Auth ---
@@ -1017,7 +1023,7 @@ export async function GET(req: NextRequest) {
       .map((seller) => ({ ...seller, totalOrders: seller.orders.length }))
       .sort((a, b) => b.totalValue - a.totalValue)
 
-    return NextResponse.json({
+    const payload = {
       source: 'sankhya',
       year,
       month,
@@ -1064,7 +1070,10 @@ export async function GET(req: NextRequest) {
         },
       },
       sellers,
-    })
+    }
+
+    setRequestCache(cacheKey, payload, 20_000)
+    return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar pedidos no Sankhya.'
     return NextResponse.json({ message }, { status: 502 })

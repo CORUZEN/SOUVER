@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -465,6 +466,11 @@ export async function GET(req: NextRequest) {
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
   if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
   const config = parseStoredConfig(integration.configEncrypted)
+  const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
+  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
+  const cacheKey = `metas:sankhya-targets:v1:${year}-${month}:${scopeToken}`
+  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
+  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   try {
     let bearerToken: string | null = null
@@ -489,7 +495,9 @@ export async function GET(req: NextRequest) {
     } catch { /* probe failed â€” proceed with full query anyway */ }
 
     if (!periodHasData) {
-      return NextResponse.json({ sellers: [], year, month, noDataForPeriod: true })
+      const payload = { sellers: [], year, month, noDataForPeriod: true }
+      setRequestCache(cacheKey, payload, 30_000)
+      return NextResponse.json(payload)
     }
 
     // Build cascades of SQL variants and run both in parallel
@@ -572,7 +580,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const payload = {
       sellers,
       year,
       month,
@@ -588,7 +596,9 @@ export async function GET(req: NextRequest) {
         variantsTriedFinancial: financialVariants.length,
         variantsTriedWeight: weightVariants.length,
       },
-    })
+    }
+    setRequestCache(cacheKey, payload, 30_000)
+    return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar metas de configuracao do Sankhya.'
     return NextResponse.json({ message }, { status: 502 })

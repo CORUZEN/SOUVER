@@ -6,6 +6,7 @@ import { getActiveAllowedProductsFromList } from '@/lib/metas/product-allowlist'
 import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -345,6 +346,11 @@ export async function GET(req: NextRequest) {
 
   const scopeRaw = req.nextUrl.searchParams.get('companyScope')
   const companyScope: '1' | '2' | 'all' = scopeRaw === '2' ? '2' : scopeRaw === 'all' ? 'all' : '1'
+  const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
+  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
+  const cacheKey = `metas:item-distribution:v1:${year}-${month}:${companyScope}:${scopeToken}:${stageEndExclusive.w1}:${stageEndExclusive.w2}:${stageEndExclusive.w3}:${stageEndExclusive.closing}`
+  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
+  if (cachedPayload) return NextResponse.json(cachedPayload)
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -456,7 +462,7 @@ export async function GET(req: NextRequest) {
     const usedAttempt = attempts.find((x) => !x.error && x.rows > 0) ?? attempts.find((x) => !x.error)
     const queryModeUsed = usedAttempt?.mode ?? 'NONE'
 
-    return NextResponse.json({
+    const payload = {
       rows,
       sellerItems,
       year,
@@ -471,7 +477,9 @@ export async function GET(req: NextRequest) {
         productCodesRequested: productCodes.length,
         companyScope,
       },
-    })
+    }
+    setRequestCache(cacheKey, payload, 30_000)
+    return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar distribuicao de itens no Sankhya.'
     return NextResponse.json({ message }, { status: 502 })

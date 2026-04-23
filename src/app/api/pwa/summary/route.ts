@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
+import { getRequestCache, setRequestCache } from '@/lib/server/request-cache'
 
 const NO_CACHE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -41,6 +42,12 @@ export async function GET(req: NextRequest) {
   const monthRaw = Number(req.nextUrl.searchParams.get('month'))
   const year = Number.isFinite(yearRaw) && yearRaw >= 2020 && yearRaw <= 2100 ? yearRaw : now.getFullYear()
   const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
+  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${user.sellerCode ?? ''}` : roleCode
+  const cacheKey = `pwa:summary:v1:${year}-${month}:${scopeToken}`
+  const cachedPayload = getRequestCache<Record<string, unknown>>(cacheKey)
+  if (cachedPayload) {
+    return NextResponse.json(cachedPayload, { headers: NO_CACHE })
+  }
 
   // ── Load config ────────────────────────────────────────────────────────────
   const configRow = await prisma.metasConfig.findUnique({ where: { scopeKey: '1' } })
@@ -263,20 +270,19 @@ export async function GET(req: NextRequest) {
     return result
   })()
 
-  return NextResponse.json(
-    {
-      year,
-      month,
-      roleCode,
-      isSupervisor,
-      supervisorCode,
-      cycleWeeks,
-      sellers: sellerSummaries,
-      totalMonthlyTarget: sellerSummaries.reduce((sum, s) => sum + s.monthlyTarget, 0),
-      sellerCount: sellerSummaries.length,
-      blocksConfigured: ruleBlocks.length,
-      configuredAt: configRow?.updatedAt ?? null,
-    },
-    { headers: NO_CACHE }
-  )
+  const payload = {
+    year,
+    month,
+    roleCode,
+    isSupervisor,
+    supervisorCode,
+    cycleWeeks,
+    sellers: sellerSummaries,
+    totalMonthlyTarget: sellerSummaries.reduce((sum, s) => sum + s.monthlyTarget, 0),
+    sellerCount: sellerSummaries.length,
+    blocksConfigured: ruleBlocks.length,
+    configuredAt: configRow?.updatedAt ?? null,
+  }
+  setRequestCache(cacheKey, payload, 20_000)
+  return NextResponse.json(payload, { headers: NO_CACHE })
 }
