@@ -6,6 +6,7 @@ import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
+import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 type RawRecord = Record<string, unknown>
 
@@ -226,14 +227,28 @@ ORDER BY CAB.CODVEND`.trim()
 }
 
 export async function GET(req: NextRequest) {
+  const routeId = 'api/metas/sellers-performance/product-focus'
+  const startedAt = Date.now()
+  let responseStatus = 200
+  recordRouteRequest(routeId)
   const authUser = await getAuthUser(req)
-  if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!authUser) {
+    responseStatus = 401
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  }
 
   const now = new Date()
   const yearRaw = Number(req.nextUrl.searchParams.get('year'))
   const monthRaw = Number(req.nextUrl.searchParams.get('month'))
   const productCode = String(req.nextUrl.searchParams.get('productCode') ?? '').trim()
-  if (!productCode) return NextResponse.json({ message: 'Parametro productCode obrigatorio.' }, { status: 400 })
+  if (!productCode) {
+    responseStatus = 400
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'Parametro productCode obrigatorio.' }, { status: 400 })
+  }
 
   const year = Number.isFinite(yearRaw) && yearRaw >= 2000 && yearRaw <= 2100 ? yearRaw : now.getFullYear()
   const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
@@ -249,10 +264,20 @@ export async function GET(req: NextRequest) {
     select: { id: true, baseUrl: true, configEncrypted: true },
   })
 
-  if (!integration?.baseUrl) return NextResponse.json({ message: 'Nenhuma integracao Sankhya ativa.' }, { status: 412 })
+  if (!integration?.baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'Nenhuma integracao Sankhya ativa.' }, { status: 412 })
+  }
 
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
-  if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
+  if (!baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
+  }
 
   const config = parseStoredConfig(integration.configEncrypted)
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
@@ -294,10 +319,15 @@ export async function GET(req: NextRequest) {
 
       return { rows, year, month, productCode }
     })
+    responseStatus = 200
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar item foco no Sankhya.'
+    responseStatus = 502
     return NextResponse.json({ message }, { status: 502 })
+  } finally {
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
   }
 }
 

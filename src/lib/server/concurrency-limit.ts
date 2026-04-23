@@ -1,3 +1,9 @@
+import {
+  observeConcurrencyWait,
+  recordConcurrencyImmediate,
+  recordConcurrencyQueued,
+} from '@/lib/server/telemetry'
+
 type QueueEntry = {
   resolve: () => void
 }
@@ -17,14 +23,18 @@ function getLimiterState(key: string): LimiterState {
   return created
 }
 
-async function acquire(state: LimiterState, maxConcurrent: number): Promise<void> {
+async function acquire(poolKey: string, state: LimiterState, maxConcurrent: number): Promise<void> {
   if (state.active < maxConcurrent) {
+    recordConcurrencyImmediate(poolKey)
     state.active += 1
     return
   }
+  const queuedAt = Date.now()
+  recordConcurrencyQueued(poolKey)
   await new Promise<void>((resolve) => {
     state.queue.push({ resolve })
   })
+  observeConcurrencyWait(poolKey, Date.now() - queuedAt)
   state.active += 1
 }
 
@@ -41,7 +51,7 @@ export async function withConcurrencyLimit<T>(
 ): Promise<T> {
   const safeMax = Number.isFinite(maxConcurrent) ? Math.max(1, Math.floor(maxConcurrent)) : 1
   const state = getLimiterState(key)
-  await acquire(state, safeMax)
+  await acquire(key, state, safeMax)
   try {
     return await task()
   } finally {

@@ -1,3 +1,5 @@
+import { recordCacheEvent } from '@/lib/server/telemetry'
+
 type CacheEntry<T> = {
   value: T
   expiresAt: number
@@ -21,6 +23,7 @@ export function getRequestCache<T>(key: string): T | null {
     valueCache.delete(key)
     return null
   }
+  recordCacheEvent(key, 'hit')
   return entry.value as T
 }
 
@@ -35,12 +38,22 @@ export async function withRequestCache<T>(key: string, ttlMs: number, loader: ()
   if (cached !== null) return cached
 
   const inFlight = inFlightCache.get(key) as Promise<T> | undefined
-  if (inFlight) return inFlight
+  if (inFlight) {
+    recordCacheEvent(key, 'inflight_hit')
+    return inFlight
+  }
 
   const promise = (async () => {
-    const value = await loader()
-    setRequestCache(key, value, ttlMs)
-    return value
+    recordCacheEvent(key, 'miss')
+    try {
+      const value = await loader()
+      setRequestCache(key, value, ttlMs)
+      recordCacheEvent(key, 'load_success')
+      return value
+    } catch (error) {
+      recordCacheEvent(key, 'load_error')
+      throw error
+    }
   })()
 
   inFlightCache.set(key, promise)
@@ -50,4 +63,3 @@ export async function withRequestCache<T>(key: string, ttlMs: number, loader: ()
     if (inFlightCache.get(key) === promise) inFlightCache.delete(key)
   }
 }
-

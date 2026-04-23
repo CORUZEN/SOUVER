@@ -6,6 +6,7 @@ import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
+import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 type RawRecord = Record<string, unknown>
 
@@ -690,8 +691,17 @@ ORDER BY C.COLUMN_ID`
 /* ---------- GET handler ---------- */
 
 export async function GET(req: NextRequest) {
+  const routeId = 'api/metas/sellers-performance'
+  const startedAt = Date.now()
+  let responseStatus = 200
+  recordRouteRequest(routeId)
   const authUser = await getAuthUser(req)
-  if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!authUser) {
+    responseStatus = 401
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  }
 
   const { year, month, startDate, endDateExclusive, companyScope } = parseYearMonth(req)
 
@@ -702,11 +712,19 @@ export async function GET(req: NextRequest) {
   })
 
   if (!integration?.baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Nenhuma integracao Sankhya ativa foi encontrada.' }, { status: 412 })
   }
 
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
-  if (!baseUrl) return NextResponse.json({ message: 'URL da integracao Sankhya invalida.' }, { status: 412 })
+  if (!baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'URL da integracao Sankhya invalida.' }, { status: 412 })
+  }
 
   const config = parseStoredConfig(integration.configEncrypted)
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
@@ -1072,10 +1090,15 @@ export async function GET(req: NextRequest) {
       sellers,
     }
     })
+    responseStatus = 200
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar pedidos no Sankhya.'
+    responseStatus = 502
     return NextResponse.json({ message }, { status: 502 })
+  } finally {
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
   }
 }
 

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { withRequestCache } from '@/lib/server/request-cache'
+import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 const NO_CACHE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -19,8 +20,15 @@ const NO_CACHE = {
  * delivered as a compact payload optimized for mobile rendering.
  */
 export async function GET(req: NextRequest) {
+  const routeId = 'api/pwa/summary'
+  const startedAt = Date.now()
+  let responseStatus = 200
+  recordRouteRequest(routeId)
   const user = await getAuthUser(req)
   if (!user) {
+    responseStatus = 401
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Não autenticado.' }, { status: 401, headers: NO_CACHE })
   }
 
@@ -34,6 +42,9 @@ export async function GET(req: NextRequest) {
     'SELLER',
   ])
   if (!ALLOWED_ROLES.has(roleCode)) {
+    responseStatus = 403
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Sem acesso a este recurso.' }, { status: 403, headers: NO_CACHE })
   }
 
@@ -44,7 +55,8 @@ export async function GET(req: NextRequest) {
   const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
   const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${user.sellerCode ?? ''}` : roleCode
   const cacheKey = `pwa:summary:v1:${year}-${month}:${scopeToken}`
-  const payload = await withRequestCache(cacheKey, 20_000, async () => {
+  try {
+    const payload = await withRequestCache(cacheKey, 20_000, async () => {
 
   // ── Load config ────────────────────────────────────────────────────────────
   const configRow = await prisma.metasConfig.findUnique({ where: { scopeKey: '1' } })
@@ -280,6 +292,15 @@ export async function GET(req: NextRequest) {
     blocksConfigured: ruleBlocks.length,
     configuredAt: configRow?.updatedAt ?? null,
   }
-  })
-  return NextResponse.json(payload, { headers: NO_CACHE })
+    })
+    responseStatus = 200
+    return NextResponse.json(payload, { headers: NO_CACHE })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao consolidar resumo do PWA.'
+    responseStatus = 502
+    return NextResponse.json({ message }, { status: 502, headers: NO_CACHE })
+  } finally {
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+  }
 }

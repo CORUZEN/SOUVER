@@ -5,6 +5,7 @@ import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/i
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
+import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 type RawRecord = Record<string, unknown>
 
@@ -443,8 +444,17 @@ async function queryWithFallback(
 }
 
 export async function GET(req: NextRequest) {
+  const routeId = 'api/metas/sankhya-targets'
+  const startedAt = Date.now()
+  let responseStatus = 200
+  recordRouteRequest(routeId)
   const authUser = await getAuthUser(req)
-  if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  if (!authUser) {
+    responseStatus = 401
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
+  }
 
   const now = new Date()
   const yearRaw = Number(req.nextUrl.searchParams.get('year'))
@@ -462,10 +472,18 @@ export async function GET(req: NextRequest) {
     select: { id: true, baseUrl: true, configEncrypted: true },
   })
   if (!integration?.baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Nenhuma integracao Sankhya ativa.' }, { status: 412 })
   }
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
-  if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
+  if (!baseUrl) {
+    responseStatus = 412
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
+    return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
+  }
   const config = parseStoredConfig(integration.configEncrypted)
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
   const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
@@ -596,10 +614,15 @@ export async function GET(req: NextRequest) {
         },
       }
     })
+    responseStatus = 200
     return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar metas de configuracao do Sankhya.'
+    responseStatus = 502
     return NextResponse.json({ message }, { status: 502 })
+  } finally {
+    recordRouteStatus(routeId, responseStatus)
+    observeRouteDuration(routeId, Date.now() - startedAt)
   }
 }
 
