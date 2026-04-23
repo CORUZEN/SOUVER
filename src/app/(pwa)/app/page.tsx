@@ -19,7 +19,7 @@ export default function PwaEntryPage() {
         }
 
         if (roleCode === 'SELLER') {
-          router.replace('/app/supervisor')
+          router.replace('/app/vendedor')
           return
         }
 

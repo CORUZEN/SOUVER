@@ -956,6 +956,14 @@ export default function SupervisorPwaDashboard() {
   const loadData = useCallback(async () => {
     const loggedSellerCode = normalizeCode(String(user?.sellerCode ?? ''))
     const isSellerUser = user?.roleCode === 'SELLER'
+    if (isSellerUser && !loggedSellerCode) {
+      setLoadState('error')
+      setError('Usuário vendedor sem vínculo com código de vendedor. Solicite ao Desenvolvedor para vincular a conta a um vendedor da lista liberada.')
+      setSellers([])
+      setHasLoadedInitialData(true)
+      hasLoadedInitialDataRef.current = true
+      return
+    }
     const loadKey = `${year}-${month}-${user?.roleCode ?? ''}-${loggedSellerCode}`
     if (inFlightKeyRef.current === loadKey) return
     inFlightKeyRef.current = loadKey
@@ -1138,6 +1146,10 @@ export default function SupervisorPwaDashboard() {
       const scopedPreviousSellers = isSellerUser && loggedSellerCode
         ? allPreviousSellers.filter((seller) => normalizeCode(seller.id.replace(/^sankhya-/, '')) === loggedSellerCode)
         : allPreviousSellers
+
+      if (isSellerUser && loggedSellerCode && scopedCurrentSellers.length === 0) {
+        throw new Error('Vínculo de vendedor não encontrado no período selecionado. Verifique se o código vinculado está correto na gestão de usuários.')
+      }
 
       const scopedPreviousTarget = (() => {
         if (!isSellerUser || !loggedSellerCode) return Number(prevSummaryData?.totalMonthlyTarget ?? 0)

@@ -77,6 +77,7 @@ export default function GestaoUsuariosPage() {
   const [confirming, setConfirming] = useState(false)
 
   const [supervisorSellers, setSupervisorSellers] = useState<{ code: string; name: string }[]>([])
+  const [sellerOptions, setSellerOptions] = useState<{ code: string; name: string }[]>([])
 
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
 
@@ -130,12 +131,18 @@ export default function GestaoUsuariosPage() {
     fetch('/api/metas/sellers-allowlist')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        const list: Array<{ code?: string | null; name: string; profileType?: string }> = d?.sellers ?? d?.list ?? []
+        const list: Array<{ code?: string | null; name: string; profileType?: string; active?: boolean }> = d?.sellers ?? d?.list ?? []
+        const activeOnly = list.filter((s) => s.active !== false && s.code)
         const supervisors = list
-          .filter((s) => s.profileType === 'SUPERVISOR' && s.code)
+          .filter((s) => s.profileType === 'SUPERVISOR' && s.code && s.active !== false)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((s) => ({ code: String(s.code!), name: s.name }))
+        const sellers = activeOnly
+          .filter((s) => s.profileType !== 'SUPERVISOR')
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((s) => ({ code: String(s.code!), name: s.name }))
         setSupervisorSellers(supervisors)
+        setSellerOptions(sellers)
       })
       .catch(() => null)
   }, [isDeveloper])
@@ -150,14 +157,15 @@ export default function GestaoUsuariosPage() {
 
   const selectedRole = useMemo(() => roles.find((r) => r.id === form.roleId) ?? null, [roles, form.roleId])
   const isSalesSupervisor = selectedRole?.code === 'SALES_SUPERVISOR'
+  const isSellerRole = selectedRole?.code === 'SELLER'
   const comercialDept = useMemo(() => departments.find((d) => d.name.toLowerCase().includes('comercial') || d.code?.toLowerCase().includes('comercial')) ?? null, [departments])
 
   function handleRoleChange(roleId: string) {
     const role = roles.find((r) => r.id === roleId) ?? null
     const updates: Partial<UserFormData> = { roleId }
-    if (role?.code === 'SALES_SUPERVISOR') {
+    if (role?.code === 'SALES_SUPERVISOR' || role?.code === 'SELLER') {
       if (comercialDept) updates.departmentId = comercialDept.id
-      // clear sellerCode so user picks from selector
+      // Clear sellerCode so user explicitly picks the linked seller/supervisor.
       updates.sellerCode = ''
     }
     setForm((p) => ({ ...p, ...updates }))
@@ -192,6 +200,12 @@ export default function GestaoUsuariosPage() {
     try {
       if (!form.fullName.trim() || !form.login.trim() || !form.email.trim()) throw new Error('Preencha nome, login e e-mail.')
       if (!editingUser && !form.password.trim()) throw new Error('Senha obrigatória para novo usuário.')
+      const selectedRoleCode = selectedRole?.code ?? ''
+      if ((selectedRoleCode === 'SALES_SUPERVISOR' || selectedRoleCode === 'SELLER') && !form.sellerCode.trim()) {
+        throw new Error(selectedRoleCode === 'SELLER'
+          ? 'Selecione o vendedor vinculado para este usuário.'
+          : 'Selecione o supervisor vinculado para este usuário.')
+      }
       const payload: Record<string, unknown> = {
         fullName: form.fullName,
         login: form.login,
@@ -390,6 +404,36 @@ export default function GestaoUsuariosPage() {
               )}
               <p className="text-xs text-surface-500">
                 Define quais vendedores este usuário poderá ver no Painel de Metas.
+              </p>
+            </div>
+          )}
+          {isSellerRole && (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-surface-700">
+                Vendedor vinculado <span className="text-error-500">*</span>
+              </label>
+              {sellerOptions.length > 0 ? (
+                <select
+                  value={form.sellerCode}
+                  onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
+                  className="h-10 w-full rounded-lg border border-surface-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">Selecione o vendedor...</option>
+                  {sellerOptions.map((s) => (
+                    <option key={s.code} value={s.code}>{s.name} — código {s.code}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.sellerCode}
+                  onChange={(e) => setForm((p) => ({ ...p, sellerCode: e.target.value }))}
+                  placeholder="Código do vendedor na allowlist (ex.: 34)"
+                  className="h-10 w-full rounded-lg border border-surface-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              )}
+              <p className="text-xs text-surface-500">
+                O vendedor verá somente os próprios dados no painel PWA.
               </p>
             </div>
           )}

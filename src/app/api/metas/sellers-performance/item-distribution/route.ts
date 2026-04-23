@@ -358,7 +358,12 @@ export async function GET(req: NextRequest) {
   const scopeRaw = req.nextUrl.searchParams.get('companyScope')
   const companyScope: '1' | '2' | 'all' = scopeRaw === '2' ? '2' : scopeRaw === 'all' ? 'all' : '1'
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
-  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
+  const normalizedUserSellerCode = String(authUser.sellerCode ?? '').trim()
+  const scopeToken = roleCode === 'SALES_SUPERVISOR'
+    ? `SUP:${normalizedUserSellerCode}`
+    : roleCode === 'SELLER'
+      ? `SELLER:${normalizedUserSellerCode}`
+      : roleCode
   const cacheKey = `metas:item-distribution:v1:${year}-${month}:${companyScope}:${scopeToken}:${stageEndExclusive.w1}:${stageEndExclusive.w2}:${stageEndExclusive.w3}:${stageEndExclusive.closing}`
 
   const integration = await prisma.integration.findFirst({
@@ -395,12 +400,19 @@ export async function GET(req: NextRequest) {
         readSellerAllowlist(),
         readProductAllowlist(),
       ])
-      const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-      const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+      const isSupervisorScope = roleCode === 'SALES_SUPERVISOR'
+      const isSellerScope = roleCode === 'SELLER'
+      const supervisorSellerCode = isSupervisorScope ? normalizedUserSellerCode : null
+      const sellerSelfCode = isSellerScope ? normalizedUserSellerCode : null
       const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
-      const scopedSellers = supervisorSellerCode
+      const scopedSellers = sellerSelfCode
+        ? activeSellers.filter((s) => String(s.code ?? '').trim() === sellerSelfCode)
+        : supervisorSellerCode
         ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
         : activeSellers
+      if (isSellerScope && (!sellerSelfCode || scopedSellers.length === 0)) {
+        throw new Error('Usuário vendedor sem vínculo válido na lista de vendedores liberados.')
+      }
       const sellerCodes = canonicalizeCodeList(scopedSellers
         .map((s) => String(s.code ?? '').trim())
         .filter((c) => c.length > 0))

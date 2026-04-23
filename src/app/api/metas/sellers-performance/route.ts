@@ -728,7 +728,12 @@ export async function GET(req: NextRequest) {
 
   const config = parseStoredConfig(integration.configEncrypted)
   const roleCode = authUser.role?.code?.toUpperCase() ?? 'UNKNOWN'
-  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${authUser.sellerCode ?? ''}` : roleCode
+  const normalizedUserSellerCode = String(authUser.sellerCode ?? '').trim()
+  const scopeToken = roleCode === 'SALES_SUPERVISOR'
+    ? `SUP:${normalizedUserSellerCode}`
+    : roleCode === 'SELLER'
+      ? `SELLER:${normalizedUserSellerCode}`
+      : roleCode
   const cacheKey = `metas:sellers-performance:v1:${year}-${month}:${companyScope}:${scopeToken}`
 
   try {
@@ -747,12 +752,19 @@ export async function GET(req: NextRequest) {
 
     // --- Allowlist ---
     const allowlist = await readSellerAllowlist()
-    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-    const supervisorSellerCode = isSupervisorScope ? (authUser.sellerCode ?? null) : null
+    const isSupervisorScope = roleCode === 'SALES_SUPERVISOR'
+    const isSellerScope = roleCode === 'SELLER'
+    const supervisorSellerCode = isSupervisorScope ? normalizedUserSellerCode : null
+    const sellerSelfCode = isSellerScope ? normalizedUserSellerCode : null
     const allActiveSellers = getActiveAllowedSellersFromList(allowlist)
-    const allowedSellers = supervisorSellerCode
+    const allowedSellers = sellerSelfCode
+      ? allActiveSellers.filter((s) => String(s.code ?? '').trim() === sellerSelfCode)
+      : supervisorSellerCode
       ? allActiveSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
       : allActiveSellers
+    if (isSellerScope && (!sellerSelfCode || allowedSellers.length === 0)) {
+      throw new Error('Usuário vendedor sem vínculo válido na lista de vendedores liberados.')
+    }
     const allowedSellerByCode = new Map<string, (typeof allowedSellers)[number]>()
     const allowedSellerByName = new Map<string, (typeof allowedSellers)[number]>()
     for (const seller of allowedSellers) {

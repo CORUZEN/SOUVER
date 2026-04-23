@@ -53,7 +53,12 @@ export async function GET(req: NextRequest) {
   const monthRaw = Number(req.nextUrl.searchParams.get('month'))
   const year = Number.isFinite(yearRaw) && yearRaw >= 2020 && yearRaw <= 2100 ? yearRaw : now.getFullYear()
   const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
-  const scopeToken = roleCode === 'SALES_SUPERVISOR' ? `SUP:${user.sellerCode ?? ''}` : roleCode
+  const normalizedUserSellerCode = String(user.sellerCode ?? '').trim()
+  const scopeToken = roleCode === 'SALES_SUPERVISOR'
+    ? `SUP:${normalizedUserSellerCode}`
+    : roleCode === 'SELLER'
+      ? `SELLER:${normalizedUserSellerCode}`
+      : roleCode
   const cacheKey = `pwa:summary:v1:${year}-${month}:${scopeToken}`
   try {
     const payload = await withRequestCache(cacheKey, 20_000, async () => {
@@ -70,12 +75,22 @@ export async function GET(req: NextRequest) {
 
   // ── Allowlist — scoped to supervisor if needed ─────────────────────────────
   const isSupervisor = roleCode === 'SALES_SUPERVISOR'
-  const supervisorCode = isSupervisor ? (user.sellerCode ?? null) : null
+  const isSeller = roleCode === 'SELLER'
+  const supervisorCode = isSupervisor ? normalizedUserSellerCode : null
+  const sellerCode = isSeller ? normalizedUserSellerCode : null
+  if (isSeller && !sellerCode) {
+    throw new Error('Usuário vendedor sem vínculo com código de vendedor.')
+  }
   const allowlist = await readSellerAllowlist()
   const activeSellers = getActiveAllowedSellersFromList(allowlist)
-  const scopedSellers = supervisorCode
+  const scopedSellers = sellerCode
+    ? activeSellers.filter((s) => String(s.code ?? '').trim() === sellerCode)
+    : supervisorCode
     ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorCode)
     : activeSellers
+  if (isSeller && scopedSellers.length === 0) {
+    throw new Error('Código de vendedor vinculado não encontrado na lista de vendedores liberados.')
+  }
 
   // ── Infer KPI type from label (mirrors MetasWorkspace.inferKpiType) ──────
   function inferKpiType(kpi: string): string {

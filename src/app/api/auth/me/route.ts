@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
         modulePermissions,
         department: user.department?.name,
         twoFactorEnabled: user.twoFactorEnabled,
+        sellerCode: user.sellerCode ?? null,
         impersonation,
       },
     }, {

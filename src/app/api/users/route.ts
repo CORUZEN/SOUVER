@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
+import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 
 const createUserSchema = z.object({
   fullName: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(120),
@@ -103,6 +105,40 @@ export async function POST(req: NextRequest) {
 
   const { fullName, email, login, phone, password, departmentId, roleId, sellerCode } = parsed.data
 
+  let normalizedSellerCode = String(sellerCode ?? '').trim()
+  if (normalizedSellerCode) {
+    const n = Number(normalizedSellerCode)
+    if (Number.isFinite(n)) normalizedSellerCode = String(n)
+  }
+
+  if (roleId) {
+    const role = await prisma.role.findUnique({
+      where: { id: roleId },
+      select: { code: true },
+    })
+    const roleCode = String(role?.code ?? '').toUpperCase()
+    if (roleCode === 'SALES_SUPERVISOR' || roleCode === 'SELLER') {
+      if (!normalizedSellerCode) {
+        return NextResponse.json(
+          { message: roleCode === 'SELLER' ? 'Vendedor vinculado é obrigatório para cargo Vendedor.' : 'Supervisor vinculado é obrigatório para cargo Supervisor de Vendas.' },
+          { status: 400 },
+        )
+      }
+      const allowlist = await readSellerAllowlist().catch(() => [])
+      const activeCodes = new Set(
+        getActiveAllowedSellersFromList(allowlist)
+          .map((seller) => String(seller.code ?? '').trim())
+          .filter((code) => code.length > 0),
+      )
+      if (!activeCodes.has(normalizedSellerCode)) {
+        return NextResponse.json(
+          { message: 'Código de vendedor não encontrado na lista de vendedores liberados.' },
+          { status: 400 },
+        )
+      }
+    }
+  }
+
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { login }] },
     select: { email: true, login: true },
@@ -123,7 +159,7 @@ export async function POST(req: NextRequest) {
       passwordHash,
       departmentId: departmentId ?? null,
       roleId: roleId ?? null,
-      sellerCode: sellerCode ?? null,
+      sellerCode: normalizedSellerCode || null,
       passwordChangedAt: new Date(),
     },
     select: { id: true, fullName: true, email: true, login: true },

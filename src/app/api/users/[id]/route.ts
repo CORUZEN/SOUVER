@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
+import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 
 const updateUserSchema = z.object({
   fullName: z.string().min(2).max(120).optional(),
@@ -90,6 +92,44 @@ export async function PUT(
 
   const { password, ...rest } = parsed.data
 
+  let normalizedSellerCode = typeof rest.sellerCode === 'string' ? rest.sellerCode.trim() : rest.sellerCode
+  if (typeof normalizedSellerCode === 'string' && normalizedSellerCode) {
+    const n = Number(normalizedSellerCode)
+    if (Number.isFinite(n)) normalizedSellerCode = String(n)
+  }
+
+  const targetRoleId = rest.roleId ?? (await prisma.user.findUnique({ where: { id }, select: { roleId: true } }))?.roleId ?? null
+  if (targetRoleId) {
+    const role = await prisma.role.findUnique({
+      where: { id: targetRoleId },
+      select: { code: true },
+    })
+    const roleCode = String(role?.code ?? '').toUpperCase()
+    if (roleCode === 'SALES_SUPERVISOR' || roleCode === 'SELLER') {
+      const effectiveSellerCode = typeof normalizedSellerCode === 'string'
+        ? normalizedSellerCode
+        : (await prisma.user.findUnique({ where: { id }, select: { sellerCode: true } }))?.sellerCode ?? ''
+      if (!effectiveSellerCode) {
+        return NextResponse.json(
+          { message: roleCode === 'SELLER' ? 'Vendedor vinculado é obrigatório para cargo Vendedor.' : 'Supervisor vinculado é obrigatório para cargo Supervisor de Vendas.' },
+          { status: 400 },
+        )
+      }
+      const allowlist = await readSellerAllowlist().catch(() => [])
+      const activeCodes = new Set(
+        getActiveAllowedSellersFromList(allowlist)
+          .map((seller) => String(seller.code ?? '').trim())
+          .filter((code) => code.length > 0),
+      )
+      if (!activeCodes.has(String(effectiveSellerCode).trim())) {
+        return NextResponse.json(
+          { message: 'Código de vendedor não encontrado na lista de vendedores liberados.' },
+          { status: 400 },
+        )
+      }
+    }
+  }
+
   if (rest.email && rest.email !== target.email) {
     const conflict = await prisma.user.findFirst({ where: { email: rest.email, NOT: { id } } })
     if (conflict) return NextResponse.json({ message: 'Este e-mail já esta em uso.' }, { status: 409 })
@@ -100,6 +140,7 @@ export async function PUT(
   }
 
   const updateData: Record<string, unknown> = { ...rest }
+  if (rest.sellerCode !== undefined) updateData.sellerCode = normalizedSellerCode || null
   if (password) {
     updateData.passwordHash = await hashPassword(password)
     updateData.passwordChangedAt = new Date()
