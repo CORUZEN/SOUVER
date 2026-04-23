@@ -1,10 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import Input from '@/components/ui/Input'
-import Button from '@/components/ui/Button'
-import { Eye, EyeOff, LogIn, Mail } from 'lucide-react'
+import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
 
 export default function LoginForm() {
   const [form, setForm] = useState({ login: '', password: '' })
@@ -87,94 +84,109 @@ export default function LoginForm() {
 
   return (
     <div className="space-y-4">
-      <Input
-        label="Login ou E-mail"
-        name="login"
-        type="text"
-        autoComplete="username"
-        placeholder="seu.login ou email@empresa.com"
-        value={form.login}
-        onChange={handleChange}
-        error={errors.login}
-        leftIcon={<Mail className="h-4 w-4" />}
-        className="h-11 rounded-xl border-slate-300/90 bg-white/90 text-slate-900 placeholder:text-slate-400 focus:ring-emerald-500"
-        required
-        autoFocus
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            void handleSubmit()
-          }
-        }}
-      />
 
-      <Input
-        label="Senha"
-        name="password"
-        type={showPassword ? 'text' : 'password'}
-        autoComplete="current-password"
-        placeholder="Digite sua senha"
-        value={form.password}
-        onChange={handleChange}
-        error={errors.password}
-        className="h-11 rounded-xl border-slate-300/90 bg-white/90 text-slate-900 placeholder:text-slate-400 focus:ring-emerald-500"
-        rightIcon={
+      {/* Login */}
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium uppercase tracking-widest text-white/35">
+          Login ou E-mail
+        </label>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+          <input
+            type="text"
+            name="login"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="seu.login ou e-mail"
+            value={form.login}
+            onChange={handleChange}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
+            className={`pwa-input h-11 w-full rounded-xl border bg-white/6 pl-10 pr-4 text-[14px] font-light text-white/90 placeholder:text-white/20 transition-colors focus:outline-none focus:ring-1 ${
+              errors.login
+                ? 'border-rose-500/50 focus:ring-rose-500/25'
+                : 'border-white/10 focus:border-white/25 focus:ring-white/10'
+            }`}
+          />
+        </div>
+        {errors.login && <p className="text-[11px] text-rose-400">{errors.login}</p>}
+      </div>
+
+      {/* Password */}
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium uppercase tracking-widest text-white/35">
+          Senha
+        </label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            name="password"
+            autoComplete="current-password"
+            placeholder="Sua senha de acesso"
+            value={form.password}
+            onChange={handleChange}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
+            className={`pwa-input h-11 w-full rounded-xl border bg-white/6 pl-10 pr-11 text-[14px] font-light text-white/90 placeholder:text-white/20 transition-colors focus:outline-none focus:ring-1 ${
+              errors.password
+                ? 'border-rose-500/50 focus:ring-rose-500/25'
+                : 'border-white/10 focus:border-white/25 focus:ring-white/10'
+            }`}
+          />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="text-slate-400 transition-colors hover:text-slate-700 focus:outline-none"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 transition-colors hover:text-white/50"
             aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
-        }
-        required
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            void handleSubmit()
-          }
-        }}
-      />
+        </div>
+        {errors.password && <p className="text-[11px] text-rose-400">{errors.password}</p>}
+      </div>
 
+      {/* API error */}
       {apiError && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
-        >
-          <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-              clipRule="evenodd"
-            />
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-500/20 bg-rose-500/8 px-3.5 py-2.5 text-[13px] text-rose-300">
+          <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
           </svg>
           {apiError}
         </div>
       )}
 
-      <Button
+      {/* Submit */}
+      <button
         type="button"
-        onClick={() => {
-          void handleSubmit()
-        }}
-        variant="primary"
-        size="lg"
-        loading={loading || !hydrated}
+        onClick={() => void handleSubmit()}
         disabled={!hydrated || loading}
-        className="mt-2 h-12 w-full rounded-xl bg-slate-900 text-white shadow-[0_10px_30px_rgba(15,23,42,0.22)] transition hover:bg-slate-800 focus-visible:ring-slate-900"
+        className="mt-4 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-500"
       >
-        <LogIn className="h-4 w-4" />
-        {!hydrated ? 'Carregando...' : loading ? 'Autenticando...' : 'Entrar'}
-      </Button>
+        {loading ? (
+          <>
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Autenticando…
+          </>
+        ) : !hydrated ? 'Carregando…' : (
+          <>
+            <LogIn className="h-4 w-4" />
+            Entrar
+          </>
+        )}
+      </button>
 
-      <div className="pt-1 text-center">
-        <Link
+      {/* Esqueci minha senha */}
+      <div className="flex justify-center pt-1">
+        <a
           href="/esqueci-senha"
-          className="text-xs font-medium text-slate-600 hover:text-emerald-700 hover:underline"
+          className="text-xs font-medium text-white/40 transition-colors hover:text-white/70"
         >
           Esqueci minha senha
-        </Link>
+        </a>
       </div>
     </div>
   )
