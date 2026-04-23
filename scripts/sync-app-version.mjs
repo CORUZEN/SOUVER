@@ -10,6 +10,36 @@ const outputDir = path.join(rootDir, 'src', 'generated')
 const outputFile = path.join(outputDir, 'app-version.ts')
 const swFile = path.join(rootDir, 'public', 'sw.js')
 
+function parsePatch(version) {
+  const match = /^1\.01\.(\d+)$/.exec(String(version ?? '').trim())
+  if (!match) return null
+  const patch = Number.parseInt(match[1], 10)
+  return Number.isFinite(patch) ? patch : null
+}
+
+function getCurrentPatch() {
+  try {
+    const current = readFileSync(outputFile, 'utf-8')
+    const match = current.match(/export const APP_VERSION = '([^']+)'/)
+    return parsePatch(match?.[1])
+  } catch {
+    return null
+  }
+}
+
+function getManualBump() {
+  const raw = process.env.APP_VERSION_BUMP?.trim()
+  if (!raw) return 0
+
+  const parsed = Number.parseInt(raw, 10)
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed
+  }
+
+  console.warn(`[version:sync] Ignoring invalid APP_VERSION_BUMP=${raw}`)
+  return 0
+}
+
 function getCommitCount() {
   try {
     const result = execSync('git rev-list --count HEAD', {
@@ -30,7 +60,10 @@ function getCommitCount() {
 }
 
 const commitCount = getCommitCount()
-const appVersion = `1.01.${commitCount}`
+const currentPatch = getCurrentPatch()
+const manualBump = getManualBump()
+const basePatch = Math.max(commitCount, currentPatch ?? 0)
+const appVersion = `1.01.${basePatch + manualBump}`
 const generatedAt = new Date().toISOString()
 
 // ── Write app-version.ts ─────────────────────────────────────────────────────
@@ -60,4 +93,6 @@ try {
   console.warn(`[version:sync] Could not patch sw.js: ${err.message}`)
 }
 
-console.log(`[version:sync] APP_VERSION=${appVersion} (commits=${commitCount})`)
+console.log(
+  `[version:sync] APP_VERSION=${appVersion} (commits=${commitCount}, current=${currentPatch ?? 'n/a'}, bump=${manualBump})`
+)
