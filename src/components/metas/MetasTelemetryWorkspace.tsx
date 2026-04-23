@@ -181,7 +181,7 @@ export default function MetasTelemetryWorkspace() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-surface-200 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+      <Card className="border-surface-200 bg-linear-to-r from-slate-900 to-slate-800 text-white">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">Monitoramento Técnico</p>
