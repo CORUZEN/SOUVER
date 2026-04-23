@@ -53,7 +53,7 @@ export default function PwaForgotPasswordPage() {
 
       {/* ── Form card ───────────────────────────────────────────── */}
       <div className="mx-auto w-full max-w-md px-4 pb-6 pt-2">
-        <div className="flex flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-[0_8px_40px_rgba(0,0,0,0.55),0_2px_8px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="flex flex-col rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-[0_4px_24px_rgba(0,0,0,0.30),0_1px_6px_rgba(0,0,0,0.18)] backdrop-blur-xl">
 
           {sent ? (
             /* ── Success state ────────────────────────────────── */
