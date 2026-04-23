@@ -206,6 +206,17 @@ body {
 .pwa-theme .hover\:text-white:hover { color: var(--pwa-ink) !important; }
 .pwa-theme .hover\:text-rose-400:hover { color: #c19072 !important; }
 
+/* Prevent browser autofill from applying white/yellow background on dark inputs */
+.pwa-theme .pwa-input:-webkit-autofill,
+.pwa-theme .pwa-input:-webkit-autofill:hover,
+.pwa-theme .pwa-input:-webkit-autofill:focus,
+.pwa-theme .pwa-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #243826 inset !important;
+  -webkit-text-fill-color: rgba(236, 235, 220, 0.9) !important;
+  caret-color: rgba(236, 235, 220, 0.9);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 .pwa-theme .pwa-shell {
   position: relative;
 }

@@ -5,8 +5,10 @@ import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
 const PUBLIC_PATHS = [
   '/login',
   '/app/login',
+  '/app/esqueci-senha',
   '/api/auth/login',
   '/api/auth/2fa/verify-login',
+  '/api/auth/forgot-password',
   '/api/health',
   '/api/integrations/sankhya/data-dictionary',
   '/esqueci-senha',
