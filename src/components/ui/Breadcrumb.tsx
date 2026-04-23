@@ -35,6 +35,7 @@ export default function Breadcrumb({ className }: { className?: string }) {
   if (pathname.startsWith('/configuracoes/perfil')) return null
   if (pathname.startsWith('/dev')) return null
   if (pathname.startsWith('/logistica/faturamento-diario')) return null
+  if (pathname.startsWith('/metas/telemetria')) return null
   const segments = pathname.split('/').filter(Boolean)
 
   if (segments.length <= 1) return null
