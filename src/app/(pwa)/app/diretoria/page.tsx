@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
-import { APP_VERSION_LABEL } from '@/generated/app-version'
+import PwaFooter from '@/components/pwa/PwaFooter'
 import {
   RefreshCw,
   LogOut,
@@ -21,8 +21,6 @@ import {
   Settings,
   Plug,
   ChevronRight,
-  X,
-  ExternalLink,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -41,10 +39,6 @@ interface ModuleBlock {
   href?: string
   soon?: boolean
   iconColor: string
-  activeGradient: string
-  inactiveGradient: string
-  activeBorder: string
-  inactiveBorder: string
 }
 
 /* ─────────────────────────────────────────────
@@ -58,127 +52,17 @@ function formatHeaderIdentity(name: string) {
 }
 
 const MODULES: ModuleBlock[] = [
-  {
-    id: 'executive',
-    title: 'Painel Executivo',
-    icon: LayoutDashboard,
-    soon: true,
-    iconColor: 'text-sky-300/70',
-    activeGradient: 'from-sky-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-sky-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'metas',
-    title: 'Metas',
-    icon: Target,
-    href: '/app/supervisor',
-    iconColor: 'text-emerald-300',
-    activeGradient: 'from-emerald-900/30 via-emerald-950/20 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-emerald-400/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'producao',
-    title: 'Produção',
-    icon: Factory,
-    soon: true,
-    iconColor: 'text-amber-300/70',
-    activeGradient: 'from-amber-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-amber-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'logistica',
-    title: 'Logística',
-    icon: Truck,
-    soon: true,
-    iconColor: 'text-orange-300/70',
-    activeGradient: 'from-orange-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-orange-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'qualidade',
-    title: 'Qualidade',
-    icon: ShieldCheck,
-    soon: true,
-    iconColor: 'text-teal-300/70',
-    activeGradient: 'from-teal-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-teal-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'rh',
-    title: 'RH',
-    icon: Users,
-    soon: true,
-    iconColor: 'text-indigo-300/70',
-    activeGradient: 'from-indigo-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-indigo-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'relatorios',
-    title: 'Relatórios',
-    icon: BarChart3,
-    soon: true,
-    iconColor: 'text-violet-300/70',
-    activeGradient: 'from-violet-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-violet-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'contabilidade',
-    title: 'Contabilidade',
-    icon: Landmark,
-    soon: true,
-    iconColor: 'text-cyan-300/70',
-    activeGradient: 'from-cyan-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-cyan-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'comunicacao',
-    title: 'Comunicação',
-    icon: MessageSquare,
-    soon: true,
-    iconColor: 'text-pink-300/70',
-    activeGradient: 'from-pink-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-pink-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'configuracoes',
-    title: 'Configurações',
-    icon: Settings,
-    soon: true,
-    iconColor: 'text-surface-300/70',
-    activeGradient: 'from-surface-800/30 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-surface-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
-  {
-    id: 'integracoes',
-    title: 'Integrações',
-    icon: Plug,
-    soon: true,
-    iconColor: 'text-lime-300/70',
-    activeGradient: 'from-lime-900/20 via-emerald-950/10 to-surface-950',
-    inactiveGradient: 'from-surface-800/20 via-surface-900/10 to-surface-950/70',
-    activeBorder: 'border-lime-500/20',
-    inactiveBorder: 'border-white/[0.04]',
-  },
+  { id: 'executive', title: 'Painel Executivo', icon: LayoutDashboard, soon: true, iconColor: 'text-sky-300/70' },
+  { id: 'metas', title: 'Metas', icon: Target, href: '/app/supervisor', iconColor: 'text-emerald-300' },
+  { id: 'producao', title: 'Produção', icon: Factory, soon: true, iconColor: 'text-amber-300/70' },
+  { id: 'logistica', title: 'Logística', icon: Truck, soon: true, iconColor: 'text-orange-300/70' },
+  { id: 'qualidade', title: 'Qualidade', icon: ShieldCheck, soon: true, iconColor: 'text-teal-300/70' },
+  { id: 'rh', title: 'RH', icon: Users, soon: true, iconColor: 'text-indigo-300/70' },
+  { id: 'relatorios', title: 'Relatórios', icon: BarChart3, soon: true, iconColor: 'text-violet-300/70' },
+  { id: 'contabilidade', title: 'Contabilidade', icon: Landmark, soon: true, iconColor: 'text-cyan-300/70' },
+  { id: 'comunicacao', title: 'Comunicação', icon: MessageSquare, soon: true, iconColor: 'text-pink-300/70' },
+  { id: 'configuracoes', title: 'Configurações', icon: Settings, soon: true, iconColor: 'text-surface-300/70' },
+  { id: 'integracoes', title: 'Integrações', icon: Plug, soon: true, iconColor: 'text-lime-300/70' },
 ]
 
 /* ─────────────────────────────────────────────
@@ -193,7 +77,6 @@ export default function DiretoriaPwaDashboard() {
   const [bootProgress, setBootProgress] = useState(0)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const [showVersionInfo, setShowVersionInfo] = useState(false)
   const authCheckStartedRef = useRef(false)
 
   // ── Auth check ────────────────────────────────────────────────────────────
@@ -321,57 +204,38 @@ export default function DiretoriaPwaDashboard() {
         </div>
       </header>
 
-      {/* ── Hero Header ────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-30"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 50% at 15% 30%, rgba(16,185,129,0.10) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 85% 20%, rgba(56,189,248,0.06) 0%, transparent 60%)',
-          }}
-        />
-        <div className="relative px-5 pt-7 pb-1">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/20">
-              <LayoutDashboard className="h-5 w-5 text-emerald-300" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-white">
-                Central de Comando
-              </h1>
-            </div>
-          </div>
-          <p className="mt-2 text-[13px] font-medium text-emerald-100/40">
-            Acesse os módulos corporativos do Ouro Verde
-          </p>
-          <div className="mt-5 h-px w-full bg-emerald-500/10" />
+      {/* ── Page Header ────────────────────────────────────────────────────── */}
+      <div className="pwa-monthbar flex items-center justify-between border-b border-surface-800 bg-surface-900/60 px-4 py-3">
+        <div className="w-7" aria-hidden="true" />
+        <div className="text-center">
+          <p className="text-sm font-semibold text-white">Central de Comando</p>
+          <p className="text-[10px] text-surface-500">Acesse os módulos corporativos</p>
         </div>
+        <div className="w-7" aria-hidden="true" />
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 px-4 pb-8 pt-4">
+      <main className="flex-1 px-4 pb-2 pt-4">
 
         {/* Grid */}
         <div className="grid grid-cols-2 gap-3">
           {MODULES.map((mod) => {
             const Icon = mod.icon
             const isClickable = !!mod.href && !mod.soon
-            const gradient = mod.soon ? mod.inactiveGradient : mod.activeGradient
-            const border = mod.soon ? mod.inactiveBorder : mod.activeBorder
-
             const Wrapper = isClickable ? 'button' : 'div'
+
             const wrapperProps = isClickable
               ? {
                   onClick: () => router.push(mod.href!),
-                  className: `group relative flex items-center gap-2.5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} py-4 px-3.5 text-left shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30 active:scale-[0.98]`,
+                  className: 'pwa-card group relative flex items-center gap-2.5 rounded-2xl border border-surface-700/50 bg-surface-900 px-3.5 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]',
                 }
               : {
-                  className: `group relative flex items-center gap-2.5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} py-4 px-3.5 shadow-md shadow-black/15 opacity-55`,
+                  className: 'pwa-card group relative flex items-center gap-2.5 rounded-2xl border border-surface-700/50 px-3.5 py-3.5 opacity-50',
                 }
 
             return (
               <Wrapper key={mod.id} {...(wrapperProps as any)}>
-                {/* Icon — clean, no box */}
+                {/* Icon */}
                 <Icon className={`h-5 w-5 shrink-0 ${mod.iconColor}`} strokeWidth={1.7} />
 
                 {/* Title */}
@@ -389,99 +253,8 @@ export default function DiretoriaPwaDashboard() {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 flex flex-col items-center gap-1">
-          <div className="h-px w-12 bg-emerald-500/15" />
-          <p className="mt-3 text-[11px] font-semibold tracking-wide text-surface-400 uppercase">
-            Sistema Ouro Verde © 2026
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowVersionInfo(true)}
-            className="text-[10px] text-surface-600 hover:text-emerald-400 transition-colors"
-          >
-            Versão {APP_VERSION_LABEL}
-          </button>
-        </div>
+        <PwaFooter />
       </main>
-
-      {/* ── Version Info Modal ───────────────────────────────────────────── */}
-      {showVersionInfo && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => setShowVersionInfo(false)}
-        >
-          <div
-            className="w-full max-w-xs rounded-3xl border border-emerald-500/15 bg-[#0f1f14] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Sobre o sistema</p>
-              <button
-                type="button"
-                onClick={() => setShowVersionInfo(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-surface-400 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="my-4 h-px w-full bg-emerald-500/10" />
-
-            {/* Info rows */}
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Software</p>
-                <p className="mt-0.5 text-[13px] font-semibold text-white">Sistema Ouro Verde © 2026</p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Versão</p>
-                <p className="mt-0.5 text-[13px] font-semibold text-emerald-300">{APP_VERSION_LABEL}</p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Desenvolvedor</p>
-                <a
-                  href="https://instagram.com/jucelio.verissimo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-                >
-                  Jucélio Verissimo
-                  <ExternalLink className="h-3 w-3 text-surface-500" />
-                </a>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Integrações</p>
-                <a
-                  href="https://coruzen.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-                >
-                  Coruzen
-                  <ExternalLink className="h-3 w-3 text-surface-500" />
-                </a>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="my-4 h-px w-full bg-emerald-500/10" />
-
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={() => setShowVersionInfo(false)}
-              className="w-full rounded-2xl bg-emerald-500/15 py-3 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-500/20 hover:bg-emerald-500/25 active:scale-95 transition-all"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Sign-out confirm ─────────────────────────────────────────────── */}
       {showSignOutConfirm && (

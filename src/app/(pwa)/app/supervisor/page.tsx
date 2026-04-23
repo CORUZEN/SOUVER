@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
+import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import PwaFooter from '@/components/pwa/PwaFooter'
 import PwaLoadingScreen from '@/components/pwa/PwaLoadingScreen'
 import { PwaLogoutConfirmDialog, PwaSigningOutOverlay } from '@/components/pwa/PwaLogoutExperience'
 import {
@@ -921,8 +923,7 @@ export default function SupervisorPwaDashboard() {
     if (authCheckStartedRef.current) return
     authCheckStartedRef.current = true
     setBootProgress(5)
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
+    fetchAuthMeCached({ force: false })
       .then((data) => {
         if (!data?.user) { router.replace('/app/login'); return }
         const roleCode = data.user.roleCode?.toUpperCase() ?? ''
@@ -932,7 +933,7 @@ export default function SupervisorPwaDashboard() {
         setBootProgress(15)
         setUser({
           name: data.user.name,
-          role: data.user.role,
+          role: typeof data.user.role === 'string' ? data.user.role : data.user.role?.name ?? '',
           roleCode,
           sellerCode: data.user.sellerCode,
         })
@@ -1436,6 +1437,17 @@ export default function SupervisorPwaDashboard() {
                 <CloudOff className="h-4.5 w-4.5" />
               </div>
             )}
+            {user?.roleCode === 'DIRECTORATE' && (
+              <button
+                type="button"
+                onClick={() => router.push('/app/diretoria')}
+                className="pwa-icon-btn flex h-9 w-9 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-800 hover:text-white active:scale-95"
+                title="Voltar para Central de Comando"
+                aria-label="Voltar"
+              >
+                <ChevronDown className="h-4 w-4 rotate-90" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => loadData()}
@@ -1758,6 +1770,8 @@ export default function SupervisorPwaDashboard() {
             )}
           </>
         )}
+        {/* Footer */}
+        <PwaFooter />
       </main>
 
       <PwaLogoutConfirmDialog
