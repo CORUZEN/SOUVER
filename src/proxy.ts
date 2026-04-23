@@ -4,6 +4,7 @@ import { verifyTokenEdge } from '@/lib/auth/jwt-edge'
 // Rotas públicas que não exigem autenticação
 const PUBLIC_PATHS = [
   '/login',
+  '/app/login',
   '/api/auth/login',
   '/api/auth/2fa/verify-login',
   '/api/health',
