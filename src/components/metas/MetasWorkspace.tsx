@@ -777,11 +777,40 @@ function resolveClosingEndDate(raw: string | undefined, year: number, month: num
   return toIsoDate(parsed)
 }
 
+function getStageTargetMultiplier(stage: string, cycleWeeks?: CycleWeek[]): number {
+  if (!cycleWeeks || cycleWeeks.length === 0) {
+    const stageOrder = ['W1', 'W2', 'W3', 'CLOSING']
+    const idx = stageOrder.indexOf(stage)
+    if (idx < 0) return 1
+    return (idx + 1) / stageOrder.length
+  }
+
+  const operationalStages = ['W1', 'W2', 'W3', 'CLOSING']
+  const operationalWeeks = cycleWeeks
+    .filter((w) => operationalStages.includes(w.key))
+    .sort((a, b) => operationalStages.indexOf(a.key) - operationalStages.indexOf(b.key))
+
+  let totalBusinessDays = 0
+  const cumulativeDaysByStage = new Map<string, number>()
+
+  for (const week of operationalWeeks) {
+    const days = Array.isArray(week.businessDays) ? week.businessDays.length : 0
+    totalBusinessDays += days
+    cumulativeDaysByStage.set(week.key, totalBusinessDays)
+  }
+
+  if (totalBusinessDays === 0) return 1
+
+  const cumulativeDays = cumulativeDaysByStage.get(stage) ?? totalBusinessDays
+  return cumulativeDays / totalBusinessDays
+}
+
 function getSellerWeightTargetRatios(
   weightTargets: WeightTarget[],
   brandWeightRows: BrandWeightRow[],
   sellerCode: string,
   stage: StageKey = 'FULL',
+  cycleWeeks?: CycleWeek[],
 ) {
   const resolveStageKg = (row: BrandWeightRow) => {
     if (stage === 'W1') return Number(row.totalKgW1 ?? row.totalKg ?? 0)
@@ -790,13 +819,14 @@ function getSellerWeightTargetRatios(
     if (stage === 'CLOSING') return Number(row.totalKgClosing ?? row.totalKg ?? 0)
     return Number(row.totalKg ?? 0)
   }
+  const targetMultiplier = getStageTargetMultiplier(stage, cycleWeeks)
   return weightTargets
     .filter((target) => target.brand && target.targetKg > 0)
     .map((target) => {
       const soldKg = brandWeightRows
         .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
         .reduce((sum, row) => sum + resolveStageKg(row), 0)
-      return soldKg / Math.max(target.targetKg, 0.00001)
+      return soldKg / Math.max(target.targetKg * targetMultiplier, 0.00001)
     })
 }
 
@@ -3642,7 +3672,8 @@ export default function MetasWorkspace() {
                   effectiveWeightTargets,
                   brandWeightRows,
                   sellerCode,
-                  rule.stage
+                  rule.stage,
+                  cycle.weeks
                 )
                 progress = getVolumeProgressByClosestTargets(stageWeightTargetRatios, requiredGroups)
               } else {
@@ -6996,7 +7027,8 @@ export default function MetasWorkspace() {
                                   effectiveWt,
                                   brandWeightRows,
                                   sellerCode,
-                                  rule.stage
+                                  rule.stage,
+                                  cycle.weeks
                                 )
                                 const achievedGroups = ratios.filter((ratio) => ratio >= 1).length
                                 const volumeProgress = requiredGroups > 0

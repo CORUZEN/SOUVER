@@ -235,6 +235,34 @@ function getBrandWeightByStage(row: BrandWeightRow, stage: string) {
   return Number(row.totalKg ?? 0)
 }
 
+function getStageTargetMultiplier(stage: string, cycleWeeks?: CycleWeek[]): number {
+  if (!cycleWeeks || cycleWeeks.length === 0) {
+    const stageOrder = ['W1', 'W2', 'W3', 'CLOSING']
+    const idx = stageOrder.indexOf(stage)
+    if (idx < 0) return 1
+    return (idx + 1) / stageOrder.length
+  }
+
+  const operationalStages = ['W1', 'W2', 'W3', 'CLOSING']
+  const operationalWeeks = cycleWeeks
+    .filter((w) => operationalStages.includes(w.key))
+    .sort((a, b) => operationalStages.indexOf(a.key) - operationalStages.indexOf(b.key))
+
+  let totalBusinessDays = 0
+  const cumulativeDaysByStage = new Map<string, number>()
+
+  for (const week of operationalWeeks) {
+    const days = Array.isArray(week.businessDays) ? week.businessDays.length : 0
+    totalBusinessDays += days
+    cumulativeDaysByStage.set(week.key, totalBusinessDays)
+  }
+
+  if (totalBusinessDays === 0) return 1
+
+  const cumulativeDays = cumulativeDaysByStage.get(stage) ?? totalBusinessDays
+  return cumulativeDays / totalBusinessDays
+}
+
 function estimatePremioEarned(profileType: string, _pct: number, earnedReward: number): string {
   if (profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15') {
     return `${fmt(earnedReward, 2)}%`
@@ -317,9 +345,10 @@ function computeEarnedReward(
         const key = row.brand.toUpperCase()
         stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
       }
+      const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return sold / Math.max(wt.targetKg, 0.00001)
+        return sold / Math.max(wt.targetKg * targetMultiplier, 0.00001)
       })
       if (requiredGroups > 0 && stageWeightTargetRatios.length > 0) {
         const topRatios = [...stageWeightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
@@ -635,16 +664,18 @@ function computeAllKpiProgress(
         const key = row.brand.toUpperCase()
         stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
       }
+      const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return sold / Math.max(wt.targetKg, 0.00001)
+        return sold / Math.max(wt.targetKg * targetMultiplier, 0.00001)
       })
       const volumeGroups = weightTargets.map((wt) => {
         const soldKg = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        const progressPct = wt.targetKg > 0 ? (soldKg / wt.targetKg) * 100 : 0
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        const progressPct = stageTargetKg > 0 ? (soldKg / stageTargetKg) * 100 : 0
         return {
           brand: wt.brand,
-          targetKg: wt.targetKg,
+          targetKg: stageTargetKg,
           soldKg,
           progressPct,
         }
