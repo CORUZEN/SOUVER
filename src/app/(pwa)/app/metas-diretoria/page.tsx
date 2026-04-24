@@ -2080,45 +2080,61 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
         const isActive = !!week && week.start <= todayIso && week.end >= todayIso
         const isEnded  = !!week && week.end < todayIso
         const isPending = !!week && week.start > todayIso
-        const stageStyle = isEnded
-          ? {
-              container: 'rounded-xl border border-slate-500/30 bg-slate-500/6 p-2.5',
-              accent: 'bg-slate-300/70',
-              badge: 'bg-slate-500/20 text-slate-200',
-              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-300',
-              statusDot: 'h-1.5 w-1.5 rounded-full bg-slate-300/80',
-              row: 'rounded-lg border border-slate-500/20 bg-slate-950/35 px-3 py-2',
-              count: 'text-slate-300',
-            }
-          : isActive
-          ? {
-              container: 'rounded-xl border border-emerald-500/35 bg-emerald-500/10 p-2.5',
-              accent: 'bg-emerald-300/85',
-              badge: 'bg-emerald-500/20 text-emerald-300',
-              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-300',
-              statusDot: 'h-1.5 w-1.5 rounded-full bg-emerald-300/90',
-              row: 'rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2',
-              count: 'text-emerald-300',
-            }
-          : isPending
-          ? {
-              container: 'rounded-xl border border-amber-500/30 bg-amber-500/8 p-2.5',
-              accent: 'bg-amber-300/85',
-              badge: 'bg-amber-500/20 text-amber-300',
-              status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-300',
-              statusDot: 'h-1.5 w-1.5 rounded-full bg-amber-300/90',
-              row: 'rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2',
-              count: 'text-amber-300',
-            }
-          : {
-              container: 'rounded-xl border border-surface-700/60 bg-surface-800/30 p-2.5',
-              accent: 'bg-surface-500/80',
-              badge: 'bg-surface-700 text-surface-400',
-              status: 'inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-surface-400',
-              statusDot: 'h-1.5 w-1.5 rounded-full bg-surface-500',
-              row: 'rounded-lg bg-surface-800/50 px-3 py-2',
-              count: 'text-surface-400',
-            }
+        const paletteByStage: Record<string, {
+          container: string
+          badge: string
+          status: string
+          statusDot: string
+          row: string
+          count: string
+        }> = {
+          W1: {
+            container: 'rounded-xl border border-emerald-300/35 bg-linear-to-br from-emerald-500/18 via-teal-500/10 to-cyan-500/8 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_28px_rgba(6,78,59,0.22)]',
+            badge: 'bg-linear-to-r from-emerald-500/32 to-teal-500/24 text-emerald-100 ring-1 ring-emerald-200/20',
+            status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-200',
+            statusDot: 'h-1.5 w-1.5 rounded-full bg-emerald-300/95',
+            row: 'rounded-lg border border-emerald-300/22 bg-surface-950/36 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            count: 'text-emerald-100',
+          },
+          W2: {
+            container: 'rounded-xl border border-cyan-300/34 bg-linear-to-br from-cyan-500/16 via-sky-500/10 to-blue-500/8 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_28px_rgba(12,74,110,0.24)]',
+            badge: 'bg-linear-to-r from-cyan-500/30 to-sky-500/24 text-cyan-100 ring-1 ring-cyan-200/20',
+            status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-cyan-200',
+            statusDot: 'h-1.5 w-1.5 rounded-full bg-cyan-300/95',
+            row: 'rounded-lg border border-cyan-300/20 bg-surface-950/36 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            count: 'text-cyan-100',
+          },
+          W3: {
+            container: 'rounded-xl border border-lime-300/30 bg-linear-to-br from-lime-500/16 via-emerald-500/10 to-amber-500/8 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_28px_rgba(77,124,15,0.24)]',
+            badge: 'bg-linear-to-r from-lime-500/28 to-emerald-500/22 text-lime-100 ring-1 ring-lime-200/20',
+            status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-lime-200',
+            statusDot: 'h-1.5 w-1.5 rounded-full bg-lime-300/95',
+            row: 'rounded-lg border border-lime-300/18 bg-surface-950/36 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            count: 'text-lime-100',
+          },
+          CLOSING: {
+            container: 'rounded-xl border border-amber-300/32 bg-linear-to-br from-amber-500/18 via-yellow-500/10 to-orange-500/8 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_28px_rgba(146,64,14,0.24)]',
+            badge: 'bg-linear-to-r from-amber-500/30 to-orange-500/24 text-amber-100 ring-1 ring-amber-200/20',
+            status: 'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200',
+            statusDot: 'h-1.5 w-1.5 rounded-full bg-amber-300/95',
+            row: 'rounded-lg border border-amber-300/20 bg-surface-950/36 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            count: 'text-amber-100',
+          },
+        }
+        const baseStageStyle = paletteByStage[key] ?? {
+          container: 'rounded-xl border border-surface-700/60 bg-surface-800/30 p-2.5',
+          badge: 'bg-surface-700 text-surface-300',
+          status: 'inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-surface-300',
+          statusDot: 'h-1.5 w-1.5 rounded-full bg-surface-400',
+          row: 'rounded-lg border border-surface-700/30 bg-surface-900/55 px-3 py-2',
+          count: 'text-surface-200',
+        }
+        const stageStateTone = isPending ? 'opacity-82 saturate-75' : isEnded ? 'opacity-94 saturate-90' : isActive ? 'ring-1 ring-white/10' : ''
+        const stageStyle = {
+          ...baseStageStyle,
+          container: `${baseStageStyle.container} ${stageStateTone}`.trim(),
+          row: `${baseStageStyle.row} ${isPending ? 'opacity-88' : ''}`.trim(),
+        }
 
         const hitCount = items.filter((i) => i.isComputable && i.progress >= 1).length
         const computableCount = items.filter((i) => i.isComputable).length
