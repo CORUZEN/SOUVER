@@ -256,11 +256,11 @@ function HeaderInner() {
   })()
 
   return (
-    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-[#3e6d52]/52 bg-linear-to-r from-[#102218] via-[#153224] to-[#1f4935] px-6 text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_10px_26px_rgba(8,15,10,0.3)]">
+    <header className="relative z-40 h-20 shrink-0 overflow-visible border-b border-[#416f59]/52 bg-linear-to-r from-[#081a12] via-[#113025] to-[#1b4739] px-6 text-[#f2f5ea] shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_12px_28px_rgba(6,14,10,0.34)]">
       <div className="pointer-events-none absolute inset-0 opacity-70">
-        <div className="absolute -left-16 top-0 h-20 w-72 bg-[#86b64b]/14 blur-2xl" />
-        <div className="absolute right-0 top-0 h-20 w-80 bg-[#12a76d]/14 blur-2xl" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-[#b99372]/38 to-transparent" />
+        <div className="absolute -left-20 top-0 h-24 w-80 bg-[#349b78]/20 blur-2xl" />
+        <div className="absolute right-0 top-0 h-24 w-88 bg-[#2ab49f]/15 blur-2xl" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-[#c6a277]/40 to-transparent" />
       </div>
 
       <div className="relative flex h-full items-center justify-between gap-4">
@@ -270,7 +270,7 @@ function HeaderInner() {
           <p className="text-xs text-[#b7c3aa]">{headerContext.subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-xl border border-[#b99372]/22 bg-linear-to-b from-[#edf0e2]/7 to-[#edf0e2]/3 px-2 py-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(237,240,226,0.12),0_8px_18px_rgba(8,15,10,0.24)]">
+        <div className="flex items-center gap-2 rounded-xl border border-[#c6a277]/26 bg-linear-to-b from-[#f2f5ea]/9 via-[#f2f5ea]/5 to-[#f2f5ea]/3 px-2 py-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(242,245,234,0.16),0_10px_22px_rgba(6,14,10,0.28)]">
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifs((prev) => !prev)}

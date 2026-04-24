@@ -199,8 +199,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           ? 'gap-3 pl-8 pr-3 py-2.5'
           : 'gap-3 px-3 py-2.5',
       isActive
-        ? 'ring-[#21b67c]/40 bg-linear-to-r from-[#12a76d] to-[#139861] text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.18),0_10px_24px_rgba(18,167,109,0.33)]'
-        : 'text-[#b5c1a9] hover:ring-[#b99372]/22 hover:bg-linear-to-r hover:from-[#12a76d]/16 hover:to-[#86b64b]/8 hover:text-[#edf0e2] hover:shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_7px_16px_rgba(8,15,10,0.2)]'
+        ? 'ring-[#3de0af]/35 bg-linear-to-r from-[#0f7f5b] via-[#14966f] to-[#1da88d] text-[#f2f5ea] shadow-[inset_0_1px_0_rgba(242,245,234,0.22),0_12px_26px_rgba(10,71,50,0.42)]'
+        : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
     )
 
     if (isAccessible) {
@@ -289,21 +289,22 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           if (isCollapsed) setIsCollapsed(false)
         }}
         className={cn(
-          'relative shrink-0 flex flex-col h-full overflow-hidden border-r border-[#3e6d52]/46 bg-linear-to-b from-[#0f2117] via-[#163325] to-[#1f4733] shadow-[inset_0_1px_0_rgba(237,240,226,0.07),inset_-1px_0_0_rgba(185,147,114,0.13),0_16px_34px_rgba(8,15,10,0.34)] transition-[width] duration-300 ease-out',
+          'relative shrink-0 flex flex-col h-full overflow-hidden border-r border-[#3f6d57]/50 bg-linear-to-b from-[#07160f] via-[#0f2a1d] to-[#173c2c] shadow-[inset_0_1px_0_rgba(242,245,234,0.08),inset_-1px_0_0_rgba(198,162,119,0.14),0_18px_40px_rgba(5,12,9,0.44)] transition-[width] duration-300 ease-out',
           isCollapsed && 'cursor-pointer',
           isCollapsed ? 'w-20' : 'w-64'
         )}
       >
         <div className="pointer-events-none absolute inset-0 opacity-70">
-          <div className="absolute -left-20 top-0 h-60 w-72 bg-[#86b64b]/14 blur-3xl" />
-          <div className="absolute -right-20 top-24 h-72 w-80 bg-[#12a76d]/12 blur-3xl" />
-          <div className="absolute inset-y-0 right-0 w-px bg-linear-to-b from-transparent via-[#b99372]/28 to-transparent" />
+          <div className="absolute -left-24 top-0 h-72 w-84 bg-[#2c9a73]/20 blur-3xl" />
+          <div className="absolute -right-24 top-28 h-80 w-88 bg-[#31b8a2]/14 blur-3xl" />
+          <div className="absolute -bottom-20 left-8 h-52 w-72 bg-[#6d8f49]/12 blur-3xl" />
+          <div className="absolute inset-y-0 right-0 w-px bg-linear-to-b from-transparent via-[#c6a277]/30 to-transparent" />
         </div>
 
         <div className="relative z-10 flex h-full flex-col">
           <div
             className={cn(
-              'relative flex items-center border-b border-[#b99372]/24 shadow-[0_1px_0_rgba(237,240,226,0.05)]',
+              'relative flex items-center border-b border-[#c6a277]/26 shadow-[0_1px_0_rgba(242,245,234,0.06)]',
               isCollapsed ? 'h-18 justify-center px-2.5' : 'h-16 px-4'
             )}
           >
@@ -425,8 +426,8 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                               className={cn(
                                 'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-pointer text-left',
                                 isFaturamentoActive
-                                  ? 'ring-[#21b67c]/40 bg-linear-to-r from-[#12a76d] to-[#139861] text-[#edf0e2] shadow-[inset_0_1px_0_rgba(237,240,226,0.18),0_10px_24px_rgba(18,167,109,0.33)]'
-                                  : 'text-[#b5c1a9] hover:ring-[#b99372]/22 hover:bg-linear-to-r hover:from-[#12a76d]/16 hover:to-[#86b64b]/8 hover:text-[#edf0e2] hover:shadow-[inset_0_1px_0_rgba(237,240,226,0.07),0_7px_16px_rgba(8,15,10,0.2)]'
+                                  ? 'ring-[#3de0af]/35 bg-linear-to-r from-[#0f7f5b] via-[#14966f] to-[#1da88d] text-[#f2f5ea] shadow-[inset_0_1px_0_rgba(242,245,234,0.22),0_12px_26px_rgba(10,71,50,0.42)]'
+                                  : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
                               )}
                             >
                               <ClipboardList className={cn(

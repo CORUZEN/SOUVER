@@ -6058,10 +6058,10 @@ export default function MetasWorkspace() {
   )
 
   const executiveMetricCardClass =
-    'group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]'
+    'group relative overflow-hidden border border-[#cbded0] bg-linear-to-br from-[#fbfdf9] via-white to-[#f1f8f1] shadow-[0_8px_20px_rgba(14,40,29,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#b4d0bf] hover:shadow-[0_14px_28px_rgba(14,40,29,0.16)]'
 
   const executivePanelCardClass =
-    'group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]'
+    'group relative overflow-hidden border border-[#cbded0] bg-linear-to-br from-[#fbfdf9] via-white to-[#eff7f0] shadow-[0_8px_20px_rgba(14,40,29,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#b4d0bf] hover:shadow-[0_14px_28px_rgba(14,40,29,0.16)]'
 
   const lineChartData = useMemo(() => {
     const W = 500
@@ -6140,8 +6140,12 @@ export default function MetasWorkspace() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
-      <Card className="relative border border-[#2f5a42]/35 bg-linear-to-br from-[#173325] via-[#1d3d2c] to-[#244a36] shadow-[0_16px_30px_rgba(8,15,10,0.22)]">
-        <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-[#86b64b] via-[#12a76d] to-[#2dc7b6]" />
+      <Card className="relative border border-[#2f5f47]/42 bg-linear-to-br from-[#0f281d] via-[#1a4432] to-[#1a5a4b] shadow-[0_18px_34px_rgba(6,16,11,0.28)]">
+        <div className="pointer-events-none absolute inset-0 opacity-80">
+          <div className="absolute -left-14 top-4 h-30 w-52 rounded-full bg-[#30a779]/18 blur-3xl" />
+          <div className="absolute right-2 top-0 h-28 w-44 rounded-full bg-[#2dc7b6]/14 blur-3xl" />
+        </div>
+        <div className="absolute inset-x-3 top-0 h-0.75 bg-linear-to-r from-[#b0c965] via-[#2ec08d] to-[#57d3c2]" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
@@ -6159,7 +6163,7 @@ export default function MetasWorkspace() {
               <button
                 type="button"
                 onClick={() => setShowCompanyModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#b99372]/20 bg-[#edf0e2]/7 px-2.5 py-1 text-xs font-medium text-[#d2dac8] transition-colors hover:bg-[#edf0e2]/14 hover:text-[#edf0e2]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#d4b089]/26 bg-[#f2f5ea]/11 px-2.5 py-1 text-xs font-medium text-[#dbe5d2] transition-colors hover:bg-[#f2f5ea]/18 hover:text-[#f2f5ea]"
               >
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                 {companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'}
@@ -8905,7 +8909,7 @@ export default function MetasWorkspace() {
         <>
           {/* ── Period selector ────────────────────────────────────── */}
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="group relative overflow-hidden border border-[#d6e6d8] bg-white shadow-[0_6px_16px_rgba(23,51,37,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bdd4bf] hover:shadow-[0_10px_22px_rgba(23,51,37,0.12)]">
+            <Card className={executiveMetricCardClass}>
               <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#86b64b] to-[#12a76d]" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500">Meta de faturamento</p>
               {corporateTotalTarget > 0 ? (() => {
