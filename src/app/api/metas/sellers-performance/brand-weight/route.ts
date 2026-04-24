@@ -9,15 +9,26 @@ import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
 import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 type RawRecord = Record<string, unknown>
+type StageEndExclusive = { w1: string; w2: string; w3: string; closing: string }
 
 /**
- * Returns aggregated gross weight (kg) by seller Ã— product brand for a given month.
+ * Returns aggregated gross weight (kg) by seller × product brand for a given month.
  *
  * Response shape:
  * {
- *   rows: Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>
- *   brands: string[]           // unique brands found (sorted)
- *   year: number; month: number
+ *   rows: Array<{
+ *     sellerCode: string
+ *     sellerName: string
+ *     brand: string
+ *     totalKgW1: number
+ *     totalKgW2: number
+ *     totalKgW3: number
+ *     totalKgClosing: number
+ *     totalKg: number
+ *   }>
+ *   brands: string[]
+ *   year: number
+ *   month: number
  * }
  */
 
@@ -26,6 +37,21 @@ function parseNumber(value: unknown): number {
   if (typeof value !== 'string') return 0
   const n = Number(value.trim().replace(/\./g, '').replace(',', '.'))
   return Number.isFinite(n) ? n : 0
+}
+
+function isIsoDate(value: string | null): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function nextDayIso(iso: string | null, fallbackIso: string) {
+  if (!iso) return fallbackIso
+  const parsed = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return fallbackIso
+  parsed.setDate(parsed.getDate() + 1)
+  const y = parsed.getFullYear()
+  const m = String(parsed.getMonth() + 1).padStart(2, '0')
+  const d = String(parsed.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function extractBearerToken(payload: unknown): string | null {
@@ -227,7 +253,7 @@ async function queryRows(
         if (serviceError) { failures.push(serviceError); continue }
         const records: RawRecord[] = []
         collectRecords(data, records)
-        return records   // even empty is OK (no orders for that brand)
+        return records
       } catch (err) {
         failures.push(err instanceof Error ? err.message : 'erro de rede')
       }
@@ -241,6 +267,7 @@ function buildBrandWeightSql(
   endDateExclusive: string,
   sellerCodes: string[],
   companyScope: '1' | '2' | 'all',
+  stageEndExclusive: StageEndExclusive,
 ) {
   let sellerFilter = ''
   if (sellerCodes.length > 0) {
@@ -251,16 +278,15 @@ function buildBrandWeightSql(
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''
 
-  // ITE.QTDNEG Ã— PRO.PESOBRUTO gives the total gross weight in grams (or kg depending on
-  // how Sankhya is configured â€” divide by 1000 if needed; we return raw and let the
-  // frontend apply the same factor used elsewhere since order-level PESOBRUTO is already in kg).
-  // We use SUM(ITE.QTDNEG * PRO.PESOBRUTO) / 1000 to convert gâ†’kg if Sankhya stores
-  // product weight in grams (TGFPRO.PESOBRUTO is per unit in kg on most installations, so we skip /1000).
   return `
 SELECT
   TO_CHAR(CAB.CODVEND) AS CODVEND,
   NVL(VEN.APELIDO, TO_CHAR(CAB.CODVEND)) AS VENDEDOR,
   NVL(TRIM(PRO.MARCA), 'SEM MARCA') AS MARCA,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w1}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W1_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w2}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W2_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w3}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W3_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.closing}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_CLOSING_KG,
   SUM(NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) AS PESO_TOTAL_KG
 FROM TGFCAB CAB
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
@@ -280,6 +306,7 @@ function buildBrandWeightSqlFallback(
   endDateExclusive: string,
   sellerCodes: string[],
   companyScope: '1' | '2' | 'all',
+  stageEndExclusive: StageEndExclusive,
 ) {
   let sellerFilter = ''
   if (sellerCodes.length > 0) {
@@ -294,6 +321,10 @@ SELECT
   TO_CHAR(CAB.CODVEND) AS CODVEND,
   NVL(VEN.APELIDO, TO_CHAR(CAB.CODVEND)) AS VENDEDOR,
   NVL(TRIM(PRO.MARCA), 'SEM MARCA') AS MARCA,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w1}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W1_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w2}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W2_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.w3}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_W3_KG,
+  SUM(CASE WHEN CAB.DTNEG < TO_DATE('${stageEndExclusive.closing}', 'YYYY-MM-DD') THEN (NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) ELSE 0 END) AS PESO_CLOSING_KG,
   SUM(NVL(ITE.QTDNEG, 0) * NVL(PRO.PESOBRUTO, 0)) AS PESO_TOTAL_KG
 FROM TGFCAB CAB
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
@@ -329,6 +360,16 @@ export async function GET(req: NextRequest) {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const next = new Date(year, month, 1)
   const endDateExclusive = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`
+  const w1End = req.nextUrl.searchParams.get('w1End')
+  const w2End = req.nextUrl.searchParams.get('w2End')
+  const w3End = req.nextUrl.searchParams.get('w3End')
+  const closingEnd = req.nextUrl.searchParams.get('closingEnd')
+  const stageEndExclusive: StageEndExclusive = {
+    w1: nextDayIso(isIsoDate(w1End) ? w1End : null, endDateExclusive),
+    w2: nextDayIso(isIsoDate(w2End) ? w2End : null, endDateExclusive),
+    w3: nextDayIso(isIsoDate(w3End) ? w3End : null, endDateExclusive),
+    closing: nextDayIso(isIsoDate(closingEnd) ? closingEnd : null, endDateExclusive),
+  }
   const scopeRaw = req.nextUrl.searchParams.get('companyScope')
   const companyScope: '1' | '2' | 'all' = scopeRaw === '2' ? '2' : scopeRaw === 'all' ? 'all' : '1'
 
@@ -358,7 +399,7 @@ export async function GET(req: NextRequest) {
     : roleCode === 'SELLER'
       ? `SELLER:${normalizedUserSellerCode}`
       : roleCode
-  const cacheKey = `metas:brand-weight:v1:${year}-${month}:${companyScope}:${scopeToken}`
+  const cacheKey = `metas:brand-weight:v2:${year}-${month}:${companyScope}:${scopeToken}:${stageEndExclusive.w1}:${stageEndExclusive.w2}:${stageEndExclusive.w3}:${stageEndExclusive.closing}`
 
   try {
     const payload = await withRequestCache(cacheKey, 30_000, async () => {
@@ -388,15 +429,19 @@ export async function GET(req: NextRequest) {
 
       let records: RawRecord[] = []
       try {
-        records = await queryRows(baseUrl, headers, buildBrandWeightSql(startDate, endDateExclusive, sellerCodes, companyScope), appKey)
+        records = await queryRows(baseUrl, headers, buildBrandWeightSql(startDate, endDateExclusive, sellerCodes, companyScope, stageEndExclusive), appKey)
       } catch {
-        records = await queryRows(baseUrl, headers, buildBrandWeightSqlFallback(startDate, endDateExclusive, sellerCodes, companyScope), appKey)
+        records = await queryRows(baseUrl, headers, buildBrandWeightSqlFallback(startDate, endDateExclusive, sellerCodes, companyScope, stageEndExclusive), appKey)
       }
 
       const rows = records.map((r) => ({
         sellerCode: String(r.CODVEND ?? '').trim(),
         sellerName: String(r.VENDEDOR ?? '').trim(),
         brand: String(r.MARCA ?? 'SEM MARCA').trim().toUpperCase(),
+        totalKgW1: parseNumber(r.PESO_W1_KG),
+        totalKgW2: parseNumber(r.PESO_W2_KG),
+        totalKgW3: parseNumber(r.PESO_W3_KG),
+        totalKgClosing: parseNumber(r.PESO_CLOSING_KG),
         totalKg: parseNumber(r.PESO_TOTAL_KG),
       }))
 

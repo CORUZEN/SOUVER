@@ -53,7 +53,15 @@ interface SellerRow {
   openTitles: Array<{ titleId: string; dueDate: string; overdueDays: number; totalValue: number }>
 }
 
-type BrandWeightRow = { sellerCode: string; brand: string; totalKg: number }
+type BrandWeightRow = {
+  sellerCode: string
+  brand: string
+  totalKg: number
+  totalKgW1?: number
+  totalKgW2?: number
+  totalKgW3?: number
+  totalKgClosing?: number
+}
 type WeightTarget    = { brand: string; targetKg: number }
 type FocusTargetMode = 'KG' | 'BASE_CLIENTS'
 type SellerDistributionRow = {
@@ -221,6 +229,14 @@ function getDistribuicaoItemsByStage(row: SellerDistributionItemsRow | undefined
   return row.itemsMonth
 }
 
+function getBrandWeightByStage(row: BrandWeightRow, stage: string) {
+  if (stage === 'W1') return Number(row.totalKgW1 ?? row.totalKg ?? 0)
+  if (stage === 'W2') return Number(row.totalKgW2 ?? row.totalKg ?? 0)
+  if (stage === 'W3') return Number(row.totalKgW3 ?? row.totalKg ?? 0)
+  if (stage === 'CLOSING') return Number(row.totalKgClosing ?? row.totalKg ?? 0)
+  return Number(row.totalKg ?? 0)
+}
+
 function estimatePremioEarned(profileType: string, _pct: number, earnedReward: number): string {
   if (profileType === 'ANTIGO_1' || profileType === 'ANTIGO_15') {
     return `${fmt(earnedReward, 2)}%`
@@ -262,18 +278,6 @@ function computeEarnedReward(
   const startedWeeks = cycleWeeks.filter((w) => w.start <= todayIso)
   if (startedWeeks.length === 0 || monthlyTarget <= 0) return 0
 
-  const brandWeightMap = new Map<string, number>()
-  for (const row of brandWeightRows) {
-    if (row.sellerCode === sellerCode) {
-      const key = row.brand.toUpperCase()
-      brandWeightMap.set(key, (brandWeightMap.get(key) ?? 0) + row.totalKg)
-    }
-  }
-  const weightTargetRatios = weightTargets.map((wt) => {
-    const sold = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
-    return sold / Math.max(wt.targetKg, 0.00001)
-  })
-
   let earned = 0
   for (const rule of rules) {
     const week = cycleWeeks.find((w) => w.key === rule.stage)
@@ -309,8 +313,18 @@ function computeEarnedReward(
       progress = clients / (base * threshold)
     } else if (kpiType === 'VOLUME') {
       const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
-      if (requiredGroups > 0 && weightTargetRatios.length > 0) {
-        const topRatios = [...weightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
+      const stageWeightByBrand = new Map<string, number>()
+      for (const row of brandWeightRows) {
+        if (row.sellerCode !== sellerCode) continue
+        const key = row.brand.toUpperCase()
+        stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
+      }
+      const stageWeightTargetRatios = weightTargets.map((wt) => {
+        const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
+        return sold / Math.max(wt.targetKg, 0.00001)
+      })
+      if (requiredGroups > 0 && stageWeightTargetRatios.length > 0) {
+        const topRatios = [...stageWeightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
         const normalized = Array.from({ length: requiredGroups }, (_, i) => Math.min(topRatios[i] ?? 0, 1))
         progress = normalized.reduce((s, v) => s + v, 0) / requiredGroups
       }
@@ -454,18 +468,6 @@ function computeAllKpiProgress(
     acc[stage] = { count: previous.size, codes: previous }
     return acc
   }, {} as Record<(typeof stageOrder)[number], { count: number; codes: Set<string> }>)
-
-  const brandWeightMap = new Map<string, number>()
-  for (const row of brandWeightRows) {
-    if (row.sellerCode === sellerCode) {
-      const key = row.brand.toUpperCase()
-      brandWeightMap.set(key, (brandWeightMap.get(key) ?? 0) + row.totalKg)
-    }
-  }
-  const weightTargetRatios = weightTargets.map((wt) => {
-    const sold = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
-    return sold / Math.max(wt.targetKg, 0.00001)
-  })
 
   const resolveRemainingBusinessDates = (week: CycleWeek): string[] => {
     const startRef = todayIso > week.start ? todayIso : week.start
@@ -629,8 +631,18 @@ function computeAllKpiProgress(
       }
     } else if (kpiType === 'VOLUME') {
       const requiredGroups = Math.max(Math.floor(parseFloat(rule.targetText) || 0), 0)
+      const stageWeightByBrand = new Map<string, number>()
+      for (const row of brandWeightRows) {
+        if (row.sellerCode !== sellerCode) continue
+        const key = row.brand.toUpperCase()
+        stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
+      }
+      const stageWeightTargetRatios = weightTargets.map((wt) => {
+        const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
+        return sold / Math.max(wt.targetKg, 0.00001)
+      })
       const volumeGroups = weightTargets.map((wt) => {
-        const soldKg = brandWeightMap.get(wt.brand.toUpperCase()) ?? 0
+        const soldKg = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
         const progressPct = wt.targetKg > 0 ? (soldKg / wt.targetKg) * 100 : 0
         return {
           brand: wt.brand,
@@ -639,8 +651,8 @@ function computeAllKpiProgress(
           progressPct,
         }
       }).sort((a, b) => b.progressPct - a.progressPct)
-      if (requiredGroups > 0 && weightTargetRatios.length > 0) {
-        const topRatios = [...weightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
+      if (requiredGroups > 0 && stageWeightTargetRatios.length > 0) {
+        const topRatios = [...stageWeightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
         const normalized = Array.from({ length: requiredGroups }, (_, i) => Math.min(topRatios[i] ?? 0, 1))
         progress = normalized.reduce((s, v) => s + v, 0) / requiredGroups
       }
@@ -1063,10 +1075,9 @@ export default function SupervisorPwaDashboard() {
       }
 
       const prevPeriod = getPreviousPeriod(year, month)
-      const [perfRes, summaryRes, brandWeightRes, prevPerfRes, prevSummaryRes] = await Promise.all([
+      const [perfRes, summaryRes, prevPerfRes, prevSummaryRes] = await Promise.all([
         trackedFetch(`/api/metas/sellers-performance?year=${year}&month=${month}&companyScope=all`),
         trackedFetch(`/api/pwa/summary?year=${year}&month=${month}`),
-        trackedFetch(`/api/metas/sellers-performance/brand-weight?year=${year}&month=${month}&companyScope=all`),
         trackedFetch(`/api/metas/sellers-performance?year=${prevPeriod.year}&month=${prevPeriod.month}&companyScope=all`),
         trackedFetch(`/api/pwa/summary?year=${prevPeriod.year}&month=${prevPeriod.month}`),
       ])
@@ -1076,10 +1087,9 @@ export default function SupervisorPwaDashboard() {
         throw new Error(d.message ?? `Erro ${perfRes.status}`)
       }
 
-      const [perfData, summaryData, brandWeightData, prevPerfData, prevSummaryData] = await Promise.all([
+      const [perfData, summaryData, prevPerfData, prevSummaryData] = await Promise.all([
         perfRes.json(),
         summaryRes.ok ? summaryRes.json() : Promise.resolve(null),
-        brandWeightRes.ok ? brandWeightRes.json() : Promise.resolve(null),
         prevPerfRes.ok ? prevPerfRes.json() : Promise.resolve(null),
         prevSummaryRes.ok ? prevSummaryRes.json() : Promise.resolve(null),
       ])
@@ -1142,14 +1152,25 @@ export default function SupervisorPwaDashboard() {
         companyScope: 'all',
       })
       const weekByKey = new Map(cycleWeeksFromSummary.map((w) => [String(w.key).toUpperCase(), w]))
-      const w1 = weekByKey.get('W1')?.end
-      const w2 = weekByKey.get('W2')?.end
-      const w3 = weekByKey.get('W3')?.end
-      const closing = weekByKey.get('CLOSING')?.end
-      if (w1) distParams.set('w1End', w1)
-      if (w2) distParams.set('w2End', w2)
-      if (w3) distParams.set('w3End', w3)
-      if (closing) distParams.set('closingEnd', closing)
+      const stageW1 = weekByKey.get('W1')?.end
+      const stageW2 = weekByKey.get('W2')?.end
+      const stageW3 = weekByKey.get('W3')?.end
+      const stageClosing = weekByKey.get('CLOSING')?.end
+      if (stageW1) distParams.set('w1End', stageW1)
+      if (stageW2) distParams.set('w2End', stageW2)
+      if (stageW3) distParams.set('w3End', stageW3)
+      if (stageClosing) distParams.set('closingEnd', stageClosing)
+      const stageParams = new URLSearchParams({
+        year: String(year),
+        month: String(month),
+        companyScope: 'all',
+      })
+      if (stageW1) stageParams.set('w1End', stageW1)
+      if (stageW2) stageParams.set('w2End', stageW2)
+      if (stageW3) stageParams.set('w3End', stageW3)
+      if (stageClosing) stageParams.set('closingEnd', stageClosing)
+      const brandWeightRes = await trackedFetch(`/api/metas/sellers-performance/brand-weight?${stageParams.toString()}`)
+      const brandWeightData = brandWeightRes.ok ? await brandWeightRes.json() : null
 
       const distributionPromise = (async () => {
         try {
@@ -2501,5 +2522,3 @@ function KpiStagesPanel({ kpiProgress, cycleWeeks, todayIso }: {
     </div>
   )
 }
-
-

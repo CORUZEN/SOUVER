@@ -67,6 +67,17 @@ interface WeightTarget {
   manualKgByPeriod?: Record<string, number> // manual values keyed by 'YYYY-MM' — used when Sankhya connected but no data for period
 }
 
+interface BrandWeightRow {
+  sellerCode: string
+  sellerName?: string
+  brand: string
+  totalKg: number
+  totalKgW1?: number
+  totalKgW2?: number
+  totalKgW3?: number
+  totalKgClosing?: number
+}
+
 interface CampaignPrize {
   id: string
   title: string
@@ -768,15 +779,23 @@ function resolveClosingEndDate(raw: string | undefined, year: number, month: num
 
 function getSellerWeightTargetRatios(
   weightTargets: WeightTarget[],
-  brandWeightRows: Array<{ sellerCode: string; brand: string; totalKg: number }>,
-  sellerCode: string
+  brandWeightRows: BrandWeightRow[],
+  sellerCode: string,
+  stage: StageKey = 'FULL',
 ) {
+  const resolveStageKg = (row: BrandWeightRow) => {
+    if (stage === 'W1') return Number(row.totalKgW1 ?? row.totalKg ?? 0)
+    if (stage === 'W2') return Number(row.totalKgW2 ?? row.totalKg ?? 0)
+    if (stage === 'W3') return Number(row.totalKgW3 ?? row.totalKg ?? 0)
+    if (stage === 'CLOSING') return Number(row.totalKgClosing ?? row.totalKg ?? 0)
+    return Number(row.totalKg ?? 0)
+  }
   return weightTargets
     .filter((target) => target.brand && target.targetKg > 0)
     .map((target) => {
       const soldKg = brandWeightRows
         .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
-        .reduce((sum, row) => sum + row.totalKg, 0)
+        .reduce((sum, row) => sum + resolveStageKg(row), 0)
       return soldKg / Math.max(target.targetKg, 0.00001)
     })
 }
@@ -1251,7 +1270,7 @@ export default function MetasWorkspace() {
     profileType: SellerProfileType
   }>({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
   // Brand weight data fetched from Sankhya (seller × brand → total kg for the selected month)
-  const [brandWeightRows, setBrandWeightRows] = useState<Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>>([])
+  const [brandWeightRows, setBrandWeightRows] = useState<BrandWeightRow[]>([])
   const [brandWeightBrands, setBrandWeightBrands] = useState<string[]>([])
   const [brandWeightLoading, setBrandWeightLoading] = useState(false)
   const [brandWeightError, setBrandWeightError] = useState('')
@@ -2294,14 +2313,24 @@ export default function MetasWorkspace() {
     setBrandWeightError('')
     setBrandWeightRows([])
     setBrandWeightBrands([])
-    fetch(
-      `/api/metas/sellers-performance/brand-weight?year=${year}&month=${month + 1}&companyScope=${companyScopeFilter}`,
-      { signal: controller.signal }
-    )
+    const params = new URLSearchParams({
+      year: String(year),
+      month: String(month + 1),
+      companyScope: companyScopeFilter,
+    })
+    const w1End = activeMonth?.weekPeriods?.W1?.end ?? ''
+    const w2End = activeMonth?.weekPeriods?.W2?.end ?? ''
+    const w3End = activeMonth?.weekPeriods?.W3?.end ?? ''
+    const closingEnd = activeMonth?.weekPeriods?.CLOSING?.end ?? activeMonth?.closingWeekEndDate ?? ''
+    if (w1End) params.set('w1End', w1End)
+    if (w2End) params.set('w2End', w2End)
+    if (w3End) params.set('w3End', w3End)
+    if (closingEnd) params.set('closingEnd', closingEnd)
+    fetch(`/api/metas/sellers-performance/brand-weight?${params.toString()}`, { signal: controller.signal })
       .then(async (res) => {
         const payload = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(payload?.message ?? 'Falha ao carregar peso por marca.')
-        const rows = (payload.rows ?? []) as Array<{ sellerCode: string; sellerName: string; brand: string; totalKg: number }>
+        const rows = (payload.rows ?? []) as BrandWeightRow[]
         const brands = (payload.brands ?? []) as string[]
         if (controller.signal.aborted || performanceRequestKeyRef.current !== requestKey) return
         startTransition(() => {
@@ -2323,7 +2352,7 @@ export default function MetasWorkspace() {
         if (!controller.signal.aborted && performanceRequestKeyRef.current === requestKey) setBrandWeightLoading(false)
       })
     return () => controller.abort()
-  }, [companyScopeFilter, month, performanceRequestKey, year])
+  }, [activeMonth?.closingWeekEndDate, activeMonth?.weekPeriods?.CLOSING?.end, activeMonth?.weekPeriods?.W1?.end, activeMonth?.weekPeriods?.W2?.end, activeMonth?.weekPeriods?.W3?.end, companyScopeFilter, month, performanceRequestKey, year])
 
   // ── Sankhya configured targets (financial + weight per brand) ─────────
 
@@ -3522,9 +3551,6 @@ export default function MetasWorkspace() {
           // Sankhya not connected — use legacy targetKg
           return wt
         })
-        const weightTargetRatios = getSellerWeightTargetRatios(effectiveWeightTargets, brandWeightRows, sellerCode)
-        const achievedWeightGroups = weightTargetRatios.filter((ratio) => ratio >= 1).length
-
         const focusCode = (block.focusProductCode ?? '').trim()
         const focusRow = focusCode ? focusRowsByCodeAndSeller.get(focusCode)?.get(sellerCode) : undefined
         const focusSoldKg = focusRow?.soldKg ?? 0
@@ -3612,7 +3638,13 @@ export default function MetasWorkspace() {
             case 'VOLUME':
               if (rawNumber > 0) {
                 const requiredGroups = Math.max(Math.floor(rawNumber), 1)
-                progress = getVolumeProgressByClosestTargets(weightTargetRatios, requiredGroups)
+                const stageWeightTargetRatios = getSellerWeightTargetRatios(
+                  effectiveWeightTargets,
+                  brandWeightRows,
+                  sellerCode,
+                  rule.stage
+                )
+                progress = getVolumeProgressByClosestTargets(stageWeightTargetRatios, requiredGroups)
               } else {
                 progress = 0
               }
@@ -6956,7 +6988,12 @@ export default function MetasWorkspace() {
                                   const sk = sellerSankhyaData.weightTargets.find((w) => w.brand.toUpperCase() === wt.brand.toUpperCase())
                                   return sk ? { ...wt, targetKg: sk.targetKg } : wt
                                 })
-                                const ratios = getSellerWeightTargetRatios(effectiveWt, brandWeightRows, sellerCode)
+                                const ratios = getSellerWeightTargetRatios(
+                                  effectiveWt,
+                                  brandWeightRows,
+                                  sellerCode,
+                                  rule.stage
+                                )
                                 const achievedGroups = ratios.filter((ratio) => ratio >= 1).length
                                 const volumeProgress = requiredGroups > 0
                                   ? getVolumeProgressByClosestTargets(ratios, requiredGroups)
