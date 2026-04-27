@@ -23,15 +23,6 @@ export async function GET(req: NextRequest) {
   await ensureMetasPermissionCatalog()
   await ensureModulePermissionCatalog()
 
-  let excludedUserIds: string[] = []
-  if (user.role?.code !== 'DEVELOPER') {
-    const devUsers = await prisma.user.findMany({
-      where: { role: { code: 'DEVELOPER' } },
-      select: { id: true },
-    })
-    excludedUserIds = devUsers.map((u: { id: string }) => u.id)
-  }
-
   const [rolesRaw, permissions, users, administrationGroup] = await Promise.all([
     prisma.role.findMany({
       where: { code: { in: ROLE_CATALOG_CODES } },
@@ -51,7 +42,6 @@ export async function GET(req: NextRequest) {
     }),
     prisma.user.findMany({
       orderBy: { fullName: 'asc' },
-      where: excludedUserIds.length > 0 ? { id: { notIn: excludedUserIds } } : undefined,
       select: {
         id: true,
         fullName: true,

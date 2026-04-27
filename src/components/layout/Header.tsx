@@ -400,12 +400,12 @@ function HeaderInner() {
                 )}
                 {user?.roleCode === 'IT_ANALYST' && (
                   <Link
-                    href="/controle/gestao-usuarios"
+                    href="/controle"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
                   >
                     <Users className="h-4 w-4 text-surface-500" />
-                    Gestão de Usuários
+                    Painel de Controle
                   </Link>
                 )}
                 {user?.impersonation?.active && (

@@ -126,11 +126,11 @@ export default function GestaoUsuariosPage() {
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([d1, d2]) => {
         const allRoles = (d1.roles ?? []) as RoleOption[]
-        setRoles(isDeveloper ? allRoles : allRoles.filter((r) => r.code !== 'DEVELOPER'))
+        setRoles(allRoles)
         setDepartments(d2.departments ?? [])
       })
       .catch(() => null)
-  }, [isDeveloper])
+  }, [canManageUsers])
 
   useEffect(() => {
     if (!canManageUsers) return
@@ -151,7 +151,7 @@ export default function GestaoUsuariosPage() {
         setSellerOptions(sellers)
       })
       .catch(() => null)
-  }, [isDeveloper])
+  }, [canManageUsers])
 
   useEffect(() => {
     if (canManageUsers) fetchUsers()
