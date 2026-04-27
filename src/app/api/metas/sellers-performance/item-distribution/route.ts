@@ -461,13 +461,16 @@ export async function GET(req: NextRequest) {
       let sellerItemsRecords: RawRecord[] = []
       for (const mode of ['STRICT', 'FALLBACK_TIPMOV', 'ANY_MOVEMENT'] as const) {
         const result = await tryMode(mode)
-        if (result && result.rows.length > 0) {
-          records = result.rows
-          sellerItemsRecords = result.sellerItemsRows
-          break
-        }
-        if (result && result.rows.length === 0) {
-          // Keep trying next mode when query succeeded but returned no rows.
+        if (result) {
+          if (result.rows.length > 0 && records.length === 0) {
+            records = result.rows
+          }
+          if (result.sellerItemsRows.length > 0 && sellerItemsRecords.length === 0) {
+            sellerItemsRecords = result.sellerItemsRows
+          }
+          if (records.length > 0 && sellerItemsRecords.length > 0) {
+            break
+          }
         }
       }
 
