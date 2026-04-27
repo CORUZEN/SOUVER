@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { Mail, ArrowLeft, CheckCircle2, Copy } from 'lucide-react'
+import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 export default function PwaForgotPasswordPage() {
   const [login, setLogin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showAbout, setShowAbout] = useState(false)
   const [devUrl, setDevUrl] = useState('')
   const [sent, setSent] = useState(false)
 
@@ -172,13 +174,21 @@ export default function PwaForgotPasswordPage() {
 
               <div className="mt-8" />
 
-              <p className="text-center text-[10px] text-white/20">
-                Desenvolvido por Jucélio Verissimo
-              </p>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAbout(true)}
+                  className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
+                >
+                  Desenvolvido por Jucélio Verissimo
+                </button>
+              </div>
             </>
           )}
         </div>
       </div>
+
+      <AboutSystemModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
 
       <div className="h-6 shrink-0" />
     </div>

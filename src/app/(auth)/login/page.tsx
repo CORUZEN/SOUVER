@@ -1,12 +1,13 @@
-import type { Metadata } from 'next'
+'use client'
+
+import { useState } from 'react'
 import Image from 'next/image'
 import LoginForm from '@/components/auth/LoginForm'
-
-export const metadata: Metadata = {
-  title: 'Acesso ao Sistema',
-}
+import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 export default function LoginPage() {
+  const [showAbout, setShowAbout] = useState(false)
+
   return (
     <div className="flex min-h-dvh flex-col">
 
@@ -44,12 +45,18 @@ export default function LoginPage() {
           <div className="mt-8" />
 
           <div className="flex justify-center">
-            <p className="text-[10px] text-white/20">
+            <button
+              type="button"
+              onClick={() => setShowAbout(true)}
+              className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
+            >
               Desenvolvido por Jucélio Verissimo
-            </p>
+            </button>
           </div>
         </div>
       </div>
+
+      <AboutSystemModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
 
       <div className="h-6 shrink-0" />
     </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { APP_VERSION_LABEL } from '@/generated/app-version'
-import { X, ExternalLink } from 'lucide-react'
+import AboutSystemModal from './AboutSystemModal'
 
 export default function PwaFooter() {
   const [showVersionInfo, setShowVersionInfo] = useState(false)
@@ -24,84 +24,7 @@ export default function PwaFooter() {
         </button>
       </div>
 
-      {/* Version Info Modal */}
-      {showVersionInfo && (
-        <div
-          className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => setShowVersionInfo(false)}
-        >
-          <div
-            className="w-full max-w-xs rounded-3xl border border-emerald-500/15 bg-[#0f1f14] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Sobre o sistema</p>
-              <button
-                type="button"
-                onClick={() => setShowVersionInfo(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-surface-400 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="my-4 h-px w-full bg-emerald-500/10" />
-
-            {/* Info rows */}
-            <div className="flex flex-col gap-3.5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Software</p>
-                <p className="mt-0.5 text-[13px] font-semibold text-white">Sistema Ouro Verde © 2026</p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Versão</p>
-                <p className="mt-0.5 text-[13px] font-semibold text-emerald-300">{APP_VERSION_LABEL}</p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Desenvolvedor</p>
-                <a
-                  href="https://instagram.com/jucelio.verissimo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-                >
-                  Jucélio Verissimo
-                  <ExternalLink className="h-3 w-3 text-surface-500" />
-                </a>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Integrações</p>
-                <a
-                  href="https://coruzen.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-                >
-                  Coruzen
-                  <ExternalLink className="h-3 w-3 text-surface-500" />
-                </a>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="my-4 h-px w-full bg-emerald-500/10" />
-
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={() => setShowVersionInfo(false)}
-              className="w-full rounded-2xl bg-emerald-500/15 py-3 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-500/20 hover:bg-emerald-500/25 active:scale-95 transition-all"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
+      <AboutSystemModal isOpen={showVersionInfo} onClose={() => setShowVersionInfo(false)} />
     </>
   )
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
 import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 /**
  * Renderiza a versão mobile dark da tela de login (idêntica ao /app/login).
@@ -17,6 +18,7 @@ export default function MobileLoginDark() {
   const [showPassword, setShowPassword] = useState(false)
   const [apiError, setApiError] = useState('')
   const [hydrated, setHydrated] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
 
   useEffect(() => {
     setHydrated(true)
@@ -232,12 +234,18 @@ export default function MobileLoginDark() {
           <div className="mt-8" />
 
           <div className="flex justify-center">
-            <p className="text-[10px] text-white/20">
+            <button
+              type="button"
+              onClick={() => setShowAbout(true)}
+              className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
+            >
               Desenvolvido por Jucélio Verissimo
-            </p>
+            </button>
           </div>
         </div>
       </div>
+
+      <AboutSystemModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
 
       <div className="h-6 shrink-0" />
     </div>
