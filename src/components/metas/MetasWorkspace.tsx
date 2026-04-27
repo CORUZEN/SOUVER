@@ -303,6 +303,7 @@ interface RuleBlock {
   focusTargetKg?: number
   focusTargetMode?: FocusTargetMode
   focusTargetBasePct?: number
+  alwaysShowProgress?: boolean
 }
 
 interface CycleWeek {
@@ -3491,7 +3492,11 @@ export default function MetasWorkspace() {
         const blockRules = block.rules
         const blockPointsTarget = blockRules.reduce((sum, rule) => sum + rule.points, 0)
         const blockRewardTarget = blockRules.reduce((sum, rule) => sum + rule.rewardValue, 0)
-        const activePointsTarget = blockRules.filter((r) => stageStarted.has(r.stage)).reduce((sum, rule) => sum + rule.points, 0)
+        const isStageActiveForSeller = (stage: StageKey) => {
+          if (block.alwaysShowProgress) return true
+          return stageStarted.has(stage)
+        }
+        const activePointsTarget = blockRules.filter((r) => isStageActiveForSeller(r.stage)).reduce((sum, rule) => sum + rule.points, 0)
         const sellerIncludedDates = new Set(
           (activeMonth?.sellerIncludedDates ?? [])
             .filter((entry) => entry.sellerId === seller.id)
@@ -3618,8 +3623,8 @@ export default function MetasWorkspace() {
 
         const ruleProgressMap = new Map<string, number>()
         const ruleProgress = blockRules.map((rule) => {
-          // Skip rules for stages that haven't started yet
-          if (!stageStarted.has(rule.stage)) return { ruleId: rule.id, progress: 0 }
+          // Skip rules for stages that haven't started yet (unless alwaysShowProgress is enabled)
+          if (!isStageActiveForSeller(rule.stage)) return { ruleId: rule.id, progress: 0 }
 
           const rawNumber = parseTargetNumber(rule.targetText) ?? 0
           const cumStage = cumulativeMetrics[rule.stage]
@@ -3827,7 +3832,7 @@ export default function MetasWorkspace() {
           return pct > 100 && (ruleProgressMap.get(rule.id) ?? 0) >= 1
         })
 
-        const activeRulesForStatus = blockRules.filter((r) => stageStarted.has(r.stage))
+        const activeRulesForStatus = blockRules.filter((r) => isStageActiveForSeller(r.stage))
         const allActiveKpisHit =
           activeRulesForStatus.length > 0 &&
           activeRulesForStatus.every((rule) => {
@@ -7516,7 +7521,22 @@ export default function MetasWorkspace() {
                     })()}
                   </div>
                   <div>
-                    <p className={label}>Vendedores neste bloco</p>
+                    <div className="flex items-center justify-between">
+                      <p className={label}>Vendedores neste bloco</p>
+                      <button
+                        type="button"
+                        onClick={() => updateBlock({ alwaysShowProgress: !block.alwaysShowProgress })}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                          block.alwaysShowProgress
+                            ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'
+                        }`}
+                        title={block.alwaysShowProgress ? 'Progresso visível durante todo o período' : 'Progresso visível apenas na semana do KPI'}
+                      >
+                        <Activity size={12} />
+                        {block.alwaysShowProgress ? 'Progresso contínuo ativo' : 'Progresso contínuo'}
+                      </button>
+                    </div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {assignedSellers.map((s) => (
                         <span key={s.id} className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200">
