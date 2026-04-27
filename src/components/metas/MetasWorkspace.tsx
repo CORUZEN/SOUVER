@@ -1571,12 +1571,13 @@ export default function MetasWorkspace() {
     [kpiApplySourceBlock, resolveBlockProfileType]
   )
   const kpiApplyTargetOptions = useMemo(() => {
-    if (!applyKpiModal.sourceBlockId) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
-    if (!kpiApplySourceProfile) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string }>
-    const bySeller = new Map<string, { sellerId: string; sellerName: string; blockId: string; blockTitle: string }>()
+    if (!applyKpiModal.sourceBlockId) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string; isSourceBlock: boolean }>
+    if (!kpiApplySourceProfile) return [] as Array<{ sellerId: string; sellerName: string; blockId: string; blockTitle: string; isSourceBlock: boolean }>
+    const bySeller = new Map<string, { sellerId: string; sellerName: string; blockId: string; blockTitle: string; isSourceBlock: boolean }>()
     for (const candidate of ruleBlocks) {
-      if (candidate.id === applyKpiModal.sourceBlockId || candidate.sellerIds.length === 0) continue
-      if (resolveBlockProfileType(candidate) !== kpiApplySourceProfile) continue
+      if (candidate.sellerIds.length === 0) continue
+      const isSourceBlock = candidate.id === applyKpiModal.sourceBlockId
+      if (!isSourceBlock && resolveBlockProfileType(candidate) !== kpiApplySourceProfile) continue
       for (const sellerId of candidate.sellerIds) {
         if (bySeller.has(sellerId)) continue
         const sellerName = sellers.find((seller) => seller.id === sellerId)?.name ?? sellerId.replace(/^sankhya-/, '')
@@ -1585,6 +1586,7 @@ export default function MetasWorkspace() {
           sellerName,
           blockId: candidate.id,
           blockTitle: candidate.title,
+          isSourceBlock,
         })
       }
     }
@@ -1631,6 +1633,7 @@ export default function MetasWorkspace() {
     const validTargetIds = new Set(kpiApplyTargetOptions.map((option) => option.sellerId))
     const selectedIds = new Set(applyKpiModal.selectedSellerIds.filter((sellerId) => validTargetIds.has(sellerId)))
     const sourceSellerIds = new Set(kpiApplySourceBlock?.sellerIds ?? [])
+    const hasSelectedSourceSellers = applyKpiModal.selectedSellerIds.some((sellerId) => sourceSellerIds.has(sellerId))
     const selectedAndSourceIds = new Set<string>([...selectedIds, ...sourceSellerIds])
     if (selectedAndSourceIds.size === 0) return
 
@@ -1664,7 +1667,7 @@ export default function MetasWorkspace() {
       return { blocks: nextBlocks, changed }
     }
 
-    setRuleBlocks((prev) => applyRulesToBlocks(prev, { skipBlockId: applyKpiModal.sourceBlockId }).blocks)
+    setRuleBlocks((prev) => applyRulesToBlocks(prev, { skipBlockId: hasSelectedSourceSellers ? undefined : applyKpiModal.sourceBlockId }).blocks)
 
     if (applyKpiModal.monthScope !== 'CURRENT') {
       const targetMonthKeys = resolveKpiApplyMonthKeys(applyKpiModal.monthScope).filter((key) => key !== activeKey)
@@ -6811,14 +6814,13 @@ export default function MetasWorkspace() {
             const unassignedSellers = sellers.filter((s) => !ruleBlocks.some((b) => b.id !== block.id && b.sellerIds.includes(s.id)) || block.sellerIds.includes(s.id))
             const sellersInBlock = sellers.filter((s) => findBlockForSeller(s.id, ruleBlocks).id === block.id)
             const otherSellerBlocksCount = ruleBlocks.filter((b) => b.id !== block.id && b.sellerIds.length > 0).length
-            const otherSellerIdsForKpiApply = Array.from(
+            const eligibleSellerIdsForKpiApply = Array.from(
               new Set(
                 ruleBlocks
                   .filter(
                     (candidate) =>
-                      candidate.id !== block.id &&
                       candidate.sellerIds.length > 0 &&
-                      resolveBlockProfileType(candidate) === activeBlockProfileType
+                      (candidate.id === block.id || resolveBlockProfileType(candidate) === activeBlockProfileType)
                   )
                   .flatMap((candidate) => candidate.sellerIds)
               )
@@ -7359,12 +7361,12 @@ export default function MetasWorkspace() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={otherSellerIdsForKpiApply.length === 0}
+                      disabled={eligibleSellerIdsForKpiApply.length === 0}
                       onClick={() =>
                         setApplyKpiModal({
                           open: true,
                           sourceBlockId: block.id,
-                          selectedSellerIds: otherSellerIdsForKpiApply,
+                          selectedSellerIds: eligibleSellerIdsForKpiApply,
                           monthScope: 'CURRENT',
                         })
                       }
@@ -10971,7 +10973,7 @@ export default function MetasWorkspace() {
 
           {kpiApplyTargetOptions.length === 0 ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
-              Não há vendedores de mesmo perfil em outros blocos para receber os parâmetros.
+              Não há vendedores disponíveis para receber os parâmetros.
             </p>
           ) : (
             <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-surface-200 bg-white p-2">
@@ -10996,7 +10998,16 @@ export default function MetasWorkspace() {
                     />
                     <div>
                       <p className="text-sm font-medium text-surface-800">{option.sellerName}</p>
-                      <p className="text-[11px] text-surface-500">Bloco atual: {option.blockTitle}</p>
+                      <p className="text-[11px] text-surface-500">
+                        {option.isSourceBlock ? (
+                          <span className="inline-flex items-center gap-1">
+                            Bloco atual: {option.blockTitle}
+                            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700">este bloco</span>
+                          </span>
+                        ) : (
+                          `Bloco atual: ${option.blockTitle}`
+                        )}
+                      </p>
                     </div>
                   </div>
                 </label>
