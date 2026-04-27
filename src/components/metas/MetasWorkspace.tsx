@@ -10693,14 +10693,34 @@ export default function MetasWorkspace() {
                                   <span className="rounded-md border border-surface-200 bg-white px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums text-surface-800">
                                     {num(row.uniqueClients, 0)}/{num(row.baseClients, 0)}
                                   </span>
-                                  {row.cells.map((cell) => (
-                                    <span
-                                      key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
-                                      className={`rounded-md px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums ${heatCellClass(cell.ratio)}`}
-                                    >
-                                      {num(cell.ratio * 100, 0)}%
-                                    </span>
-                                  ))}
+                                  {(() => {
+                                    const visibleStageCells = row.cells.filter((cell) => {
+                                      const blockStageRules = sellerBlock.rules.filter((r) => r.stage === cell.stageKey)
+                                      return blockStageRules.length > 0
+                                    })
+                                    const getStageColSpan = (index: number) => {
+                                      const count = visibleStageCells.length
+                                      if (count === 1) return 4
+                                      if (count === 2) return 2
+                                      if (count === 3) return index === 0 ? 2 : 1
+                                      return 1
+                                    }
+                                    return row.cells.map((cell) => {
+                                      const blockStageRules = sellerBlock.rules.filter((r) => r.stage === cell.stageKey)
+                                      if (blockStageRules.length === 0) return null
+                                      const visibleIndex = visibleStageCells.findIndex((c) => c.stageKey === cell.stageKey)
+                                      const colSpan = getStageColSpan(visibleIndex)
+                                      return (
+                                        <span
+                                          key={`seller-stage-pill-${row.id}-${cell.stageKey}`}
+                                          className={`rounded-md px-1.5 py-1 text-center text-[11px] font-semibold tabular-nums ${heatCellClass(cell.ratio)}`}
+                                          style={{ gridColumn: `span ${colSpan}` }}
+                                        >
+                                          {num(cell.ratio * 100, 0)}%
+                                        </span>
+                                      )
+                                    })
+                                  })()}
                                   <ChevronDown
                                     size={14}
                                     className={`justify-self-center text-surface-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
