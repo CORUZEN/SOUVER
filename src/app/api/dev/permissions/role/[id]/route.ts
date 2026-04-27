@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser, isUserManager } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import type { Prisma } from '@prisma/client'
 
@@ -15,8 +15,8 @@ export async function PUT(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
-  if (user.role?.code !== 'DEVELOPER') {
-    return NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 })
+  if (!isUserManager(user.role?.code)) {
+    return NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 })
   }
 
   const { id } = await params

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, isUserManager } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
@@ -25,12 +25,12 @@ const updateUserSchema = z.object({
   sellerCode: z.string().max(20).nullable().optional(),
 })
 
-function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
+function ensureUserManager(user: Awaited<ReturnType<typeof getAuthUser>>) {
   if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
-  if (user.role?.code !== 'DEVELOPER') {
-    return { ok: false as const, response: NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
+  if (!isUserManager(user.role?.code)) {
+    return { ok: false as const, response: NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 }) }
   }
-  return { ok: true as const }
+  return { ok: true as const, user }
 }
 
 export async function GET(
@@ -38,7 +38,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const currentUser = await getAuthUser(req)
-  const guard = ensureDeveloper(currentUser)
+  const guard = ensureUserManager(currentUser)
   if (!guard.ok) return guard.response
 
   const { id } = await params
@@ -63,6 +63,9 @@ export async function GET(
   })
 
   if (!user) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+  if (currentUser?.role?.code !== 'DEVELOPER' && user.role?.code === 'DEVELOPER') {
+    return NextResponse.json({ message: 'Acesso restrito a este usuário.' }, { status: 403 })
+  }
   return NextResponse.json({ user })
 }
 
@@ -71,15 +74,18 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const currentUser = await getAuthUser(req)
-  const guard = ensureDeveloper(currentUser)
+  const guard = ensureUserManager(currentUser)
   if (!guard.ok) return guard.response
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   const userAgent = req.headers.get('user-agent') ?? 'unknown'
 
-  const target = await prisma.user.findUnique({ where: { id }, select: { id: true, fullName: true, email: true, login: true, isActive: true } })
+  const target = await prisma.user.findUnique({ where: { id }, select: { id: true, fullName: true, email: true, login: true, isActive: true, role: { select: { code: true } } } })
   if (!target) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+  if (currentUser?.role?.code !== 'DEVELOPER' && target.role?.code === 'DEVELOPER') {
+    return NextResponse.json({ message: 'Você não tem permissão para alterar este usuário.' }, { status: 403 })
+  }
 
   const body = await req.json()
   const parsed = updateUserSchema.safeParse(body)
@@ -91,6 +97,13 @@ export async function PUT(
   }
 
   const { password, ...rest } = parsed.data
+
+  if (rest.roleId && currentUser?.role?.code !== 'DEVELOPER') {
+    const newRole = await prisma.role.findUnique({ where: { id: rest.roleId }, select: { code: true } })
+    if (newRole?.code === 'DEVELOPER') {
+      return NextResponse.json({ message: 'Você não tem permissão para atribuir o cargo Desenvolvedor.' }, { status: 403 })
+    }
+  }
 
   let normalizedSellerCode = typeof rest.sellerCode === 'string' ? rest.sellerCode.trim() : rest.sellerCode
   if (typeof normalizedSellerCode === 'string' && normalizedSellerCode) {
@@ -173,10 +186,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const currentUser = await getAuthUser(req)
-  const guard = ensureDeveloper(currentUser)
+  const guard = ensureUserManager(currentUser)
   if (!guard.ok) return guard.response
 
   const { id } = await params
+
+  if (currentUser?.role?.code !== 'DEVELOPER') {
+    return NextResponse.json({ message: 'Apenas Desenvolvedor pode excluir usuários.' }, { status: 403 })
+  }
 
   if (currentUser!.id === id) {
     return NextResponse.json({ message: 'Não e permitido excluir o proprio usuário.' }, { status: 400 })
@@ -190,6 +207,9 @@ export async function DELETE(
     select: { id: true, fullName: true, email: true, login: true, role: { select: { code: true } } },
   })
   if (!target) return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+  if (currentUser?.role?.code !== 'DEVELOPER' && target.role?.code === 'DEVELOPER') {
+    return NextResponse.json({ message: 'Você não tem permissão para excluir este usuário.' }, { status: 403 })
+  }
 
   try {
     await prisma.user.delete({ where: { id } })

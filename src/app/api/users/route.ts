@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, isUserManager } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
@@ -22,18 +23,20 @@ const createUserSchema = z.object({
   sellerCode: z.string().max(20).optional().nullable(),
 })
 
-function ensureDeveloper(user: Awaited<ReturnType<typeof getAuthUser>>) {
+function ensureUserManager(user: Awaited<ReturnType<typeof getAuthUser>>) {
   if (!user) return { ok: false as const, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
-  if (user.role?.code !== 'DEVELOPER') {
-    return { ok: false as const, response: NextResponse.json({ message: 'Área Dev exclusiva para desenvolvedor.' }, { status: 403 }) }
+  if (!isUserManager(user.role?.code)) {
+    return { ok: false as const, response: NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 }) }
   }
-  return { ok: true as const }
+  return { ok: true as const, user }
 }
 
 export async function GET(req: NextRequest) {
   const currentUser = await getAuthUser(req)
-  const guard = ensureDeveloper(currentUser)
+  const guard = ensureUserManager(currentUser)
   if (!guard.ok) return guard.response
+
+  const isDev = currentUser?.role?.code === 'DEVELOPER'
 
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search') ?? ''
@@ -43,7 +46,16 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
 
-  const where = {
+  let excludedUserIds: string[] = []
+  if (!isDev) {
+    const devUsers = await prisma.user.findMany({
+      where: { role: { code: 'DEVELOPER' } },
+      select: { id: true },
+    })
+    excludedUserIds = devUsers.map((u: { id: string }) => u.id)
+  }
+
+  const where: Prisma.UserWhereInput = {
     ...(search
       ? {
           OR: [
@@ -56,6 +68,7 @@ export async function GET(req: NextRequest) {
     ...(roleId ? { roleId } : {}),
     ...(departmentId ? { departmentId } : {}),
     ...(statusFilter === 'active' ? { isActive: true } : statusFilter === 'inactive' ? { isActive: false } : {}),
+    ...(excludedUserIds.length > 0 ? { id: { notIn: excludedUserIds } } : {}),
   }
 
   const [users, total] = await Promise.all([
@@ -88,7 +101,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const currentUser = await getAuthUser(req)
-  const guard = ensureDeveloper(currentUser)
+  const guard = ensureUserManager(currentUser)
   if (!guard.ok) return guard.response
 
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
@@ -117,6 +130,9 @@ export async function POST(req: NextRequest) {
       select: { code: true },
     })
     const roleCode = String(role?.code ?? '').toUpperCase()
+    if (roleCode === 'DEVELOPER' && currentUser?.role?.code !== 'DEVELOPER') {
+      return NextResponse.json({ message: 'Você não tem permissão para atribuir o cargo Desenvolvedor.' }, { status: 403 })
+    }
     if (roleCode === 'SALES_SUPERVISOR' || roleCode === 'SELLER') {
       if (!normalizedSellerCode) {
         return NextResponse.json(

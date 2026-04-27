@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3001'],
     },
   },
+  async rewrites() {
+    return [
+      { source: '/controle', destination: '/dev' },
+      { source: '/controle/gestao-usuarios', destination: '/dev/gestao-usuarios' },
+      { source: '/controle/gestao-permissoes', destination: '/dev/gestao-permissoes' },
+    ]
+  },
   async headers() {
     const headers = [
       {

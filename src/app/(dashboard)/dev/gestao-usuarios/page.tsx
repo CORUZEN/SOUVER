@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, Lock, LogIn, Pencil, Plus, RefreshCw, Search, Trash2, UserCheck, UserX, Users, ArrowLeft } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -51,6 +52,7 @@ const EMPTY_FORM: UserFormData = {
 }
 
 export default function GestaoUsuariosPage() {
+  const pathname = usePathname()
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
@@ -80,10 +82,12 @@ export default function GestaoUsuariosPage() {
   const [supervisorSellers, setSupervisorSellers] = useState<{ code: string; name: string }[]>([])
   const [sellerOptions, setSellerOptions] = useState<{ code: string; name: string }[]>([])
 
+  const canManageUsers = currentUser?.roleCode === 'DEVELOPER' || currentUser?.roleCode === 'IT_ANALYST'
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
+  const basePath = pathname?.startsWith('/controle') ? '/controle' : '/dev'
 
   const fetchUsers = useCallback(async () => {
-    if (!isDeveloper) return
+    if (!canManageUsers) return
     setLoadingUsers(true)
     setUsersError(null)
     try {
@@ -105,7 +109,7 @@ export default function GestaoUsuariosPage() {
     } finally {
       setLoadingUsers(false)
     }
-  }, [isDeveloper, page, search, filterRole, filterDept, filterStatus])
+  }, [canManageUsers, isDeveloper, page, search, filterRole, filterDept, filterStatus])
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -117,18 +121,19 @@ export default function GestaoUsuariosPage() {
   }, [])
 
   useEffect(() => {
-    if (!isDeveloper) return
+    if (!canManageUsers) return
     Promise.all([fetch('/api/roles'), fetch('/api/departments')])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([d1, d2]) => {
-        setRoles(d1.roles ?? [])
+        const allRoles = (d1.roles ?? []) as RoleOption[]
+        setRoles(isDeveloper ? allRoles : allRoles.filter((r) => r.code !== 'DEVELOPER'))
         setDepartments(d2.departments ?? [])
       })
       .catch(() => null)
   }, [isDeveloper])
 
   useEffect(() => {
-    if (!isDeveloper) return
+    if (!canManageUsers) return
     fetch('/api/metas/sellers-allowlist')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -149,8 +154,8 @@ export default function GestaoUsuariosPage() {
   }, [isDeveloper])
 
   useEffect(() => {
-    if (isDeveloper) fetchUsers()
-  }, [fetchUsers, isDeveloper])
+    if (canManageUsers) fetchUsers()
+  }, [fetchUsers, canManageUsers])
 
   useEffect(() => {
     setPage(1)
@@ -290,29 +295,36 @@ export default function GestaoUsuariosPage() {
       header: 'Ações',
       render: (_, row) => {
         const self = row.id === currentUser?.id
+        const isDevTarget = row.role?.code === 'DEVELOPER'
+
+        // Analista de TI não pode interagir com usuários Desenvolvedor
+        if (!isDeveloper && isDevTarget) {
+          return <span className="text-[11px] text-surface-400">—</span>
+        }
+
         return (
           <div className="flex items-center gap-1">
             <button className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Ver perfil"><Eye className="h-3.5 w-3.5" /></button>
             <button onClick={() => openEdit(row)} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
-            {!self && <button onClick={() => { setConfirmUser(row); setConfirmType('impersonate'); setConfirmOpen(true) }} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Locar como"><LogIn className="h-3.5 w-3.5" /></button>}
+            {!self && isDeveloper && <button onClick={() => { setConfirmUser(row); setConfirmType('impersonate'); setConfirmOpen(true) }} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Locar como"><LogIn className="h-3.5 w-3.5" /></button>}
             <button onClick={() => { setConfirmUser(row); setConfirmType('toggle'); setConfirmOpen(true) }} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Ativar ou desativar">{row.isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}</button>
-            {!self && <button onClick={() => { setConfirmUser(row); setConfirmType('delete'); setConfirmOpen(true) }} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>}
+            {isDeveloper && !self && <button onClick={() => { setConfirmUser(row); setConfirmType('delete'); setConfirmOpen(true) }} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-surface-100" title="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>}
           </div>
         )
       },
     },
   ]
 
-  if (!authLoaded) return <div className="flex items-center gap-2 text-sm text-surface-500"><Spinner />Validando acesso Dev...</div>
+  if (!authLoaded) return <div className="flex items-center gap-2 text-sm text-surface-500"><Spinner />Validando acesso...</div>
 
-  if (!isDeveloper) {
+  if (!canManageUsers) {
     return (
       <div className="rounded-xl border border-surface-200 bg-white p-8">
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-red-50 p-2 text-red-700"><Lock className="h-5 w-5" /></div>
           <div>
             <h1 className="text-lg font-semibold">Acesso restrito</h1>
-            <p className="mt-1 text-sm text-surface-600">Esta página Dev é exclusiva do usuário Desenvolvedor.</p>
+            <p className="mt-1 text-sm text-surface-600">Esta área é exclusiva para administradores de usuários.</p>
           </div>
         </div>
       </div>
@@ -332,7 +344,7 @@ export default function GestaoUsuariosPage() {
           <p className="mt-1 text-xs text-surface-500">{total} {total === 1 ? 'usuário cadastrado' : 'usuários cadastrados'}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dev">
+          <Link href={basePath}>
             <Button variant="outline"><ArrowLeft className="h-4 w-4" />Voltar para Central</Button>
           </Link>
           <Button onClick={openCreate}><Plus className="h-4 w-4" />Novo usuário</Button>

@@ -1,27 +1,36 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser } from '@/lib/auth/permissions'
+import { ensureMetasPermissionCatalog, ensureModulePermissionCatalog, getAuthUser, isUserManager } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 import { ensureRoleCatalog, ROLE_CATALOG_CODES, sortRolesByCatalogOrder } from '@/lib/role-catalog'
 
 function deny() {
-  return NextResponse.json({ message: 'Ãrea Dev exclusiva para desenvolvedor.' }, { status: 403 })
+  return NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 })
 }
 
-async function requireDeveloper(req: NextRequest) {
+async function requireUserManager(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user) return { user: null, response: NextResponse.json({ message: 'NÃ£o autenticado' }, { status: 401 }) }
-  if (user.role?.code !== 'DEVELOPER') return { user: null, response: deny() }
+  if (!user) return { user: null, response: NextResponse.json({ message: 'Não autenticado' }, { status: 401 }) }
+  if (!isUserManager(user.role?.code)) return { user: null, response: deny() }
   return { user, response: undefined }
 }
 
 export async function GET(req: NextRequest) {
-  const { user, response } = await requireDeveloper(req)
+  const { user, response } = await requireUserManager(req)
   if (!user || response) return response
 
   await ensureRoleCatalog(prisma)
   await ensureMetasPermissionCatalog()
   await ensureModulePermissionCatalog()
+
+  let excludedUserIds: string[] = []
+  if (user.role?.code !== 'DEVELOPER') {
+    const devUsers = await prisma.user.findMany({
+      where: { role: { code: 'DEVELOPER' } },
+      select: { id: true },
+    })
+    excludedUserIds = devUsers.map((u: { id: string }) => u.id)
+  }
 
   const [rolesRaw, permissions, users, administrationGroup] = await Promise.all([
     prisma.role.findMany({
@@ -42,6 +51,7 @@ export async function GET(req: NextRequest) {
     }),
     prisma.user.findMany({
       orderBy: { fullName: 'asc' },
+      where: excludedUserIds.length > 0 ? { id: { notIn: excludedUserIds } } : undefined,
       select: {
         id: true,
         fullName: true,
@@ -76,7 +86,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user, response } = await requireDeveloper(req)
+  const { user, response } = await requireUserManager(req)
   if (!user || response) return response
   await ensureMetasPermissionCatalog()
 

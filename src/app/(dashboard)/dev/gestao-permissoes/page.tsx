@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Lock, Shield } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -133,6 +134,7 @@ const MODULE_PERMISSION_ITEMS: MetasPermissionItem[] = [
 ]
 
 export default function GestaoPermissoesPage() {
+  const pathname = usePathname()
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
@@ -149,10 +151,12 @@ export default function GestaoPermissoesPage() {
   const [savingUserRole, setSavingUserRole] = useState(false)
   const [creatingAdminGroup, setCreatingAdminGroup] = useState(false)
 
+  const canManagePermissions = currentUser?.roleCode === 'DEVELOPER' || currentUser?.roleCode === 'IT_ANALYST'
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
+  const basePath = pathname?.startsWith('/controle') ? '/controle' : '/dev'
 
   const fetchPermissionsPanel = useCallback(async () => {
-    if (!isDeveloper) return
+    if (!canManagePermissions) return
     const r = await fetch('/api/dev/permissions')
     const d = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(d.message ?? 'Erro ao carregar painel de permissões.')
@@ -172,7 +176,7 @@ export default function GestaoPermissoesPage() {
       setSelectedUserId(d.users[0].id)
       setSelectedUserRoleId(d.users[0].roleId ?? '')
     }
-  }, [isDeveloper, selectedRoleId, selectedUserId])
+  }, [canManagePermissions, isDeveloper, selectedRoleId, selectedUserId])
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -184,10 +188,10 @@ export default function GestaoPermissoesPage() {
   }, [])
 
   useEffect(() => {
-    if (isDeveloper) {
+    if (canManagePermissions) {
       fetchPermissionsPanel().catch((e) => setPermMessage((e as Error).message))
     }
-  }, [fetchPermissionsPanel, isDeveloper])
+  }, [fetchPermissionsPanel, canManagePermissions])
 
   const selectedRoleData = useMemo(() => devRoles.find((r) => r.id === selectedRoleId) ?? null, [devRoles, selectedRoleId])
 
@@ -263,16 +267,16 @@ export default function GestaoPermissoesPage() {
     }
   }
 
-  if (!authLoaded) return <div className="flex items-center gap-2 text-sm text-surface-500"><Spinner />Validando acesso Dev...</div>
+  if (!authLoaded) return <div className="flex items-center gap-2 text-sm text-surface-500"><Spinner />Validando acesso...</div>
 
-  if (!isDeveloper) {
+  if (!canManagePermissions) {
     return (
       <div className="rounded-xl border border-surface-200 bg-white p-8">
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-red-50 p-2 text-red-700"><Lock className="h-5 w-5" /></div>
           <div>
             <h1 className="text-lg font-semibold">Acesso restrito</h1>
-            <p className="mt-1 text-sm text-surface-600">Esta página Dev é exclusiva do usuário Desenvolvedor.</p>
+            <p className="mt-1 text-sm text-surface-600">Esta área é exclusiva para administradores de permissões.</p>
           </div>
         </div>
       </div>
@@ -288,7 +292,7 @@ export default function GestaoPermissoesPage() {
           <h1 className="text-xl font-semibold">Governança de Acessos</h1>
           <p className="text-sm text-surface-500">Controle corporativo de privilégios por cargo e delegação de permissões por usuário.</p>
         </div>
-        <Link href="/dev">
+        <Link href={basePath}>
           <Button variant="outline"><ArrowLeft className="h-4 w-4" />Voltar para Central</Button>
         </Link>
       </div>

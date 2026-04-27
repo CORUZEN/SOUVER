@@ -428,6 +428,13 @@ export async function getMetasPermissions(user: AuthzUserLike | null | undefined
   return buildMetasPermissions(permissionCodes)
 }
 
+const USER_MANAGER_ROLE_CODES = new Set(['DEVELOPER', 'IT_ANALYST'])
+
+export function isUserManager(roleCode: string | null | undefined): boolean {
+  if (!roleCode) return false
+  return USER_MANAGER_ROLE_CODES.has(roleCode.toUpperCase())
+}
+
 /** Regra central para acesso ao painel de integrações. */
 export async function canAccessIntegrations(user: AuthzUserLike | null | undefined): Promise<boolean> {
   if (!user) return false

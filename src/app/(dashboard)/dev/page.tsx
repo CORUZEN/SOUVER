@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { ArrowRight, Lock, Shield, Users, KeyRound } from 'lucide-react'
 import { Spinner } from '@/components/ui/Skeleton'
 
@@ -11,6 +12,7 @@ interface CurrentUser {
 }
 
 export default function DevPage() {
+  const pathname = usePathname()
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
@@ -23,18 +25,20 @@ export default function DevPage() {
       .finally(() => setAuthLoaded(true))
   }, [])
 
+  const canAccess = currentUser?.roleCode === 'DEVELOPER' || currentUser?.roleCode === 'IT_ANALYST'
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
+  const basePath = pathname?.startsWith('/controle') ? '/controle' : '/dev'
 
   if (!authLoaded) {
     return (
       <div className="flex items-center gap-2 text-sm text-surface-500">
         <Spinner />
-        Validando acesso Dev...
+        Validando acesso...
       </div>
     )
   }
 
-  if (!isDeveloper) {
+  if (!canAccess) {
     return (
       <div className="rounded-xl border border-surface-200 bg-white p-8">
         <div className="flex items-start gap-3">
@@ -43,7 +47,7 @@ export default function DevPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Acesso restrito</h1>
-            <p className="mt-1 text-sm text-surface-600">Esta página Dev é exclusiva do usuário Desenvolvedor.</p>
+            <p className="mt-1 text-sm text-surface-600">Esta área é exclusiva para administradores de usuários.</p>
           </div>
         </div>
       </div>
@@ -53,16 +57,18 @@ export default function DevPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">Área Dev</p>
-        <h1 className="mt-2 text-2xl font-semibold text-surface-900">Central do Desenvolvedor</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">{isDeveloper ? 'Área Dev' : 'Administração'}</p>
+        <h1 className="mt-2 text-2xl font-semibold text-surface-900">{isDeveloper ? 'Central do Desenvolvedor' : 'Gestão de Usuários e Permissões'}</h1>
         <p className="mt-2 max-w-3xl text-sm text-surface-600">
-          Painel de governança técnica para administração de contas e controle de permissões do sistema empresarial.
+          {isDeveloper
+            ? 'Painel de governança técnica para administração de contas e controle de permissões do sistema empresarial.'
+            : 'Painel corporativo para administração de contas e controle de permissões do sistema empresarial.'}
         </p>
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Link
-          href="/dev/gestao-usuarios"
+          href={`${basePath}/gestao-usuarios`}
           className="group rounded-2xl border border-surface-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md"
         >
           <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
@@ -77,7 +83,7 @@ export default function DevPage() {
         </Link>
 
         <Link
-          href="/dev/gestao-permissoes"
+          href={`${basePath}/gestao-permissoes`}
           className="group rounded-2xl border border-surface-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md"
         >
           <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
@@ -95,7 +101,7 @@ export default function DevPage() {
       <section className="rounded-xl border border-surface-200 bg-surface-50 p-4 text-sm text-surface-600">
         <p className="inline-flex items-center gap-2 font-medium text-surface-700">
           <Shield className="h-4 w-4" />
-          Uso restrito ao perfil Desenvolvedor.
+          {isDeveloper ? 'Uso restrito ao perfil Desenvolvedor.' : 'Acesso liberado para Analista de TI.'}
         </p>
       </section>
     </div>

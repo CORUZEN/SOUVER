@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield, Users } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import MobilePwaRedirect from './MobilePwaRedirect'
 import Link from 'next/link'
@@ -208,25 +208,28 @@ function HeaderInner() {
       }
     }
 
-    if (pathname === '/dev') {
+    if (pathname === '/dev' || pathname === '/controle') {
+      const isDev = user?.roleCode === 'DEVELOPER'
       return {
-        eyebrow: 'Área Dev • Governança',
-        title: 'Central do Desenvolvedor',
+        eyebrow: isDev ? 'Área Dev • Governança' : 'Administração • Governança',
+        title: isDev ? 'Central do Desenvolvedor' : 'Gestão de Usuários e Permissões',
         subtitle: 'Acesso corporativo para gestão de usuários e permissões do sistema',
       }
     }
 
-    if (pathname.startsWith('/dev/gestao-usuarios')) {
+    if (pathname.startsWith('/dev/gestao-usuarios') || pathname.startsWith('/controle/gestao-usuarios')) {
+      const isDev = user?.roleCode === 'DEVELOPER'
       return {
-        eyebrow: 'Área Dev • Identidades',
+        eyebrow: isDev ? 'Área Dev • Identidades' : 'Administração • Identidades',
         title: 'Gestão de Usuários',
         subtitle: 'Administração de contas, status e ciclo de acesso corporativo',
       }
     }
 
-    if (pathname.startsWith('/dev/gestao-permissoes')) {
+    if (pathname.startsWith('/dev/gestao-permissoes') || pathname.startsWith('/controle/gestao-permissoes')) {
+      const isDev = user?.roleCode === 'DEVELOPER'
       return {
-        eyebrow: 'Área Dev • Acessos',
+        eyebrow: isDev ? 'Área Dev • Acessos' : 'Administração • Acessos',
         title: 'Gestão de Permissões',
         subtitle: 'Controle de grupos, privilégios e delegação de acesso por usuário',
       }
@@ -387,12 +390,22 @@ function HeaderInner() {
                 </Link>
                 {user?.roleCode === 'DEVELOPER' && (
                   <Link
-                    href="/dev"
+                    href="/dev/gestao-usuarios"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
                   >
                     <Shield className="h-4 w-4 text-surface-500" />
                     Dev
+                  </Link>
+                )}
+                {user?.roleCode === 'IT_ANALYST' && (
+                  <Link
+                    href="/controle/gestao-usuarios"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
+                  >
+                    <Users className="h-4 w-4 text-surface-500" />
+                    Gestão de Usuários
                   </Link>
                 )}
                 {user?.impersonation?.active && (
