@@ -1770,7 +1770,7 @@ export default function SupervisorPwaDashboard() {
                             icon={<DollarSign className="h-3.5 w-3.5" />}
                             label="Vlr. dos Pedidos"
                             value={fmtBrl(seller.totalValue)}
-                            highlight={financialPct >= 100 ? 'success' : 'none'}
+                            highlight={getProgressHighlight(financialPct)}
                           />
                           <MetricCell icon={<Target className="h-3.5 w-3.5" />} label="Meta" value={target > 0 ? fmtBrl(target) : '—'} />
                           <MetricCell icon={<ShoppingCart className="h-3.5 w-3.5" />} label="Pedidos" value={fmt(seller.totalOrders)} />
@@ -1779,7 +1779,7 @@ export default function SupervisorPwaDashboard() {
                             icon={<Weight className="h-3.5 w-3.5" />}
                             label="Peso Bruto"
                             value={fmtKg(seller.totalGrossWeight)}
-                            highlight={weightTargetKg > 0 && seller.totalGrossWeight >= weightTargetKg ? 'success' : 'none'}
+                            highlight={getProgressHighlight(weightTargetKg > 0 ? (seller.totalGrossWeight / weightTargetKg) * 100 : 0)}
                           />
                           <MetricCell
                             icon={<Weight className="h-3.5 w-3.5" />}
@@ -1804,6 +1804,25 @@ export default function SupervisorPwaDashboard() {
                             <p className="text-[10px] text-emerald-300">
                               <span className="font-semibold">{fmtBrl(seller.totalValue - target)}</span>
                               {' '}acima da meta
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Weight gap info */}
+                        {weightTargetKg > 0 && seller.totalGrossWeight < weightTargetKg && (
+                          <div className="mt-2 rounded-lg bg-surface-800/60 px-3 py-2">
+                            <p className="text-[10px] text-surface-400">
+                              Faltam{' '}
+                              <span className="font-semibold text-white">{fmtKg(weightTargetKg - seller.totalGrossWeight)}</span>
+                              {' '}para bater a meta de peso
+                            </p>
+                          </div>
+                        )}
+                        {weightTargetKg > 0 && seller.totalGrossWeight >= weightTargetKg && (
+                          <div className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2">
+                            <p className="text-[10px] text-emerald-300">
+                              <span className="font-semibold">{fmtKg(seller.totalGrossWeight - weightTargetKg)}</span>
+                              {' '}acima da meta de peso
                             </p>
                           </div>
                         )}
@@ -1845,14 +1864,28 @@ export default function SupervisorPwaDashboard() {
 /* ─────────────────────────────────────────────
    Sub-components
 ───────────────────────────────────────────── */
-type MetricHighlight = 'success' | 'warn' | 'none'
+type MetricHighlight = 'success' | 'warn' | 'danger' | 'attention' | 'none'
+
+function getProgressHighlight(pct: number): MetricHighlight {
+  if (pct >= 100) return 'success'
+  if (pct >= 75) return 'warn'
+  if (pct >= 25) return 'attention'
+  return 'danger'
+}
 
 function MetricCell({ icon, label, value, highlight = 'none' }: { icon: React.ReactNode; label: string; value: string; highlight?: MetricHighlight }) {
   const valueColor =
-    highlight === 'success' ? 'text-emerald-400' :
-    highlight === 'warn'    ? 'text-amber-400'   :
+    highlight === 'success'   ? 'text-emerald-400' :
+    highlight === 'warn'      ? 'text-amber-400'   :
+    highlight === 'attention' ? 'text-orange-400'  :
+    highlight === 'danger'    ? 'text-red-400'     :
     'text-white'
-  const borderAccent = 'border border-surface-700/50 bg-surface-800/60'
+  const borderAccent =
+    highlight === 'success'   ? 'border border-emerald-500/25 bg-emerald-500/5' :
+    highlight === 'warn'      ? 'border border-amber-500/25 bg-amber-500/5'     :
+    highlight === 'attention' ? 'border border-orange-500/25 bg-orange-500/5'   :
+    highlight === 'danger'    ? 'border border-red-500/25 bg-red-500/5'         :
+    'border border-surface-700/50 bg-surface-800/60'
   return (
     <div className={`rounded-lg px-2.5 py-2 ${borderAccent}`}>
       <div className="flex items-center gap-1 text-surface-400">
