@@ -7,7 +7,13 @@ export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req)
   if (!authUser) return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
 
-  const canView = await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.PRODUCTS_VIEW)
+  const roleCode = authUser.role?.code?.toUpperCase() ?? ''
+  const METAS_VIEWER_ROLES = new Set([
+    'DEVELOPER', 'COMMERCIAL_MANAGER', 'DIRECTORATE',
+    'COMMERCIAL_SUPERVISOR', 'SALES_SUPERVISOR', 'SELLER',
+  ])
+  const canView = METAS_VIEWER_ROLES.has(roleCode)
+    || await hasPermission(authUser.roleId, METAS_PERMISSION_CODES.PRODUCTS_VIEW)
   if (!canView) {
     return NextResponse.json({ message: 'Sem permissao para visualizar produtos da meta.' }, { status: 403 })
   }

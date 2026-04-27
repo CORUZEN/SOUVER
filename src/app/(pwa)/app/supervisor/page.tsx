@@ -348,7 +348,8 @@ function computeEarnedReward(
       const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return sold / Math.max(wt.targetKg * targetMultiplier, 0.00001)
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        return stageTargetKg > 0 ? sold / stageTargetKg : 0
       })
       if (requiredGroups > 0 && stageWeightTargetRatios.length > 0) {
         const topRatios = [...stageWeightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
@@ -667,7 +668,8 @@ function computeAllKpiProgress(
       const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return sold / Math.max(wt.targetKg * targetMultiplier, 0.00001)
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        return stageTargetKg > 0 ? sold / stageTargetKg : 0
       })
       const volumeGroups = weightTargets.map((wt) => {
         const soldKg = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0

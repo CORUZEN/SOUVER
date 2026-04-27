@@ -827,7 +827,7 @@ function getSellerWeightTargetRatios(
       const soldKg = brandWeightRows
         .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
         .reduce((sum, row) => sum + resolveStageKg(row), 0)
-      return soldKg / Math.max(target.targetKg * targetMultiplier, 0.00001)
+      return target.targetKg * targetMultiplier > 0 ? soldKg / (target.targetKg * targetMultiplier) : 0
     })
 }
 
@@ -2595,12 +2595,9 @@ export default function MetasWorkspace() {
     if (dashboardFocusProductsPrefetchAttemptedRef.current) return
     if (productAllowlistLoading) return
     if (productAllowlist.length > 0) return
-    if (!canViewProducts && !canViewConfig) return
-    const hasFocusCodes = ruleBlocks.some((block) => String(block.focusProductCode ?? '').trim().length > 0)
-    if (!hasFocusCodes) return
     dashboardFocusProductsPrefetchAttemptedRef.current = true
     void loadProductAllowlist()
-  }, [canViewConfig, canViewProducts, productAllowlist.length, productAllowlistLoading, ruleBlocks, view])
+  }, [productAllowlist.length, productAllowlistLoading, view])
 
   useEffect(() => {
     if (allowlist.length === 0) return
