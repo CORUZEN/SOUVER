@@ -1630,7 +1630,7 @@ export default function MetasWorkspace() {
     return [activeKey]
   }, [activeKey, metaConfigs])
 
-  const applyKpiRulesToSelectedSellers = () => {
+  const executeApplyKpiRulesToSelectedSellers = () => {
     const validTargetIds = new Set(kpiApplyTargetOptions.map((option) => option.sellerId))
     const selectedIds = new Set(applyKpiModal.selectedSellerIds.filter((sellerId) => validTargetIds.has(sellerId)))
     const sourceSellerIds = new Set(kpiApplySourceBlock?.sellerIds ?? [])
@@ -1693,6 +1693,49 @@ export default function MetasWorkspace() {
     }
 
     closeApplyKpiModal()
+  }
+
+  const applyKpiRulesToSelectedSellers = () => {
+    const sourceBlock = kpiApplySourceBlock
+    const selectedTargetIds = applyKpiModal.selectedSellerIds
+
+    const sourceHasSpecialConfig = sourceBlock?.alwaysShowProgress === true
+    const targetHasSpecialConfig = selectedTargetIds.some((sellerId) => {
+      const targetBlock = ruleBlocks.find((b) => b.sellerIds.includes(sellerId) && b.id !== applyKpiModal.sourceBlockId)
+      return targetBlock?.alwaysShowProgress === true
+    })
+
+    if (sourceHasSpecialConfig || targetHasSpecialConfig) {
+      const sourceName = sourceBlock?.title ?? 'bloco de origem'
+      const specialSellers = selectedTargetIds
+        .map((sellerId) => {
+          const targetBlock = ruleBlocks.find((b) => b.sellerIds.includes(sellerId) && b.id !== applyKpiModal.sourceBlockId)
+          if (targetBlock?.alwaysShowProgress) return kpiApplyTargetOptions.find((o) => o.sellerId === sellerId)?.sellerName ?? sellerId
+          return null
+        })
+        .filter((name): name is string => Boolean(name))
+
+      const messages: string[] = []
+      if (sourceHasSpecialConfig) {
+        messages.push(`O bloco "${sourceName}" possui configurações especiais (progresso contínuo ativo).`)
+      }
+      if (specialSellers.length > 0) {
+        messages.push(`Os seguintes vendedores selecionados possuem configurações especiais: ${specialSellers.join(', ')}.`)
+      }
+      messages.push('Aplicar esses parâmetros pode sobrescrever regras personalizadas e causar perda de dados. Deseja continuar?')
+
+      setConfirmModal({
+        open: true,
+        title: 'Atenção: configurações especiais detectadas',
+        message: messages.join(' '),
+        confirmLabel: 'Continuar mesmo assim',
+        variant: 'danger',
+        onConfirm: executeApplyKpiRulesToSelectedSellers,
+      })
+      return
+    }
+
+    executeApplyKpiRulesToSelectedSellers()
   }
 
   useEffect(() => {
