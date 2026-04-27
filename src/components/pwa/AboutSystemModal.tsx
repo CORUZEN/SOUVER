@@ -39,7 +39,7 @@ export default function AboutSystemModal({ isOpen, onClose }: AboutSystemModalPr
         <div className="flex flex-col gap-3.5">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Software</p>
-            <p className="mt-0.5 text-[13px] font-semibold text-white">Sistema Ouro Verde © 2026</p>
+            <p className="mt-0.5 text-[13px] font-semibold text-white">Sistema Ouro Verde</p>
           </div>
 
           <div>
@@ -49,28 +49,33 @@ export default function AboutSystemModal({ isOpen, onClose }: AboutSystemModalPr
 
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Desenvolvedor</p>
-            <a
-              href="https://instagram.com/jucelio.verissimo"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-            >
-              Jucélio Verissimo
-              <ExternalLink className="h-3 w-3 text-surface-500" />
-            </a>
+            <div className="mt-0.5 flex flex-col">
+              <a
+                href="https://instagram.com/jucelio.verissimo"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
+              >
+                Jucélio Verissimo
+                <ExternalLink className="h-3 w-3 text-surface-500" />
+              </a>
+              <a
+                href="https://coruzen.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
+              >
+                Coruzen
+                <ExternalLink className="h-3 w-3 text-surface-500" />
+              </a>
+            </div>
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Integrações</p>
-            <a
-              href="https://coruzen.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-0.5 inline-flex items-center gap-1 text-[13px] font-semibold text-white hover:text-emerald-300 transition-colors"
-            >
-              Coruzen
-              <ExternalLink className="h-3 w-3 text-surface-500" />
-            </a>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Propriedade Intelectual</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-surface-400">
+              Este software é de propriedade exclusiva do Café Ouro Verde. Todo o código-fonte, arquitetura, design e funcionalidades foram desenvolvidos sob medida para atender às demandas operacionais, gerenciais e estratégicas da empresa, sendo vedada a reprodução, distribuição ou uso não autorizado.
+            </p>
           </div>
         </div>
 
