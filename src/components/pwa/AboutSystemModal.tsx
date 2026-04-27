@@ -48,7 +48,7 @@ export default function AboutSystemModal({ isOpen, onClose }: AboutSystemModalPr
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Desenvolvedor</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Programador & Desenvolvedor</p>
             <div className="mt-0.5 flex flex-col">
               <a
                 href="https://instagram.com/jucelio.verissimo"
