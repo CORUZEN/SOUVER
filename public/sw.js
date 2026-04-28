@@ -1,5 +1,5 @@
 // Ouro Verde PWA Service Worker
-const CACHE_VERSION = 'ov-pwa-v1.01.493'
+const CACHE_VERSION = 'ov-pwa-v1.01.494'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const API_CACHE = `${CACHE_VERSION}-api`
 
