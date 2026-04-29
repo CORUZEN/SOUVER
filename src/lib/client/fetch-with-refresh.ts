@@ -25,9 +25,15 @@ async function tryRefresh(): Promise<boolean> {
 
   isRefreshing = true
   refreshPromise = fetch('/api/auth/refresh', { method: 'POST', cache: 'no-store' })
-    .then((res) => {
-      if (res.ok) return true
-      // Refresh falhou — sessão realmente expirou
+    .then(async (res) => {
+      if (!res.ok) {
+        // Refresh falhou — sessão realmente expirou
+        window.location.href = getLoginPath()
+        return false
+      }
+      const data = await res.json().catch(() => ({ ok: false }))
+      if (data.ok === true) return true
+      // Refresh retornou ok: false — sessão expirou
       window.location.href = getLoginPath()
       return false
     })

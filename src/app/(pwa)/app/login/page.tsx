@@ -27,7 +27,8 @@ export default function PwaLoginPage() {
     async function trySilentRefresh() {
       try {
         const refreshRes = await fetch('/api/auth/refresh', { method: 'POST', cache: 'no-store' })
-        if (!refreshRes.ok) {
+        const refreshData = await refreshRes.json().catch(() => ({ ok: false }))
+        if (!refreshData.ok) {
           setCheckingSession(false)
           return
         }

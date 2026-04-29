@@ -12,14 +12,17 @@ const NO_CACHE_HEADERS = {
  *
  * Recebe o refresh token via cookie `souver_refresh_token` e emite
  * um novo access token (`souver_token`) se a sessão ainda for válida.
+ *
+ * Retorna 200 em todos os casos para evitar logs de erro no console
+ * do navegador em fluxos proativos de silent refresh (PWA).
  */
 export async function POST(req: NextRequest) {
   const refreshToken = req.cookies.get('souver_refresh_token')?.value
 
   if (!refreshToken) {
     return NextResponse.json(
-      { message: 'Refresh token não encontrado.' },
-      { status: 401, headers: NO_CACHE_HEADERS }
+      { ok: false, message: 'Refresh token não encontrado.' },
+      { status: 200, headers: NO_CACHE_HEADERS }
     )
   }
 
@@ -27,8 +30,8 @@ export async function POST(req: NextRequest) {
 
   if (!result) {
     const response = NextResponse.json(
-      { message: 'Sessão inválida ou expirada. Faça login novamente.' },
-      { status: 401, headers: NO_CACHE_HEADERS }
+      { ok: false, message: 'Sessão inválida ou expirada. Faça login novamente.' },
+      { status: 200, headers: NO_CACHE_HEADERS }
     )
     response.cookies.delete('souver_token')
     response.cookies.delete('souver_refresh_token')
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   const response = NextResponse.json(
-    { message: 'Sessão renovada com sucesso.' },
+    { ok: true, message: 'Sessão renovada com sucesso.' },
     { headers: NO_CACHE_HEADERS }
   )
 
