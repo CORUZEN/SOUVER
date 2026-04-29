@@ -1,0 +1,24 @@
+# Documentação e relatórios
+*.md
+doc/
+Tabelas/
+
+# Scripts de desenvolvimento (não necessários em produção)
+scripts/
+!scripts/sync-app-version.mjs
+
+# Arquivos de configuração local
+.env.local
+.env.*.local
+
+# Cache e build local
+.next/cache/
+build.log
+*.log
+
+# Testes e dados de exemplo
+prisma/seed.ts
+
+# Outros
+.vercel
+.github

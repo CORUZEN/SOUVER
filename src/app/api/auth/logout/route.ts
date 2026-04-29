@@ -30,12 +30,14 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ message: 'Sessao encerrada.' })
     response.cookies.delete('souver_token')
+    response.cookies.delete('souver_refresh_token')
     response.cookies.delete('souver_impersonator_token')
     return response
   } catch (error) {
     console.error('[AUTH/LOGOUT]', error)
     const response = NextResponse.json({ message: 'Sessao encerrada.' })
     response.cookies.delete('souver_token')
+    response.cookies.delete('souver_refresh_token')
     response.cookies.delete('souver_impersonator_token')
     return response
   }

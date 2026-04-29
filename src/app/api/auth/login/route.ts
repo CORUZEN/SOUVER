@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       return challengeResponse
     }
 
-    const { token, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
+    const { token, refreshToken, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
 
     // Atualizacao de ultimo login nao deve impedir autenticacao.
     try {
@@ -156,6 +156,12 @@ export async function POST(req: NextRequest) {
         expires: expiresAt,
         path: '/',
       })
+      setupResponse.cookies.set('souver_refresh_token', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      })
       setupResponse.cookies.delete('souver_2fa_challenge')
       return setupResponse
     }
@@ -177,6 +183,12 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       expires: expiresAt,
+      path: '/',
+    })
+    response.cookies.set('souver_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       path: '/',
     })
     response.cookies.delete('souver_2fa_challenge')

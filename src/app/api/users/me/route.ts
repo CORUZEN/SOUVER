@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import bcrypt from 'bcrypt'
 
 const PHONE_REGEX = /^\(\d{2}\)\s\d\s\d{4}-\d{4}$/
 

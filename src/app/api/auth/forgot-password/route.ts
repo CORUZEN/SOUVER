@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import bcrypt from 'bcryptjs'
+import bcrypt from 'bcrypt'
 
 // POST /api/auth/forgot-password
 // Body: { login: string }   (aceita login OU email)

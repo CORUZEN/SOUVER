@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import bcrypt from 'bcrypt'
 import { authResetLimiter, getClientIp, checkRateLimit } from '@/lib/server/rate-limit'
 
 // POST /api/auth/reset-password

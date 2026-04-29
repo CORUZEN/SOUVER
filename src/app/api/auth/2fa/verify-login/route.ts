@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Código de verificação inválido.' }, { status: 401 })
   }
 
-  const { token: sessionToken, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
+  const { token: sessionToken, refreshToken, expiresAt } = await createSession(user.id, ip, userAgent, user.role?.sessionDurationHours)
 
   if (usedRecoveryCodeId) {
     await prisma.$transaction([
@@ -162,6 +162,12 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     expires: expiresAt,
+    path: '/',
+  })
+  response.cookies.set('souver_refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     path: '/',
   })
   response.cookies.delete('souver_2fa_challenge')

@@ -1,5 +1,7 @@
 'use client'
 
+import { fetchWithRefresh } from './fetch-with-refresh'
+
 type AuthMeResponse = {
   user?: {
     id?: string
@@ -44,7 +46,7 @@ export async function fetchAuthMeCached(options: FetchAuthMeOptions = {}): Promi
     return inFlightAuthMe
   }
 
-  inFlightAuthMe = fetch('/api/auth/me', { cache: 'no-store' })
+  inFlightAuthMe = fetchWithRefresh('/api/auth/me', { cache: 'no-store' })
     .then((response) => (response.ok ? response.json() : null))
     .catch(() => null)
     .finally(() => {
