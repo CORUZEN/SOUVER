@@ -269,7 +269,7 @@ function parseSellerRecords(records: RawRecord[]): SellerRow[] {
       dedup.set(key, {
         code,
         name,
-        partnerCode: partnerCodeRaw.length > 0 ? partnerCodeRaw : null,
+        partnerCode: partnerCodeRaw.length > 0 && partnerCodeRaw !== '0' ? partnerCodeRaw : null,
         profileTypeHint: tipVendRaw === 'S' || tipVendRaw === 'SUPERVISOR' ? 'SUPERVISOR' : 'NOVATO',
       })
     }
@@ -284,6 +284,30 @@ function normalizeSellerName(value: string) {
     .toUpperCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+}
+
+async function queryPartnerMap(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
+  // Build a map of normalized partner name -> CODPARC from TGFPAR.
+  // This is used as a fallback when TGFVEN.CODPARC is empty/0.
+  const sql = `
+SELECT TO_CHAR(CODPARC) AS CODPARC, TRIM(NOMEPARC) AS NOMEPARC
+FROM TGFPAR
+WHERE ATIVO = 'S' AND CODPARC > 0`.trim()
+
+  try {
+    const records = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+    const map = new Map<string, string>()
+    for (const record of records) {
+      const code = String(record.CODPARC ?? record.COL_1 ?? '').trim()
+      const name = String(record.NOMEPARC ?? record.COL_2 ?? '').trim()
+      if (!code || !name) continue
+      const normalized = normalizeSellerName(name)
+      if (!map.has(normalized)) map.set(normalized, code)
+    }
+    return map
+  } catch {
+    return new Map<string, string>()
+  }
 }
 
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
@@ -379,7 +403,30 @@ export async function POST(req: NextRequest) {
     }
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey ?? config.token ?? null
-    const remoteSellers = await querySellers(baseUrl, headers, appKey)
+    const [remoteSellers, partnerMap] = await Promise.all([
+      querySellers(baseUrl, headers, appKey),
+      queryPartnerMap(baseUrl, headers, appKey),
+    ])
+
+    // Fallback: when TGFVEN.CODPARC is empty/0, try to match by name against TGFPAR
+    for (const seller of remoteSellers) {
+      if (!seller.partnerCode && partnerMap.size > 0) {
+        const normalized = normalizeSellerName(seller.name)
+        const matched = partnerMap.get(normalized)
+        if (matched) {
+          seller.partnerCode = matched
+        } else {
+          // Try partial match: find a partner whose name is contained within the seller name
+          for (const [partnerName, partnerCode] of partnerMap) {
+            if (normalized.includes(partnerName) || partnerName.includes(normalized)) {
+              seller.partnerCode = partnerCode
+              break
+            }
+          }
+        }
+      }
+    }
+
     const existing = await readSellerAllowlist()
 
     // Incremental sync:
