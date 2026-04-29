@@ -7537,7 +7537,7 @@ export default function MetasWorkspace() {
                               type="number"
                               step="0.01"
                               min="0"
-                              value={block.monthlyTarget || ''}
+                              value={block.monthlyTarget ?? 0}
                               onChange={(e) => updateBlock({ monthlyTarget: parseDecimal(e.target.value, 0) })}
                             />
                             <p className="mt-1 text-[10px] text-surface-400">
@@ -7590,25 +7590,33 @@ export default function MetasWorkspace() {
                       </button>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {assignedSellers.map((s) => (
-                        <span key={s.id} className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200">
-                          {s.name.split(' ').slice(0, 2).join(' ')}
-                          <button
-                            type="button"
-                            onClick={() => setConfirmModal({
-                              open: true,
-                              title: 'Remover vendedor do grupo',
-                              message: `Deseja remover "${s.name}" do grupo "${block.title}"? O vendedor voltará a usar o grupo padrão e essa ação não pode ser desfeita.`,
-                              confirmLabel: 'Remover',
-                              variant: 'danger',
+                      {assignedSellers.map((s) => {
+                        const otherBlock = ruleBlocks.find((b) => b.id !== block.id && b.sellerIds.includes(s.id))
+                        return (
+                          <span key={s.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border ${otherBlock ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-primary-50 text-primary-700 border-primary-200'}`}>
+                            {s.name.split(' ').slice(0, 2).join(' ')}
+                            {otherBlock && (
+                              <span className="ml-0.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800" title={`Também em: ${otherBlock.title}`}>
+                                ⚠️ {otherBlock.title.split(' ').slice(0, 2).join(' ')}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setConfirmModal({
+                                open: true,
+                                title: 'Remover vendedor do grupo',
+                                message: `Deseja remover "${s.name}" do grupo "${block.title}"? O vendedor voltará a usar o grupo padrão e essa ação não pode ser desfeita.`,
+                                confirmLabel: 'Remover',
+                                variant: 'danger',
                               onConfirm: () => updateBlock({ sellerIds: block.sellerIds.filter((id) => id !== s.id) }),
-                            })}
-                            className="ml-0.5 flex items-center justify-center rounded-full p-0.5 text-primary-400 hover:bg-primary-100 hover:text-rose-600 transition-colors"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      ))}
+                              })}
+                              className="ml-0.5 flex items-center justify-center rounded-full p-0.5 text-primary-400 hover:bg-primary-100 hover:text-rose-600 transition-colors"
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        )
+                      })}
                       {assignedSellers.length === 0 ? (
                       <div className="relative">
                         <button
@@ -8078,7 +8086,7 @@ export default function MetasWorkspace() {
                                         step="0.01"
                                         min="0"
                                         placeholder="0"
-                                        value={manualVal || ''}
+                                        value={manualVal ?? 0}
                                         onChange={(e) => saveManual(parseDecimal(e.target.value, 0))}
                                       />
                                     )

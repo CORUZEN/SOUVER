@@ -1912,7 +1912,7 @@ export default function SupervisorPwaDashboard() {
                             value={fmtBrl(seller.totalValue)}
                             highlight={financialPct >= 100 ? 'success' : 'none'}
                           />
-                          <MetricCell icon={<Target className="h-3.5 w-3.5" />} label="Meta" value={target > 0 ? fmtBrl(target) : '—'} />
+                          <MetricCell icon={<Target className="h-3.5 w-3.5" />} label="Meta" value={fmtBrl(target)} />
                           <MetricCell icon={<ShoppingCart className="h-3.5 w-3.5" />} label="Pedidos" value={fmt(seller.totalOrders)} />
                           <MetricCell icon={<Users className="h-3.5 w-3.5" />} label="Clientes" value={`${fmt(clients)}/${fmt(seller.baseClientCount)}`} />
                           <MetricCell
@@ -1924,7 +1924,7 @@ export default function SupervisorPwaDashboard() {
                           <MetricCell
                             icon={<Weight className="h-3.5 w-3.5" />}
                             label="Meta de Peso"
-                            value={weightTargetKg > 0 ? fmtKg(weightTargetKg) : '—'}
+                            value={fmtKg(weightTargetKg)}
                             highlight="none"
                           />
                         </div>
