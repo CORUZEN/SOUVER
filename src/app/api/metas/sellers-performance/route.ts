@@ -694,6 +694,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { year, month, startDate, endDateExclusive, companyScope } = parseYearMonth(req)
+  const includeDiagnostics = req.nextUrl.searchParams.get('debug') === '1'
 
   const integration = await prisma.integration.findFirst({
     where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -724,7 +725,7 @@ export async function GET(req: NextRequest) {
     : roleCode === 'SELLER'
       ? `SELLER:${normalizedUserSellerCode}`
       : roleCode
-  const cacheKey = `metas:sellers-performance:v1:${year}-${month}:${companyScope}:${scopeToken}`
+  const cacheKey = `metas:sellers-performance:v1:${year}-${month}:${companyScope}:${scopeToken}:${includeDiagnostics ? 'debug' : 'nodebug'}`
 
   try {
     const payload = await withRequestCache(cacheKey, 180_000, async () => {
@@ -825,31 +826,41 @@ export async function GET(req: NextRequest) {
     }
 
     // --- DevoluÃ§Ãµes do mÃªs por vendedor ---
-    let returns: SankhyaReturn[] = []
-    try {
-      const sqlReturns = buildReturnsSql(startDate, endDateExclusive, sellerCodes, companyScope)
-      const returnRecords = await queryRows(baseUrl, headers, sqlReturns, appKey, { allowEmpty: true })
-      returns = returnRecords.map(toReturn).filter((o): o is SankhyaReturn => o !== null)
-    } catch {
-      returns = []
-    }
-
-    let openTitles: SankhyaOpenTitle[] = []
-    let openTitlesQueryMode = 'NONE'
-    const openTitlesErrors: string[] = []
-    const openTitlesSqlCandidates = buildOpenTitlesSqlCandidates(endDateExclusive, sellerCodes, companyScope, tgffinColumns)
-    for (let i = 0; i < openTitlesSqlCandidates.length; i += 1) {
-      const sqlTitles = openTitlesSqlCandidates[i]
+    // --- Devolucoes e titulos em aberto (paralelos) ---
+    const returnsPromise = (async (): Promise<SankhyaReturn[]> => {
       try {
-        const titleRecords = await queryRows(baseUrl, headers, sqlTitles, appKey, { allowEmpty: true })
-        openTitles = titleRecords.map(toOpenTitle).filter((o): o is SankhyaOpenTitle => o !== null)
-        openTitlesQueryMode = `VARIANT_${i + 1}`
-        break
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'erro desconhecido'
-        openTitlesErrors.push(`VARIANT_${i + 1}: ${msg}`)
+        const sqlReturns = buildReturnsSql(startDate, endDateExclusive, sellerCodes, companyScope)
+        const returnRecords = await queryRows(baseUrl, headers, sqlReturns, appKey, { allowEmpty: true })
+        return returnRecords.map(toReturn).filter((o): o is SankhyaReturn => o !== null)
+      } catch {
+        return []
       }
-    }
+    })()
+
+    const openTitlesPromise = (async (): Promise<{ openTitles: SankhyaOpenTitle[]; openTitlesQueryMode: string; openTitlesErrors: string[] }> => {
+      let openTitles: SankhyaOpenTitle[] = []
+      let openTitlesQueryMode = 'NONE'
+      const openTitlesErrors: string[] = []
+      const openTitlesSqlCandidates = buildOpenTitlesSqlCandidates(endDateExclusive, sellerCodes, companyScope, tgffinColumns)
+      for (let i = 0; i < openTitlesSqlCandidates.length; i += 1) {
+        const sqlTitles = openTitlesSqlCandidates[i]
+        try {
+          const titleRecords = await queryRows(baseUrl, headers, sqlTitles, appKey, { allowEmpty: true })
+          openTitles = titleRecords.map(toOpenTitle).filter((o): o is SankhyaOpenTitle => o !== null)
+          openTitlesQueryMode = `VARIANT_${i + 1}`
+          break
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'erro desconhecido'
+          openTitlesErrors.push(`VARIANT_${i + 1}: ${msg}`)
+        }
+      }
+      return { openTitles, openTitlesQueryMode, openTitlesErrors }
+    })()
+
+    const [returns, { openTitles, openTitlesQueryMode, openTitlesErrors }] = await Promise.all([
+      returnsPromise,
+      openTitlesPromise,
+    ])
 
     let sellerBaseRows: SankhyaSellerBase[] = []
     let sellerBaseQueryMode = 'NONE'
@@ -1047,42 +1058,44 @@ export async function GET(req: NextRequest) {
         allowlistEnabled: allowedSellers.length > 0,
         allowlistCount: allowedSellers.length,
       },
-      diagnostics: {
-        selectedMonthOrders: orders.length,
-        queryMode,
-        companyScope,
-        byStatus: orders.reduce<Record<string, number>>((acc, o) => {
-          acc[o.statusNota] = (acc[o.statusNota] ?? 0) + 1
-          return acc
-        }, {}),
-        byCompany: orders.reduce<Record<string, number>>((acc, o) => {
-          const key = o.companyCode || 'desconhecida'
-          acc[key] = (acc[key] ?? 0) + 1
-          return acc
-        }, {}),
-        orderQueryErrors: orderQueryErrors.slice(0, 3),
-        openTitlesFetched: openTitles.length,
-        openTitlesMappedToSeller: mappedOpenTitlesCount,
-        sellerBaseFetched: sellerBaseRows.length,
-        sellerBaseQueryMode,
-        sellerBaseErrors: sellerBaseErrors.slice(0, 3),
-        openTitlePartners: openTitles.reduce((acc, item) => {
-          if (item.partnerCode) acc.add(item.partnerCode)
-          return acc
-        }, new Set<string>()).size,
-        openTitlesQueryMode,
-        openTitlesErrors: openTitlesErrors.slice(0, 3),
-        tgffinColumnHints: {
-          hasAtraso: tgffinColumns.has('ATRASO'),
-          hasAtrasoInicial: tgffinColumns.has('ATRASOINICIAL'),
-          hasVlrLiquido: tgffinColumns.has('VLRLIQUIDO'),
-          hasVlrDesdob: tgffinColumns.has('VLRDESDOB'),
-          hasVlrJuro: tgffinColumns.has('VLRJURO'),
-          hasVlrMulta: tgffinColumns.has('VLRMULTA'),
-          hasVlrDesc: tgffinColumns.has('VLRDESC'),
-          hasVlrAbatimento: tgffinColumns.has('VLRABATIMENTO'),
+      ...(includeDiagnostics ? {
+        diagnostics: {
+          selectedMonthOrders: orders.length,
+          queryMode,
+          companyScope,
+          byStatus: orders.reduce<Record<string, number>>((acc, o) => {
+            acc[o.statusNota] = (acc[o.statusNota] ?? 0) + 1
+            return acc
+          }, {}),
+          byCompany: orders.reduce<Record<string, number>>((acc, o) => {
+            const key = o.companyCode || 'desconhecida'
+            acc[key] = (acc[key] ?? 0) + 1
+            return acc
+          }, {}),
+          orderQueryErrors: orderQueryErrors.slice(0, 3),
+          openTitlesFetched: openTitles.length,
+          openTitlesMappedToSeller: mappedOpenTitlesCount,
+          sellerBaseFetched: sellerBaseRows.length,
+          sellerBaseQueryMode,
+          sellerBaseErrors: sellerBaseErrors.slice(0, 3),
+          openTitlePartners: openTitles.reduce((acc, item) => {
+            if (item.partnerCode) acc.add(item.partnerCode)
+            return acc
+          }, new Set<string>()).size,
+          openTitlesQueryMode,
+          openTitlesErrors: openTitlesErrors.slice(0, 3),
+          tgffinColumnHints: {
+            hasAtraso: tgffinColumns.has('ATRASO'),
+            hasAtrasoInicial: tgffinColumns.has('ATRASOINICIAL'),
+            hasVlrLiquido: tgffinColumns.has('VLRLIQUIDO'),
+            hasVlrDesdob: tgffinColumns.has('VLRDESDOB'),
+            hasVlrJuro: tgffinColumns.has('VLRJURO'),
+            hasVlrMulta: tgffinColumns.has('VLRMULTA'),
+            hasVlrDesc: tgffinColumns.has('VLRDESC'),
+            hasVlrAbatimento: tgffinColumns.has('VLRABATIMENTO'),
+          },
         },
-      },
+      } : {}),
       sellers,
     }
     })

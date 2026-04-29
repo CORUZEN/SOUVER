@@ -31,6 +31,9 @@ function createPrismaClient() {
     // Give Neon's compute endpoint time to wake from auto-suspend (can take up to 5 s).
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
+    // Neon uses its own pooler (PgBouncer). Keep the local pool small to avoid
+    // pool-on-pool contention and unnecessary connection overhead.
+    max: Number(process.env.PG_POOL_MAX ?? 3),
   })
 
   return new PrismaClient({

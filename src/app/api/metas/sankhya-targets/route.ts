@@ -497,7 +497,12 @@ export async function GET(req: NextRequest) {
       const appKey = config.appKey ?? config.token ?? null
 
       // Discover FK/PK column names (queries ALL_TAB_COLUMNS, falls back to Sankhya defaults)
-      const { childFk, parentPk } = await discoverFkColumns(baseUrl, headers, appKey)
+      // Cached for 24h since schema rarely changes.
+      const { childFk, parentPk } = await withRequestCache(
+        'sankhya:fk-columns:v1',
+        24 * 60 * 60 * 1000,
+        () => discoverFkColumns(baseUrl, headers, appKey),
+      )
 
       // Fast probe: check if the period has ANY config rows before running expensive JOINs.
       // This avoids iterating through all SQL variants for months with no data.

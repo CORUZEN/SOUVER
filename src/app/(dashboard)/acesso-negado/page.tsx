@@ -1,3 +1,5 @@
+export const dynamic = 'force-static'
+
 import Link from 'next/link'
 import { ShieldOff, ArrowLeft } from 'lucide-react'
 
