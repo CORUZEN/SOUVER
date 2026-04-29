@@ -4,8 +4,13 @@ doc/
 Tabelas/
 
 # Scripts de desenvolvimento (não necessários em produção)
-scripts/
-!scripts/sync-app-version.mjs
+scripts/diagnose-metas-config.ts
+scripts/fix-erivaldo-meta.ts
+scripts/generate-secrets.mjs
+scripts/sync-metas-sellers-allowlist.ts
+scripts/sync-sankhya-data-dictionary.ts
+scripts/sync-sankhya-live-tables.ts
+scripts/unlock-login.ts
 
 # Arquivos de configuração local
 .env
