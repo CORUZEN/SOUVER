@@ -14,10 +14,13 @@ const RETENTION = {
  * Executa limpeza automática semanal — chamado via Vercel Cron
  */
 export async function GET(req: NextRequest) {
-  // Verifica autenticação do cron
-  const authHeader = req.headers.get('authorization')
+  // Verifica autenticação do cron — secret obrigatório (fail-closed)
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET não configurado' }, { status: 500 })
+  }
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

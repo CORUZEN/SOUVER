@@ -51,9 +51,10 @@ export async function POST(req: NextRequest) {
   // PRODUCTION_NOTE: integre um serviço de e-mail (Resend, SendGrid, etc.) aqui.
   const resetUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3001'}/resetar-senha?token=${rawToken}`
 
+  const isDev = process.env.APP_ENV === 'development' || process.env.NODE_ENV === 'development'
+
   return NextResponse.json({
     message: 'Se o cadastro existir, um link de recuperação foi gerado.',
-    // DEV: remove the fields below in production
-    _dev: { resetUrl, token: rawToken },
+    ...(isDev ? { _dev: { resetUrl, token: rawToken } } : {}),
   })
 }

@@ -7,6 +7,7 @@ import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
 import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
+import { sanitizeSellerCodes, buildSafeSellerInClause } from '@/lib/metas/seller-code-validation'
 
 type RawRecord = Record<string, unknown>
 type StageEndExclusive = { w1: string; w2: string; w3: string; closing: string }
@@ -269,11 +270,8 @@ function buildBrandWeightSql(
   companyScope: '1' | '2' | 'all',
   stageEndExclusive: StageEndExclusive,
 ) {
-  let sellerFilter = ''
-  if (sellerCodes.length > 0) {
-    const escaped = sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
-    sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
-  }
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'CAB.CODVEND')
   const companyFilter = companyScope !== 'all'
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''
@@ -308,11 +306,8 @@ function buildBrandWeightSqlFallback(
   companyScope: '1' | '2' | 'all',
   stageEndExclusive: StageEndExclusive,
 ) {
-  let sellerFilter = ''
-  if (sellerCodes.length > 0) {
-    const escaped = sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
-    sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
-  }
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'CAB.CODVEND')
   const companyFilter = companyScope !== 'all'
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
     : ''

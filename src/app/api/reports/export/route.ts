@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, hasPermission } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/domains/audit/audit.service'
 import * as XLSX from 'xlsx'
@@ -383,6 +383,17 @@ export async function GET(req: NextRequest) {
   }
 
   if (mod === 'hr') {
+    const roleCode = auth.role?.code?.toUpperCase() ?? ''
+    const canExportHr =
+      roleCode === 'DEVELOPER' ||
+      roleCode === 'DIRECTORATE' ||
+      roleCode === 'HR' ||
+      (await hasPermission(auth.roleId, 'hr:read'))
+
+    if (!canExportHr) {
+      return NextResponse.json({ error: 'Sem permissão para exportar dados de RH.' }, { status: 403 })
+    }
+
     const users = await prisma.user.findMany({
       where: dateFilter ? { createdAt: dateFilter } : undefined,
       include: {

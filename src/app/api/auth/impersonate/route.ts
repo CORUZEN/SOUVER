@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   response.cookies.set('souver_token', impersonatedToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     expires: expiresAt,
     path: '/',
   })
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set('souver_impersonator_token', currentToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
     })
   }

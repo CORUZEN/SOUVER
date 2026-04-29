@@ -14,11 +14,12 @@ import { auditLog } from '@/domains/audit/audit.service'
 export async function GET(req: NextRequest) {
   // Vercel Cron assina a requisição com o secret em Authorization Bearer
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-    }
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET não configurado' }, { status: 500 })
+  }
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
   const now      = new Date()

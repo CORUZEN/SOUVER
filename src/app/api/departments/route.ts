@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, isUserManager } from '@/lib/auth/permissions'
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
@@ -34,6 +34,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+
+  if (!isUserManager(user.role?.code)) {
+    return NextResponse.json({ message: 'Área restrita a administradores.' }, { status: 403 })
+  }
 
   const body = await req.json()
   const { name, code, description, managerUserId } = body

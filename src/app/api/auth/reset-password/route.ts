@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { authResetLimiter, getClientIp, checkRateLimit } from '@/lib/server/rate-limit'
 
 // POST /api/auth/reset-password
 // Body: { token: string, newPassword: string }
 export async function POST(req: NextRequest) {
+  // Rate limiting por IP
+  const ip = getClientIp(req)
+  const limitResult = await checkRateLimit(authResetLimiter, ip)
+  if (!limitResult.ok) {
+    return NextResponse.json(
+      { error: `Muitas tentativas. Aguarde ${limitResult.retryAfterSeconds} segundos.` },
+      { status: 429, headers: { 'Retry-After': String(limitResult.retryAfterSeconds) } }
+    )
+  }
+
   const body = await req.json().catch(() => null)
   const { token, newPassword } = body ?? {}
 

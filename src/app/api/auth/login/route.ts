@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
       challengeResponse.cookies.set('souver_2fa_challenge', challengeToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
         expires: challengeExpiresAt,
         path: '/',
       })
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       setupResponse.cookies.set('souver_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
         expires: expiresAt,
         path: '/',
       })
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set('souver_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: expiresAt,
       path: '/',
     })

@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
   response.cookies.set('souver_token', sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     expires: expiresAt,
     path: '/',
   })

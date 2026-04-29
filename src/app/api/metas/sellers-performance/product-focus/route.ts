@@ -7,6 +7,7 @@ import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
 import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
+import { sanitizeSellerCodes, buildSafeSellerInClause, isValidSellerCode } from '@/lib/metas/seller-code-validation'
 
 type RawRecord = Record<string, unknown>
 
@@ -201,11 +202,15 @@ async function queryRows(baseUrl: string, headers: Record<string, string>, sql: 
 }
 
 function buildSql(startDate: string, endDateExclusive: string, sellerCodes: string[], productCode: string, companyScope: '1' | '2' | 'all', mode: 'STRICT' | 'FALLBACK_TIPMOV') {
-  const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'CAB.CODVEND')
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
     ? "AND CAB.CODTIPOPER = 1001\n  "
     : "AND CAB.TIPMOV = 'V'\n  "
+  // productCode deve ser numérico puro (código Sankhya)
+  const safeProductCode = isValidSellerCode(productCode) ? productCode.trim() : ''
+  const productFilter = safeProductCode ? `AND TO_CHAR(PRO.CODPROD) = '${safeProductCode}'\n  ` : ''
 
   return `
 SELECT
@@ -221,8 +226,7 @@ WHERE CAB.DTNEG >= TO_DATE('${startDate}', 'YYYY-MM-DD')
   AND CAB.DTNEG < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')
   AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
   AND CAB.CODVEND > 0
-  AND TO_CHAR(PRO.CODPROD) = '${productCode.replace(/'/g, "''")}'
-  ${typeFilter}${companyFilter}${sellerFilter}GROUP BY CAB.CODVEND, VEN.APELIDO
+  ${productFilter}${typeFilter}${companyFilter}${sellerFilter}GROUP BY CAB.CODVEND, VEN.APELIDO
 ORDER BY CAB.CODVEND`.trim()
 }
 

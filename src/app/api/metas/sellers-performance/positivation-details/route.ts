@@ -6,6 +6,7 @@ import { getActiveAllowedProductsFromList } from '@/lib/metas/product-allowlist'
 import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
+import { isValidSellerCode, sanitizeSellerCodes } from '@/lib/metas/seller-code-validation'
 
 type RawRecord = Record<string, unknown>
 
@@ -234,8 +235,12 @@ function buildPositivationSql(
   companyScope: '1' | '2' | 'all',
   mode: 'STRICT' | 'FALLBACK_TIPMOV' | 'ANY_MOVEMENT',
 ) {
-  const sellerFilter = `AND CAB.CODVEND = '${sellerCode.replace(/'/g, "''")}'\n  `
-  const productFilter = productCodes.length > 0 ? `AND TO_CHAR(PRO.CODPROD) IN (${productCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  ` : ''
+  const safeSellerCode = isValidSellerCode(sellerCode) ? sellerCode.trim() : ''
+  const sellerFilter = safeSellerCode ? `AND CAB.CODVEND = ${safeSellerCode}\n  ` : ''
+  const safeProductCodes = sanitizeSellerCodes(productCodes)
+  const productFilter = safeProductCodes.length > 0
+    ? `AND TO_CHAR(PRO.CODPROD) IN (${safeProductCodes.map((c) => `'${c}'`).join(', ')})\n  `
+    : ''
   const companyFilter = companyScope !== 'all' ? `AND CAB.CODEMP = ${Number(companyScope)}\n  ` : ''
   const typeFilter = mode === 'STRICT'
     ? "AND CAB.CODTIPOPER = 1001\n  "

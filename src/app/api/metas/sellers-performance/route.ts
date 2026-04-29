@@ -7,6 +7,7 @@ import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
 import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
+import { sanitizeSellerCodes, buildSafeSellerInClause } from '@/lib/metas/seller-code-validation'
 
 type RawRecord = Record<string, unknown>
 
@@ -421,11 +422,8 @@ function buildOrdersSql(
       ? "AND CAB.TIPMOV = 'V'\n  "
       : ''
 
-  let sellerFilter = ''
-  if (sellerCodes.length > 0) {
-    const escaped = sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
-    sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
-  }
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'CAB.CODVEND')
 
   // companyScope controls which Sankhya company (CODEMP) to include:
   //   '1'   â†’ Moagem Ouro Verde (empresa 1 apenas)
@@ -462,11 +460,8 @@ function buildReturnsSql(
   sellerCodes: string[],
   companyScope: '1' | '2' | 'all' = '1'
 ) {
-  let sellerFilter = ''
-  if (sellerCodes.length > 0) {
-    const escaped = sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')
-    sellerFilter = `AND CAB.CODVEND IN (${escaped})\n  `
-  }
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'CAB.CODVEND')
 
   const companyFilter = companyScope !== 'all'
     ? `AND CAB.CODEMP = ${Number(companyScope)}\n  `
@@ -497,9 +492,8 @@ function buildOpenTitlesSqlCandidates(
   tgffinColumns?: Set<string>
 ) {
   const hasCol = (name: string) => Boolean(tgffinColumns?.has(name.toUpperCase()))
-  const sellerFilter = sellerCodes.length > 0
-    ? `AND FIN.CODVEND IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
-    : ''
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'FIN.CODVEND')
   const companyFilter = companyScope !== 'all'
     ? `AND FIN.CODEMP = ${Number(companyScope)}\n  `
     : ''
@@ -529,9 +523,7 @@ ${buildBaseFilters(pendingCond, withReceitasReal)}
   AND NVL(FIN.CODVEND, 0) > 0
   ${companyFilter}${sellerFilter}ORDER BY FIN.CODVEND, FIN.DTVENC`.trim()
 
-  const sellerFilterFallback = sellerCodes.length > 0
-    ? `AND NVL(FIN.CODVEND, CAB.CODVEND) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
-    : ''
+  const sellerFilterFallback = buildSafeSellerInClause(safeSellerCodes, 'NVL(FIN.CODVEND, CAB.CODVEND)')
 
   const makeFallbackSql = (openValueExpr: string, overdueExpr: string, pendingCond: string, withReceitasReal: boolean) => `
 SELECT
@@ -610,12 +602,9 @@ ${buildBaseFilters(pendingCond, withReceitasReal)}
 }
 
 function buildSellerBaseSqlCandidates(sellerCodes: string[]) {
-  const sellerFilter = sellerCodes.length > 0
-    ? `AND NVL(PAR.CODVEND, 0) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
-    : ''
-  const sellerPrefFilter = sellerCodes.length > 0
-    ? `AND NVL(PAR.CODVENDPREF, 0) IN (${sellerCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(', ')})\n  `
-    : ''
+  const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
+  const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'NVL(PAR.CODVEND, 0)')
+  const sellerPrefFilter = buildSafeSellerInClause(safeSellerCodes, 'NVL(PAR.CODVENDPREF, 0)')
 
   const clienteCond = "UPPER(TO_CHAR(NVL(PAR.CLIENTE, 'N'))) IN ('S', '1', 'SIM')"
   const ativoCond = "UPPER(TO_CHAR(NVL(PAR.ATIVO, 'S'))) IN ('S', '1', 'SIM')"
