@@ -104,7 +104,7 @@ export async function authenticateSankhyaCached(
   integrationId: string
 ): Promise<string | null> {
   const cacheKey = `sankhya:token:${integrationId}`
-  return withRequestCache(cacheKey, 50 * 60 * 1000, async () => {
+  return withRequestCache(cacheKey, 5 * 60 * 1000, async () => {
     let bearerToken: string | null = null
     if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
       bearerToken = await authenticateOAuth(config, baseUrl)
