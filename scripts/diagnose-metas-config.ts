@@ -2,6 +2,9 @@
  * Script de diagnóstico para investigar configuração de metas.
  * Executar: npx tsx scripts/diagnose-metas-config.ts
  */
+import { config } from 'dotenv'
+config({ path: '.env.local' })
+
 import { prisma } from '../src/lib/prisma'
 
 async function main() {
