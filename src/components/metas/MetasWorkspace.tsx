@@ -4319,7 +4319,11 @@ export default function MetasWorkspace() {
         const groupsWithTarget = groups.filter((group) => group.targetKg > 0)
         const totalTargetKg = groupsWithTarget.reduce((sum, group) => sum + group.targetKg, 0)
         const totalSoldKg = groupsWithTarget.reduce((sum, group) => sum + group.soldKg, 0)
-        const overallRatio = totalTargetKg > 0 ? totalSoldKg / totalTargetKg : 0
+        // Média aritmética dos progressos por grupo (não ponderada pela meta).
+        // Assim o vendedor só atinge 100% quando TODOS os grupos atingem a meta.
+        const overallRatio = groupsWithTarget.length > 0
+          ? groupsWithTarget.reduce((sum, group) => sum + group.ratio, 0) / groupsWithTarget.length
+          : 0
         const groupsHit = groupsWithTarget.filter((group) => group.ratio >= 1).length
 
         return {
