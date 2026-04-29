@@ -169,9 +169,6 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // Busca todos os módulos em paralelo (atual + anterior ao mesmo tempo)
-  const activeUsersPromise = prisma.user.count({ where: { status: 'ACTIVE' } })
-
   const [production, inventory, quality, hr] = await Promise.all([
     cachedModuleData('production', dateRange, period),
     cachedModuleData('inventory', dateRange, period),
@@ -210,7 +207,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const activeUsers = await activeUsersPromise
+  const activeUsers = await prisma.user.count({ where: { status: 'ACTIVE' } })
 
   return NextResponse.json(
     { production, inventory, quality, hr, activeUsers, period, variation },

@@ -2,6 +2,7 @@
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
@@ -491,11 +492,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const payload = await withRequestCache(cacheKey, 600_000, async () => {
-      let bearerToken: string | null = null
-      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
-        bearerToken = await authenticateOAuth(config, baseUrl)
-      }
-      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+      const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
       const headers = buildHeaders(config, bearerToken)
       const appKey = config.appKey ?? config.token ?? null
 
@@ -615,7 +612,11 @@ export async function GET(req: NextRequest) {
       }
     })
     responseStatus = 200
-    return NextResponse.json(payload)
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'private, max-age=300, stale-while-revalidate=300',
+      },
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar metas de configuracao do Sankhya.'
     responseStatus = 502

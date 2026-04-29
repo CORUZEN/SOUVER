@@ -158,6 +158,7 @@ export async function GET(req: NextRequest) {
         createdBy:  { select: { fullName: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 5000,
     })
 
     const rows = batches.map((b: (typeof batches)[number]) => ({
@@ -221,6 +222,7 @@ export async function GET(req: NextRequest) {
     const items = await prisma.inventoryItem.findMany({
       where: dateFilter ? { createdAt: dateFilter } : undefined,
       orderBy: { name: 'asc' },
+      take: 5000,
     })
 
     const rows = items.map((i: (typeof items)[number]) => ({
@@ -284,6 +286,7 @@ export async function GET(req: NextRequest) {
           inspectedBy: { select: { fullName: true } },
         },
         orderBy: { inspectedAt: 'desc' },
+        take: 5000,
       }),
       prisma.nonConformance.findMany({
         where: dateFilter ? { openedAt: dateFilter } : undefined,
@@ -292,6 +295,7 @@ export async function GET(req: NextRequest) {
           batch:    { select: { batchCode: true } },
         },
         orderBy: { openedAt: 'desc' },
+        take: 5000,
       }),
     ])
 
@@ -401,6 +405,7 @@ export async function GET(req: NextRequest) {
         department: { select: { name: true } },
       },
       orderBy: { fullName: 'asc' },
+      take: 5000,
     })
 
     const rows = users.map((u: (typeof users)[number]) => ({

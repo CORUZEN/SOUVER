@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
 
 type RawRecord = Record<string, unknown>
 
@@ -472,9 +473,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'URL base do Sankhya não configurada' }, { status: 503 })
     }
 
-    // Authenticate
-    let bearerToken = await authenticateOAuth(config, baseUrl)
-    if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+    // Authenticate (cached)
+    const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
 
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
@@ -579,7 +579,11 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+      },
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro interno'
     console.error('[faturamento/route] Erro:', message)

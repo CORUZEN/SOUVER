@@ -11,6 +11,10 @@ const NO_CACHE = {
   Pragma: 'no-cache',
 }
 
+const CACHE_5MIN = {
+  'Cache-Control': 'private, max-age=60, stale-while-revalidate=240',
+}
+
 /**
  * GET /api/pwa/summary?year=YYYY&month=M
  *
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
       : roleCode
   const cacheKey = `pwa:summary:v1:${year}-${month}:${scopeToken}`
   try {
-    const payload = await withRequestCache(cacheKey, 20_000, async () => {
+    const payload = await withRequestCache(cacheKey, 300_000, async () => {
 
   // ── Load config ────────────────────────────────────────────────────────────
   const configRow = await prisma.metasConfig.findUnique({ where: { scopeKey: '1' } })
@@ -309,7 +313,7 @@ export async function GET(req: NextRequest) {
   }
     })
     responseStatus = 200
-    return NextResponse.json(payload, { headers: NO_CACHE })
+    return NextResponse.json(payload, { headers: CACHE_5MIN })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consolidar resumo do PWA.'
     responseStatus = 502

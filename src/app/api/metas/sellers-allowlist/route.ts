@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
     total: sellers.length,
     activeTotal: getActiveAllowedSellersFromList(sellers).length,
     sellers,
+  }, {
+    headers: {
+      'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+    },
   })
 }
 

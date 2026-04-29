@@ -177,6 +177,7 @@ model TwoFactorRecoveryCode {
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("two_factor_recovery_codes")
 }
 
@@ -294,6 +295,7 @@ model ProductionEvent {
   batch       ProductionBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
   createdBy   User              @relation("EventCreator", fields: [createdById], references: [id])
 
+  @@index([batchId])
   @@map("production_events")
 }
 
@@ -527,6 +529,7 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
+  @@index([userId])
   @@map("conversation_participants")
 }
 
@@ -546,6 +549,8 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User         @relation("MessageSender", fields: [senderId], references: [id])
 
+  @@index([conversationId, createdAt])
+  @@index([senderId])
   @@map("messages")
 }
 
@@ -576,6 +581,7 @@ model Integration {
 
   logs             IntegrationLog[]
 
+  @@index([provider, status])
   @@map("integrations")
 }
 
@@ -619,6 +625,8 @@ model IntegrationLog {
 
   integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
+  @@index([integrationId, executedAt])
+  @@index([status, executedAt])
   @@map("integration_logs")
 }
 
@@ -641,6 +649,9 @@ model MetasSeller {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([code])
+  @@index([active])
+  @@index([supervisorCode])
   @@map("metas_sellers")
 }
 
@@ -658,6 +669,7 @@ model MetasProduct {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([active])
   @@map("metas_products")
 }
 
@@ -671,5 +683,6 @@ model FaturamentoCity {
   ufCode String @map("uf_code")
   uf     String
 
+  @@index([ufCode])
   @@map("faturamento_cities")
 }

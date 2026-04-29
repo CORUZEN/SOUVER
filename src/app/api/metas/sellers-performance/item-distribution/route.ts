@@ -2,6 +2,7 @@
 import { getAuthUser } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
 import { getActiveAllowedProductsFromList } from '@/lib/metas/product-allowlist'
 import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
@@ -389,9 +390,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const payload = await withRequestCache(cacheKey, 180_000, async () => {
-      let bearerToken: string | null = null
-      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
-      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+      const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
 
       const headers = buildHeaders(config, bearerToken)
       const appKey = config.appKey ?? config.token ?? null
@@ -515,7 +514,11 @@ export async function GET(req: NextRequest) {
       }
     })
     responseStatus = 200
-    return NextResponse.json(payload)
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar distribuicao de itens no Sankhya.'
     responseStatus = 502

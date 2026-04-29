@@ -180,6 +180,7 @@ export async function listBatchEvents(batchId: string) {
   return prisma.productionEvent.findMany({
     where: { batchId },
     orderBy: { occurredAt: 'desc' },
+    take: 100,
     include: { createdBy: { select: { id: true, fullName: true } } },
   })
 }

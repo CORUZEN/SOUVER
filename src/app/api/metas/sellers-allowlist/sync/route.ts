@@ -2,6 +2,7 @@
 import { getAuthUser, hasPermission, METAS_PERMISSION_CODES } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
+import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
 import { normalizeSellerProfileType, type SellerProfileType } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist, writeSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 
@@ -394,13 +395,7 @@ export async function POST(req: NextRequest) {
   const config = parseStoredConfig(integration.configEncrypted)
 
   try {
-    let bearerToken: string | null = null
-    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
-      bearerToken = await authenticateOAuth(config, baseUrl)
-    }
-    if (!bearerToken) {
-      bearerToken = await authenticateSession(config, baseUrl)
-    }
+    const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey ?? config.token ?? null
     const [remoteSellers, partnerMap] = await Promise.all([
