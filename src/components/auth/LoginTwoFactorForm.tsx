@@ -6,6 +6,7 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { KeyRound, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 
 function normalizeToken(value: string) {
   return value.toUpperCase().replace(/\s+/g, '')
@@ -40,7 +41,7 @@ export default function LoginTwoFactorForm() {
       }
 
       clearAuthMeCache()
-      window.location.href = '/dashboard'
+      window.location.href = getPostAuthRedirect('/dashboard')
     } catch {
       setError('Falha de conexão ao validar o segundo fator. Tente novamente.')
     } finally {

@@ -1,12 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import LoginForm from '@/components/auth/LoginForm'
 import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 export default function LoginPage() {
   const [showAbout, setShowAbout] = useState(false)
+
+  useEffect(() => {
+    // If running inside an installed PWA, redirect to the dedicated PWA login
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window.navigator as any).standalone === true
+    if (isStandalone) {
+      window.location.replace('/app/login')
+    }
+  }, [])
 
   return (
     <div className="flex min-h-dvh flex-col">

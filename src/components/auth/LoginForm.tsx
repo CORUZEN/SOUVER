@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
 import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 
 export default function LoginForm() {
   const [form, setForm] = useState({ login: '', password: '' })
@@ -71,7 +72,7 @@ export default function LoginForm() {
       }
 
       clearAuthMeCache()
-      window.location.href = '/dashboard'
+      window.location.href = getPostAuthRedirect('/dashboard')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         setApiError('A autenticacao demorou mais que o esperado. Tente novamente.')
