@@ -3,6 +3,7 @@
 import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield, Users, Menu } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import MobilePwaRedirect from './MobilePwaRedirect'
+import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -284,6 +285,20 @@ function HeaderInner() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8d2bd]">{headerContext.eyebrow}</p>
             <p className="mt-1 text-base font-semibold leading-tight text-[#edf0e2] lg:text-lg">{headerContext.title}</p>
             <p className="hidden text-xs text-[#b7c3aa] lg:block">{headerContext.subtitle}</p>
+          </div>
+        </div>
+
+        {/* Mobile logo */}
+        <div className="flex shrink-0 items-center lg:hidden">
+          <div className="relative h-10 w-24 overflow-hidden">
+            <Image
+              src="/branding/ouroverde.png"
+              alt="Ouro Verde"
+              fill
+              priority
+              sizes="96px"
+              className="object-contain object-right"
+            />
           </div>
         </div>
 

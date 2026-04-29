@@ -30,6 +30,8 @@ import {
   Shield,
   Bell,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -254,23 +256,66 @@ export default function MobileNavDrawer({
 
           {/* Profile & Actions */}
           <div className="border-t border-[#b99372]/20 px-3 py-3">
-            {user && (
-              <div className="mb-3 flex items-center gap-3 rounded-xl border border-[#b99372]/15 bg-[#edf0e2]/5 px-3 py-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#b99372]/30 bg-[#edf0e2]/8">
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <User className="h-5 w-5 text-[#d2dac8]" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#edf0e2]">{user.name}</p>
-                  <p className="truncate text-xs text-[#b7c3aa]">{user.role}</p>
-                </div>
-              </div>
-            )}
+            <ProfileSection
+              user={user}
+              onLogout={onLogout}
+              onStopImpersonation={onStopImpersonation}
+              onClose={onClose}
+            />
+          </div>
+        </div>
+      </aside>
+    </div>
+  )
+}
 
-            <div className="space-y-1">
+function ProfileSection({
+  user,
+  onLogout,
+  onStopImpersonation,
+  onClose,
+}: {
+  user: MobileNavDrawerProps['user']
+  onLogout: () => void
+  onStopImpersonation?: () => void
+  onClose: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (!user) return null
+
+  return (
+    <div className="space-y-2">
+      {/* Collapsible user card */}
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex w-full items-center gap-3 rounded-xl border border-[#b99372]/15 bg-[#edf0e2]/5 px-3 py-2.5 transition-colors hover:bg-[#edf0e2]/8"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#b99372]/30 bg-[#edf0e2]/8">
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+          ) : (
+            <User className="h-5 w-5 text-[#d2dac8]" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1 text-left">
+          <p className="truncate text-sm font-semibold text-[#edf0e2]">{user.name}</p>
+          <p className="truncate text-xs text-[#b7c3aa]">{user.role}</p>
+        </div>
+        <div className="shrink-0 text-[#b7c3aa] transition-transform duration-200">
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </div>
+      </button>
+
+      {/* Expandable actions */}
+      <div
+        className={cn(
+          'overflow-hidden transition-all duration-200',
+          expanded ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+        )}
+      >
+        <div className="space-y-1 pt-1">
               {user?.roleCode === 'DEVELOPER' && (
                 <Link
                   href="/dev/gestao-usuarios"
@@ -320,7 +365,5 @@ export default function MobileNavDrawer({
             </div>
           </div>
         </div>
-      </aside>
-    </div>
   )
 }
