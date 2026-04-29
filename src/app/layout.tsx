@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { APP_VERSION } from '@/generated/app-version'
+import { QueryProvider } from '@/components/providers/QueryProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -45,7 +46,9 @@ export default function RootLayout({
         <link rel="manifest" href={`/manifest.json?v=${APP_VERSION}`} />
       </head>
       <body>
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

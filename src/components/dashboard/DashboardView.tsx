@@ -20,7 +20,10 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from 'recharts'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
+import { useDashboardKpis } from '@/lib/client/hooks/use-dashboard-kpis'
+import { useDashboardTrend } from '@/lib/client/hooks/use-dashboard'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface KPIData {
   production: {
@@ -109,52 +112,25 @@ const ROLE_VISIBILITY: Record<string, {
 }
 
 export default function DashboardView() {
-  const [kpis, setKpis]             = useState<KPIData | null>(null)
-  const [loadingKpis, setLoadingKpis] = useState(true)
   const [period, setPeriod]         = useState('today')
   const [userRole, setUserRole]     = useState<string | null>(null)
-  const [trendData, setTrendData]   = useState<{ date: string; batches: number; movements: number; ncs: number }[]>([])
-  const [loadingTrend, setLoadingTrend] = useState(true)
-  const abortRef = useRef<AbortController | null>(null)
-                                                     
-  const loadKpis = useCallback(async (p?: string) => {
-    const prd = p ?? period
-    setLoadingKpis(true)
-    abortRef.current?.abort()
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-    try {
-      const res = await fetch(`/api/dashboard/kpis?period=${prd}&variation=true`, { signal: ctrl.signal })
-      if (res.ok) setKpis(await res.json())
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') { /* silent */ }
-    } finally {
-      setLoadingKpis(false)
-    }
-  }, [period])
+
+  const queryClient = useQueryClient()
+  const { data: kpisData, isLoading: loadingKpis } = useDashboardKpis(period)
+  const { data: trendDataRaw, isLoading: loadingTrend } = useDashboardTrend()
+
+  const kpis = kpisData ?? null
+  const trendData = trendDataRaw?.days ?? []
+  const { data: authData } = useAuth()
 
   useEffect(() => {
-    // Buscar KPIs, perfil e tendÃªncia em PARALELO
-    const ctrl = new AbortController()
-
-    Promise.all([
-      loadKpis(),
-      fetchAuthMeCached()
-        .then(d => { if (d?.user?.roleCode) setUserRole(d.user.roleCode) })
-        .catch(() => null),
-      fetch('/api/dashboard/trend?days=7', { signal: ctrl.signal })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.days) setTrendData(d.days) })
-        .catch(() => null)
-        .finally(() => setLoadingTrend(false)),
-    ])
-
-    return () => ctrl.abort()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (authData?.user?.roleCode) {
+      setUserRole(authData.user.roleCode)
+    }
+  }, [authData])
 
   function handlePeriodChange(p: string) {
     setPeriod(p)
-    loadKpis(p)
   }
 
   const kpiCards = [
@@ -230,7 +206,10 @@ export default function DashboardView() {
             ))}
           </select>
           <button
-            onClick={() => loadKpis()}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['dashboard', 'kpis'] })
+              queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
+            }}
             title="Atualizar"
             className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 hover:text-surface-600 transition-colors"
           >

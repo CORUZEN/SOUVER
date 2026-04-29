@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { MODULE_MENU_SECTIONS, MODULE_PLANS } from '@/lib/development-modules'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 import {
   LayoutDashboard,
   Target,
@@ -105,20 +105,17 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     return () => mediaQuery.removeEventListener('change', onChange)
   }, [])
 
+  const { data: authData } = useAuth()
+
   useEffect(() => {
-    fetchAuthMeCached()
-      .then((data) => {
-        setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations))
-        if (data?.user?.modulePermissions && typeof data.user.modulePermissions === 'object') {
-          setModulePermissions(data.user.modulePermissions)
-        }
-        setModulePermissionsLoaded(true)
-      })
-      .catch(() => {
-        setCanAccessIntegrations(false)
-        setModulePermissionsLoaded(true)
-      })
-  }, [])
+    if (authData) {
+      setCanAccessIntegrations(Boolean(authData?.user?.canAccessIntegrations))
+      if (authData?.user?.modulePermissions && typeof authData.user.modulePermissions === 'object') {
+        setModulePermissions(authData.user.modulePermissions)
+      }
+      setModulePermissionsLoaded(true)
+    }
+  }, [authData])
 
   function openDevelopmentModal(moduleLabel: string) {
     setDevTargetLabel(moduleLabel)

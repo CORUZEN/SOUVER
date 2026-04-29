@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
 import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 export default function PwaLoginPage() {
@@ -16,6 +16,7 @@ export default function PwaLoginPage() {
   const [apiError, setApiError] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const invalidateAuth = useInvalidateAuth()
 
   const [checkingSession, setCheckingSession] = useState(true)
 
@@ -108,7 +109,7 @@ export default function PwaLoginPage() {
         return
       }
 
-      clearAuthMeCache()
+      invalidateAuth()
 
       // Resolve the target PWA route immediately — avoids any soft-navigation
       // flash through the /app entry page or web routes.

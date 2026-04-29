@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 import PwaFooter from '@/components/pwa/PwaFooter'
 import PwaLoadingScreen from '@/components/pwa/PwaLoadingScreen'
 import { PwaLogoutConfirmDialog, PwaSigningOutOverlay } from '@/components/pwa/PwaLogoutExperience'
@@ -963,28 +963,27 @@ export default function SupervisorPwaDashboard() {
     return bySeller
   }, [distributionSellerItemsRows])
 
+  const { data: authData } = useAuth()
+
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (authCheckStartedRef.current) return
     authCheckStartedRef.current = true
     setBootProgress(5)
-    fetchAuthMeCached({ force: false })
-      .then((data) => {
-        if (!data?.user) { router.replace('/app/login'); return }
-        const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        const ALLOWED_SUPERVISOR_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SALES_SUPERVISOR', 'SELLER', 'DIRECTORATE', 'COMMERCIAL_MANAGER', 'DEVELOPER'])
-        if (!ALLOWED_SUPERVISOR_ROLES.has(roleCode)) { router.replace('/app'); return }
-        // Keep continuity between "Validando acesso" and "Carregando sistema".
-        setBootProgress(15)
-        setUser({
-          name: data.user.name,
-          role: typeof data.user.role === 'string' ? data.user.role : data.user.role?.name ?? '',
-          roleCode,
-          sellerCode: data.user.sellerCode,
-        })
-      })
-      .catch(() => router.replace('/app/login'))
-  }, [router])
+    if (!authData) return
+    if (!authData?.user) { router.replace('/app/login'); return }
+    const roleCode = authData.user.roleCode?.toUpperCase() ?? ''
+    const ALLOWED_SUPERVISOR_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SALES_SUPERVISOR', 'SELLER', 'DIRECTORATE', 'COMMERCIAL_MANAGER', 'DEVELOPER'])
+    if (!ALLOWED_SUPERVISOR_ROLES.has(roleCode)) { router.replace('/app'); return }
+    // Keep continuity between "Validando acesso" and "Carregando sistema".
+    setBootProgress(15)
+    setUser({
+      name: authData.user.name,
+      role: typeof authData.user.role === 'string' ? authData.user.role : authData.user.role?.name ?? '',
+      roleCode,
+      sellerCode: authData.user.sellerCode,
+    })
+  }, [router, authData])
 
   // ── Online status ────────────────────────────────────────────────────────
   useEffect(() => {

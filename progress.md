@@ -485,5 +485,58 @@ O painel "Metas Gerais Consolidadas" exibe badges "vs mes anterior" (ex.: ▲24.
 
 ---
 
-**Ultima atualizacao:** 20/04/2026  
+### Sessao 26-27/04/2026 — Migracao para TanStack Query (React Query) e otimizacoes de performance
+
+#### Contexto
+- Dependencia adicionada: `@tanstack/react-query` v5
+- Objetivo: eliminar `fetch` manual, `useEffect` poluidos, `AbortController` e `setInterval` de polling, substituindo por cache declarativo, invalidacao automatica e stale-while-revalidate
+
+#### Infraestrutura base
+
+- `QueryClient` configurado com `staleTime: 30s`, `refetchOnWindowFocus: false`
+- `QueryProvider` adicionado ao root layout (`src/app/layout.tsx`)
+- Hooks centralizados criados em `src/lib/client/hooks/`:
+  - `useAuth()` — cache de auth com refetch a cada 60s
+  - `useInvalidateAuth()` — invalidacao em logout/impersonation
+  - `useNotifications()` — substitui polling manual de 60s no Header
+  - `useDashboardKpis(period)` — cache por periodo, 15s staleTime
+  - `useDashboardTrend()` — cache do grafico de tendencia, 60s staleTime
+  - `useSellersPerformance(year, month, scope)` — cache dos dados Sankhya
+  - `usePwaSummary(year, month)` — cache do resumo PWA
+  - `useMetasConfig()` — cache da configuracao de metas, 5min staleTime
+  - `useSellersAllowlist()` — cache da allowlist, 5min staleTime
+  - `useBrandWeight()`, `useItemDistribution()`, `useProductFocus()` — caches dos endpoints secundarios
+
+#### Componentes migrados
+
+| Componente | Antes | Depois |
+|---|---|---|
+| `Header.tsx` | `fetchAuthMeCached()` + `loadNotifs` + `setInterval` | `useAuth()` + `useNotifications()` |
+| `DashboardView.tsx` | `fetch` manual + `AbortController` + `loadKpis` | `useDashboardKpis()` + `useDashboardTrend()` |
+| `gestao-usuarios/page.tsx` | `useEffect` com `fetch('/api/metas/sellers-allowlist')` | `useSellersAllowlist()` + `useMemo` |
+| `PlanejamentoDiario.tsx` | `useEffect` com `fetch('/api/metas/sellers-allowlist')` | `useSellersAllowlist()` + `useMemo` |
+
+- **PWA pages** (`supervisor/page.tsx`, `metas-diretoria/page.tsx`): mantidas com `fetch` manual por enquanto devido a logica customizada de progresso de boot (`bootProgress`, `trackedFetch`, `activeLoadIdRef`). Hooks criados e disponiveis para migracao futura.
+
+#### Otimizacoes de performance (DB/API)
+
+- **11 indices Prisma** adicionados em 9 modelos (`ConversationParticipant`, `Message`, `Integration`, `IntegrationLog`, `MetasSeller`, `MetasProduct`, `FaturamentoCity`, `ProductionEvent`)
+- **OAuth token caching** — `authenticateSankhyaCached()` em `sankhya-auth.ts` (TTL 50min)
+- **HTTP Cache-Control** em endpoints metas (`private, max-age=60, stale-while-revalidate=120`)
+- **N+1 chat fix** — `getUnreadCounts` usa `groupBy` + CTE unica
+- **Limite de paginacao** — `take: 5000` em relatorios/export, `take: 50` em chat, `take: 100` em eventos
+- **Pool PrismaPg** — `max: 3` para evitar contencao no Neon pooler
+- **Paginas estaticas** — `acesso-negado/page.tsx` com `force-static`
+- **Queries paralelas** — `returns` + `openTitles` em `sellers-performance`
+- **Diagnostics opcional** — payload de debug em `sellers-performance` so com `?debug=1`
+- **Cache FK discovery** — `discoverFkColumns` cacheado por 24h em `sankhya-targets`
+
+#### Pendencias
+
+- `prisma migrate dev --name add_performance_indexes` — aguardando execucao no Neon para aplicar os 11 novos indices
+- Migracao completa dos PWA pages (`supervisor`, `metas-diretoria`) para React Query — adiada para sessao futura devido a complexidade da logica de progresso
+
+---
+
+**Ultima atualizacao:** 27/04/2026  
 **Responsavel pelo controle:** Time de Desenvolvimento SOUVER

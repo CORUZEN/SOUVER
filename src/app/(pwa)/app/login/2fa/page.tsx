@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { KeyRound, ShieldCheck, ArrowLeft } from 'lucide-react'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
 
 function normalizeToken(value: string) {
   return value.toUpperCase().replace(/\s+/g, '')
@@ -12,6 +12,7 @@ function normalizeToken(value: string) {
 
 export default function PwaLoginTwoFactorPage() {
   const router = useRouter()
+  const invalidateAuth = useInvalidateAuth()
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -44,7 +45,7 @@ export default function PwaLoginTwoFactorPage() {
         return
       }
 
-      clearAuthMeCache()
+      invalidateAuth()
 
       // Resolve the target PWA route immediately
       const meRes = await fetch('/api/auth/me', { cache: 'no-store' })

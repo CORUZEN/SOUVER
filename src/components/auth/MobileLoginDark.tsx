@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
 import AboutSystemModal from '@/components/pwa/AboutSystemModal'
 
 /**
@@ -19,6 +19,7 @@ export default function MobileLoginDark() {
   const [apiError, setApiError] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const invalidateAuth = useInvalidateAuth()
 
   useEffect(() => {
     setHydrated(true)
@@ -77,7 +78,7 @@ export default function MobileLoginDark() {
         return
       }
 
-      clearAuthMeCache()
+      invalidateAuth()
       window.location.href = '/dashboard'
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

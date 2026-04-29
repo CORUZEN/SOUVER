@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { KeyRound, ShieldCheck, ArrowLeft } from 'lucide-react'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
 import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 
 function normalizeToken(value: string) {
@@ -13,6 +13,7 @@ function normalizeToken(value: string) {
 }
 
 export default function LoginTwoFactorForm() {
+  const invalidateAuth = useInvalidateAuth()
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -40,7 +41,7 @@ export default function LoginTwoFactorForm() {
         return
       }
 
-      clearAuthMeCache()
+      invalidateAuth()
       window.location.href = getPostAuthRedirect('/dashboard')
     } catch {
       setError('Falha de conexão ao validar o segundo fator. Tente novamente.')

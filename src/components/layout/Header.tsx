@@ -8,7 +8,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { MODULE_PLANS } from '@/lib/development-modules'
-import { clearAuthMeCache, fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth, useInvalidateAuth } from '@/lib/client/hooks/use-auth'
+import { useNotifications } from '@/lib/client/hooks/use-notifications'
 import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 import MobileNavDrawer from './MobileNavDrawer'
 
@@ -73,74 +74,36 @@ function HeaderInner() {
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const { data: authData } = useAuth()
+  const invalidateAuth = useInvalidateAuth()
 
   useEffect(() => {
-    fetchAuthMeCached()
-      .then((data) => {
-        if (data?.user) {
-          const { name, email, role, roleCode, avatarUrl, impersonation } = data.user
-          const resolvedRole =
-            typeof role === 'string'
-              ? role
-              : role?.name ?? 'Usuário'
-          setUser({
-            name,
-            email,
-            role: resolvedRole,
-            roleCode: roleCode ?? null,
-            avatarUrl: avatarUrl ?? null,
-            impersonation: impersonation ?? null,
-          })
-        }
+    if (authData?.user) {
+      const { name, email, role, roleCode, avatarUrl, impersonation } = authData.user
+      const resolvedRole =
+        typeof role === 'string'
+          ? role
+          : role?.name ?? 'Usuário'
+      setUser({
+        name,
+        email,
+        role: resolvedRole,
+        roleCode: roleCode ?? null,
+        avatarUrl: avatarUrl ?? null,
+        impersonation: impersonation ?? null,
       })
-      .catch(() => null)
-  }, [])
+    }
+  }, [authData])
 
-  const loadNotifs = useCallback(() => {
-    fetch('/api/notifications?limit=10')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d) {
-          setNotifs(d.notifications ?? [])
-          setUnreadCount(d.totalUnread ?? 0)
-        }
-      })
-      .catch(() => null)
-  }, [])
+  const { data: notifData } = useNotifications()
 
   useEffect(() => {
-    loadNotifs()
-
-    function startPolling() {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
-      pollTimerRef.current = setInterval(loadNotifs, 60000)
+    if (notifData) {
+      setNotifs(notifData.notifications ?? [])
+      setUnreadCount(notifData.totalUnread ?? 0)
     }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    function handleVisibility() {
-      if (document.hidden) {
-        stopPolling()
-      } else {
-        loadNotifs()
-        startPolling()
-      }
-    }
-
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [loadNotifs])
+  }, [notifData])
 
   useEffect(() => {
     function handler(event: MouseEvent) {
@@ -173,13 +136,13 @@ function HeaderInner() {
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
-    clearAuthMeCache()
+    invalidateAuth()
     window.location.href = getPostAuthRedirect('/login')
   }
 
   async function handleStopImpersonation() {
     await fetch('/api/auth/impersonate/stop', { method: 'POST' })
-    clearAuthMeCache()
+    invalidateAuth()
     window.location.reload()
   }
 

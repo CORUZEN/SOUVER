@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
 import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 
 export default function LoginForm() {
@@ -12,6 +12,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [apiError, setApiError] = useState('')
   const [hydrated, setHydrated] = useState(false)
+  const invalidateAuth = useInvalidateAuth()
 
   useEffect(() => {
     setHydrated(true)
@@ -71,7 +72,7 @@ export default function LoginForm() {
         return
       }
 
-      clearAuthMeCache()
+      invalidateAuth()
       window.location.href = getPostAuthRedirect('/dashboard')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

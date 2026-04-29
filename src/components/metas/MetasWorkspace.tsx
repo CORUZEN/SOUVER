@@ -32,7 +32,7 @@ import {
 import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type OperationalStageKey = Exclude<StageKey, 'FULL'>
@@ -1770,52 +1770,44 @@ export default function MetasWorkspace() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [readOnlyBlockPickerOpen])
 
+  const { data: authData } = useAuth()
+
   useEffect(() => {
-    fetchAuthMeCached()
-      .then((data) => {
-        const roleCode = String(data?.user?.roleCode ?? '').toUpperCase()
-        setCurrentUserRoleCode(roleCode)
-        setCurrentUserName(String(data?.user?.name ?? ''))
-        const perms = data?.user?.metasPermissions as MetasUiPermissions | undefined
-        if (!perms) {
-          setMetasPermissions({
-            config: { view: false, edit: false, save: false, remove: false },
-            sellers: { view: false, edit: false, save: false, remove: false },
-            products: { view: false, edit: false, save: false, remove: false },
-          })
-          return
-        }
-        setMetasPermissions({
-          config: {
-            view: Boolean(perms.config?.view),
-            edit: Boolean(perms.config?.edit),
-            save: Boolean(perms.config?.save),
-            remove: Boolean(perms.config?.remove),
-          },
-          sellers: {
-            view: Boolean(perms.sellers?.view),
-            edit: Boolean(perms.sellers?.edit),
-            save: Boolean(perms.sellers?.save),
-            remove: Boolean(perms.sellers?.remove),
-          },
-          products: {
-            view: Boolean(perms.products?.view),
-            edit: Boolean(perms.products?.edit),
-            save: Boolean(perms.products?.save),
-            remove: Boolean(perms.products?.remove),
-          },
-        })
-      })
-      .catch(() => {
-        setCurrentUserRoleCode('')
-        setCurrentUserName('')
+    if (authData?.user) {
+      const roleCode = String(authData.user.roleCode ?? '').toUpperCase()
+      setCurrentUserRoleCode(roleCode)
+      setCurrentUserName(String(authData.user.name ?? ''))
+      const perms = authData.user.metasPermissions as MetasUiPermissions | undefined
+      if (!perms) {
         setMetasPermissions({
           config: { view: false, edit: false, save: false, remove: false },
           sellers: { view: false, edit: false, save: false, remove: false },
           products: { view: false, edit: false, save: false, remove: false },
         })
+        return
+      }
+      setMetasPermissions({
+        config: {
+          view: Boolean(perms.config?.view),
+          edit: Boolean(perms.config?.edit),
+          save: Boolean(perms.config?.save),
+          remove: Boolean(perms.config?.remove),
+        },
+        sellers: {
+          view: Boolean(perms.sellers?.view),
+          edit: Boolean(perms.sellers?.edit),
+          save: Boolean(perms.sellers?.save),
+          remove: Boolean(perms.sellers?.remove),
+        },
+        products: {
+          view: Boolean(perms.products?.view),
+          edit: Boolean(perms.products?.edit),
+          save: Boolean(perms.products?.save),
+          remove: Boolean(perms.products?.remove),
+        },
       })
-  }, [])
+    }
+  }, [authData])
 
   useEffect(() => {
     function handleViewportChange() {

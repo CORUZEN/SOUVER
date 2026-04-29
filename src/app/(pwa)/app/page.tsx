@@ -2,36 +2,38 @@
 
 import { useEffect } from 'react'
 import Image from 'next/image'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 
 export default function PwaEntryPage() {
+  const { data: authData, isLoading } = useAuth()
+
   useEffect(() => {
-    fetchAuthMeCached({ force: true })
-      .then((data) => {
-        const roleCode = data?.user?.roleCode?.toUpperCase() ?? ''
+    if (isLoading) return
+    if (!authData?.user) {
+      window.location.replace('/app/login')
+      return
+    }
 
-        if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
-          window.location.replace('/app/supervisor')
-          return
-        }
+    const roleCode = authData.user.roleCode?.toUpperCase() ?? ''
 
-        if (roleCode === 'SELLER') {
-          window.location.replace('/app/vendedor')
-          return
-        }
+    if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
+      window.location.replace('/app/supervisor')
+      return
+    }
 
-        if (roleCode === 'DIRECTORATE') {
-          window.location.replace('/app/diretoria')
-          return
-        }
+    if (roleCode === 'SELLER') {
+      window.location.replace('/app/vendedor')
+      return
+    }
 
-        // Manager / Developer — go to full desktop
-        window.location.replace('/metas')
-      })
-      .catch(() => {
-        window.location.replace('/app/login')
-      })
-  }, [])
+    if (roleCode === 'DIRECTORATE') {
+      window.location.replace('/app/diretoria')
+      return
+    }
+
+    // Manager / Developer — go to full desktop
+    window.location.replace('/metas')
+  }, [authData, isLoading])
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface-950">

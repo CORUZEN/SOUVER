@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 
 const MOBILE_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SELLER', 'DIRECTORATE'])
 
@@ -13,6 +13,7 @@ const MOBILE_ROLES = new Set(['COMMERCIAL_SUPERVISOR', 'SELLER', 'DIRECTORATE'])
  */
 export default function MobilePwaRedirect() {
   const router = useRouter()
+  const { data: authData } = useAuth()
 
   useEffect(() => {
     // Skip on desktop / tablet widths
@@ -20,15 +21,11 @@ export default function MobilePwaRedirect() {
     // Skip if already in standalone PWA or if URL is already /app/*
     if (window.location.pathname.startsWith('/app')) return
 
-    fetchAuthMeCached()
-      .then((data) => {
-        const roleCode = (data?.user?.roleCode ?? '').toUpperCase()
-        if (MOBILE_ROLES.has(roleCode)) {
-          router.replace('/app')
-        }
-      })
-      .catch(() => {/* ignore — don't redirect on network error */})
-  }, [router])
+    const roleCode = (authData?.user?.roleCode ?? '').toUpperCase()
+    if (MOBILE_ROLES.has(roleCode)) {
+      router.replace('/app')
+    }
+  }, [router, authData])
 
   return null
 }

@@ -11,7 +11,8 @@ import Modal from '@/components/ui/Modal'
 import Table, { Column } from '@/components/ui/Table'
 import Badge from '@/components/ui/Badge'
 import { ErrorState, Spinner } from '@/components/ui/Skeleton'
-import { clearAuthMeCache } from '@/lib/client/auth-me-cache'
+import { useInvalidateAuth } from '@/lib/client/hooks/use-auth'
+import { useSellersAllowlist } from '@/lib/client/hooks/use-metas'
 
 interface UserRow {
   id: string
@@ -53,6 +54,7 @@ const EMPTY_FORM: UserFormData = {
 
 export default function GestaoUsuariosPage() {
   const pathname = usePathname()
+  const invalidateAuth = useInvalidateAuth()
   const [authLoaded, setAuthLoaded] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
@@ -79,8 +81,7 @@ export default function GestaoUsuariosPage() {
   const [confirmUser, setConfirmUser] = useState<UserRow | null>(null)
   const [confirming, setConfirming] = useState(false)
 
-  const [supervisorSellers, setSupervisorSellers] = useState<{ code: string; name: string }[]>([])
-  const [sellerOptions, setSellerOptions] = useState<{ code: string; name: string }[]>([])
+  const { data: allowlistData } = useSellersAllowlist()
 
   const canManageUsers = currentUser?.roleCode === 'DEVELOPER' || currentUser?.roleCode === 'IT_ANALYST'
   const isDeveloper = currentUser?.roleCode === 'DEVELOPER'
@@ -132,26 +133,21 @@ export default function GestaoUsuariosPage() {
       .catch(() => null)
   }, [canManageUsers])
 
-  useEffect(() => {
-    if (!canManageUsers) return
-    fetch('/api/metas/sellers-allowlist')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        const list: Array<{ code?: string | null; name: string; profileType?: string; active?: boolean }> = d?.sellers ?? d?.list ?? []
-        const activeOnly = list.filter((s) => s.active !== false && s.code)
-        const supervisors = list
-          .filter((s) => s.profileType === 'SUPERVISOR' && s.code && s.active !== false)
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((s) => ({ code: String(s.code!), name: s.name }))
-        const sellers = activeOnly
-          .filter((s) => s.profileType !== 'SUPERVISOR')
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((s) => ({ code: String(s.code!), name: s.name }))
-        setSupervisorSellers(supervisors)
-        setSellerOptions(sellers)
-      })
-      .catch(() => null)
-  }, [canManageUsers])
+  const supervisorSellers = useMemo(() => {
+    const list = allowlistData?.sellers ?? []
+    return list
+      .filter((s) => s.profileType === 'SUPERVISOR' && s.code && s.active !== false)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((s) => ({ code: String(s.code!), name: s.name }))
+  }, [allowlistData])
+
+  const sellerOptions = useMemo(() => {
+    const list = allowlistData?.sellers ?? []
+    return list
+      .filter((s) => s.active !== false && s.code && s.profileType !== 'SUPERVISOR')
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((s) => ({ code: String(s.code!), name: s.name }))
+  }, [allowlistData])
 
   useEffect(() => {
     if (canManageUsers) fetchUsers()
@@ -262,7 +258,7 @@ export default function GestaoUsuariosPage() {
     })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(d.message ?? 'Falha ao locar como usuário.')
-    clearAuthMeCache()
+    invalidateAuth()
     window.location.href = '/'
   }
 

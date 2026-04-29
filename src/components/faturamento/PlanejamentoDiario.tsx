@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSellersAllowlist } from '@/lib/client/hooks/use-metas'
 import {
   AlertTriangle,
   BookMarked,
@@ -498,7 +499,6 @@ export default function PlanejamentoDiario() {
   const [savedListsOpen, setSavedListsOpen] = useState(false)
 
   // ── Data state ────────────────────────────
-  const [sellers, setSellers] = useState<AllowedSeller[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [data, setData] = useState<FaturamentoData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -518,16 +518,16 @@ export default function PlanejamentoDiario() {
     try { localStorage.setItem(LS_FILTER_LISTS, JSON.stringify(lists)) } catch { /* ignore */ }
   }
 
-  // ── Load sellers + cities on mount ─────────
-  useEffect(() => {
-    fetch('/api/metas/sellers-allowlist')
-      .then((r) => r.ok ? r.json() : { sellers: [] })
-      .then((d) => {
-        const list: AllowedSeller[] = Array.isArray(d.sellers) ? d.sellers : Array.isArray(d) ? d : []
-        setSellers(list)
-      })
-      .catch(() => setSellers([]))
+  const { data: allowlistData } = useSellersAllowlist()
+  const sellers: AllowedSeller[] = useMemo(() => {
+    const list = allowlistData?.sellers ?? []
+    return Array.isArray(list)
+      ? list.map((s) => ({ code: s.code ?? null, name: s.name, active: s.active ?? true }))
+      : []
+  }, [allowlistData])
 
+  // ── Load cities on mount ─────────
+  useEffect(() => {
     fetch('/api/faturamento/cities')
       .then((r) => r.ok ? r.json() : { cities: [] })
       .then((d) => setCities(Array.isArray(d.cities) ? d.cities : []))
