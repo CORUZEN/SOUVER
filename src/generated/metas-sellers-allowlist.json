@@ -1,7 +1,7 @@
 [
   {
     "code": "34",
-    "partnerCode": "15425",
+    "partnerCode": "3678",
     "name": "ALEX SOUSA",
     "active": true,
     "profileType": "NOVATO",
@@ -10,7 +10,7 @@
   },
   {
     "code": "32",
-    "partnerCode": "15555",
+    "partnerCode": "2508",
     "name": "ANDREA DUARTE COSTA",
     "active": true,
     "profileType": "NOVATO",
@@ -19,34 +19,34 @@
   },
   {
     "code": "6",
-    "partnerCode": "16443",
+    "partnerCode": "30",
     "name": "CAIO CESAR DE JESUS DE BRITO L",
     "active": true,
-    "profileType": "ANTIGO_1",
+    "profileType": "NOVATO",
     "supervisorCode": "17",
     "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
   {
     "code": "28",
-    "partnerCode": "15873",
+    "partnerCode": "594",
     "name": "CRISLAINE DA SILVA LIMA",
     "active": true,
-    "profileType": "ANTIGO_1",
+    "profileType": "NOVATO",
     "supervisorCode": "16",
     "supervisorName": "JOSE CLAUDIO FEITOSA"
   },
   {
     "code": "7",
-    "partnerCode": "15594",
+    "partnerCode": "32",
     "name": "EDER CRUZ DE LIMA",
     "active": true,
-    "profileType": "ANTIGO_15",
+    "profileType": "NOVATO",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "15",
-    "partnerCode": "231",
+    "partnerCode": "0",
     "name": "EGLINAURIA VIEIRA CAVALCANTE",
     "active": false,
     "profileType": "SUPERVISOR",
@@ -54,35 +54,44 @@
     "supervisorName": null
   },
   {
+    "code": "35",
+    "partnerCode": "3859",
+    "name": "ERIVALDO FERREIRA",
+    "active": true,
+    "profileType": "NOVATO",
+    "supervisorCode": "18",
+    "supervisorName": "ROGERIO CORREIA DA SILVA"
+  },
+  {
     "code": "8",
-    "partnerCode": "16944",
+    "partnerCode": "34",
     "name": "EUFRASIA MARISIA VIEIRA GOMES",
     "active": true,
-    "profileType": "ANTIGO_15",
+    "profileType": "NOVATO",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "9",
-    "partnerCode": "15559",
+    "partnerCode": "36",
     "name": "EVANDSON DOS SANTOS FERRO",
     "active": true,
-    "profileType": "ANTIGO_15",
+    "profileType": "NOVATO",
     "supervisorCode": "18",
     "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
   {
     "code": "10",
-    "partnerCode": "16737",
+    "partnerCode": "37",
     "name": "IZABEL CRISTINA BAHIA DOS SANT",
     "active": true,
-    "profileType": "ANTIGO_15",
+    "profileType": "NOVATO",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "29",
-    "partnerCode": "16643",
+    "partnerCode": "188",
     "name": "JOSE CARLOS DIAS",
     "active": false,
     "profileType": "NOVATO",
@@ -91,7 +100,7 @@
   },
   {
     "code": "11",
-    "partnerCode": "15560",
+    "partnerCode": "31",
     "name": "JOSE CICERO BEZERRA JUNIOR",
     "active": false,
     "profileType": "NOVATO",
@@ -100,7 +109,7 @@
   },
   {
     "code": "16",
-    "partnerCode": "16909",
+    "partnerCode": "232",
     "name": "JOSE CLAUDIO FEITOSA",
     "active": false,
     "profileType": "SUPERVISOR",
@@ -109,16 +118,16 @@
   },
   {
     "code": "31",
-    "partnerCode": "16737",
+    "partnerCode": "1724",
     "name": "JOSE PAULO DA SILVA",
     "active": true,
-    "profileType": "ANTIGO_1",
+    "profileType": "NOVATO",
     "supervisorCode": "17",
     "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
   {
     "code": "17",
-    "partnerCode": "233",
+    "partnerCode": "0",
     "name": "JOSELIA LOPES DE SIQUEIRA",
     "active": false,
     "profileType": "SUPERVISOR",
@@ -127,7 +136,7 @@
   },
   {
     "code": "19",
-    "partnerCode": "15557",
+    "partnerCode": "39",
     "name": "MARIA JAILMA GALDINO DE MOURA",
     "active": true,
     "profileType": "NOVATO",
@@ -136,16 +145,16 @@
   },
   {
     "code": "20",
-    "partnerCode": "15503",
+    "partnerCode": "40",
     "name": "MARIA JOSE",
     "active": true,
-    "profileType": "ANTIGO_1",
+    "profileType": "NOVATO",
     "supervisorCode": "18",
     "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
   {
     "code": "23",
-    "partnerCode": "17018",
+    "partnerCode": "111",
     "name": "MOAGEM OURO VERDE",
     "active": false,
     "profileType": "NOVATO",
@@ -154,16 +163,16 @@
   },
   {
     "code": "12",
-    "partnerCode": "16643",
+    "partnerCode": "41",
     "name": "RICARDO HENRIQUE VIEIRA",
     "active": true,
-    "profileType": "ANTIGO_1",
+    "profileType": "NOVATO",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
   {
     "code": "18",
-    "partnerCode": "15567",
+    "partnerCode": "0",
     "name": "ROGERIO CORREIA DA SILVA",
     "active": false,
     "profileType": "SUPERVISOR",
@@ -172,11 +181,20 @@
   },
   {
     "code": "22",
-    "partnerCode": "16931",
+    "partnerCode": "230",
     "name": "ROSILAINE FERREIRA",
     "active": true,
     "profileType": "NOVATO",
     "supervisorCode": "17",
     "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
+  },
+  {
+    "code": "14",
+    "partnerCode": "42",
+    "name": "VICTOR EVERTON BEZERRA GONCALV",
+    "active": false,
+    "profileType": "NOVATO",
+    "supervisorCode": null,
+    "supervisorName": null
   }
 ]

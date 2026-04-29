@@ -288,24 +288,19 @@ function normalizeSellerName(value: string) {
 
 async function querySellers(baseUrl: string, headers: Record<string, string>, appKey?: string | null) {
   // --- Strategy: single combined query with TIPO and ATIVO filters in SQL ---
-  // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) â€” also accept full-text values
+  // TGFVEN.TIPVEND: 'V' (Vendedor), 'S' (Supervisor) — also accept full-text values
   // TGFVEN.ATIVO: 'S' (Sim)
-  // LEFT JOIN TGFCAB to get the most recent partner code (CODPARC) from orders
+  // TGFVEN.CODPARC: partner code directly from the seller table (not from orders)
   const sqlCombined = `
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  TO_CHAR(MAX(CAB.CODPARC)) AS CODPARC,
+  TO_CHAR(V.CODPARC) AS CODPARC,
   UPPER(TRIM(V.TIPVEND)) AS TIPVEND
 FROM TGFVEN V
-LEFT JOIN TGFCAB CAB
-  ON CAB.CODVEND = V.CODVEND
- AND CAB.TIPMOV IN ('V', 'P')
- AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
 WHERE TRIM(V.APELIDO) IS NOT NULL
   AND UPPER(TRIM(V.TIPVEND)) IN ('V', 'S', 'VENDEDOR', 'SUPERVISOR')
   AND V.ATIVO = 'S'
-GROUP BY V.CODVEND, TRIM(V.APELIDO), UPPER(TRIM(V.TIPVEND))
 ORDER BY TRIM(V.APELIDO)`.trim()
 
   try {
@@ -320,7 +315,7 @@ ORDER BY TRIM(V.APELIDO)`.trim()
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  CAST(NULL AS VARCHAR2(20)) AS CODPARC,
+  TO_CHAR(V.CODPARC) AS CODPARC,
   UPPER(TRIM(V.TIPVEND)) AS TIPVEND
 FROM TGFVEN V
 WHERE TRIM(V.APELIDO) IS NOT NULL
@@ -340,7 +335,7 @@ ORDER BY TRIM(V.APELIDO)`.trim()
 SELECT
   TO_CHAR(V.CODVEND) AS CODVEND,
   TRIM(V.APELIDO) AS APELIDO,
-  CAST(NULL AS VARCHAR2(20)) AS CODPARC,
+  TO_CHAR(V.CODPARC) AS CODPARC,
   CAST(NULL AS VARCHAR2(20)) AS TIPVEND
 FROM TGFVEN V
 WHERE TRIM(V.APELIDO) IS NOT NULL
@@ -391,6 +386,7 @@ export async function POST(req: NextRequest) {
     // - keeps manual active/inactive state
     // - keeps existing manual sellers
     // - adds only sellers missing from local allowlist
+    // - updates existing sellers when Sankhya data changes (name, partnerCode, profileType)
     const merged = [...existing]
     const indexByCode = new Map<string, number>()
     const indexByName = new Map<string, number>()
@@ -402,6 +398,7 @@ export async function POST(req: NextRequest) {
     }
 
     let added = 0
+    let updated = 0
     for (const seller of remoteSellers) {
       const normalizedName = normalizeSellerName(seller.name)
       const codeMatchIndex = indexByCode.get(seller.code)
@@ -410,16 +407,30 @@ export async function POST(req: NextRequest) {
 
       if (foundIndex >= 0) {
         const prev = merged[foundIndex]
+        const newPartnerCode = seller.partnerCode?.trim() || prev.partnerCode || null
+        const newProfileType = seller.profileTypeHint
+          ? normalizeSellerProfileType(seller.profileTypeHint)
+          : normalizeSellerProfileType(prev.profileType)
+        const newName = seller.name?.trim() || prev.name
+        const newCode = seller.code?.trim() || prev.code || null
+
+        const hasChanges =
+          newPartnerCode !== prev.partnerCode ||
+          newProfileType !== normalizeSellerProfileType(prev.profileType) ||
+          newName !== prev.name ||
+          newCode !== prev.code
+
         merged[foundIndex] = {
           ...prev,
-          code: seller.code ? seller.code : (prev.code ?? null),
-          partnerCode: seller.partnerCode ?? prev.partnerCode ?? null,
-          name: seller.name || prev.name,
+          code: newCode,
+          partnerCode: newPartnerCode,
+          name: newName,
           active: prev.active,
-          profileType: normalizeSellerProfileType(prev.profileType),
+          profileType: newProfileType,
           supervisorCode: prev.supervisorCode ?? null,
           supervisorName: prev.supervisorName ?? null,
         }
+        if (hasChanges) updated += 1
         if (seller.code) indexByCode.set(seller.code, foundIndex)
         indexByName.set(normalizedName, foundIndex)
       } else {
@@ -445,6 +456,7 @@ export async function POST(req: NextRequest) {
       integration: { id: integration.id, name: integration.name },
       imported: remoteSellers.length,
       added,
+      updated,
       sellers: saved,
     })
   } catch (error) {
