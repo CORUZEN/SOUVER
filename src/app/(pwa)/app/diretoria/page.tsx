@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
+import { useAuth } from '@/lib/client/hooks/use-auth'
 import PwaFooter from '@/components/pwa/PwaFooter'
 import {
   RefreshCw,
@@ -77,32 +78,27 @@ export default function DiretoriaPwaDashboard() {
   const [bootProgress, setBootProgress] = useState(0)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const authCheckStartedRef = useRef(false)
+
+  const { data: authData } = useAuth()
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (authCheckStartedRef.current) return
-    authCheckStartedRef.current = true
     setBootProgress(5)
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.user) { router.replace('/app/login'); return }
-        const roleCode = data.user.roleCode?.toUpperCase() ?? ''
-        if (roleCode !== 'DIRECTORATE' && roleCode !== 'DEVELOPER' && roleCode !== 'COMMERCIAL_MANAGER') {
-          router.replace('/app')
-          return
-        }
-        setBootProgress(100)
-        setUser({
-          name: data.user.name,
-          role: data.user.role,
-          roleCode,
-        })
-        setLoadState('success')
-      })
-      .catch(() => router.replace('/app/login'))
-  }, [router])
+    if (!authData) return
+    if (!authData?.user) { router.replace('/app/login'); return }
+    const roleCode = authData.user.roleCode?.toUpperCase() ?? ''
+    if (roleCode !== 'DIRECTORATE' && roleCode !== 'DEVELOPER' && roleCode !== 'COMMERCIAL_MANAGER') {
+      router.replace('/app')
+      return
+    }
+    setBootProgress(100)
+    setUser({
+      name: authData.user.name,
+      role: typeof authData.user.role === 'string' ? authData.user.role : authData.user.role?.name ?? '',
+      roleCode,
+    })
+    setLoadState('success')
+  }, [router, authData])
 
   // ── Online status ────────────────────────────────────────────────────────
   useEffect(() => {

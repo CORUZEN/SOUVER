@@ -905,7 +905,6 @@ export default function SupervisorPwaDashboard() {
   const [bootProgress, setBootProgress] = useState(0)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
   const hasLoadedInitialDataRef = useRef(false)
-  const authCheckStartedRef = useRef(false)
   const activeLoadIdRef = useRef(0)
   const inFlightKeyRef = useRef<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
@@ -977,8 +976,6 @@ export default function SupervisorPwaDashboard() {
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (authCheckStartedRef.current) return
-    authCheckStartedRef.current = true
     setBootProgress(5)
     if (!authData) return
     if (!authData?.user) { router.replace('/app/login'); return }
