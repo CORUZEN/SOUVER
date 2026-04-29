@@ -533,7 +533,7 @@ O painel "Metas Gerais Consolidadas" exibe badges "vs mes anterior" (ex.: ▲24.
 
 #### Pendencias
 
-- `prisma migrate dev --name add_performance_indexes` — aguardando execucao no Neon para aplicar os 11 novos indices
+- ~~`prisma migrate dev --name add_performance_indexes`~~ — **Resolvido em 27/04/2026.** Os 13 indices foram aplicados diretamente no Neon via `prisma migrate diff` + `prisma db execute` apos falha no shadow database devido a migrations anteriores usarem `ALTER TABLE` em tabelas sem `CREATE TABLE` correspondente
 - Migracao completa dos PWA pages (`supervisor`, `metas-diretoria`) para React Query — adiada para sessao futura devido a complexidade da logica de progresso
 
 ---
