@@ -486,7 +486,19 @@ function findBlockForSeller(sellerId: string, blocks: RuleBlock[]): RuleBlock {
     b.sellerIds.some((rawId) => candidates.has(String(rawId ?? '').trim()))
   )
   if (specific) return specific
-  return blocks.find((b) => b.sellerIds.length === 0) ?? blocks[0]
+  return blocks.find((b) => b.sellerIds.length === 0) ?? {
+    id: 'unassigned',
+    title: 'Sem bloco',
+    sellerProfileType: 'NOVATO',
+    monthlyTarget: 0,
+    sellerIds: [],
+    rules: [],
+    weightTargets: [],
+    focusProductCode: '',
+    focusTargetKg: 0,
+    focusTargetMode: 'KG',
+    focusTargetBasePct: 0,
+  }
 }
 
 const DEFAULT_PRIZES: CampaignPrize[] = [
@@ -5476,7 +5488,7 @@ export default function MetasWorkspace() {
           const currentBlock = (
             ruleBlocks.find((block) =>
               (block.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
-            ) ?? ruleBlocks[0] ?? null
+            ) ?? ruleBlocks.find((b) => (b.sellerIds ?? []).length === 0) ?? null
           )
           const fallbackBlock = (() => {
             const hasPrevRules = Array.isArray(summarySeller.rules) && summarySeller.rules.length > 0
@@ -5515,7 +5527,7 @@ export default function MetasWorkspace() {
           const activeBlock = fallbackBlock ?? (
             ruleBlocks.find((b) =>
               (b.sellerIds ?? []).some((id) => candidateFallbackIds.has(String(id ?? '').trim()))
-            ) ?? ruleBlocks[0] ?? null
+            ) ?? ruleBlocks.find((b) => (b.sellerIds ?? []).length === 0) ?? null
           )
           const prevWeightTargets = (activeBlock?.weightTargets ?? []).map((wt) => {
             if (!wt.brand) return { brand: '', targetKg: 0 }

@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
         if (!normalizedRaw) return false
         return sellerCandidates.has(normalizedRaw) || sellerCandidates.has(`sankhya-${normalizedRaw}`)
       })
-    }) ?? ruleBlocks[0] ?? null
+    }) ?? ruleBlocks.find((b) => !b.sellerIds || b.sellerIds.length === 0) ?? null
 
     const profileType = seller.profileType as string
     void profileType // profileType stored per seller, used by PWA for display formatting
