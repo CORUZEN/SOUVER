@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield, Users } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, CheckCheck, X, User, Shield, Users, Menu } from 'lucide-react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import MobilePwaRedirect from './MobilePwaRedirect'
 import Link from 'next/link'
@@ -9,6 +9,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { MODULE_PLANS } from '@/lib/development-modules'
 import { clearAuthMeCache, fetchAuthMeCached } from '@/lib/client/auth-me-cache'
 import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
+import MobileNavDrawer from './MobileNavDrawer'
 
 interface UserInfo {
   name: string
@@ -67,6 +68,7 @@ function HeaderInner() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifs, setShowNotifs] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -268,13 +270,24 @@ function HeaderInner() {
       </div>
 
       <div className="relative flex h-full items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8d2bd]">{headerContext.eyebrow}</p>
-          <p className="mt-1 text-lg font-semibold leading-tight text-[#edf0e2]">{headerContext.title}</p>
-          <p className="text-xs text-[#b7c3aa]">{headerContext.subtitle}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          {/* Mobile hamburger */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#c6a277]/20 bg-[#edf0e2]/5 text-[#d2dac8] transition-colors hover:bg-[#edf0e2]/10 hover:text-[#edf0e2] lg:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c8d2bd]">{headerContext.eyebrow}</p>
+            <p className="mt-1 text-base font-semibold leading-tight text-[#edf0e2] lg:text-lg">{headerContext.title}</p>
+            <p className="hidden text-xs text-[#b7c3aa] lg:block">{headerContext.subtitle}</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 rounded-xl border border-[#c6a277]/26 bg-linear-to-b from-[#f2f5ea]/9 via-[#f2f5ea]/5 to-[#f2f5ea]/3 px-2 py-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(242,245,234,0.16),0_10px_22px_rgba(6,14,10,0.28)]">
+        <div className="hidden items-center gap-2 rounded-xl border border-[#c6a277]/26 bg-linear-to-b from-[#f2f5ea]/9 via-[#f2f5ea]/5 to-[#f2f5ea]/3 px-2 py-1 backdrop-blur-md shadow-[inset_0_1px_0_rgba(242,245,234,0.16),0_10px_22px_rgba(6,14,10,0.28)] lg:flex">
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifs((prev) => !prev)}
@@ -442,6 +455,15 @@ function HeaderInner() {
           </button>
         </div>
       </div>
+
+      <MobileNavDrawer
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        user={user}
+        unreadCount={unreadCount}
+        onLogout={handleLogout}
+        onStopImpersonation={handleStopImpersonation}
+      />
     </header>
   )
 }

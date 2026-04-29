@@ -13,8 +13,10 @@ export default function DashboardLayout({
   return (
     <ToastProvider>
       <div className="dashboard-ov-theme flex h-screen overflow-hidden">
-        <Suspense fallback={<div className="w-64 shrink-0 bg-linear-to-b from-[#0f2117] via-[#163325] to-[#1f4733]" />}>
-          <Sidebar appVersion={APP_VERSION} />
+        <Suspense fallback={<div className="hidden lg:flex w-64 shrink-0 bg-linear-to-b from-[#0f2117] via-[#163325] to-[#1f4733]" />}>
+          <div className="hidden lg:flex h-full">
+            <Sidebar appVersion={APP_VERSION} />
+          </div>
         </Suspense>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Suspense fallback={<div className="h-20 shrink-0 border-b border-[#3e6d52]/52 bg-linear-to-r from-[#102218] via-[#153224] to-[#1f4935]" />}>
