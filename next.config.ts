@@ -28,6 +28,16 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3001'],
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'souver-8lzr7vsw8-ouroverde.vercel.app' }],
+        destination: 'https://sistema.cafeouroverde.com.br/:path*',
+        permanent: true,
+      },
+    ]
+  },
   async rewrites() {
     return [
       { source: '/controle', destination: '/dev' },

@@ -294,7 +294,7 @@ export async function GET(req: NextRequest) {
   const cacheKey = `metas:product-focus:v1:${year}-${month}:${companyScope}:${scopeToken}:prod:${productCode}`
 
   try {
-    const payload = await withRequestCache(cacheKey, 30_000, async () => {
+    const payload = await withRequestCache(cacheKey, 180_000, async () => {
       let bearerToken: string | null = null
       if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
       if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)

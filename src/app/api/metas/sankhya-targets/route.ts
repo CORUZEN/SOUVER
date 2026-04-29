@@ -490,7 +490,7 @@ export async function GET(req: NextRequest) {
   const cacheKey = `metas:sankhya-targets:v1:${year}-${month}:${scopeToken}`
 
   try {
-    const payload = await withRequestCache(cacheKey, 30_000, async () => {
+    const payload = await withRequestCache(cacheKey, 600_000, async () => {
       let bearerToken: string | null = null
       if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
         bearerToken = await authenticateOAuth(config, baseUrl)

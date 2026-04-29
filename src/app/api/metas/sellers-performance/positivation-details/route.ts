@@ -7,6 +7,7 @@ import { readProductAllowlist } from '@/lib/metas/product-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { isValidSellerCode, sanitizeSellerCodes } from '@/lib/metas/seller-code-validation'
+import { withRequestCache } from '@/lib/server/request-cache'
 
 type RawRecord = Record<string, unknown>
 
@@ -298,97 +299,102 @@ export async function GET(req: NextRequest) {
   if (!baseUrl) return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
   const config = parseStoredConfig(integration.configEncrypted)
 
-  try {
-    let bearerToken: string | null = null
-    if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
-    if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
-    const headers = buildHeaders(config, bearerToken)
-    const appKey = config.appKey ?? config.token ?? null
+  const [sellerAllowlist, productAllowlist] = await Promise.all([
+    readSellerAllowlist(),
+    readProductAllowlist(),
+  ])
+  const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
+  const supervisorSellerCode = isSupervisorScope ? String(authUser.sellerCode ?? '').trim() : ''
+  const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
+  const scopedSellers = supervisorSellerCode
+    ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
+    : activeSellers
+  const allowedSellerCodes = canonicalizeCodeList(scopedSellers.map((s) => String(s.code ?? '').trim()).filter(Boolean))
+  if (!allowedSellerCodes.includes(sellerCode)) {
+    return NextResponse.json({ message: 'Vendedor fora do escopo permitido.' }, { status: 403 })
+  }
 
-    const [sellerAllowlist, productAllowlist] = await Promise.all([
-      readSellerAllowlist(),
-      readProductAllowlist(),
-    ])
-    const isSupervisorScope = authUser.role?.code === 'SALES_SUPERVISOR'
-    const supervisorSellerCode = isSupervisorScope ? String(authUser.sellerCode ?? '').trim() : ''
-    const activeSellers = getActiveAllowedSellersFromList(sellerAllowlist)
-    const scopedSellers = supervisorSellerCode
-      ? activeSellers.filter((s) => String(s.supervisorCode ?? '').trim() === supervisorSellerCode)
-      : activeSellers
-    const allowedSellerCodes = canonicalizeCodeList(scopedSellers.map((s) => String(s.code ?? '').trim()).filter(Boolean))
-    if (!allowedSellerCodes.includes(sellerCode)) {
-      return NextResponse.json({ message: 'Vendedor fora do escopo permitido.' }, { status: 403 })
-    }
-
-    const activeProducts = getActiveAllowedProductsFromList(productAllowlist)
-    const productCodes = canonicalizeCodeList(activeProducts.map((p) => String(p.code ?? '').trim()).filter(Boolean))
-    if (productCodes.length === 0) {
-      return NextResponse.json({
-        year,
-        month,
-        sellerCode,
-        summary: { totalTargetItems: 0, totalPositivatedItems: 0, totalPendingItems: 0, totalSoldWeightKg: 0, totalSoldQty: 0 },
-        positivatedProducts: [],
-        pendingProducts: [],
-      })
-    }
-
-    let records: RawRecord[] = []
-    for (const mode of ['STRICT', 'FALLBACK_TIPMOV', 'ANY_MOVEMENT'] as const) {
-      try {
-        records = await queryRows(baseUrl, headers, buildPositivationSql(startDate, endDateExclusive, sellerCode, productCodes, companyScope, mode), appKey)
-        break
-      } catch {}
-    }
-
-    const soldByProduct = new Map<string, { soldQty: number; soldWeightKg: number; distinctClients: number }>()
-    for (const row of records) {
-      const code = normalizeCode(String(row.CODPROD ?? '').trim())
-      if (!code) continue
-      soldByProduct.set(code, {
-        soldQty: Math.max(parseNumber(row.QTD_VENDIDA), 0),
-        soldWeightKg: Math.max(parseNumber(row.PESO_KG), 0),
-        distinctClients: Math.max(Math.floor(parseNumber(row.CLIENTES)), 0),
-      })
-    }
-
-    const catalog = activeProducts.map((product) => {
-      const code = normalizeCode(String(product.code ?? '').trim())
-      const sold = soldByProduct.get(code)
-      return {
-        code,
-        description: String(product.description ?? '').trim(),
-        brand: String(product.brand ?? '').trim(),
-        unit: String(product.unit ?? '').trim(),
-        soldQty: sold?.soldQty ?? 0,
-        soldWeightKg: sold?.soldWeightKg ?? 0,
-        distinctClients: sold?.distinctClients ?? 0,
-        positivated: Boolean(sold && sold.soldQty > 0),
-      }
-    })
-
-    const positivatedProducts = catalog
-      .filter((item) => item.positivated)
-      .sort((a, b) => b.soldWeightKg - a.soldWeightKg || a.description.localeCompare(b.description, 'pt-BR'))
-
-    const pendingProducts = catalog
-      .filter((item) => !item.positivated)
-      .sort((a, b) => a.description.localeCompare(b.description, 'pt-BR'))
-
+  const activeProducts = getActiveAllowedProductsFromList(productAllowlist)
+  const productCodes = canonicalizeCodeList(activeProducts.map((p) => String(p.code ?? '').trim()).filter(Boolean))
+  if (productCodes.length === 0) {
     return NextResponse.json({
       year,
       month,
       sellerCode,
-      summary: {
-        totalTargetItems: catalog.length,
-        totalPositivatedItems: positivatedProducts.length,
-        totalPendingItems: pendingProducts.length,
-        totalSoldWeightKg: positivatedProducts.reduce((sum, item) => sum + item.soldWeightKg, 0),
-        totalSoldQty: positivatedProducts.reduce((sum, item) => sum + item.soldQty, 0),
-      },
-      positivatedProducts,
-      pendingProducts,
+      summary: { totalTargetItems: 0, totalPositivatedItems: 0, totalPendingItems: 0, totalSoldWeightKg: 0, totalSoldQty: 0 },
+      positivatedProducts: [],
+      pendingProducts: [],
     })
+  }
+
+  const cacheKey = `metas:positivation-details:v1:${year}-${month}:${companyScope}:${sellerCode}`
+
+  try {
+    const payload = await withRequestCache(cacheKey, 180_000, async () => {
+      let bearerToken: string | null = null
+      if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') bearerToken = await authenticateOAuth(config, baseUrl)
+      if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
+      const headers = buildHeaders(config, bearerToken)
+      const appKey = config.appKey ?? config.token ?? null
+
+      let records: RawRecord[] = []
+      for (const mode of ['STRICT', 'FALLBACK_TIPMOV', 'ANY_MOVEMENT'] as const) {
+        try {
+          records = await queryRows(baseUrl, headers, buildPositivationSql(startDate, endDateExclusive, sellerCode, productCodes, companyScope, mode), appKey)
+          break
+        } catch {}
+      }
+
+      const soldByProduct = new Map<string, { soldQty: number; soldWeightKg: number; distinctClients: number }>()
+      for (const row of records) {
+        const code = normalizeCode(String(row.CODPROD ?? '').trim())
+        if (!code) continue
+        soldByProduct.set(code, {
+          soldQty: Math.max(parseNumber(row.QTD_VENDIDA), 0),
+          soldWeightKg: Math.max(parseNumber(row.PESO_KG), 0),
+          distinctClients: Math.max(Math.floor(parseNumber(row.CLIENTES)), 0),
+        })
+      }
+
+      const catalog = activeProducts.map((product) => {
+        const code = normalizeCode(String(product.code ?? '').trim())
+        const sold = soldByProduct.get(code)
+        return {
+          code,
+          description: String(product.description ?? '').trim(),
+          brand: String(product.brand ?? '').trim(),
+          unit: String(product.unit ?? '').trim(),
+          soldQty: sold?.soldQty ?? 0,
+          soldWeightKg: sold?.soldWeightKg ?? 0,
+          distinctClients: sold?.distinctClients ?? 0,
+          positivated: Boolean(sold && sold.soldQty > 0),
+        }
+      })
+
+      const positivatedProducts = catalog
+        .filter((item) => item.positivated)
+        .sort((a, b) => b.soldWeightKg - a.soldWeightKg || a.description.localeCompare(b.description, 'pt-BR'))
+
+      const pendingProducts = catalog
+        .filter((item) => !item.positivated)
+        .sort((a, b) => a.description.localeCompare(b.description, 'pt-BR'))
+
+      return {
+        year,
+        month,
+        sellerCode,
+        summary: {
+          totalTargetItems: catalog.length,
+          totalPositivatedItems: positivatedProducts.length,
+          totalPendingItems: pendingProducts.length,
+          totalSoldWeightKg: positivatedProducts.reduce((sum, item) => sum + item.soldWeightKg, 0),
+          totalSoldQty: positivatedProducts.reduce((sum, item) => sum + item.soldQty, 0),
+        },
+        positivatedProducts,
+        pendingProducts,
+      }
+    })
+    return NextResponse.json(payload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar detalhes de positivaÃ§Ã£o no Sankhya.'
     return NextResponse.json({ message }, { status: 502 })

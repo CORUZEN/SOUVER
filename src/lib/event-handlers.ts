@@ -99,5 +99,7 @@ jobQueue.register(JOB_TYPES.AUDIT_ARCHIVE, async (payload: unknown) => {
   console.log(`[Job] Archiving audit logs older than ${data.olderThanDays} days`)
 })
 
-console.log('[EventHandlers] Domain event handlers registered')
-console.log('[EventHandlers] Job handlers registered:', Object.values(JOB_TYPES).join(', '))
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[EventHandlers] Domain event handlers registered')
+  console.log('[EventHandlers] Job handlers registered:', Object.values(JOB_TYPES).join(', '))
+}

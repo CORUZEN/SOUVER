@@ -726,7 +726,7 @@ export async function GET(req: NextRequest) {
   const cacheKey = `metas:sellers-performance:v1:${year}-${month}:${companyScope}:${scopeToken}`
 
   try {
-    const payload = await withRequestCache(cacheKey, 20_000, async () => {
+    const payload = await withRequestCache(cacheKey, 180_000, async () => {
     // --- Auth ---
     let bearerToken: string | null = null
     if ((config.authMode ?? 'OAUTH2') === 'OAUTH2') {
