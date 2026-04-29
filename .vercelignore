@@ -8,17 +8,23 @@ scripts/
 !scripts/sync-app-version.mjs
 
 # Arquivos de configuração local
-.env.local
-.env.*.local
+.env
+.env.*
+!.env.example
 
 # Cache e build local
 .next/cache/
+.next/dev/
 build.log
 *.log
+*.tsbuildinfo
 
 # Testes e dados de exemplo
 prisma/seed.ts
+prisma/migrations/
 
 # Outros
 .vercel
 .github
+.turbo
+coverage/
