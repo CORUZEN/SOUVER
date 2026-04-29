@@ -17,8 +17,41 @@ export default function PwaLoginPage() {
   const [hydrated, setHydrated] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
 
+  const [checkingSession, setCheckingSession] = useState(true)
+
   useEffect(() => {
     setHydrated(true)
+
+    // Tenta silent refresh ao abrir a tela de login do PWA.
+    // Se o refresh token ainda for válido, redireciona sem pedir senha.
+    async function trySilentRefresh() {
+      try {
+        const refreshRes = await fetch('/api/auth/refresh', { method: 'POST', cache: 'no-store' })
+        if (!refreshRes.ok) {
+          setCheckingSession(false)
+          return
+        }
+
+        // Refresh funcionou — descobre para onde redirecionar
+        const meRes = await fetch('/api/auth/me', { cache: 'no-store' })
+        const me = meRes.ok ? await meRes.json() : null
+        const roleCode: string = me?.user?.roleCode?.toUpperCase() ?? ''
+
+        if (roleCode === 'COMMERCIAL_SUPERVISOR' || roleCode === 'SALES_SUPERVISOR') {
+          window.location.replace('/app/supervisor')
+        } else if (roleCode === 'SELLER') {
+          window.location.replace('/app/vendedor')
+        } else if (roleCode === 'DIRECTORATE') {
+          window.location.replace('/app/diretoria')
+        } else {
+          window.location.replace('/metas')
+        }
+      } catch {
+        setCheckingSession(false)
+      }
+    }
+
+    void trySilentRefresh()
   }, [])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -218,7 +251,7 @@ export default function PwaLoginPage() {
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={!hydrated || loading}
+            disabled={!hydrated || loading || checkingSession}
             className="mt-8 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-500"
           >
             {loading ? (
@@ -229,7 +262,7 @@ export default function PwaLoginPage() {
                 </svg>
                 Autenticando…
               </>
-            ) : !hydrated ? 'Carregando…' : (
+            ) : checkingSession ? 'Verificando sessão…' : !hydrated ? 'Carregando…' : (
               <>
                 <LogIn className="h-4 w-4" />
                 Entrar

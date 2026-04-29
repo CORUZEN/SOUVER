@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
       challengeResponse.cookies.set('souver_2fa_challenge', challengeToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         expires: challengeExpiresAt,
         path: '/',
       })
@@ -152,14 +152,14 @@ export async function POST(req: NextRequest) {
       setupResponse.cookies.set('souver_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         expires: expiresAt,
         path: '/',
       })
       setupResponse.cookies.set('souver_refresh_token', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/',
       })
       setupResponse.cookies.delete('souver_2fa_challenge')
@@ -181,14 +181,14 @@ export async function POST(req: NextRequest) {
     response.cookies.set('souver_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       expires: expiresAt,
       path: '/',
     })
     response.cookies.set('souver_refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
     })
     response.cookies.delete('souver_2fa_challenge')

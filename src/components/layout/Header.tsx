@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { MODULE_PLANS } from '@/lib/development-modules'
 import { clearAuthMeCache, fetchAuthMeCached } from '@/lib/client/auth-me-cache'
+import { getPostAuthRedirect } from '@/lib/client/pwa-utils'
 
 interface UserInfo {
   name: string
@@ -170,7 +171,7 @@ function HeaderInner() {
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     clearAuthMeCache()
-    window.location.href = '/login'
+    window.location.href = getPostAuthRedirect('/login')
   }
 
   async function handleStopImpersonation() {

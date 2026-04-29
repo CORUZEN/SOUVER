@@ -9,8 +9,14 @@
  * 4. Se refresh der 401, limpa cache de auth e redireciona para login
  */
 
+import { isPwaStandalone } from './pwa-utils'
+
 let isRefreshing = false
 let refreshPromise: Promise<boolean> | null = null
+
+function getLoginPath(): string {
+  return isPwaStandalone() ? '/app/login' : '/login'
+}
 
 async function tryRefresh(): Promise<boolean> {
   if (isRefreshing && refreshPromise) {
@@ -22,11 +28,11 @@ async function tryRefresh(): Promise<boolean> {
     .then((res) => {
       if (res.ok) return true
       // Refresh falhou — sessão realmente expirou
-      window.location.href = '/login'
+      window.location.href = getLoginPath()
       return false
     })
     .catch(() => {
-      window.location.href = '/login'
+      window.location.href = getLoginPath()
       return false
     })
     .finally(() => {

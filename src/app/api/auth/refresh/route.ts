@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   response.cookies.set('souver_token', result.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     expires: result.expiresAt,
     path: '/',
   })
