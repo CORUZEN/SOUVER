@@ -415,13 +415,27 @@ export async function POST(req: NextRequest) {
         const matched = partnerMap.get(normalized)
         if (matched) {
           seller.partnerCode = matched
-        } else {
-          // Try partial match: find a partner whose name is contained within the seller name
-          for (const [partnerName, partnerCode] of partnerMap) {
-            if (normalized.includes(partnerName) || partnerName.includes(normalized)) {
-              seller.partnerCode = partnerCode
-              break
-            }
+          continue
+        }
+
+        // Try partial (substring) match
+        let found = false
+        for (const [partnerName, partnerCode] of partnerMap) {
+          if (normalized.includes(partnerName) || partnerName.includes(normalized)) {
+            seller.partnerCode = partnerCode
+            found = true
+            break
+          }
+        }
+        if (found) continue
+
+        // Try word-based match: all significant words of the partner must be present in the seller name
+        const sellerWords = new Set(normalized.split(/\s+/).filter((w) => w.length >= 3))
+        for (const [partnerName, partnerCode] of partnerMap) {
+          const partnerWords = partnerName.split(/\s+/).filter((w) => w.length >= 3)
+          if (partnerWords.length > 0 && partnerWords.every((w) => sellerWords.has(w))) {
+            seller.partnerCode = partnerCode
+            break
           }
         }
       }
