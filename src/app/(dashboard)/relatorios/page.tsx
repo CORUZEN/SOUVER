@@ -1,558 +1,285 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import {
-  FileBarChart2, Factory, Truck, ShieldCheck, Users,
-  RefreshCw, Download, Calendar, Filter, ChevronDown,
-  BarChart3, TrendingUp, Package, AlertTriangle, CheckCircle2, History, Clock
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { CalendarDays, FileBarChart2, FileDown, FolderKanban } from 'lucide-react'
 
-// ─── Tipos ───────────────────────────────────────────────────────
+type SectionId = 'metas' | 'production' | 'inventory' | 'quality' | 'hr'
+type PeriodMode = 'today' | 'current_month' | 'single_month' | 'range'
+type ExportFormat = 'csv' | 'xlsx' | 'pdf'
+
 interface ReportSection {
-  id:    string
-  label: string
-  icon:  React.ReactNode
-  color: string
-}
-
-interface KpiData {
-  production?: {
-    totalBatches: number
-    inProgress: number
-    finished: number
-    cancelled: number
-    totalProducedQty: number | null
-  }
-  inventory?: {
-    totalItems: number
-    activeItems: number
-    lowStockCount: number
-    totalMovements: number
-  }
-  quality?: {
-    totalRecords: number
-    approvedRecords: number
-    rejectedRecords: number
-    pendingRecords: number
-    openNCs: number
-    criticalNCs: number
-    resolvedThisMonth: number
-  }
-  hr?: {
-    total: number
-    totalActive: number
-    totalInactive: number
-    with2FA: number
-    loggedToday: number
-  }
-  activeUsers?: number
+  id: SectionId
+  title: string
+  description: string
+  status: 'ready' | 'soon'
 }
 
 const SECTIONS: ReportSection[] = [
-  { id: 'production', label: 'Produção',      icon: <Factory className="w-4 h-4" />,       color: 'bg-amber-600'   },
-  { id: 'inventory',  label: 'Logística',     icon: <Truck className="w-4 h-4" />,          color: 'bg-cyan-600'    },
-  { id: 'quality',    label: 'Qualidade',     icon: <ShieldCheck className="w-4 h-4" />,    color: 'bg-emerald-600' },
-  { id: 'hr',         label: 'RH',            icon: <Users className="w-4 h-4" />,          color: 'bg-violet-600'  },
-  { id: 'history',    label: 'Histórico',     icon: <History className="w-4 h-4" />,         color: 'bg-slate-500'   },
+  {
+    id: 'metas',
+    title: 'Metas',
+    description: 'Relatorio executivo e detalhado de performance comercial.',
+    status: 'ready',
+  },
+  {
+    id: 'production',
+    title: 'Producao',
+    description: 'Exportacao operacional de lotes e andamento.',
+    status: 'ready',
+  },
+  {
+    id: 'inventory',
+    title: 'Logistica',
+    description: 'Exportacao de itens, estoque e movimentacoes.',
+    status: 'ready',
+  },
+  {
+    id: 'quality',
+    title: 'Qualidade',
+    description: 'Exportacao de inspecoes e nao conformidades.',
+    status: 'ready',
+  },
+  {
+    id: 'hr',
+    title: 'RH',
+    description: 'Exportacao de colaboradores e status de acesso.',
+    status: 'ready',
+  },
 ]
 
-function StatCard({ label, value, sub, accent }: {
-  label: string; value: string | number; sub?: string; accent?: string
-}) {
-  return (
-    <div className={`bg-white rounded-xl border border-surface-200 px-4 py-4 ${accent ?? ''}`}>
-      <p className="text-2xl font-bold text-surface-900">{value ?? 0}</p>
-      <p className="text-xs font-medium text-surface-700 mt-0.5">{label}</p>
-      {sub && <p className="text-[11px] text-surface-400 mt-0.5">{sub}</p>}
-    </div>
-  )
+function toMonthInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-function SectionHeader({ section }: { section: ReportSection }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <div className={`w-7 h-7 rounded-lg ${section.color} flex items-center justify-center text-white`}>
-        {section.icon}
-      </div>
-      <h2 className="font-semibold text-surface-900">{section.label}</h2>
-    </div>
-  )
+function monthLabelPt(monthInput: string) {
+  const [yearRaw, monthRaw] = monthInput.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  if (!year || !month) return monthInput
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))
+}
+
+function dateRangeFromMode(mode: PeriodMode, singleMonth: string, fromMonth: string, toMonth: string) {
+  const now = new Date()
+
+  if (mode === 'today') {
+    const date = now.toISOString().slice(0, 10)
+    return { from: date, to: date }
+  }
+
+  if (mode === 'current_month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
+  }
+
+  if (mode === 'single_month') {
+    const [y, m] = singleMonth.split('-').map(Number)
+    const start = new Date(y, m - 1, 1)
+    const end = new Date(y, m, 0)
+    return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
+  }
+
+  const [fromY, fromM] = fromMonth.split('-').map(Number)
+  const [toY, toM] = toMonth.split('-').map(Number)
+  const start = new Date(fromY, fromM - 1, 1)
+  const end = new Date(toY, toM, 0)
+  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
 }
 
 export default function RelatoriosPage() {
-  const [data, setData]           = useState<KpiData | null>(null)
-  const [loading, setLoading]     = useState(false)
-  const [exporting, setExporting]       = useState(false)
-  const [exportingXlsx, setExportingXlsx] = useState(false)
-  const [exportingPdf,  setExportingPdf]  = useState(false)
-  const [active, setActive]       = useState<string>('production')
-  const [period, setPeriod]       = useState('today')
+  const router = useRouter()
+  const now = new Date()
+  const currentMonth = toMonthInput(now)
 
-  interface ExportLogEntry {
-    id: string
-    description: string | null
-    createdAt: string
-    user?: { fullName: string } | null
-  }
-  const [history, setHistory]             = useState<ExportLogEntry[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [historyError, setHistoryError]   = useState(false)
+  const [section, setSection] = useState<SectionId>('metas')
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('current_month')
+  const [singleMonth, setSingleMonth] = useState(currentMonth)
+  const [fromMonth, setFromMonth] = useState(currentMonth)
+  const [toMonth, setToMonth] = useState(currentMonth)
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null)
 
-  const fetchHistory = useCallback(async () => {
-    setLoadingHistory(true)
-    setHistoryError(false)
+  const range = useMemo(
+    () => dateRangeFromMode(periodMode, singleMonth, fromMonth, toMonth),
+    [periodMode, singleMonth, fromMonth, toMonth]
+  )
+
+  const periodPreview = useMemo(() => {
+    if (periodMode === 'today') return `Hoje (${new Date(range.from).toLocaleDateString('pt-BR')})`
+    if (periodMode === 'current_month') return monthLabelPt(currentMonth)
+    if (periodMode === 'single_month') return monthLabelPt(singleMonth)
+    return `${monthLabelPt(fromMonth)} a ${monthLabelPt(toMonth)}`
+  }, [currentMonth, fromMonth, periodMode, range.from, singleMonth, toMonth])
+
+  async function exportOperational(format: ExportFormat) {
+    setExportingFormat(format)
     try {
-      const res = await fetch('/api/audit?module=reports&action=EXPORT&period=30d&limit=20')
-      if (res.ok) {
-        const json = await res.json()
-        setHistory(json.logs ?? [])
-      } else {
-        setHistoryError(true)
-      }
-    } catch {
-      setHistoryError(true)
-    } finally {
-      setLoadingHistory(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (active === 'history') fetchHistory()
-  }, [active, fetchHistory])
-
-  async function downloadFile(format: 'csv' | 'xlsx' | 'pdf') {
-    const setter = format === 'xlsx' ? setExportingXlsx : format === 'pdf' ? setExportingPdf : setExporting
-    setter(true)
-    try {
-      const res = await fetch(`/api/reports/export?module=${active}&format=${format}&period=${period}`)
+      const params = new URLSearchParams({
+        module: section,
+        format,
+        dateFrom: range.from,
+        dateTo: range.to,
+      })
+      const res = await fetch(`/api/reports/export?${params.toString()}`)
       if (!res.ok) return
+
       const blob = await res.blob()
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      const cd   = res.headers.get('content-disposition') ?? ''
-      const name = cd.match(/filename="([^"]+)"/)?.[1] ?? `${active}_export.${format}`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const cd = res.headers.get('content-disposition') ?? ''
+      const filename = cd.match(/filename="([^"]+)"/)?.[1] ?? `${section}_${format}.bin`
       a.href = url
-      a.download = name
+      a.download = filename
       a.click()
       URL.revokeObjectURL(url)
-    } finally { setter(false) }
+    } finally {
+      setExportingFormat(null)
+    }
   }
 
-  const downloadCsv  = () => downloadFile('csv')
-  const downloadXlsx = () => downloadFile('xlsx')
-  const downloadPdf  = () => downloadFile('pdf')
+  function openMetasSection() {
+    const [y, m] = (periodMode === 'single_month' ? singleMonth : toMonthInput(new Date(range.from))).split('-')
+    router.push(`/metas?year=${y}&month=${m}`)
+  }
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/dashboard/kpis?period=${period}&variation=false`)
-      if (res.ok) setData(await res.json())
-    } finally { setLoading(false) }
-  }, [period])
-
-  useEffect(() => { fetchData() }, [fetchData])
-
-  const p  = data?.production
-  const inv = data?.inventory
-  const q  = data?.quality
-  const hr = data?.hr
-
-  const qualityRate = p && q
-    ? q.totalRecords > 0
-      ? Math.round((q.approvedRecords / q.totalRecords) * 100)
-      : null
-    : null
+  const sectionMeta = SECTIONS.find((item) => item.id === section)
+  const isMetas = section === 'metas'
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-surface-200 bg-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
-              <FileBarChart2 className="w-5 h-5 text-white" />
-            </div>
+    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,_#ecf7f2,_#f8fbfa_55%,_#ffffff)] px-6 py-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-[#0b3b2e] via-[#0f5c45] to-[#19745a] p-6 text-white shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-lg font-bold text-surface-900 leading-tight">Relatórios</h1>
-              <p className="text-xs text-surface-500">Painel consolidado de indicadores operacionais</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">Modulo • Relatorios</p>
+              <h1 className="mt-2 text-3xl font-bold leading-tight">Central de Relatorios</h1>
+              <p className="mt-2 text-sm text-emerald-100">Selecione a secao, defina o periodo e gere arquivos profissionais com padrao empresarial.</p>
+            </div>
+            <div className="hidden rounded-xl border border-white/20 bg-white/10 p-3 md:block">
+              <FileBarChart2 className="h-8 w-8 text-emerald-100" />
             </div>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 border border-surface-200 rounded-lg px-3 py-1.5 text-xs text-surface-600">
-              <Calendar className="w-3.5 h-3.5" />
-              <select value={period} onChange={e => setPeriod(e.target.value)} className="bg-transparent focus:outline-none text-xs pr-1">
-                <option value="today">Hoje</option>
-                <option value="week">Esta semana</option>
-                <option value="month">Este mês</option>
-                <option value="quarter">Últimos 90 dias</option>
-                <option value="all">Todo o período</option>
-              </select>
-              <ChevronDown className="w-3 h-3" />
-            </div>
-            <button
-              onClick={downloadCsv}
-              disabled={exporting || exportingXlsx || exportingPdf}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 rounded-lg transition-colors"
-            >
-              <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-bounce' : ''}`} />
-              {exporting ? 'Exportando…' : 'CSV'}
-            </button>
-            <button
-              onClick={downloadXlsx}
-              disabled={exporting || exportingXlsx || exportingPdf}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg transition-colors"
-            >
-              <Download className={`w-3.5 h-3.5 ${exportingXlsx ? 'animate-bounce' : ''}`} />
-              {exportingXlsx ? 'Exportando…' : 'XLSX'}
-            </button>
-            <button
-              onClick={downloadPdf}
-              disabled={exporting || exportingXlsx || exportingPdf}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60 rounded-lg transition-colors"
-            >
-              <Download className={`w-3.5 h-3.5 ${exportingPdf ? 'animate-bounce' : ''}`} />
-              {exportingPdf ? 'Gerando…' : 'PDF'}
-            </button>
-            <button
-              onClick={fetchData}
-              className="p-2 text-surface-400 hover:text-surface-700 border border-surface-200 rounded-lg"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <FolderKanban className="h-4 w-4 text-emerald-700" />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-surface-600">Secao do Relatorio</h2>
           </div>
-        </div>
-
-        {/* Seção tabs */}
-        <div className="flex gap-1 mt-4">
-          {SECTIONS.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setActive(s.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                active === s.id ? 'bg-indigo-600 text-white' : 'text-surface-500 hover:bg-surface-100'
-              }`}
-            >
-              {s.icon}{s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
-
-        {/* ── Produção ── */}
-        {active === 'production' && (
-          <div>
-            <SectionHeader section={SECTIONS[0]} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard label="Total de Lotes"     value={p?.totalBatches ?? 0} />
-              <StatCard label="Em Andamento"       value={p?.inProgress   ?? 0} sub="lotes ativos" />
-              <StatCard label="Finalizados"         value={p?.finished     ?? 0} />
-              <StatCard label="Cancelados"          value={p?.cancelled    ?? 0} />
-            </div>
-
-            {/* Barra resumo produção */}
-            <div className="bg-white rounded-xl border border-surface-200 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-amber-600" />
-                <p className="text-sm font-semibold text-surface-900">Distribuição de Status</p>
-              </div>
-              {p && p.totalBatches > 0 ? (
-                <div className="space-y-3">
-                  {[
-                    { label: 'Em Andamento', count: p.inProgress, color: 'bg-blue-500'    },
-                    { label: 'Finalizados',  count: p.finished,   color: 'bg-green-500'   },
-                    { label: 'Cancelados',   count: p.cancelled,  color: 'bg-red-400'     },
-                    { label: 'Outros',       count: p.totalBatches - p.inProgress - p.finished - p.cancelled, color: 'bg-surface-300' },
-                  ].filter(r => r.count > 0).map(r => (
-                    <div key={r.label} className="flex items-center gap-3">
-                      <span className="text-xs text-surface-600 w-28 shrink-0">{r.label}</span>
-                      <div className="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${r.color}`}
-                          style={{ width: `${Math.round((r.count / p.totalBatches) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-surface-700 w-8 text-right">{r.count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-surface-400 text-center py-4">Nenhum lote registrado ainda</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Logística ── */}
-        {active === 'inventory' && (
-          <div>
-            <SectionHeader section={SECTIONS[1]} />
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <StatCard label="Itens Cadastrados" value={inv?.totalItems     ?? 0} />
-              <StatCard label="Itens Ativos"       value={inv?.activeItems   ?? 0} />
-              <StatCard label="Abaixo do Mínimo"  value={inv?.lowStockCount  ?? 0} sub="requer atenção" />
-              <StatCard label="Movimentações"     value={inv?.totalMovements ?? 0} />
-            </div>
-
-            {inv && inv.lowStockCount > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-yellow-800">Alerta de Estoque Mínimo</p>
-                  <p className="text-xs text-yellow-700 mt-0.5">
-                    {inv.lowStockCount} {inv.lowStockCount === 1 ? 'item está' : 'itens estão'} abaixo do estoque mínimo.
-                    Acesse o módulo de <strong>Logística</strong> para verificar e realizar pedidos de reposição.
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {SECTIONS.map((item) => {
+              const active = section === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSection(item.id)}
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    active
+                      ? 'border-emerald-400 bg-emerald-50 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]'
+                      : 'border-surface-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40'
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-surface-900">{item.title}</p>
+                  <p className="mt-1 text-xs text-surface-600">{item.description}</p>
+                  <p className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {item.status === 'ready' ? 'Disponivel' : 'Em breve'}
                   </p>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white rounded-xl border border-surface-200 p-5 mt-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="w-4 h-4 text-cyan-600" />
-                <p className="text-sm font-semibold text-surface-900">Situação do Estoque</p>
-              </div>
-              {inv && inv.totalItems > 0 ? (
-                <div className="space-y-3">
-                  {[
-                    { label: 'Ativos regulares', count: (inv.activeItems ?? 0) - (inv.lowStockCount ?? 0), color: 'bg-green-500' },
-                    { label: 'Abaixo do mínimo', count: inv.lowStockCount ?? 0,                            color: 'bg-yellow-400' },
-                    { label: 'Inativos',          count: (inv.totalItems ?? 0) - (inv.activeItems ?? 0),   color: 'bg-surface-300' },
-                  ].filter(r => r.count > 0).map(r => (
-                    <div key={r.label} className="flex items-center gap-3">
-                      <span className="text-xs text-surface-600 w-32 shrink-0">{r.label}</span>
-                      <div className="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${r.color}`}
-                          style={{ width: `${Math.round((r.count / inv.totalItems) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-surface-700 w-8 text-right">{r.count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-surface-400 text-center py-4">Nenhum item cadastrado ainda</p>
-              )}
-            </div>
+                </button>
+              )
+            })}
           </div>
-        )}
+        </section>
 
-        {/* ── Qualidade ── */}
-        {active === 'quality' && (
-          <div>
-            <SectionHeader section={SECTIONS[2]} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard label="Inspeções"              value={q?.totalRecords       ?? 0} />
-              <StatCard label="Aprovadas"              value={q?.approvedRecords    ?? 0} />
-              <StatCard label="Reprovadas"             value={q?.rejectedRecords    ?? 0} />
-              <StatCard label="NCs Abertas"            value={q?.openNCs            ?? 0} sub="em andamento" />
-              <StatCard label="NCs Críticas"           value={q?.criticalNCs        ?? 0} sub="requer atenção" />
-              <StatCard label="Resolvidas/mês"         value={q?.resolvedThisMonth  ?? 0} />
-              {qualityRate !== null && (
-                <StatCard label="Taxa de Aprovação" value={`${qualityRate}%`} sub="das inspeções" />
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl border border-surface-200 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <p className="text-sm font-semibold text-surface-900">Resultado das Inspeções</p>
-              </div>
-              {q && q.totalRecords > 0 ? (
-                <div className="space-y-3">
-                  {[
-                    { label: 'Aprovadas',    count: q.approvedRecords,                                    color: 'bg-green-500'  },
-                    { label: 'Pendentes',    count: q.pendingRecords,                                     color: 'bg-yellow-400' },
-                    { label: 'Condicionais', count: q.totalRecords - q.approvedRecords - q.rejectedRecords - q.pendingRecords, color: 'bg-orange-400' },
-                    { label: 'Reprovadas',   count: q.rejectedRecords,                                    color: 'bg-red-500'    },
-                  ].filter(r => r.count > 0).map(r => (
-                    <div key={r.label} className="flex items-center gap-3">
-                      <span className="text-xs text-surface-600 w-28 shrink-0">{r.label}</span>
-                      <div className="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${r.color}`}
-                          style={{ width: `${Math.round((r.count / q.totalRecords) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-surface-700 w-8 text-right">{r.count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-surface-400 text-center py-4">Nenhuma inspeção registrada ainda</p>
-              )}
-            </div>
-
-            {q && q.criticalNCs > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
-                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-800">NCs Críticas Pendentes</p>
-                  <p className="text-xs text-red-700 mt-0.5">
-                    Existem <strong>{q.criticalNCs}</strong> não conformidades de severidade CRÍTICA em aberto.
-                    Acesse o módulo de <strong>Qualidade</strong> para tratativa imediata.
-                  </p>
-                </div>
-              </div>
-            )}
+        <section className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-emerald-700" />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-surface-600">Periodo</h2>
           </div>
-        )}
 
-        {/* ── RH ── */}
-        {active === 'hr' && (
-          <div>
-            <SectionHeader section={SECTIONS[3]} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard label="Total Colaboradores" value={hr?.total         ?? 0} />
-              <StatCard label="Ativos"               value={hr?.totalActive  ?? 0} />
-              <StatCard label="Inativos"             value={hr?.totalInactive ?? 0} />
-              <StatCard label="Com 2FA"              value={hr?.with2FA      ?? 0} sub="autenticação dupla" />
-              <StatCard label="Acessaram Hoje"       value={hr?.loggedToday  ?? 0} />
-              <StatCard label="Usuários Ativos"      value={data?.activeUsers ?? 0} sub="sessão ativa" />
-            </div>
-
-            <div className="bg-white rounded-xl border border-surface-200 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-4 h-4 text-violet-600" />
-                <p className="text-sm font-semibold text-surface-900">Distribuição por Status</p>
-              </div>
-              {hr && hr.total > 0 ? (
-                <div className="space-y-3">
-                  {[
-                    { label: 'Ativos',    count: hr.totalActive,                                       color: 'bg-green-500'  },
-                    { label: 'Inativos',  count: hr.totalInactive,                                     color: 'bg-surface-300' },
-                    { label: 'Suspensos', count: hr.total - hr.totalActive - hr.totalInactive,          color: 'bg-red-400'    },
-                  ].filter(r => r.count > 0).map(r => (
-                    <div key={r.label} className="flex items-center gap-3">
-                      <span className="text-xs text-surface-600 w-24 shrink-0">{r.label}</span>
-                      <div className="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${r.color}`}
-                          style={{ width: `${Math.round((r.count / hr.total) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-surface-700 w-8 text-right">{r.count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-surface-400 text-center py-4">Nenhum colaborador cadastrado</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Histórico de Exportações ── */}
-        {active === 'history' && (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-slate-500 flex items-center justify-center text-white">
-                <History className="w-4 h-4" />
-              </div>
-              <h2 className="font-semibold text-surface-900">Histórico de Exportações</h2>
+          <div className="mt-4 grid gap-2 md:grid-cols-4">
+            {[
+              { id: 'today', label: 'Dia atual' },
+              { id: 'current_month', label: 'Mes atual' },
+              { id: 'single_month', label: 'Mes especifico' },
+              { id: 'range', label: 'Intervalo de meses' },
+            ].map((option) => (
               <button
-                onClick={fetchHistory}
-                className="ml-auto p-1.5 text-surface-400 hover:text-surface-700 border border-surface-200 rounded-lg"
+                key={option.id}
+                type="button"
+                onClick={() => setPeriodMode(option.id as PeriodMode)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  periodMode === option.id
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                    : 'border-surface-200 bg-white text-surface-700 hover:bg-surface-50'
+                }`}
               >
-                <RefreshCw className={`w-4 h-4 ${loadingHistory ? 'animate-spin' : ''}`} />
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {periodMode === 'single_month' && (
+            <div className="mt-4 max-w-xs">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Mes de referencia</label>
+              <input type="month" value={singleMonth} onChange={(e) => setSingleMonth(e.target.value)} className="mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800" />
+            </div>
+          )}
+
+          {periodMode === 'range' && (
+            <div className="mt-4 grid gap-4 md:max-w-xl md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">De</label>
+                <input type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-surface-500">Ate</label>
+                <input type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800" />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-surface-700">
+            <strong>Selecao atual:</strong> {sectionMeta?.title} • {periodPreview}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-surface-600">Geracao</h2>
+          {isMetas ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-surface-700">
+                Para a secao <strong>Metas</strong>, a geracao profissional ocorre no proprio Painel de Metas com o periodo selecionado.
+              </p>
+              <button
+                type="button"
+                onClick={openMetasSection}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                <FileDown className="h-4 w-4" />
+                Abrir Painel de Metas no periodo
               </button>
             </div>
-
-            {loadingHistory ? (
-              <div className="flex items-center justify-center py-12 text-surface-400 text-sm gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Carregando histórico…
-              </div>
-            ) : historyError ? (
-              <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0" />
-                Sem permissão para visualizar a trilha de auditoria ou dados indisponíveis.
-              </div>
-            ) : history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-surface-400 text-sm gap-2">
-                <Clock className="w-8 h-8 opacity-30" />
-                <p>Nenhuma exportação registrada nos últimos 30 dias.</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-surface-200 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-200 bg-surface-50">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Data / Hora</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Módulo</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Formato</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Registros</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-surface-600">Usuário</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((entry, idx) => {
-                      const desc = entry.description ?? ''
-                      const modMatch    = desc.match(/^Exportação de (.+?) em formato/)
-                      const fmtMatch    = desc.match(/em formato (\w+)/)
-                      const countMatch  = desc.match(/\((\d+) registros?\)/)
-                      const mod    = modMatch?.[1]  ?? '—'
-                      const fmt    = fmtMatch?.[1]  ?? '—'
-                      const count  = countMatch?.[1] ?? '—'
-                      const dt     = new Date(entry.createdAt)
-                      return (
-                        <tr key={entry.id} className={`border-b border-surface-100 last:border-0 ${idx % 2 === 0 ? '' : 'bg-surface-50'}`}>
-                          <td className="px-4 py-2.5 text-xs text-surface-700 whitespace-nowrap">
-                            {dt.toLocaleDateString('pt-BR')} {dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-surface-700 capitalize">{mod}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              fmt === 'PDF'  ? 'bg-rose-100 text-rose-700' :
-                              fmt === 'XLSX' ? 'bg-emerald-100 text-emerald-700' :
-                              'bg-indigo-100 text-indigo-700'
-                            }`}>{fmt}</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-surface-500">{count}</td>
-                          <td className="px-4 py-2.5 text-xs text-surface-600">{entry.user?.fullName ?? '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Rodapé informativo */}
-        <div className="text-center pt-2 pb-4">
-          <p className="text-xs text-surface-400">
-            Dados consolidados · Período: <strong>{{
-              today: 'Hoje',
-              week: 'Últimos 7 dias',
-              month: 'Este mês',
-              quarter: 'Últimos 90 dias',
-              all: 'Todo o período',
-            }[period] ?? 'Todo o período'}</strong> · Atualizado às {new Date().toLocaleTimeString('pt-BR')}
-          </p>
-          <p className="text-xs text-surface-300 mt-0.5">
-            Clique em <strong>CSV</strong> ou <strong>XLSX</strong> para exportar os dados da aba selecionada
-          </p>
-          <Link
-            href="/relatorios/executivo"
-            className="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
-          >
-            Ver Visão Executiva Consolidada →
-          </Link>
-          <Link
-            href="/relatorios/compliance"
-            className="inline-flex items-center gap-1.5 mt-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Relatório de Compliance e Segurança →
-          </Link>
-        </div>
+          ) : (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(['csv', 'xlsx', 'pdf'] as ExportFormat[]).map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  onClick={() => exportOperational(format)}
+                  disabled={Boolean(exportingFormat)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-white px-4 py-2 text-sm font-semibold text-surface-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileDown className="h-4 w-4" />
+                  {exportingFormat === format ? `Gerando ${format.toUpperCase()}...` : `Exportar ${format.toUpperCase()}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )
 }
+

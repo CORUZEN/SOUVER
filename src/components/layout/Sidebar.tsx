@@ -54,6 +54,7 @@ const DEFAULT_MODULE: ModuleKey = 'metas'
 const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
 const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
   metas: '/metas',
+  relatorios: '/relatorios',
   integracoes: '/integracoes',
 }
 
@@ -74,7 +75,6 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [showDevModal, setShowDevModal] = useState(false)
   const [devTargetLabel, setDevTargetLabel] = useState('')
   const [isRhExpanded, setIsRhExpanded] = useState(false)
-  const [isReportsExpanded, setIsReportsExpanded] = useState(false)
   const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
@@ -170,7 +170,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const isActive = moduleKey === 'integracoes'
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : '(Em breve)'
+    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' || moduleKey === 'relatorios' ? null : '(Em breve)'
     const iconClass = cn(
       'w-4 h-4 shrink-0 transition-all duration-300',
       isActive
@@ -395,19 +395,6 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                       )
                     }
 
-                    if (moduleKey === 'relatorios') {
-                      return (
-                        <div key={moduleKey} className="space-y-0.5">
-                          {renderMenuItem('relatorios', {
-                            expandable: true,
-                            expanded: isReportsExpanded,
-                            onToggleExpand: () => setIsReportsExpanded((prev) => !prev),
-                          })}
-                          {!isCollapsed && isReportsExpanded && renderMenuItem('auditoria', { isSubmenu: true })}
-                        </div>
-                      )
-                    }
-
                     if (moduleKey === 'logistica') {
                       const isFaturamentoActive = pathname === '/logistica/faturamento-diario'
                       return (
@@ -525,5 +512,4 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     </>
   )
 }
-
 

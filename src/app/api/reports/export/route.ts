@@ -110,9 +110,18 @@ function pdfResponse(
   })
 }
 
-// ─── GET /api/reports/export?module=production|inventory|quality|hr&format=csv|xlsx|pdf&period=today|week|month|quarter|all ──
+// ─── GET /api/reports/export?module=production|inventory|quality|hr&format=csv|xlsx|pdf&period=today|week|month|quarter|all&dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD ──
 
-function buildPeriodFilter(period: string): { gte?: Date; lte?: Date } | undefined {
+function buildPeriodFilter(period: string, dateFrom?: string | null, dateTo?: string | null): { gte?: Date; lte?: Date } | undefined {
+  if (dateFrom || dateTo) {
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined
+    const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : undefined
+    if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
+      return undefined
+    }
+    return { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
+  }
+
   const now = new Date()
   const to  = new Date(now)
   to.setHours(23, 59, 59, 999)
@@ -145,10 +154,12 @@ export async function GET(req: NextRequest) {
   const mod    = req.nextUrl.searchParams.get('module') ?? ''
   const format = req.nextUrl.searchParams.get('format') ?? 'csv'
   const period = req.nextUrl.searchParams.get('period') ?? 'all'
+  const dateFrom = req.nextUrl.searchParams.get('dateFrom')
+  const dateTo = req.nextUrl.searchParams.get('dateTo')
   const now    = new Date()
   const ts     = now.toISOString().slice(0, 10)
 
-  const dateFilter = buildPeriodFilter(period)
+  const dateFilter = buildPeriodFilter(period, dateFrom, dateTo)
 
   if (mod === 'production') {
     const batches = await prisma.productionBatch.findMany({

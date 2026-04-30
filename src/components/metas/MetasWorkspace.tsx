@@ -1449,6 +1449,19 @@ export default function MetasWorkspace() {
     () => getMaintenanceMetaText(individualPerformancePanelMaintenance),
     [getMaintenanceMetaText, individualPerformancePanelMaintenance]
   )
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const yearParam = Number(params.get('year'))
+    const monthParam = Number(params.get('month'))
+
+    if (Number.isInteger(yearParam) && yearParam >= 2020 && yearParam <= 2100) {
+      setYear(yearParam)
+    }
+    if (Number.isInteger(monthParam) && monthParam >= 1 && monthParam <= 12) {
+      setMonth(monthParam - 1)
+    }
+  }, [])
   const maintenanceControlButtonClass = (enabled: boolean) =>
     `inline-flex h-9 w-9 items-center justify-center rounded-xl border ring-1 transition-all duration-200 ${
       enabled
