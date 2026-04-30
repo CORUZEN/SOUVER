@@ -22,7 +22,7 @@
     "partnerCode": "30",
     "name": "CAIO CESAR DE JESUS DE BRITO L",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_1",
     "supervisorCode": "17",
     "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
@@ -31,7 +31,7 @@
     "partnerCode": "594",
     "name": "CRISLAINE DA SILVA LIMA",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_1",
     "supervisorCode": "16",
     "supervisorName": "JOSE CLAUDIO FEITOSA"
   },
@@ -40,7 +40,7 @@
     "partnerCode": "32",
     "name": "EDER CRUZ DE LIMA",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_15",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
@@ -67,7 +67,7 @@
     "partnerCode": "34",
     "name": "EUFRASIA MARISIA VIEIRA GOMES",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_15",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
@@ -76,7 +76,7 @@
     "partnerCode": "36",
     "name": "EVANDSON DOS SANTOS FERRO",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_15",
     "supervisorCode": "18",
     "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
@@ -85,7 +85,7 @@
     "partnerCode": "37",
     "name": "IZABEL CRISTINA BAHIA DOS SANT",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_15",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
@@ -121,7 +121,7 @@
     "partnerCode": "1724",
     "name": "JOSE PAULO DA SILVA",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_1",
     "supervisorCode": "17",
     "supervisorName": "JOSELIA LOPES DE SIQUEIRA"
   },
@@ -148,7 +148,7 @@
     "partnerCode": "40",
     "name": "MARIA JOSE",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_1",
     "supervisorCode": "18",
     "supervisorName": "ROGERIO CORREIA DA SILVA"
   },
@@ -166,7 +166,7 @@
     "partnerCode": "41",
     "name": "RICARDO HENRIQUE VIEIRA",
     "active": true,
-    "profileType": "NOVATO",
+    "profileType": "ANTIGO_1",
     "supervisorCode": "15",
     "supervisorName": "EGLINAURIA VIEIRA CAVALCANTE"
   },
