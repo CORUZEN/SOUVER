@@ -86,8 +86,13 @@ export default function LoginForm() {
     }
   }
 
+  function handleSubmitForm(e: React.FormEvent) {
+    e.preventDefault()
+    void handleSubmit()
+  }
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmitForm} className="space-y-4" noValidate>
 
       {/* Login */}
       <div className="space-y-1">
@@ -162,9 +167,8 @@ export default function LoginForm() {
 
       {/* Submit */}
       <button
-        type="button"
-        onClick={() => void handleSubmit()}
-        disabled={!hydrated || loading}
+        type="submit"
+        disabled={loading}
         className="mt-4 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-500"
       >
         {loading ? (
@@ -175,7 +179,7 @@ export default function LoginForm() {
             </svg>
             Autenticando…
           </>
-        ) : !hydrated ? 'Carregando…' : (
+        ) : (
           <>
             <LogIn className="h-4 w-4" />
             Entrar
@@ -192,6 +196,6 @@ export default function LoginForm() {
           Esqueci minha senha
         </a>
       </div>
-    </div>
+    </form>
   )
 }
