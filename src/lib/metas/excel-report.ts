@@ -378,12 +378,32 @@ function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[])
     ws['!rows'] = ws['!rows'] || []
     ws['!rows'][row - 1] = { hpt: 24 }
 
-    for (let s = 0; s < 4; s++) {
-      const ratio = stages[s]
-      if (ratio == null) continue
-      setCell(ws, row, 11 + s, `${Math.round(ratio * 100)}%`, {
-        font: { bold: true, color: { rgb: C.white }, sz: 10 },
-        fill: { fgColor: { rgb: heatColor(ratio) } },
+    const w1 = stages[0] ?? null
+    const w2 = stages[1] ?? null
+    const w3 = stages[2] ?? null
+    const closing = stages[3] ?? null
+    const closingCoversAllWeeks =
+      closing != null &&
+      closing > 0 &&
+      (w1 ?? 0) <= 0 &&
+      (w2 ?? 0) <= 0 &&
+      (w3 ?? 0) <= 0
+
+    if (closingCoversAllWeeks) {
+      for (let c = 11; c <= 14; c++) {
+        setCell(ws, row, c, '', {
+          fill: { fgColor: { rgb: heatColor(closing) } },
+          border: {
+            bottom: { style: 'thin', color: { rgb: C.line } },
+            left: { style: 'thin', color: { rgb: C.line } },
+            right: { style: 'thin', color: { rgb: C.line } },
+          },
+        })
+      }
+      merge(ws, row, 11, row, 14)
+      setCell(ws, row, 11, `${Math.round(closing * 100)}%`, {
+        font: { bold: true, color: { rgb: C.white }, sz: 11 },
+        fill: { fgColor: { rgb: heatColor(closing) } },
         alignment: { horizontal: 'center', vertical: 'center' },
         border: {
           bottom: { style: 'thin', color: { rgb: C.line } },
@@ -391,6 +411,21 @@ function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[])
           right: { style: 'thin', color: { rgb: C.line } },
         },
       })
+    } else {
+      for (let s = 0; s < 4; s++) {
+        const ratio = stages[s]
+        if (ratio == null) continue
+        setCell(ws, row, 11 + s, `${Math.round(ratio * 100)}%`, {
+          font: { bold: true, color: { rgb: C.white }, sz: 10 },
+          fill: { fgColor: { rgb: heatColor(ratio) } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: {
+            bottom: { style: 'thin', color: { rgb: C.line } },
+            left: { style: 'thin', color: { rgb: C.line } },
+            right: { style: 'thin', color: { rgb: C.line } },
+          },
+        })
+      }
     }
 
   })
@@ -593,7 +628,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const ws2: XLSX.WorkSheet = {}
   buildHeader(ws2, 14, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores monitorados`, monthLabel, generatedBy)
   writeMainTable(ws2, 6, rows)
-  setCols(ws2, [5, 24, 20, 13, 10, 13, 11, 9, 18, 13, 12, 12, 12, 13])
+  setCols(ws2, [5, 22, 18, 13, 11, 13, 11, 11, 18, 13, 14, 14, 14, 15])
   ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 7 + rows.length, c: 13 } })
   XLSX.utils.book_append_sheet(wb, ws2, 'Desempenho por Vendedor')
 
@@ -689,12 +724,32 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       vals.forEach((v, i) => setCell(ws, row, i + 1, v, dataStyle(alt, i === 0 || i === 3 || i === 5 || i === 6 || i >= 9)))
       rowMeta[row - 1] = { hpt: 24 }
 
-      for (let s = 0; s < 4; s++) {
-        const ratio = stages[s]
-        if (ratio == null) continue
-        setCell(ws, row, 10 + s, `${Math.round(ratio * 100)}%`, {
-          font: { bold: true, color: { rgb: C.white }, sz: 10 },
-          fill: { fgColor: { rgb: heatColor(ratio) } },
+      const w1 = stages[0] ?? null
+      const w2 = stages[1] ?? null
+      const w3 = stages[2] ?? null
+      const closing = stages[3] ?? null
+      const closingCoversAllWeeks =
+        closing != null &&
+        closing > 0 &&
+        (w1 ?? 0) <= 0 &&
+        (w2 ?? 0) <= 0 &&
+        (w3 ?? 0) <= 0
+
+      if (closingCoversAllWeeks) {
+        for (let c = 10; c <= 13; c++) {
+          setCell(ws, row, c, '', {
+            fill: { fgColor: { rgb: heatColor(closing) } },
+            border: {
+              bottom: { style: 'thin', color: { rgb: C.line } },
+              left: { style: 'thin', color: { rgb: C.line } },
+              right: { style: 'thin', color: { rgb: C.line } },
+            },
+          })
+        }
+        merge(ws, row, 10, row, 13)
+        setCell(ws, row, 10, `${Math.round(closing * 100)}%`, {
+          font: { bold: true, color: { rgb: C.white }, sz: 11 },
+          fill: { fgColor: { rgb: heatColor(closing) } },
           alignment: { horizontal: 'center', vertical: 'center' },
           border: {
             bottom: { style: 'thin', color: { rgb: C.line } },
@@ -702,12 +757,27 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
             right: { style: 'thin', color: { rgb: C.line } },
           },
         })
+      } else {
+        for (let s = 0; s < 4; s++) {
+          const ratio = stages[s]
+          if (ratio == null) continue
+          setCell(ws, row, 10 + s, `${Math.round(ratio * 100)}%`, {
+            font: { bold: true, color: { rgb: C.white }, sz: 10 },
+            fill: { fgColor: { rgb: heatColor(ratio) } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+              bottom: { style: 'thin', color: { rgb: C.line } },
+              left: { style: 'thin', color: { rgb: C.line } },
+              right: { style: 'thin', color: { rgb: C.line } },
+            },
+          })
+        }
       }
 
     })
 
     addAutoFilter(ws, 10, 1, 10 + supRows.length, 13)
-    setCols(ws, [5, 23, 13, 10, 13, 11, 9, 18, 13, 12, 12, 12, 13])
+    setCols(ws, [5, 21, 12, 11, 13, 11, 10, 18, 13, 14, 14, 14, 15])
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 11 + supRows.length, c: 13 } })
 
     const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
