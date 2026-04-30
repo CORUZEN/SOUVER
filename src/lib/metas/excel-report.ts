@@ -685,7 +685,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     metricCard(ws, 6, 10, 14, 'MÉDIA GERAL DE ATINGIMENTO', fmtPct(supAvg), 'Percentual médio no escopo selecionado', 'ok')
 
     metricCard(ws, 9, 1, 3, 'VLR. DOS PEDIDOS REALIZADOS', fmtCurr(supValue), 'Valor dos pedidos registrados pelos vendedores da equipe', 'info')
-    metricCard(ws, 9, 4, 6, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
+    metricCard(ws, 9, 4, 6, 'PESO TOTAL DOS PEDIDOS', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
     metricCard(
       ws,
       9,
