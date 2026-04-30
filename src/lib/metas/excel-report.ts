@@ -192,8 +192,8 @@ function styleHeaderBand(title: string, accent = false): CellStyle {
 
 function sectionRibbonStyle(): CellStyle {
   return {
-    font: { bold: true, color: { rgb: C.white }, sz: 10 },
-    fill: { fgColor: { rgb: '0E5A45' } },
+    font: { bold: true, color: { rgb: C.white }, sz: 11 },
+    fill: { fgColor: { rgb: '0C5E4A' } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: C.accent } },
@@ -296,34 +296,34 @@ function metricCard(
   note: string,
   tone: 'ok' | 'warn' | 'bad' | 'info' = 'info'
 ) {
-  const toneHeader = tone === 'ok' ? '0B5D4B' : tone === 'warn' ? '8A4B08' : tone === 'bad' ? '9F1239' : '0B4F75'
-  const toneBorder = C.cardFrame
-  const innerBorder = C.cardInner
-  const bodyBg = 'FBFDFC'
+  const toneHeader = tone === 'ok' ? '0F6A57' : tone === 'warn' ? '8B5300' : tone === 'bad' ? '9A2545' : '0B4F75'
+  const toneBorder = '9EB2AB'
+  const innerBorder = 'D6E0DD'
+  const bodyBg = 'FCFEFD'
   for (let c = c1; c <= c2; c++) {
     setCell(ws, row, c, '', {
       fill: { fgColor: { rgb: toneHeader } },
       border: {
-        top: { style: 'medium', color: { rgb: toneBorder } },
+        top: { style: 'thin', color: { rgb: toneBorder } },
         bottom: { style: 'thin', color: { rgb: toneBorder } },
-        left: { style: 'medium', color: { rgb: toneBorder } },
-        right: { style: 'medium', color: { rgb: toneBorder } },
+        left: { style: 'thin', color: { rgb: toneBorder } },
+        right: { style: 'thin', color: { rgb: toneBorder } },
       },
     })
     setCell(ws, row + 1, c, '', {
       fill: { fgColor: { rgb: bodyBg } },
       border: {
         bottom: { style: 'thin', color: { rgb: innerBorder } },
-        left: { style: 'medium', color: { rgb: toneBorder } },
-        right: { style: 'medium', color: { rgb: toneBorder } },
+        left: { style: 'thin', color: { rgb: toneBorder } },
+        right: { style: 'thin', color: { rgb: toneBorder } },
       },
     })
     setCell(ws, row + 2, c, '', {
       fill: { fgColor: { rgb: bodyBg } },
       border: {
-        bottom: { style: 'medium', color: { rgb: toneBorder } },
-        left: { style: 'medium', color: { rgb: toneBorder } },
-        right: { style: 'medium', color: { rgb: toneBorder } },
+        bottom: { style: 'thin', color: { rgb: toneBorder } },
+        left: { style: 'thin', color: { rgb: toneBorder } },
+        right: { style: 'thin', color: { rgb: toneBorder } },
       },
     })
   }
@@ -333,24 +333,24 @@ function metricCard(
   merge(ws, row + 2, c1, row + 2, c2)
 
   setCell(ws, row, c1, label, {
-    font: { bold: true, color: { rgb: C.white }, sz: 9 },
+    font: { bold: true, color: { rgb: C.white }, sz: 10 },
     fill: { fgColor: { rgb: toneHeader } },
     alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
     border: {
-      top: { style: 'medium', color: { rgb: toneBorder } },
+      top: { style: 'thin', color: { rgb: toneBorder } },
       bottom: { style: 'thin', color: { rgb: toneBorder } },
-      left: { style: 'medium', color: { rgb: toneBorder } },
-      right: { style: 'medium', color: { rgb: toneBorder } },
+      left: { style: 'thin', color: { rgb: toneBorder } },
+      right: { style: 'thin', color: { rgb: toneBorder } },
     },
   })
   setCell(ws, row + 1, c1, value, {
-    font: { bold: true, color: { rgb: C.text }, sz: 17 },
+    font: { bold: true, color: { rgb: C.text }, sz: 18 },
     fill: { fgColor: { rgb: bodyBg } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
       bottom: { style: 'thin', color: { rgb: innerBorder } },
-      left: { style: 'medium', color: { rgb: toneBorder } },
-      right: { style: 'medium', color: { rgb: toneBorder } },
+      left: { style: 'thin', color: { rgb: toneBorder } },
+      right: { style: 'thin', color: { rgb: toneBorder } },
     },
   })
   setCell(ws, row + 2, c1, note, {
@@ -358,9 +358,9 @@ function metricCard(
     fill: { fgColor: { rgb: bodyBg } },
     alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
     border: {
-      bottom: { style: 'medium', color: { rgb: toneBorder } },
-      left: { style: 'medium', color: { rgb: toneBorder } },
-      right: { style: 'medium', color: { rgb: toneBorder } },
+      bottom: { style: 'thin', color: { rgb: toneBorder } },
+      left: { style: 'thin', color: { rgb: toneBorder } },
+      right: { style: 'thin', color: { rgb: toneBorder } },
     },
   })
 }
@@ -638,9 +638,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   ws1['!rows'] = ws1['!rows'] || []
   ;[13, 18, 23].forEach((r) => { ws1['!rows']![r - 1] = { hpt: 5 } })
   ;[7, 10, 15, 20].forEach((r) => {
-    ws1['!rows']![r - 1] = { hpt: 16 }
-    ws1['!rows']![r] = { hpt: 24 }
-    ws1['!rows']![r + 1] = { hpt: 18 }
+    ws1['!rows']![r - 1] = { hpt: 18 }
+    ws1['!rows']![r] = { hpt: 28 }
+    ws1['!rows']![r + 1] = { hpt: 20 }
   })
   ws1['!rows']![24] = { hpt: 20 }
   ws1['!rows']![25] = { hpt: 20 }
@@ -815,11 +815,11 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     ws['!rows'] = ws['!rows'] || []
     ws['!rows'][5] = { hpt: 18 }
-    ws['!rows'][6] = { hpt: 30 }
+    ws['!rows'][6] = { hpt: 32 }
     ws['!rows'][7] = { hpt: 22 }
     ws['!rows'][8] = { hpt: 18 }
-    ws['!rows'][9] = { hpt: 32 }
-    ws['!rows'][10] = { hpt: 26 }
+    ws['!rows'][9] = { hpt: 34 }
+    ws['!rows'][10] = { hpt: 24 }
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
     ws['!rows'][11] = { hpt: 6 } // linha 12 vazia (espaço visual igual ao separador do topo)
