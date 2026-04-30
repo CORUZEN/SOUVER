@@ -139,7 +139,10 @@ function shortPersonName(name: string, isVendor = false): string {
   if (isVendor && upper.startsWith('EVANDSON ')) return 'Evandson Santos'
   const parts = raw.split(/\s+/).filter(Boolean)
   if (parts.length === 1) return toTitleCase(parts[0])
-  return toTitleCase(`${parts[0]} ${parts[1]}`)
+  const connectors = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
+  const secondIndex = parts.findIndex((p, idx) => idx > 0 && !connectors.has(p.toLocaleLowerCase('pt-BR')))
+  const secondPart = secondIndex > 0 ? parts[secondIndex] : parts[1]
+  return toTitleCase(`${parts[0]} ${secondPart}`)
 }
 
 function heatColor(ratio: number) {
@@ -205,7 +208,7 @@ function supervisorTabLabel(name: string): string {
   const upper = (name || '').toLocaleUpperCase('pt-BR')
   if (upper.includes('ROGERIO')) return 'SUP: ROGERIO'
   if (upper.includes('JOSELIA')) return 'SUP: JOSELIA'
-  if (upper.includes('JOSE CLAUDIO')) return 'SUP: JOSE CLAUDIO'
+  if (upper.includes('JOSE CLAUDIO')) return 'SUP: CLAUDIO'
   if (upper.includes('EGLINAURIA')) return 'SUP: EGLINAURIA'
   const short = shortPersonName(name).toLocaleUpperCase('pt-BR')
   return `SUP: ${short}`
