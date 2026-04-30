@@ -756,7 +756,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       })
     }
     merge(ws, distRow, 7, distRow, 9)
-    merge(ws, distRow + 1, 7, distRow + 1, 8)
+    merge(ws, distRow + 1, 7, distRow + 1, 9)
     merge(ws, distRow + 2, 7, distRow + 2, 9)
 
     setCell(ws, distRow, 7, 'DISTRIBUIÇÃO DE ITENS', {
@@ -777,16 +777,6 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       border: {
         bottom: { style: 'thin', color: { rgb: C.cardInner } },
         left: { style: 'medium', color: { rgb: C.cardFrame } },
-        right: { style: 'thin', color: { rgb: C.cardInner } },
-      },
-    })
-    setCell(ws, distRow + 1, 9, `| ${fmt(supDistribClientsPct, 1)}%`, {
-      font: { bold: true, color: { rgb: '6B7280' }, sz: 10 },
-      fill: { fgColor: { rgb: 'FBFDFC' } },
-      alignment: { horizontal: 'left', vertical: 'center' },
-      border: {
-        bottom: { style: 'thin', color: { rgb: C.cardInner } },
-        left: { style: 'hair', color: { rgb: C.cardInner } },
         right: { style: 'medium', color: { rgb: C.cardFrame } },
       },
     })
@@ -794,7 +784,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       ws,
       distRow + 2,
       7,
-      `${fmt(distribItemsPctSetting, 0)}% dos itens em ${fmt(distribBasePctSetting, 0)}% da base | Vendedores: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
+      `Cobertura da base: ${fmt(supDistribClientsPct, 1)}% | ${fmt(distribItemsPctSetting, 0)}% dos itens em ${fmt(distribBasePctSetting, 0)}% da base | Vendedores: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
       {
         font: { color: { rgb: C.muted }, sz: 9 },
         fill: { fgColor: { rgb: 'FBFDFC' } },
