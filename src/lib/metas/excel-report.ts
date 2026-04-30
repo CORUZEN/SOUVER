@@ -259,7 +259,7 @@ function buildHeader(ws: XLSX.WorkSheet, lastCol: number, title: string, subtitl
     font: { bold: true, color: { rgb: C.white }, sz: 22 },
     alignment: { horizontal: 'center', vertical: 'top', wrapText: true },
   })
-  setCell(ws, 3, 1, `${subtitle}  |  Período: ${period}  |  Gerado em: ${nowStr()}  |  Responsável: ${generatedBy || 'Sistema Ouro Verde'}`, {
+  setCell(ws, 3, 1, `${subtitle}  |  Período: ${period}  |  Gerado em: ${nowStr()} por ${generatedBy || 'Sistema Ouro Verde'}`, {
     font: { color: { rgb: 'B9F3DE' }, sz: 10, bold: true },
     fill: { fgColor: { rgb: C.deep } },
     alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
