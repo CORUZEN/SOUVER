@@ -496,38 +496,56 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   metricCard(ws1, 20, 7, 8, 'VOLUMES VS MÊS ANTERIOR', fmt(ex?.totalVolumes ?? 0, 0), ex?.previousTotalVolumes != null ? `${volumeDelta >= 0 ? '+' : '-'}${fmt(Math.abs(volumeDelta), 0)} volumes` : 'Sem base comparativa', 'info')
   metricCard(ws1, 20, 9, 10, 'TOTAL DE CLIENTES ÚNICOS', fmt(ex?.uniqueClients ?? totalClients, 0), `Base ativa: ${fmt(ex?.totalBaseClients ?? 0, 0)} clientes`, 'info')
 
-  addSheetTitleRibbon(ws1, 24, 1, 7, 'DETALHES DE META DE PESO POR GRUPO')
-  addSheetTitleRibbon(ws1, 24, 8, 10, 'DISTRIBUIÇÃO DE STATUS')
-  const weightHeaders = ['GRUPO', 'META (KG)', 'VENDIDO (KG)', 'ATINGIMENTO', 'NO ALVO']
-  ;[1, 3, 5, 7].forEach((col, i) => {
-    const c2 = col + 1
-    for (let c = col; c <= c2; c++) setCell(ws1, 25, c, '', tableHeaderStyle())
-    merge(ws1, 25, col, 25, c2)
-    setCell(ws1, 25, col, weightHeaders[i], tableHeaderStyle())
+  addSheetTitleRibbon(ws1, 24, 1, 10, 'DETALHES DE META DE PESO POR GRUPO')
+  const weightHeaders = ['GRUPO', 'META (KG)', 'VENDIDO (KG)', 'ATINGIMENTO']
+  const weightHeaderRanges: Array<[number, number]> = [
+    [1, 3],   // A:C
+    [4, 5],   // D:E
+    [6, 7],   // F:G
+    [8, 10],  // H:J
+  ]
+  weightHeaderRanges.forEach(([c1, c2], i) => {
+    for (let c = c1; c <= c2; c++) setCell(ws1, 25, c, '', tableHeaderStyle())
+    merge(ws1, 25, c1, 25, c2)
+    setCell(ws1, 25, c1, weightHeaders[i], tableHeaderStyle())
   })
-  setCell(ws1, 25, 7, weightHeaders[3], tableHeaderStyle())
   const brands = (ex?.weightByBrand ?? []).slice(0, 6)
+
+  const detailGridStyle = (alt: boolean): CellStyle => ({
+    font: { color: { rgb: C.text }, sz: 10 },
+    fill: { fgColor: { rgb: alt ? C.paper : C.white } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: {
+      top: { style: 'thin', color: { rgb: C.line } },
+      bottom: { style: 'thin', color: { rgb: C.line } },
+      left: { style: 'thin', color: { rgb: C.line } },
+      right: { style: 'thin', color: { rgb: C.line } },
+    },
+  })
+
+  const detailGridStyleCenter = (alt: boolean): CellStyle => ({
+    ...detailGridStyle(alt),
+    alignment: { horizontal: 'center', vertical: 'center' },
+  })
+
   brands.forEach((b, i) => {
     const r = 26 + i
     const ratio = b.targetKg > 0 ? b.soldKg / b.targetKg : 0
-    setCell(ws1, r, 1, b.brand || '-', dataStyle(i % 2 === 1))
-    merge(ws1, r, 1, r, 2)
-    setCell(ws1, r, 3, `${fmt(b.targetKg, 2)} kg`, dataStyle(i % 2 === 1, true))
-    merge(ws1, r, 3, r, 4)
-    setCell(ws1, r, 5, `${fmt(b.soldKg, 2)} kg`, dataStyle(i % 2 === 1, true))
-    merge(ws1, r, 5, r, 6)
-    setCell(ws1, r, 7, `${fmt(ratio * 100, 1)}%`, { ...dataStyle(i % 2 === 1, true), font: { bold: true, color: { rgb: ratio >= 1 ? C.ok : C.h2 }, sz: 10 } })
-  })
-  const statusRows: Array<[string, number, string]> = [
-    ['Superou meta', rows.filter((r) => r.status === 'SUPEROU').length, C.ok],
-    ['No alvo', rows.filter((r) => r.status === 'NO_ALVO').length, C.ok],
-    ['Atenção', rows.filter((r) => r.status === 'ATENCAO').length, C.warn],
-    ['Crítico', rows.filter((r) => r.status === 'CRITICO').length, C.bad],
-  ]
-  statusRows.forEach((r, i) => {
-    setCell(ws1, 26 + i, 8, r[0], dataStyle(false))
-    merge(ws1, 26 + i, 8, 26 + i, 9)
-    setCell(ws1, 26 + i, 10, r[1], { ...dataStyle(false, true), font: { bold: true, color: { rgb: r[2] }, sz: 11 } })
+
+    // Preenche todas as células da linha com bordas para evitar falhas visuais em áreas mescladas.
+    for (let c = 1; c <= 10; c++) setCell(ws1, r, c, '', detailGridStyle(i % 2 === 1))
+
+    setCell(ws1, r, 1, b.brand || '-', detailGridStyle(i % 2 === 1))
+    merge(ws1, r, 1, r, 3)
+    setCell(ws1, r, 4, `${fmt(b.targetKg, 2)} kg`, detailGridStyleCenter(i % 2 === 1))
+    merge(ws1, r, 4, r, 5)
+    setCell(ws1, r, 6, `${fmt(b.soldKg, 2)} kg`, detailGridStyleCenter(i % 2 === 1))
+    merge(ws1, r, 6, r, 7)
+    setCell(ws1, r, 8, `${fmt(ratio * 100, 1)}%`, {
+      ...detailGridStyleCenter(i % 2 === 1),
+      font: { bold: true, color: { rgb: ratio >= 1 ? C.ok : C.h2 }, sz: 10 },
+    })
+    merge(ws1, r, 8, r, 10)
   })
 
   ws1['!rows'] = ws1['!rows'] || []
