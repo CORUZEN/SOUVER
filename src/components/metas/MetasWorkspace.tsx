@@ -33,6 +33,7 @@ import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { useAuth } from '@/lib/client/hooks/use-auth'
+import { generateMetasReport, downloadBuffer } from '@/lib/metas/excel-report'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type OperationalStageKey = Exclude<StageKey, 'FULL'>
@@ -1392,6 +1393,7 @@ export default function MetasWorkspace() {
   const [configSaveSuccess, setConfigSaveSuccess] = useState('')
   const [lastSavedConfigSignature, setLastSavedConfigSignature] = useState<string | null>(null)
   const [isRebaseliningConfig, setIsRebaseliningConfig] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
   const canViewConfig = metasPermissions?.config.view ?? false
@@ -6395,6 +6397,87 @@ export default function MetasWorkspace() {
                     </div>
                   )}
                 </div>
+
+                {view === 'dashboard' && snapshots.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setExporting(true)
+                      try {
+                        const scopeLabel = companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'
+                        const monthLabel = `${MONTHS[month]} ${year}`
+
+                        // Construir dados de exportação exatamente como no painel
+                        const exportRows = sellerWeeklyHeatmap
+                          .map((heatmapRow) => {
+                            const snapshot = snapshots.find((s) => s.seller.id === heatmapRow.seller.id)
+                            if (!snapshot) return null
+                            const snapshotBlock =
+                              ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+                              findBlockForSeller(heatmapRow.seller.id, ruleBlocks) ??
+                              null
+                            const resolvedProfileType = snapshotBlock
+                              ? resolveBlockProfileType(snapshotBlock)
+                              : (resolveSellerProfileForId(heatmapRow.seller.id) ?? 'NOVATO')
+                            const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+
+                            return {
+                              rank: 0,
+                              name: heatmapRow.seller.name,
+                              supervisorName: snapshot.seller.supervisorName || '',
+                              profileTypeLabel: SELLER_PROFILE_LABEL[resolvedProfileType],
+                              status: snapshot.status,
+                              pointsRatio: Math.min(Math.max(pointsRatio, 0), 1),
+                              rewardAchieved: snapshot.rewardAchieved,
+                              rewardMode: snapshot.rewardMode,
+                              uniqueClients: snapshot.uniqueClients,
+                              baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
+                              totalOrders: snapshot.totalOrders,
+                              totalValue: snapshot.totalValue,
+                              totalGrossWeight: snapshot.totalGrossWeight,
+                              averageTicket: snapshot.averageTicket,
+                              stages: heatmapRow.cells.map((c) => ({
+                                stageKey: c.stageKey,
+                                stageLabel: c.stage,
+                                ratio: c.ratio,
+                              })),
+                              pointsAchieved: snapshot.pointsAchieved,
+                              pointsTarget: snapshot.pointsTarget,
+                              kpiRewardAchieved: snapshot.kpiRewardAchieved,
+                              gapToTarget: snapshot.gapToTarget,
+                            }
+                          })
+                          .filter((r): r is NonNullable<typeof r> => r !== null)
+                          .sort((a, b) => {
+                            if (b.pointsRatio !== a.pointsRatio) return b.pointsRatio - a.pointsRatio
+                            if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
+                            return a.name.localeCompare(b.name, 'pt-BR')
+                          })
+
+                        exportRows.forEach((r, i) => { r.rank = i + 1 })
+
+                        const buf = await generateMetasReport({
+                          rows: exportRows,
+                          monthLabel,
+                          scopeLabel,
+                          generatedBy: authData?.user?.name || undefined,
+                        })
+                        const filename = `Relatorio_Metas_${MONTHS[month]}_${year}_${new Date().toISOString().slice(0, 10)}.xlsx`
+                        downloadBuffer(buf, filename)
+                      } catch (err) {
+                        console.error('Erro ao exportar relatório:', err)
+                        alert('Erro ao gerar relatório. Tente novamente.')
+                      } finally {
+                        setExporting(false)
+                      }
+                    }}
+                    disabled={exporting}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-100 backdrop-blur-sm transition-all hover:bg-emerald-500/25 disabled:opacity-50"
+                  >
+                    <FileDown size={14} />
+                    {exporting ? 'Gerando…' : 'Exportar Relatório'}
+                  </button>
+                )}
 
                 {(canViewConfig || canViewSellers || canViewProducts || canViewTelemetry) && (
                   <div className="h-5 w-px bg-white/20" />
