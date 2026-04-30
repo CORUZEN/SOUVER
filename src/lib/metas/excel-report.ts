@@ -654,50 +654,24 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supReward = supRows.reduce((s, r) => s + r.rewardAchieved, 0)
     const supAvg = supRows.length ? supRows.reduce((s, r) => s + r.pointsRatio, 0) / supRows.length : 0
 
-    const supMetrics = [
-      ['VENDEDORES', String(supRows.length)],
-      ['PEDIDOS', String(supOrders)],
-      ['CLIENTES', String(supClients)],
-      ['FATURAMENTO', fmtCurr(supValue)],
-      ['PESO', `${fmt(supWeight, 2)} kg`],
-      ['PONTOS', fmt(supPoints, 2)],
-      ['PREMIAÇÃO', fmtCurr(supReward)],
-      ['ATINGIMENTO', fmtPct(supAvg)],
-    ]
+    // Resumo executivo da equipe distribuído em A:N (2 linhas de cards) para evitar cortes.
+    metricCard(ws, 7, 1, 3, 'VENDEDORES', fmt(supRows.length, 0), 'Vendedores ativos na equipe', 'info')
+    metricCard(ws, 7, 4, 6, 'PEDIDOS', fmt(supOrders, 0), 'Pedidos consolidados da equipe', 'info')
+    metricCard(ws, 7, 7, 9, 'CLIENTES', fmt(supClients, 0), 'Clientes únicos atendidos', 'info')
+    metricCard(ws, 7, 10, 14, 'ATINGIMENTO', fmtPct(supAvg), 'Atingimento médio da equipe', 'ok')
 
-    supMetrics.forEach((m, i) => {
-      setCell(ws, 7, i + 1, m[0], {
-        font: { bold: true, color: { rgb: C.deep }, sz: 9 },
-        fill: { fgColor: { rgb: 'E6F7F1' } },
-        alignment: { horizontal: 'center', vertical: 'center' },
-        border: {
-          top: { style: 'thin', color: { rgb: C.accent } },
-          left: { style: 'thin', color: { rgb: C.line } },
-          right: { style: 'thin', color: { rgb: C.line } },
-        },
-      })
-      setCell(ws, 8, i + 1, m[1], {
-        font: { bold: true, color: { rgb: C.deep }, sz: 15 },
-        fill: { fgColor: { rgb: C.white } },
-        alignment: { horizontal: 'center', vertical: 'center' },
-        border: {
-          bottom: { style: 'medium', color: { rgb: C.accent } },
-          left: { style: 'thin', color: { rgb: C.line } },
-          right: { style: 'thin', color: { rgb: C.line } },
-        },
-      })
-    })
-    ws['!rows'] = ws['!rows'] || []
-    ws['!rows'][5] = { hpt: 22 }
-    ws['!rows'][6] = { hpt: 22 }
-    ws['!rows'][7] = { hpt: 30 }
+    metricCard(ws, 11, 1, 4, 'FATURAMENTO', fmtCurr(supValue), 'Valor faturado pela equipe', 'info')
+    metricCard(ws, 11, 5, 8, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
+    metricCard(ws, 11, 9, 11, 'PONTOS', fmt(supPoints, 2), 'Pontos conquistados no período', 'info')
+    metricCard(ws, 11, 12, 14, 'PREMIAÇÃO', fmtCurr(supReward), 'Premiação consolidada da equipe', 'warn')
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
-    headers.forEach((h, i) => setCell(ws, 10, i + 1, h, tableHeaderStyle()))
-    ws['!rows'][9] = { hpt: 26 }
+    headers.forEach((h, i) => setCell(ws, 16, i + 1, h, tableHeaderStyle()))
+    ws['!rows'] = ws['!rows'] || []
+    ws['!rows'][15] = { hpt: 26 }
 
     supRows.forEach((r, idx) => {
-      const row = 11 + idx
+      const row = 17 + idx
       const alt = idx % 2 === 1
       const rowMeta = ws['!rows'] ?? (ws['!rows'] = [])
       const stages = [
@@ -776,9 +750,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     })
 
-    addAutoFilter(ws, 10, 1, 10 + supRows.length, 13)
-    setCols(ws, [5, 21, 12, 11, 13, 11, 10, 18, 13, 14, 14, 14, 15])
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 11 + supRows.length, c: 13 } })
+    addAutoFilter(ws, 16, 1, 16 + supRows.length, 13)
+    // Mesmo padrão visual de espaçamento da aba Desempenho por Vendedor, ocupando até N.
+    setCols(ws, [5, 22, 18, 13, 11, 13, 11, 11, 18, 13, 14, 14, 14, 15])
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 17 + supRows.length, c: 13 } })
 
     const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, safeName)
