@@ -196,8 +196,8 @@ function sectionRibbonStyle(): CellStyle {
     fill: { fgColor: { rgb: '0C5E4A' } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
-      top: { style: 'thin', color: { rgb: C.accent } },
-      bottom: { style: 'thin', color: { rgb: C.accent } },
+      top: { style: 'thin', color: { rgb: '0C5E4A' } },
+      bottom: { style: 'thin', color: { rgb: '0C5E4A' } },
       left: { style: 'thin', color: { rgb: C.deep } },
       right: { style: 'thin', color: { rgb: C.deep } },
     },
@@ -485,7 +485,8 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const rewardPct = rewardTarget > 0 ? rewardValue / rewardTarget : 0
 
   const weightTarget = ex?.weightTarget ?? 0
-  const weightSold = ex?.totalWeight ?? totalWeight
+  const weightSoldByGroup = ex?.weightByBrand?.reduce((sum, row) => sum + Math.max(row.soldKg, 0), 0)
+  const weightSold = weightSoldByGroup ?? (ex?.totalWeight ?? totalWeight)
   const weightPct = weightTarget > 0 ? weightSold / weightTarget : 0
   const weightGap = Math.max(weightTarget - weightSold, 0)
   const weightOver = Math.max(weightSold - weightTarget, 0)
@@ -563,7 +564,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: detailFrameColor } },
-      bottom: { style: 'thin', color: { rgb: detailFrameColor } },
+      bottom: { style: 'thin', color: { rgb: '0E5A45' } },
       left: { style: 'thin', color: { rgb: detailFrameColor } },
       right: { style: 'thin', color: { rgb: detailFrameColor } },
     },
