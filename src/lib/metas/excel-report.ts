@@ -676,6 +676,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supDistribHit = supRows.reduce((s, r) => s + (r.distribuicaoSellerHit === 1 ? 1 : 0), 0)
     const supDistribTotal = supRows.length
     const supDistribPct = supDistribTotal > 0 ? (supDistribHit / supDistribTotal) * 100 : 0
+    const supDistribPctDisplay = `${fmt(supDistribPct, Math.abs(supDistribPct - Math.round(supDistribPct)) < 0.05 ? 0 : 1)}%`
     const supDistribClientsHit = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsHit, 0), 0)
     const supDistribClientsTarget = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsTarget, 0), 0)
     const supDistribClientsPct = supDistribClientsTarget > 0 ? (supDistribClientsHit / supDistribClientsTarget) * 100 : 0
@@ -770,7 +771,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
         right: { style: 'medium', color: { rgb: C.cardFrame } },
       },
     })
-    setCell(ws, distRow + 1, 7, `${fmt(supDistribClientsHit, 0)} / ${fmt(supDistribClientsTarget, 0)}`, {
+    setCell(ws, distRow + 1, 7, supDistribPctDisplay, {
       font: { bold: true, color: { rgb: C.text }, sz: 17 },
       fill: { fgColor: { rgb: 'FBFDFC' } },
       alignment: { horizontal: 'left', vertical: 'center' },
@@ -784,7 +785,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       ws,
       distRow + 2,
       7,
-      `Cobertura da base: ${fmt(supDistribClientsPct, 1)}% | ${fmt(distribItemsPctSetting, 0)}% dos itens em ${fmt(distribBasePctSetting, 0)}% da base | Vendedores: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
+      `Vendedores no alvo: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} | Cobertura da base: ${fmt(supDistribClientsHit, 0)} / ${fmt(supDistribClientsTarget, 0)} (${fmt(supDistribClientsPct, 1)}%) | Regra: ${fmt(distribItemsPctSetting, 0)}% dos itens em ${fmt(distribBasePctSetting, 0)}% da base`,
       {
         font: { color: { rgb: C.muted }, sz: 9 },
         fill: { fgColor: { rgb: 'FBFDFC' } },
