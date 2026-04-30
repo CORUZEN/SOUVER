@@ -6419,6 +6419,12 @@ export default function MetasWorkspace() {
                               ? resolveBlockProfileType(snapshotBlock)
                               : (resolveSellerProfileForId(heatmapRow.seller.id) ?? 'NOVATO')
                             const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+                            const blockRules = snapshotBlock?.rules ?? []
+                            const metasTotal = blockRules.length
+                            const metasHit = blockRules.reduce((count, rule) => {
+                              const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+                              return count + (progress >= 1 ? 1 : 0)
+                            }, 0)
 
                             return {
                               rank: 0,
@@ -6442,6 +6448,8 @@ export default function MetasWorkspace() {
                               })),
                               pointsAchieved: snapshot.pointsAchieved,
                               pointsTarget: snapshot.pointsTarget,
+                              metasHit,
+                              metasTotal,
                               kpiRewardAchieved: snapshot.kpiRewardAchieved,
                               gapToTarget: snapshot.gapToTarget,
                             }

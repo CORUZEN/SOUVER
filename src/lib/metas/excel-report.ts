@@ -24,6 +24,8 @@ export interface ExportRow {
   stages: ExportStageCell[]
   pointsAchieved: number
   pointsTarget: number
+  metasHit: number
+  metasTotal: number
   kpiRewardAchieved: number
   gapToTarget: number
 }
@@ -654,13 +656,13 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const shortSup = shortPersonName(sup)
     buildHeader(ws, 14, `SUPERVISOR: ${shortSup.toLocaleUpperCase('pt-BR')}`, `${scopeLabel} - ${supRows.length} vendedores`, monthLabel, generatedBy)
 
-    addSheetTitleRibbon(ws, 6, 1, 14, `Resumo Executivo da Equipe — ${monthLabel}`)
-
     const supOrders = supRows.reduce((s, r) => s + r.totalOrders, 0)
     const supClients = supRows.reduce((s, r) => s + r.uniqueClients, 0)
     const supValue = supRows.reduce((s, r) => s + r.totalValue, 0)
     const supWeight = supRows.reduce((s, r) => s + r.totalGrossWeight, 0)
-    const supPoints = supRows.reduce((s, r) => s + r.pointsAchieved, 0)
+    const supBaseClients = supRows.reduce((s, r) => s + Math.max(r.baseClients, 0), 0)
+    const supMetasHit = supRows.reduce((s, r) => s + Math.max(r.metasHit, 0), 0)
+    const supMetasTotal = supRows.reduce((s, r) => s + Math.max(r.metasTotal, 0), 0)
     const supRewardPercentRows = supRows.filter((r) => r.rewardMode === 'PERCENT')
     const supRewardCurrencyRows = supRows.filter((r) => r.rewardMode === 'CURRENCY')
     const supRewardPercentTotal = supRewardPercentRows.reduce((s, r) => s + r.rewardAchieved, 0)
@@ -668,14 +670,32 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supAvg = supRows.length ? supRows.reduce((s, r) => s + r.pointsRatio, 0) / supRows.length : 0
 
     // Resumo executivo da equipe distribuído em A:N (2 linhas de cards) para evitar cortes.
-    metricCard(ws, 7, 1, 3, 'VENDEDORES', fmt(supRows.length, 0), 'Vendedores ativos na equipe', 'info')
-    metricCard(ws, 7, 4, 6, 'PEDIDOS', fmt(supOrders, 0), 'Pedidos consolidados da equipe', 'info')
-    metricCard(ws, 7, 7, 9, 'CLIENTES', fmt(supClients, 0), 'Clientes únicos atendidos', 'info')
-    metricCard(ws, 7, 10, 14, 'ATINGIMENTO', fmtPct(supAvg), 'Atingimento médio da equipe', 'ok')
+    metricCard(ws, 6, 1, 3, 'TOTAL DE VENDEDORES', fmt(supRows.length, 0), 'Vendedores ativos na equipe', 'info')
+    metricCard(ws, 6, 4, 6, 'PEDIDOS REALIZADOS', fmt(supOrders, 0), 'Pedidos consolidados da equipe', 'info')
+    metricCard(
+      ws,
+      6,
+      7,
+      9,
+      'CLIENTES ÚNICOS ATENDIDOS',
+      `${fmt(supClients, 0)} / ${fmt(supBaseClients, 0)}`,
+      `Total de clientes da base do supervisor: ${fmt(supBaseClients, 0)}`,
+      'info'
+    )
+    metricCard(ws, 6, 10, 14, 'MÉDIA GERAL DE ATINGIMENTO', fmtPct(supAvg), 'Percentual médio no escopo selecionado', 'ok')
 
-    metricCard(ws, 11, 1, 4, 'FATURAMENTO', fmtCurr(supValue), 'Valor faturado pela equipe', 'info')
-    metricCard(ws, 11, 5, 8, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
-    metricCard(ws, 11, 9, 10, 'PONTOS', fmt(supPoints, 2), 'Pontos conquistados no período', 'info')
+    metricCard(ws, 9, 1, 3, 'VLR. DOS PEDIDOS REALIZADOS', fmtCurr(supValue), 'Valor dos pedidos registrados pelos vendedores da equipe', 'info')
+    metricCard(ws, 9, 4, 6, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
+    metricCard(
+      ws,
+      9,
+      7,
+      9,
+      'METAS CONQUISTADAS',
+      `${fmt(supMetasHit, 0)} / ${fmt(supMetasTotal, 0)}`,
+      'Consolidado de metas por vendedores da equipe',
+      'info'
+    )
     const supRewardDisplay = supRewardCurrencyRows.length === 0
       ? `${fmt(supRewardPercentTotal, 2)}%`
       : supRewardPercentRows.length === 0
@@ -685,23 +705,23 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       ? 'Percentual consolidado por perfil (1% e 1,5%)'
       : supRewardPercentRows.length === 0
         ? 'Premiação consolidada da equipe'
-        : 'Formatos distintos por perfil (não somar % com valor fixo)'
-    metricCard(ws, 11, 11, 14, 'PREMIAÇÃO', supRewardDisplay, supRewardNote, 'warn')
+        : 'Valores distintos por perfil (não somar % com valor fixo)'
+    metricCard(ws, 9, 10, 14, 'PREMIAÇÃO TOTAL', supRewardDisplay, supRewardNote, 'warn')
 
     ws['!rows'] = ws['!rows'] || []
-    ws['!rows'][6] = { hpt: 18 }
-    ws['!rows'][7] = { hpt: 30 }
-    ws['!rows'][8] = { hpt: 22 }
-    ws['!rows'][10] = { hpt: 18 }
-    ws['!rows'][11] = { hpt: 32 }
-    ws['!rows'][12] = { hpt: 26 }
+    ws['!rows'][5] = { hpt: 18 }
+    ws['!rows'][6] = { hpt: 30 }
+    ws['!rows'][7] = { hpt: 22 }
+    ws['!rows'][8] = { hpt: 18 }
+    ws['!rows'][9] = { hpt: 32 }
+    ws['!rows'][10] = { hpt: 26 }
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
-    headers.forEach((h, i) => setCell(ws, 16, i + 1, h, tableHeaderStyle()))
-    ws['!rows'][15] = { hpt: 26 }
+    headers.forEach((h, i) => setCell(ws, 12, i + 1, h, tableHeaderStyle()))
+    ws['!rows'][11] = { hpt: 26 }
 
     supRows.forEach((r, idx) => {
-      const row = 17 + idx
+      const row = 13 + idx
       const alt = idx % 2 === 1
       const rowMeta = ws['!rows'] ?? (ws['!rows'] = [])
       const stages = [
@@ -780,10 +800,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     })
 
-    addAutoFilter(ws, 16, 1, 16 + supRows.length, 13)
+    addAutoFilter(ws, 12, 1, 12 + supRows.length, 13)
     // Ajuste fino da aba de supervisor: mesmas proporções da aba principal, respeitando o conjunto de colunas local.
     setCols(ws, [5, 22, 15, 11, 12, 11, 10, 18, 14, 14, 14, 14, 15, 8])
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 17 + supRows.length, c: 13 } })
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 13 + supRows.length, c: 13 } })
 
     const safeName = supervisorTabLabel(sup).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, safeName)
