@@ -464,15 +464,21 @@ export async function POST(req: NextRequest) {
       if (foundIndex >= 0) {
         const prev = merged[foundIndex]
         const newPartnerCode = seller.partnerCode?.trim() || prev.partnerCode || null
-        const newProfileType = seller.profileTypeHint
-          ? normalizeSellerProfileType(seller.profileTypeHint)
-          : normalizeSellerProfileType(prev.profileType)
+        // Preserve local profileType for existing sellers — Sankhya only knows V/S,
+        // but SOUVER has custom types (ANTIGO_1, ANTIGO_1_5). Only override to
+        // SUPERVISOR if Sankhya explicitly says so and local type is different.
+        const sankhyaHint = normalizeSellerProfileType(seller.profileTypeHint)
+        const prevTypeNormalized = normalizeSellerProfileType(prev.profileType)
+        const newProfileType =
+          sankhyaHint === 'SUPERVISOR' && prevTypeNormalized !== 'SUPERVISOR'
+            ? 'SUPERVISOR'
+            : prevTypeNormalized
         const newName = seller.name?.trim() || prev.name
         const newCode = seller.code?.trim() || prev.code || null
 
         const hasChanges =
           newPartnerCode !== prev.partnerCode ||
-          newProfileType !== normalizeSellerProfileType(prev.profileType) ||
+          newProfileType !== prevTypeNormalized ||
           newName !== prev.name ||
           newCode !== prev.code
 
