@@ -15,6 +15,8 @@ import {
   CircleHelp,
   CircleDollarSign,
   FileDown,
+  FileSpreadsheet,
+  FileText,
   Plus,
   Pencil,
   RefreshCw,
@@ -34,6 +36,7 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { useAuth } from '@/lib/client/hooks/use-auth'
 import { generateMetasReport, downloadBuffer } from '@/lib/metas/excel-report'
+import { generateSellerPdfReport, downloadPdf } from '@/lib/metas/pdf-report'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type OperationalStageKey = Exclude<StageKey, 'FULL'>
@@ -1395,6 +1398,9 @@ export default function MetasWorkspace() {
   const [lastSavedConfigSignature, setLastSavedConfigSignature] = useState<string | null>(null)
   const [isRebaseliningConfig, setIsRebaseliningConfig] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [pdfSellerId, setPdfSellerId] = useState<string>('')
+  const [pdfGenerating, setPdfGenerating] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
   const label = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-surface-500'
   const canViewConfig = metasPermissions?.config.view ?? false
@@ -6427,6 +6433,114 @@ export default function MetasWorkspace() {
     }
   }
 
+  async function handleExportPdf() {
+    if (!pdfSellerId) return
+    setPdfGenerating(true)
+    try {
+      const scopeLabel = companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'
+      const monthLabel = `${MONTHS[month]} ${year}`
+
+      const heatmapRow = sellerWeeklyHeatmap.find((h) => h.seller.id === pdfSellerId)
+      const snapshot = snapshots.find((s) => s.seller.id === pdfSellerId)
+      if (!heatmapRow || !snapshot) {
+        alert('Vendedor não encontrado nos dados atuais.')
+        return
+      }
+
+      const snapshotBlock =
+        ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+        findBlockForSeller(heatmapRow.seller.id, ruleBlocks) ??
+        null
+      const resolvedProfileType = snapshotBlock
+        ? resolveBlockProfileType(snapshotBlock)
+        : (resolveSellerProfileForId(heatmapRow.seller.id) ?? 'NOVATO')
+      const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+      const blockRules = snapshotBlock?.rules ?? []
+      const metasTotal = blockRules.length
+      const metasHit = blockRules.reduce((count, rule) => {
+        const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        return count + (progress >= 1 ? 1 : 0)
+      }, 0)
+      const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+      const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+      const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+      const soldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+      const activeProductsCount = Math.max(productAllowlist.filter((product) => product.active).length, 0)
+      const requiredItems = activeProductsCount > 0
+        ? Math.ceil(activeProductsCount * (distribuicaoItemsPct / 100))
+        : 0
+      const clientsWithItems = sellerRows.reduce((sum, row) => {
+        const productsByStage = getDistribuicaoProductsByStage(row, 'FULL')
+        return sum + (productsByStage >= 1 ? 1 : 0)
+      }, 0)
+      const baseTotalClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
+      const requiredClients = baseTotalClients > 0
+        ? Math.ceil(baseTotalClients * (distribuicaoBasePct / 100))
+        : 0
+      const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
+      const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
+      const weightSoldKgByGroup = Math.max(Number(weightPerfRow?.totalSoldKg ?? 0), 0)
+      const fallbackWeightTargetKg = (snapshotBlock?.weightTargets ?? []).reduce(
+        (sum: number, target: { targetKg: number }) => sum + Math.max(Number(target.targetKg ?? 0), 0),
+        0
+      )
+
+      const exportRow = {
+        rank: 0,
+        name: heatmapRow.seller.name,
+        supervisorName: snapshot.seller.supervisorName || '',
+        profileTypeLabel: SELLER_PROFILE_LABEL[resolvedProfileType],
+        status: snapshot.status,
+        pointsRatio: Math.min(Math.max(pointsRatio, 0), 1),
+        rewardAchieved: snapshot.rewardAchieved,
+        rewardMode: snapshot.rewardMode,
+        uniqueClients: snapshot.uniqueClients,
+        baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
+        totalOrders: snapshot.totalOrders,
+        totalValue: snapshot.totalValue,
+        financialTarget: Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0),
+        totalGrossWeight: snapshot.totalGrossWeight,
+        weightSoldKgByGroup,
+        weightTargetKg: weightTargetKgByGroup > 0 ? weightTargetKgByGroup : fallbackWeightTargetKg,
+        averageTicket: snapshot.averageTicket,
+        stages: heatmapRow.cells.map((c) => ({
+          stageKey: c.stageKey,
+          stageLabel: c.stage,
+          ratio: c.ratio,
+        })),
+        pointsAchieved: snapshot.pointsAchieved,
+        pointsTarget: snapshot.pointsTarget,
+        metasHit,
+        metasTotal,
+        distribuicaoSellerHit: (requiredItems > 0 && soldItems >= requiredItems ? 1 : 0) as 0 | 1,
+        distribuicaoClientsHit: clientsWithItems,
+        distribuicaoClientsTarget: requiredClients,
+        kpiRewardAchieved: snapshot.kpiRewardAchieved,
+        gapToTarget: snapshot.gapToTarget,
+      }
+
+      const doc = generateSellerPdfReport({
+        row: exportRow,
+        monthLabel,
+        scopeLabel,
+        generatedBy: authData?.user?.name || undefined,
+      })
+
+      const now = new Date()
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const yy = String(now.getFullYear()).slice(-2)
+      const filename = `Relatorio_Individual_${exportRow.name.replace(/\s+/g, '_')}_${MONTHS[month]}_${year}_${dd}-${mm}-${yy}.pdf`
+      downloadPdf(doc, filename)
+      setExportModalOpen(false)
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      alert('Erro ao gerar PDF. Tente novamente.')
+    } finally {
+      setPdfGenerating(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
       <Card className="relative border border-[#2f5f47]/42 bg-linear-to-br from-[#0f281d] via-[#1a4432] to-[#1a5a4b] shadow-[0_18px_34px_rgba(6,16,11,0.28)]">
@@ -6602,12 +6716,12 @@ export default function MetasWorkspace() {
                   <button
                     id="metas-export-button"
                     type="button"
-                    onClick={handleExportReport}
-                    disabled={exporting}
+                    onClick={() => setExportModalOpen(true)}
+                    disabled={exporting || pdfGenerating}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-100 backdrop-blur-sm transition-all hover:bg-emerald-500/25 disabled:opacity-50"
                   >
                     <FileDown size={14} />
-                    {exporting ? 'Gerando…' : 'Exportar Relatório'}
+                    {exporting || pdfGenerating ? 'Gerando…' : 'Exportar Relatório'}
                   </button>
                 )}
 
@@ -12085,6 +12199,87 @@ export default function MetasWorkspace() {
                   </button>
                 )
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Export modal ──────────────────────────────── */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setExportModalOpen(false) }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-surface-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
+              <div>
+                <h3 className="text-base font-semibold text-surface-900">Exportar Relatório</h3>
+                <p className="text-xs text-surface-500 mt-0.5">Escolha o formato e o tipo de relatório</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExportModalOpen(false)}
+                className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Excel option */}
+              <button
+                type="button"
+                onClick={() => { setExportModalOpen(false); void handleExportReport() }}
+                disabled={exporting}
+                className="flex w-full items-start gap-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-left transition-all hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-surface-800">Relatório Completo</p>
+                  <p className="mt-0.5 text-xs text-surface-500">Exporta todos os vendedores e KPIs em planilha Excel (.xlsx)</p>
+                </div>
+                <FileDown size={16} className="mt-2 text-emerald-600" />
+              </button>
+
+              {/* PDF option */}
+              <div className="rounded-xl border border-surface-200 bg-surface-50/50 p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+                    <FileText size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-surface-800">Relatório Individual PDF</p>
+                    <p className="mt-0.5 text-xs text-surface-500">Folha empresarial com metas e assinatura de um vendedor específico</p>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-surface-500">Vendedor</label>
+                  <select
+                    value={pdfSellerId}
+                    onChange={(e) => setPdfSellerId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                  >
+                    <option value="">Selecione um vendedor...</option>
+                    {sellerWeeklyHeatmap.map((h) => (
+                      <option key={h.seller.id} value={h.seller.id}>
+                        {h.seller.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleExportPdf()}
+                  disabled={!pdfSellerId || pdfGenerating}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {pdfGenerating ? 'Gerando PDF…' : 'Gerar PDF Individual'}
+                  <FileDown size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
