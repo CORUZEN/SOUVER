@@ -496,7 +496,35 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   metricCard(ws1, 20, 7, 8, 'VOLUMES VS MÊS ANTERIOR', fmt(ex?.totalVolumes ?? 0, 0), ex?.previousTotalVolumes != null ? `${volumeDelta >= 0 ? '+' : '-'}${fmt(Math.abs(volumeDelta), 0)} volumes` : 'Sem base comparativa', 'info')
   metricCard(ws1, 20, 9, 10, 'TOTAL DE CLIENTES ÚNICOS', fmt(ex?.uniqueClients ?? totalClients, 0), `Base ativa: ${fmt(ex?.totalBaseClients ?? 0, 0)} clientes`, 'info')
 
-  addSheetTitleRibbon(ws1, 24, 1, 10, 'DETALHES DE META DE PESO POR GRUPO')
+  const detailFrameColor = '8FA9A1'
+  const detailInnerColor = 'C9D8D3'
+  const detailSectionStyle: CellStyle = {
+    font: { bold: true, color: { rgb: C.white }, sz: 11 },
+    fill: { fgColor: { rgb: '0E5A45' } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: {
+      top: { style: 'thin', color: { rgb: detailFrameColor } },
+      bottom: { style: 'thin', color: { rgb: detailFrameColor } },
+      left: { style: 'thin', color: { rgb: detailFrameColor } },
+      right: { style: 'thin', color: { rgb: detailFrameColor } },
+    },
+  }
+  for (let c = 1; c <= 10; c++) setCell(ws1, 24, c, '', detailSectionStyle)
+  merge(ws1, 24, 1, 24, 10)
+  setCell(ws1, 24, 1, 'DETALHES DE META DE PESO POR GRUPO', detailSectionStyle)
+
+  const detailHeaderStyle: CellStyle = {
+    font: { bold: true, color: { rgb: C.white }, sz: 10 },
+    fill: { fgColor: { rgb: '0B6C5A' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: {
+      top: { style: 'thin', color: { rgb: detailFrameColor } },
+      bottom: { style: 'thin', color: { rgb: detailFrameColor } },
+      left: { style: 'thin', color: { rgb: detailFrameColor } },
+      right: { style: 'thin', color: { rgb: detailFrameColor } },
+    },
+  }
+
   const weightHeaders = ['GRUPO', 'META (KG)', 'VENDIDO (KG)', 'ATINGIMENTO']
   const weightHeaderRanges: Array<[number, number]> = [
     [1, 3],   // A:C
@@ -505,9 +533,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     [8, 10],  // H:J
   ]
   weightHeaderRanges.forEach(([c1, c2], i) => {
-    for (let c = c1; c <= c2; c++) setCell(ws1, 25, c, '', tableHeaderStyle())
+    for (let c = c1; c <= c2; c++) setCell(ws1, 25, c, '', detailHeaderStyle)
     merge(ws1, 25, c1, 25, c2)
-    setCell(ws1, 25, c1, weightHeaders[i], tableHeaderStyle())
+    setCell(ws1, 25, c1, weightHeaders[i], detailHeaderStyle)
   })
   const brands = (ex?.weightByBrand ?? []).slice(0, 6)
 
@@ -516,10 +544,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     fill: { fgColor: { rgb: alt ? C.paper : C.white } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
-      top: { style: 'thin', color: { rgb: C.line } },
-      bottom: { style: 'thin', color: { rgb: C.line } },
-      left: { style: 'thin', color: { rgb: C.line } },
-      right: { style: 'thin', color: { rgb: C.line } },
+      top: { style: 'thin', color: { rgb: detailInnerColor } },
+      bottom: { style: 'thin', color: { rgb: detailInnerColor } },
+      left: { style: 'thin', color: { rgb: detailInnerColor } },
+      right: { style: 'thin', color: { rgb: detailInnerColor } },
     },
   })
 
