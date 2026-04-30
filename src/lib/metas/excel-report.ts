@@ -195,7 +195,7 @@ function tableHeaderStyle(): CellStyle {
   return {
     font: { bold: true, color: { rgb: C.white }, sz: 10 },
     fill: { fgColor: { rgb: C.deep2 } },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
     border: {
       top: { style: 'thin', color: { rgb: C.accent } },
       bottom: { style: 'thin', color: { rgb: C.accent } },
@@ -593,7 +593,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const ws2: XLSX.WorkSheet = {}
   buildHeader(ws2, 14, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores monitorados`, monthLabel, generatedBy)
   writeMainTable(ws2, 6, rows)
-  setCols(ws2, [5, 25, 20, 13, 9, 12, 11, 9, 17, 12, 11, 11, 11, 12])
+  setCols(ws2, [5, 24, 20, 13, 10, 13, 11, 9, 18, 13, 12, 12, 12, 13])
   ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 7 + rows.length, c: 13 } })
   XLSX.utils.book_append_sheet(wb, ws2, 'Desempenho por Vendedor')
 
@@ -707,7 +707,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     })
 
     addAutoFilter(ws, 10, 1, 10 + supRows.length, 13)
-    setCols(ws, [5, 24, 13, 9, 12, 11, 9, 17, 12, 10, 10, 10, 11])
+    setCols(ws, [5, 23, 13, 10, 13, 11, 9, 18, 13, 12, 12, 12, 13])
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 11 + supRows.length, c: 13 } })
 
     const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
