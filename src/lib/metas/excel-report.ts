@@ -651,7 +651,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supValue = supRows.reduce((s, r) => s + r.totalValue, 0)
     const supWeight = supRows.reduce((s, r) => s + r.totalGrossWeight, 0)
     const supPoints = supRows.reduce((s, r) => s + r.pointsAchieved, 0)
-    const supReward = supRows.reduce((s, r) => s + r.rewardAchieved, 0)
+    const supRewardPercentRows = supRows.filter((r) => r.rewardMode === 'PERCENT')
+    const supRewardCurrencyRows = supRows.filter((r) => r.rewardMode === 'CURRENCY')
+    const supRewardPercentTotal = supRewardPercentRows.reduce((s, r) => s + r.rewardAchieved, 0)
+    const supRewardCurrencyTotal = supRewardCurrencyRows.reduce((s, r) => s + r.rewardAchieved, 0)
     const supAvg = supRows.length ? supRows.reduce((s, r) => s + r.pointsRatio, 0) / supRows.length : 0
 
     // Resumo executivo da equipe distribuído em A:N (2 linhas de cards) para evitar cortes.
@@ -663,7 +666,17 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     metricCard(ws, 11, 1, 4, 'FATURAMENTO', fmtCurr(supValue), 'Valor faturado pela equipe', 'info')
     metricCard(ws, 11, 5, 8, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
     metricCard(ws, 11, 9, 11, 'PONTOS', fmt(supPoints, 2), 'Pontos conquistados no período', 'info')
-    metricCard(ws, 11, 12, 14, 'PREMIAÇÃO', fmtCurr(supReward), 'Premiação consolidada da equipe', 'warn')
+    const supRewardDisplay = supRewardCurrencyRows.length === 0
+      ? `${fmt(supRewardPercentTotal, 2)}%`
+      : supRewardPercentRows.length === 0
+        ? fmtCurr(supRewardCurrencyTotal)
+        : `${fmt(supRewardPercentTotal, 2)}% + ${fmtCurr(supRewardCurrencyTotal)}`
+    const supRewardNote = supRewardCurrencyRows.length === 0
+      ? 'Percentual consolidado por perfil (1% e 1,5%)'
+      : supRewardPercentRows.length === 0
+        ? 'Premiação consolidada da equipe'
+        : 'Consolidado misto: percentual e valor fixo'
+    metricCard(ws, 11, 12, 14, 'PREMIAÇÃO', supRewardDisplay, supRewardNote, 'warn')
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
     headers.forEach((h, i) => setCell(ws, 16, i + 1, h, tableHeaderStyle()))
@@ -751,8 +764,8 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     })
 
     addAutoFilter(ws, 16, 1, 16 + supRows.length, 13)
-    // Mesmo padrão visual de espaçamento da aba Desempenho por Vendedor, ocupando até N.
-    setCols(ws, [5, 22, 18, 13, 11, 13, 11, 11, 18, 13, 14, 14, 14, 15])
+    // Ajuste fino da aba de supervisor: mesmas proporções da aba principal, respeitando o conjunto de colunas local.
+    setCols(ws, [5, 22, 15, 11, 12, 11, 10, 18, 14, 14, 14, 14, 15, 8])
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 17 + supRows.length, c: 13 } })
 
     const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
