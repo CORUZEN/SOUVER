@@ -6425,6 +6425,28 @@ export default function MetasWorkspace() {
                               const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                               return count + (progress >= 1 ? 1 : 0)
                             }, 0)
+                            const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+                            const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+                            const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+                            const soldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+                            const activeProductsCount = Math.max(productAllowlist.filter((product) => product.active).length, 0)
+                            const requiredItems = activeProductsCount > 0
+                              ? Math.ceil(activeProductsCount * (distribuicaoItemsPct / 100))
+                              : 0
+                            const clientsWithItems = sellerRows.reduce((sum, row) => {
+                              const productsByStage = getDistribuicaoProductsByStage(row, 'FULL')
+                              return sum + (productsByStage >= 1 ? 1 : 0)
+                            }, 0)
+                            const baseTotalClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
+                            const requiredClients = baseTotalClients > 0
+                              ? Math.ceil(baseTotalClients * (distribuicaoBasePct / 100))
+                              : 0
+                            const itemsProgress = requiredItems > 0 ? soldItems / Math.max(requiredItems, 1) : 0
+                            const clientsProgress = requiredClients > 0 ? clientsWithItems / Math.max(requiredClients, 1) : 0
+                            const distribuicaoProgress = requiredItems > 0 && requiredClients > 0
+                              ? Math.min(itemsProgress, clientsProgress)
+                              : 0
+                            const distribuicaoSellerHit: 0 | 1 = distribuicaoProgress >= 1 ? 1 : 0
                             const financialTarget = Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0)
                             const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
                             const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
@@ -6461,6 +6483,9 @@ export default function MetasWorkspace() {
                               pointsTarget: snapshot.pointsTarget,
                               metasHit,
                               metasTotal,
+                              distribuicaoSellerHit,
+                              distribuicaoClientsHit: clientsWithItems,
+                              distribuicaoClientsTarget: requiredClients,
                               kpiRewardAchieved: snapshot.kpiRewardAchieved,
                               gapToTarget: snapshot.gapToTarget,
                             }

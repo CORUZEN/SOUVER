@@ -29,6 +29,9 @@ export interface ExportRow {
   pointsTarget: number
   metasHit: number
   metasTotal: number
+  distribuicaoSellerHit: 0 | 1
+  distribuicaoClientsHit: number
+  distribuicaoClientsTarget: number
   kpiRewardAchieved: number
   gapToTarget: number
 }
@@ -668,8 +671,12 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supWeightTarget = supRows.reduce((s, r) => s + Math.max(r.weightTargetKg, 0), 0)
     const supWeightPct = supWeightTarget > 0 ? supWeight / supWeightTarget : 0
     const supBaseClients = supRows.reduce((s, r) => s + Math.max(r.baseClients, 0), 0)
-    const supMetasHit = supRows.reduce((s, r) => s + Math.max(r.metasHit, 0), 0)
-    const supMetasTotal = supRows.reduce((s, r) => s + Math.max(r.metasTotal, 0), 0)
+    const supDistribHit = supRows.reduce((s, r) => s + (r.distribuicaoSellerHit === 1 ? 1 : 0), 0)
+    const supDistribTotal = supRows.length
+    const supDistribPct = supDistribTotal > 0 ? (supDistribHit / supDistribTotal) * 100 : 0
+    const supDistribClientsHit = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsHit, 0), 0)
+    const supDistribClientsTarget = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsTarget, 0), 0)
+    const supDistribClientsPct = supDistribClientsTarget > 0 ? (supDistribClientsHit / supDistribClientsTarget) * 100 : 0
     const supRewardPercentRows = supRows.filter((r) => r.rewardMode === 'PERCENT')
     const supRewardCurrencyRows = supRows.filter((r) => r.rewardMode === 'CURRENCY')
     const supRewardPercentTotal = supRewardPercentRows.reduce((s, r) => s + r.rewardAchieved, 0)
@@ -720,9 +727,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
       9,
       7,
       9,
-      'METAS CONQUISTADAS',
-      `${fmt(supMetasHit, 0)} / ${fmt(supMetasTotal, 0)}`,
-      'Consolidado de metas por vendedores da equipe',
+      'DISTRIBUIÇÃO DE ITENS',
+      `${fmt(supDistribClientsHit, 0)} / ${fmt(supDistribClientsTarget, 0)}`,
+      `Cobertura da base (${fmt(supDistribClientsPct, 1)}%) | Vendedores no alvo de itens: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
       'info'
     )
     const supRewardDisplay = supRewardCurrencyRows.length === 0
