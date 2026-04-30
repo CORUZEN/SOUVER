@@ -93,6 +93,8 @@ const C = {
   h4: '6366F1',
   h5: 'F59E0B',
   h6: 'FB7185',
+  cardFrame: '8FA9A1',
+  cardInner: 'C9D8D3',
 }
 
 function nowStr() {
@@ -228,13 +230,13 @@ function buildHeader(ws: XLSX.WorkSheet, lastCol: number, title: string, subtitl
   merge(ws, 2, 1, 2, lastCol)
   merge(ws, 3, 1, 3, lastCol)
 
-  setCell(ws, 1, 1, 'SISTEMA OURO VERDE - GESTAO COMERCIAL', styleHeaderBand('', true))
+  setCell(ws, 1, 1, 'SISTEMA OURO VERDE - GESTÃO COMERCIAL', styleHeaderBand('', true))
   setCell(ws, 2, 1, title, {
     ...styleHeaderBand(''),
     font: { bold: true, color: { rgb: C.white }, sz: 22 },
     alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
   })
-  setCell(ws, 3, 1, `${subtitle}  |  Periodo: ${period}  |  Gerado em: ${nowStr()}  |  Responsavel: ${generatedBy || 'Sistema Ouro Verde'}`, {
+  setCell(ws, 3, 1, `${subtitle}  |  Período: ${period}  |  Gerado em: ${nowStr()}  |  Responsável: ${generatedBy || 'Sistema Ouro Verde'}`, {
     font: { color: { rgb: 'B9F3DE' }, sz: 10, bold: true },
     fill: { fgColor: { rgb: C.deep } },
     alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
@@ -271,9 +273,9 @@ function metricCard(
   note: string,
   tone: 'ok' | 'warn' | 'bad' | 'info' = 'info'
 ) {
-  const toneColor = tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : tone === 'bad' ? C.bad : C.h2
   const toneHeader = tone === 'ok' ? '0B5D4B' : tone === 'warn' ? '8A4B08' : tone === 'bad' ? '9F1239' : '0B4F75'
-  const toneBorder = tone === 'ok' ? '0F766E' : tone === 'warn' ? 'B45309' : tone === 'bad' ? 'BE123C' : '0369A1'
+  const toneBorder = C.cardFrame
+  const innerBorder = C.cardInner
   const bodyBg = 'FBFDFC'
   for (let c = c1; c <= c2; c++) {
     setCell(ws, row, c, '', {
@@ -288,7 +290,7 @@ function metricCard(
     setCell(ws, row + 1, c, '', {
       fill: { fgColor: { rgb: bodyBg } },
       border: {
-        bottom: { style: 'thin', color: { rgb: C.line } },
+        bottom: { style: 'thin', color: { rgb: innerBorder } },
         left: { style: 'medium', color: { rgb: toneBorder } },
         right: { style: 'medium', color: { rgb: toneBorder } },
       },
@@ -323,7 +325,7 @@ function metricCard(
     fill: { fgColor: { rgb: bodyBg } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
-      bottom: { style: 'thin', color: { rgb: C.line } },
+      bottom: { style: 'thin', color: { rgb: innerBorder } },
       left: { style: 'medium', color: { rgb: toneBorder } },
       right: { style: 'medium', color: { rgb: toneBorder } },
     },
