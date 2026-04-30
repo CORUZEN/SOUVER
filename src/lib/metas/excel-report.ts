@@ -343,7 +343,7 @@ function metricCard(
 }
 
 function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[]) {
-  const headers = ['#', 'Vendedor', 'Supervisor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', 'Ticket Médio', '1ª Semana', '2ª Semana', '3ª Semana', 'Fechamento']
+  const headers = ['#', 'Vendedor', 'Supervisor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Semana', '2ª Semana', '3ª Semana', 'Fechamento']
   headers.forEach((h, i) => setCell(ws, startRow, i + 1, h, tableHeaderStyle()))
   ws['!rows'] = ws['!rows'] || []
   ws['!rows'][startRow - 1] = { hpt: 26 }
@@ -368,21 +368,20 @@ function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[])
       r.totalOrders,
       fmtCurr(r.totalValue),
       `${fmt(r.totalGrossWeight, 2)} kg`,
-      fmtCurr(r.averageTicket),
       stages[0] == null ? '-' : `${Math.round(stages[0] * 100)}%`,
       stages[1] == null ? '-' : `${Math.round(stages[1] * 100)}%`,
       stages[2] == null ? '-' : `${Math.round(stages[2] * 100)}%`,
       stages[3] == null ? '-' : `${Math.round(stages[3] * 100)}%`,
     ]
 
-    vals.forEach((v, i) => setCell(ws, row, i + 1, v, dataStyle(alt, i === 0 || i === 4 || i === 6 || i === 7 || i >= 11)))
+    vals.forEach((v, i) => setCell(ws, row, i + 1, v, dataStyle(alt, i === 0 || i === 4 || i === 6 || i === 7 || i >= 10)))
     ws['!rows'] = ws['!rows'] || []
     ws['!rows'][row - 1] = { hpt: 24 }
 
     for (let s = 0; s < 4; s++) {
       const ratio = stages[s]
       if (ratio == null) continue
-      setCell(ws, row, 12 + s, `${Math.round(ratio * 100)}%`, {
+      setCell(ws, row, 11 + s, `${Math.round(ratio * 100)}%`, {
         font: { bold: true, color: { rgb: C.white }, sz: 10 },
         fill: { fgColor: { rgb: heatColor(ratio) } },
         alignment: { horizontal: 'center', vertical: 'center' },
@@ -396,7 +395,7 @@ function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[])
 
   })
 
-  addAutoFilter(ws, startRow, 1, startRow + rows.length, 15)
+  addAutoFilter(ws, startRow, 1, startRow + rows.length, 14)
 }
 
 export async function generateMetasReport(payload: ExportPayload): Promise<Buffer> {
@@ -592,10 +591,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   XLSX.utils.book_append_sheet(wb, ws1, 'Resumo Executivo')
 
   const ws2: XLSX.WorkSheet = {}
-  buildHeader(ws2, 15, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores monitorados`, monthLabel, generatedBy)
-  writeMainTable(ws2, 8, rows)
-  setCols(ws2, [6, 34, 24, 15, 11, 15, 13, 11, 20, 16, 16, 11, 11, 11, 12])
-  ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 9 + rows.length, c: 14 } })
+  buildHeader(ws2, 14, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores monitorados`, monthLabel, generatedBy)
+  writeMainTable(ws2, 6, rows)
+  setCols(ws2, [5, 30, 22, 14, 9, 12, 11, 9, 18, 13, 10, 10, 10, 11])
+  ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 7 + rows.length, c: 13 } })
   XLSX.utils.book_append_sheet(wb, ws2, 'Desempenho por Vendedor')
 
   const bySupervisor = new Map<string, ExportRow[]>()
@@ -658,7 +657,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     ws['!rows'][6] = { hpt: 22 }
     ws['!rows'][7] = { hpt: 30 }
 
-    const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', 'Ticket Médio', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
+    const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
     headers.forEach((h, i) => setCell(ws, 10, i + 1, h, tableHeaderStyle()))
     ws['!rows'][9] = { hpt: 26 }
 
@@ -682,19 +681,18 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
         r.totalOrders,
         fmtCurr(r.totalValue),
         `${fmt(r.totalGrossWeight, 2)} kg`,
-        fmtCurr(r.averageTicket),
         stages[0] == null ? '-' : `${Math.round(stages[0] * 100)}%`,
         stages[1] == null ? '-' : `${Math.round(stages[1] * 100)}%`,
         stages[2] == null ? '-' : `${Math.round(stages[2] * 100)}%`,
         stages[3] == null ? '-' : `${Math.round(stages[3] * 100)}%`,
       ]
-      vals.forEach((v, i) => setCell(ws, row, i + 1, v, dataStyle(alt, i === 0 || i === 3 || i === 5 || i === 6 || i >= 10)))
+      vals.forEach((v, i) => setCell(ws, row, i + 1, v, dataStyle(alt, i === 0 || i === 3 || i === 5 || i === 6 || i >= 9)))
       rowMeta[row - 1] = { hpt: 24 }
 
       for (let s = 0; s < 4; s++) {
         const ratio = stages[s]
         if (ratio == null) continue
-        setCell(ws, row, 11 + s, `${Math.round(ratio * 100)}%`, {
+        setCell(ws, row, 10 + s, `${Math.round(ratio * 100)}%`, {
           font: { bold: true, color: { rgb: C.white }, sz: 10 },
           fill: { fgColor: { rgb: heatColor(ratio) } },
           alignment: { horizontal: 'center', vertical: 'center' },
@@ -708,9 +706,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     })
 
-    addAutoFilter(ws, 10, 1, 10 + supRows.length, 14)
-    setCols(ws, [6, 30, 15, 11, 15, 13, 11, 20, 16, 16, 10, 10, 10, 12])
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 11 + supRows.length, c: 14 } })
+    addAutoFilter(ws, 10, 1, 10 + supRows.length, 13)
+    setCols(ws, [5, 28, 14, 10, 13, 11, 9, 18, 13, 8, 8, 8, 10])
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 11 + supRows.length, c: 13 } })
 
     const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, safeName)
