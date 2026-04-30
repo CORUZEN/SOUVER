@@ -193,11 +193,11 @@ function styleHeaderBand(title: string, accent = false): CellStyle {
 function sectionRibbonStyle(): CellStyle {
   return {
     font: { bold: true, color: { rgb: C.white }, sz: 13 },
-    fill: { fgColor: { rgb: '0C5E4A' } },
+    fill: { fgColor: { rgb: C.deep } },
     alignment: { horizontal: 'center', vertical: 'center' },
     border: {
-      top: { style: 'thin', color: { rgb: '0C5E4A' } },
-      bottom: { style: 'thin', color: { rgb: '0C5E4A' } },
+      top: { style: 'thin', color: { rgb: C.deep } },
+      bottom: { style: 'thin', color: { rgb: C.deep } },
       left: { style: 'thin', color: { rgb: C.deep } },
       right: { style: 'thin', color: { rgb: C.deep } },
     },
@@ -296,7 +296,8 @@ function metricCard(
   note: string,
   tone: 'ok' | 'warn' | 'bad' | 'info' = 'info'
 ) {
-  const toneHeader = tone === 'ok' ? '0F6A57' : tone === 'warn' ? '8B5300' : tone === 'bad' ? '9A2545' : '0B4F75'
+  // Padrão corporativo: subtítulos em verde mais claro uniforme.
+  const toneHeader = '0B6C5A'
   const toneBorder = '9EB2AB'
   const innerBorder = 'D6E0DD'
   const bodyBg = 'FCFEFD'
@@ -560,11 +561,11 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const detailInnerColor = 'C9D8D3'
   const detailSectionStyle: CellStyle = {
     font: { bold: true, color: { rgb: C.white }, sz: 13 },
-    fill: { fgColor: { rgb: '0E5A45' } },
+    fill: { fgColor: { rgb: C.deep } },
     alignment: { horizontal: 'center', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: detailFrameColor } },
-      bottom: { style: 'thin', color: { rgb: '0E5A45' } },
+      bottom: { style: 'thin', color: { rgb: C.deep } },
       left: { style: 'thin', color: { rgb: detailFrameColor } },
       right: { style: 'thin', color: { rgb: detailFrameColor } },
     },
