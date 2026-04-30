@@ -1378,6 +1378,7 @@ export default function MetasWorkspace() {
   const weightRankingHeaderRef = useRef<HTMLDivElement>(null)
   const weightRankingListRef = useRef<HTMLDivElement>(null)
   const dashboardFocusProductsPrefetchAttemptedRef = useRef(false)
+  const autoExportTriggeredRef = useRef(false)
 
   const activeKey = monthKey(year, month)
   const performanceRequestKey = `${year}-${month + 1}-${companyScopeFilter}`
@@ -1462,6 +1463,24 @@ export default function MetasWorkspace() {
       setMonth(monthParam - 1)
     }
   }, [])
+
+  useEffect(() => {
+    if (autoExportTriggeredRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    const shouldAutoExport = params.get('autoExport') === '1'
+    if (!shouldAutoExport) return
+    if (view !== 'dashboard' || exporting) return
+
+    const exportButton = document.getElementById('metas-export-button')
+    if (!exportButton) return
+
+    autoExportTriggeredRef.current = true
+    exportButton.click()
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('autoExport')
+    window.history.replaceState({}, '', cleanUrl.toString())
+  }, [exporting, view])
   const maintenanceControlButtonClass = (enabled: boolean) =>
     `inline-flex h-9 w-9 items-center justify-center rounded-xl border ring-1 transition-all duration-200 ${
       enabled
@@ -6412,6 +6431,7 @@ export default function MetasWorkspace() {
 
                 {view === 'dashboard' && snapshots.length > 0 && (
                   <button
+                    id="metas-export-button"
                     type="button"
                     onClick={async () => {
                       setExporting(true)
