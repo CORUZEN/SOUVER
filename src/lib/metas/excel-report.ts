@@ -234,7 +234,7 @@ function buildHeader(ws: XLSX.WorkSheet, lastCol: number, title: string, subtitl
   setCell(ws, 2, 1, title, {
     ...styleHeaderBand(''),
     font: { bold: true, color: { rgb: C.white }, sz: 22 },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    alignment: { horizontal: 'center', vertical: 'top', wrapText: true },
   })
   setCell(ws, 3, 1, `${subtitle}  |  Período: ${period}  |  Gerado em: ${nowStr()}  |  Responsável: ${generatedBy || 'Sistema Ouro Verde'}`, {
     font: { color: { rgb: 'B9F3DE' }, sz: 10, bold: true },
@@ -626,7 +626,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   XLSX.utils.book_append_sheet(wb, ws1, 'Resumo Executivo')
 
   const ws2: XLSX.WorkSheet = {}
-  buildHeader(ws2, 14, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores monitorados`, monthLabel, generatedBy)
+  buildHeader(ws2, 14, 'DESEMPENHO INDIVIDUAL DE VENDEDORES', `${scopeLabel} - ${rows.length} vendedores`, monthLabel, generatedBy)
   writeMainTable(ws2, 6, rows)
   setCols(ws2, [5, 22, 18, 13, 11, 13, 11, 11, 18, 13, 14, 14, 14, 15])
   ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 7 + rows.length, c: 13 } })
