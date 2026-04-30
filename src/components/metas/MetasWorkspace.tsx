@@ -6486,6 +6486,8 @@ export default function MetasWorkspace() {
                               distribuicaoSellerHit,
                               distribuicaoClientsHit: clientsWithItems,
                               distribuicaoClientsTarget: requiredClients,
+                              distribuicaoBasePctSetting: distribuicaoBasePct,
+                              distribuicaoItemsPctSetting: distribuicaoItemsPct,
                               kpiRewardAchieved: snapshot.kpiRewardAchieved,
                               gapToTarget: snapshot.gapToTarget,
                             }

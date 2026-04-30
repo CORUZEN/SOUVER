@@ -32,6 +32,8 @@ export interface ExportRow {
   distribuicaoSellerHit: 0 | 1
   distribuicaoClientsHit: number
   distribuicaoClientsTarget: number
+  distribuicaoBasePctSetting: number
+  distribuicaoItemsPctSetting: number
   kpiRewardAchieved: number
   gapToTarget: number
 }
@@ -677,6 +679,8 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supDistribClientsHit = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsHit, 0), 0)
     const supDistribClientsTarget = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsTarget, 0), 0)
     const supDistribClientsPct = supDistribClientsTarget > 0 ? (supDistribClientsHit / supDistribClientsTarget) * 100 : 0
+    const distribBasePctSetting = supRows.length > 0 ? Math.max(supRows[0].distribuicaoBasePctSetting, 0) : 0
+    const distribItemsPctSetting = supRows.length > 0 ? Math.max(supRows[0].distribuicaoItemsPctSetting, 0) : 0
     const supRewardPercentRows = supRows.filter((r) => r.rewardMode === 'PERCENT')
     const supRewardCurrencyRows = supRows.filter((r) => r.rewardMode === 'CURRENCY')
     const supRewardPercentTotal = supRewardPercentRows.reduce((s, r) => s + r.rewardAchieved, 0)
@@ -722,15 +726,85 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
         : 'Meta de peso não parametrizada para a equipe',
       'info'
     )
-    metricCard(
+    // Card customizado para manter o percentual de cobertura discreto, menor e alinhado à direita.
+    const distRow = 9
+    for (let c = 7; c <= 9; c++) {
+      setCell(ws, distRow, c, '', {
+        fill: { fgColor: { rgb: '0B4F75' } },
+        border: {
+          top: { style: 'medium', color: { rgb: C.cardFrame } },
+          bottom: { style: 'thin', color: { rgb: C.cardFrame } },
+          left: { style: 'medium', color: { rgb: C.cardFrame } },
+          right: { style: 'medium', color: { rgb: C.cardFrame } },
+        },
+      })
+      setCell(ws, distRow + 1, c, '', {
+        fill: { fgColor: { rgb: 'FBFDFC' } },
+        border: {
+          bottom: { style: 'thin', color: { rgb: C.cardInner } },
+          left: { style: 'medium', color: { rgb: C.cardFrame } },
+          right: { style: 'medium', color: { rgb: C.cardFrame } },
+        },
+      })
+      setCell(ws, distRow + 2, c, '', {
+        fill: { fgColor: { rgb: 'FBFDFC' } },
+        border: {
+          bottom: { style: 'medium', color: { rgb: C.cardFrame } },
+          left: { style: 'medium', color: { rgb: C.cardFrame } },
+          right: { style: 'medium', color: { rgb: C.cardFrame } },
+        },
+      })
+    }
+    merge(ws, distRow, 7, distRow, 9)
+    merge(ws, distRow + 1, 7, distRow + 1, 8)
+    merge(ws, distRow + 2, 7, distRow + 2, 9)
+
+    setCell(ws, distRow, 7, 'DISTRIBUIÇÃO DE ITENS', {
+      font: { bold: true, color: { rgb: C.white }, sz: 9 },
+      fill: { fgColor: { rgb: '0B4F75' } },
+      alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'medium', color: { rgb: C.cardFrame } },
+        bottom: { style: 'thin', color: { rgb: C.cardFrame } },
+        left: { style: 'medium', color: { rgb: C.cardFrame } },
+        right: { style: 'medium', color: { rgb: C.cardFrame } },
+      },
+    })
+    setCell(ws, distRow + 1, 7, `${fmt(supDistribClientsHit, 0)} / ${fmt(supDistribClientsTarget, 0)}`, {
+      font: { bold: true, color: { rgb: C.text }, sz: 17 },
+      fill: { fgColor: { rgb: 'FBFDFC' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: {
+        bottom: { style: 'thin', color: { rgb: C.cardInner } },
+        left: { style: 'medium', color: { rgb: C.cardFrame } },
+        right: { style: 'thin', color: { rgb: C.cardInner } },
+      },
+    })
+    setCell(ws, distRow + 1, 9, `| ${fmt(supDistribClientsPct, 1)}%`, {
+      font: { bold: true, color: { rgb: '6B7280' }, sz: 10 },
+      fill: { fgColor: { rgb: 'FBFDFC' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: {
+        bottom: { style: 'thin', color: { rgb: C.cardInner } },
+        left: { style: 'hair', color: { rgb: C.cardInner } },
+        right: { style: 'medium', color: { rgb: C.cardFrame } },
+      },
+    })
+    setCell(
       ws,
-      9,
+      distRow + 2,
       7,
-      9,
-      'DISTRIBUIÇÃO DE ITENS',
-      `${fmt(supDistribClientsHit, 0)} / ${fmt(supDistribClientsTarget, 0)}`,
-      `Cobertura da base (${fmt(supDistribClientsPct, 1)}%) | Vendedores no alvo de itens: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
-      'info'
+      `${fmt(distribItemsPctSetting, 0)}% dos itens em ${fmt(distribBasePctSetting, 0)}% da base | Vendedores: ${fmt(supDistribHit, 0)} / ${fmt(supDistribTotal, 0)} (${fmt(supDistribPct, 1)}%)`,
+      {
+        font: { color: { rgb: C.muted }, sz: 9 },
+        fill: { fgColor: { rgb: 'FBFDFC' } },
+        alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+        border: {
+          bottom: { style: 'medium', color: { rgb: C.cardFrame } },
+          left: { style: 'medium', color: { rgb: C.cardFrame } },
+          right: { style: 'medium', color: { rgb: C.cardFrame } },
+        },
+      }
     )
     const supRewardDisplay = supRewardCurrencyRows.length === 0
       ? `${fmt(supRewardPercentTotal, 2)}%`
