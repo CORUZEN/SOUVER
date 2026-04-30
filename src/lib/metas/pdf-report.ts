@@ -1,8 +1,18 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-export interface PdfExportRow {
-  rank: number
+export interface PdfKpiRule {
+  id: string
+  stage: string
+  stageLabel: string
+  kpi: string
+  description: string
+  targetText: string
+  progress: number
+  points: number
+}
+
+export interface PdfExportData {
   name: string
   supervisorName: string
   profileTypeLabel: string
@@ -10,6 +20,7 @@ export interface PdfExportRow {
   pointsRatio: number
   rewardAchieved: number
   rewardMode: 'PERCENT' | 'CURRENCY'
+  rewardTarget: number
   uniqueClients: number
   baseClients: number
   totalOrders: number
@@ -24,11 +35,9 @@ export interface PdfExportRow {
   pointsTarget: number
   metasHit: number
   metasTotal: number
-  distribuicaoSellerHit: 0 | 1
-  distribuicaoClientsHit: number
-  distribuicaoClientsTarget: number
   kpiRewardAchieved: number
   gapToTarget: number
+  rules: PdfKpiRule[]
 }
 
 function formatCurrency(value: number): string {
@@ -39,12 +48,26 @@ function formatNumber(value: number, decimals = 0): string {
   return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
 }
 
-function formatPercent(value: number): string {
-  return `${formatNumber(value * 100, 1)}%`
+function formatPercent(value: number, decimals = 1): string {
+  return `${formatNumber(value * 100, decimals)}%`
+}
+
+function formatPercentExact(value: number): string {
+  return `${formatNumber(value * 100, 2)}%`
+}
+
+function stageLabel(key: string): string {
+  const map: Record<string, string> = {
+    W1: '1ª Semana',
+    W2: '2ª Semana',
+    W3: '3ª Semana',
+    CLOSING: 'Fechamento',
+  }
+  return map[key] ?? key
 }
 
 export function generateSellerPdfReport(options: {
-  row: PdfExportRow
+  row: PdfExportData
   monthLabel: string
   scopeLabel: string
   generatedBy?: string
@@ -56,7 +79,6 @@ export function generateSellerPdfReport(options: {
   const contentWidth = pageWidth - margin * 2
   let y = 14
 
-  // Colors
   const primaryColor = '#0f281d'
   const accentColor = '#2ec08d'
   const textDark = '#1a1a1a'
@@ -84,7 +106,7 @@ export function generateSellerPdfReport(options: {
 
   y = 40
 
-  // --- SELLER INFO ---
+  // --- SELLER INFO (simplified) ---
   doc.setTextColor(textDark)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
@@ -94,26 +116,28 @@ export function generateSellerPdfReport(options: {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(textLight)
-  const infoLine = [
-    `Supervisor: ${row.supervisorName || '—'}`,
-    `Perfil: ${row.profileTypeLabel}`,
-    `Status: ${row.status}`,
-  ].join('   |   ')
-  doc.text(infoLine, margin, y)
+  doc.text(`Supervisor: ${row.supervisorName || '—'}`, margin, y)
   y += 10
 
-  // --- SUMMARY CARDS (simulated with table) ---
+  // --- SUMMARY ---
   doc.setFontSize(10)
   doc.setTextColor(textDark)
   doc.setFont('helvetica', 'bold')
   doc.text('Resumo de Performance', margin, y)
   y += 4
 
+  const financialPct = row.financialTarget > 0 ? row.totalValue / row.financialTarget : 0
+
+  const rewardDisplay = row.rewardMode === 'PERCENT'
+    ? formatPercentExact(row.kpiRewardAchieved)
+    : formatCurrency(row.kpiRewardAchieved)
+
   const summaryData = [
-    ['Pontuação', formatPercent(row.pointsRatio), 'Meta Financeira', formatCurrency(row.financialTarget)],
-    ['Premiação', row.rewardMode === 'PERCENT' ? formatPercent(row.rewardAchieved / 100) : formatCurrency(row.rewardAchieved), 'Pedidos', String(row.totalOrders)],
-    ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Ticket Médio', formatCurrency(row.averageTicket)],
+    ['Pontuação', formatPercent(row.pointsRatio, 2), 'Meta Financeira', `${formatCurrency(row.financialTarget)} (${formatPercent(financialPct, 1)})`],
+    ['Premiação', rewardDisplay, 'Total de Pedidos', formatCurrency(row.totalValue)],
+    ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Pedidos', String(row.totalOrders)],
     ['Peso Bruto Total', `${formatNumber(row.totalGrossWeight, 2)} kg`, 'Peso por Grupo', `${formatNumber(row.weightSoldKgByGroup, 2)} / ${formatNumber(row.weightTargetKg, 2)} kg`],
+    ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`, '', ''],
   ]
 
   autoTable(doc, {
@@ -122,10 +146,10 @@ export function generateSellerPdfReport(options: {
     tableWidth: contentWidth,
     body: summaryData,
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2, font: 'helvetica' },
+    styles: { fontSize: 9, cellPadding: 2.5, font: 'helvetica' },
     columnStyles: {
       0: { fontStyle: 'bold', textColor: textLight, cellWidth: 38 },
-      1: { textColor: textDark, cellWidth: 38 },
+      1: { textColor: textDark, cellWidth: 56 },
       2: { fontStyle: 'bold', textColor: textLight, cellWidth: 38 },
       3: { textColor: textDark, cellWidth: 'auto' },
     },
@@ -134,74 +158,64 @@ export function generateSellerPdfReport(options: {
 
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
-  // --- STAGES BREAKDOWN ---
-  if (row.stages.length > 0) {
+  // --- KPI DETAIL ---
+  if (row.rules.length > 0) {
     doc.setFontSize(10)
     doc.setTextColor(textDark)
     doc.setFont('helvetica', 'bold')
-    doc.text('Aderência por Etapa', margin, y)
+    doc.text('Metas e Parâmetros do Ciclo', margin, y)
     y += 4
 
-    const stageRows = row.stages.map((s) => [
-      s.stageLabel,
-      formatPercent(s.ratio),
-      s.ratio >= 1 ? '✓ Atingida' : s.ratio >= 0.8 ? 'Quase lá' : 'Em progresso',
-    ])
+    const stageOrder = ['W1', 'W2', 'W3', 'CLOSING']
+    const rulesByStage = new Map<string, PdfKpiRule[]>()
+    for (const rule of row.rules) {
+      const list = rulesByStage.get(rule.stage) ?? []
+      list.push(rule)
+      rulesByStage.set(rule.stage, list)
+    }
+
+    const allRows: Array<[string, string, string, string, string]> = []
+    for (const stageKey of stageOrder) {
+      const rules = rulesByStage.get(stageKey)
+      if (!rules || rules.length === 0) continue
+      for (const r of rules) {
+        const progressPct = r.progress
+        const diff = progressPct >= 1 ? 'Meta atingida' : `Faltam ${formatPercent(1 - progressPct, 1)}`
+        allRows.push([
+          stageLabel(r.stage),
+          r.kpi,
+          r.targetText,
+          formatPercent(progressPct, 1),
+          diff,
+        ])
+      }
+    }
 
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
       tableWidth: contentWidth,
-      head: [['Etapa', 'Aderência', 'Status']],
-      body: stageRows,
+      head: [['Etapa', 'KPI', 'Meta', 'Atingimento', 'Diferença']],
+      body: allRows,
       theme: 'striped',
-      headStyles: { fillColor: primaryColor, textColor: '#ffffff', fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
+      headStyles: { fillColor: '#e8f5f0', textColor: primaryColor, fontStyle: 'bold', fontSize: 8 },
+      styles: { fontSize: 8.5, cellPadding: 2.5, font: 'helvetica' },
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 'auto' },
+        0: { cellWidth: 28 },
+        1: { cellWidth: 48 },
+        2: { cellWidth: 32 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 'auto' },
       },
       bodyStyles: { textColor: textDark },
       alternateRowStyles: { fillColor: '#f8faf9' },
     })
 
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
   }
 
-  // --- METAS HIT DETAIL ---
-  doc.setFontSize(10)
-  doc.setTextColor(textDark)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Metas Conquistadas', margin, y)
-  y += 4
-
-  const metasData = [
-    ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`],
-    ['Distribuição de Itens', row.distribuicaoSellerHit ? '✓ Atingida' : 'Não atingida'],
-    ['Clientes com Itens', `${row.distribuicaoClientsHit} / ${row.distribuicaoClientsTarget}`],
-    ['Premiação por KPIs', formatCurrency(row.kpiRewardAchieved)],
-    ['Gap para Meta', formatCurrency(row.gapToTarget)],
-  ]
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    body: metasData,
-    theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2.5, font: 'helvetica' },
-    columnStyles: {
-      0: { fontStyle: 'bold', textColor: textLight, cellWidth: 50 },
-      1: { textColor: textDark, cellWidth: 'auto' },
-    },
-    alternateRowStyles: { fillColor: '#f8faf9' },
-  })
-
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14
-
   // --- SIGNATURE AREA ---
-  const sigY = Math.min(y, 250)
+  const sigY = Math.min(y, 255)
   doc.setDrawColor(accentColor)
   doc.setLineWidth(0.3)
   doc.line(margin, sigY, margin + 70, sigY)

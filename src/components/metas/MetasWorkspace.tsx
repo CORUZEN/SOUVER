@@ -6485,6 +6485,20 @@ export default function MetasWorkspace() {
         0
       )
 
+      const pdfRules = (snapshotBlock?.rules ?? []).map((rule) => {
+        const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+        return {
+          id: rule.id,
+          stage: rule.stage,
+          stageLabel: rule.stage,
+          kpi: rule.kpi,
+          description: rule.description,
+          targetText: rule.targetText,
+          progress,
+          points: rule.points,
+        }
+      })
+
       const exportRow = {
         rank: 0,
         name: heatmapRow.seller.name,
@@ -6494,6 +6508,7 @@ export default function MetasWorkspace() {
         pointsRatio: Math.min(Math.max(pointsRatio, 0), 1),
         rewardAchieved: snapshot.rewardAchieved,
         rewardMode: snapshot.rewardMode,
+        rewardTarget: snapshot.rewardTarget,
         uniqueClients: snapshot.uniqueClients,
         baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
         totalOrders: snapshot.totalOrders,
@@ -6517,6 +6532,7 @@ export default function MetasWorkspace() {
         distribuicaoClientsTarget: requiredClients,
         kpiRewardAchieved: snapshot.kpiRewardAchieved,
         gapToTarget: snapshot.gapToTarget,
+        rules: pdfRules,
       }
 
       const doc = generateSellerPdfReport({
