@@ -6425,6 +6425,14 @@ export default function MetasWorkspace() {
                               const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
                               return count + (progress >= 1 ? 1 : 0)
                             }, 0)
+                            const financialTarget = Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0)
+                            const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
+                            const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
+                            const weightSoldKgByGroup = Math.max(Number(weightPerfRow?.totalSoldKg ?? 0), 0)
+                            const fallbackWeightTargetKg = (snapshotBlock?.weightTargets ?? []).reduce(
+                              (sum: number, target: { targetKg: number }) => sum + Math.max(Number(target.targetKg ?? 0), 0),
+                              0
+                            )
 
                             return {
                               rank: 0,
@@ -6439,7 +6447,10 @@ export default function MetasWorkspace() {
                               baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
                               totalOrders: snapshot.totalOrders,
                               totalValue: snapshot.totalValue,
+                              financialTarget,
                               totalGrossWeight: snapshot.totalGrossWeight,
+                              weightSoldKgByGroup,
+                              weightTargetKg: weightTargetKgByGroup > 0 ? weightTargetKgByGroup : fallbackWeightTargetKg,
                               averageTicket: snapshot.averageTicket,
                               stages: heatmapRow.cells.map((c) => ({
                                 stageKey: c.stageKey,

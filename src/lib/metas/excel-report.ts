@@ -19,7 +19,10 @@ export interface ExportRow {
   baseClients: number
   totalOrders: number
   totalValue: number
+  financialTarget: number
   totalGrossWeight: number
+  weightSoldKgByGroup: number
+  weightTargetKg: number
   averageTicket: number
   stages: ExportStageCell[]
   pointsAchieved: number
@@ -659,7 +662,11 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supOrders = supRows.reduce((s, r) => s + r.totalOrders, 0)
     const supClients = supRows.reduce((s, r) => s + r.uniqueClients, 0)
     const supValue = supRows.reduce((s, r) => s + r.totalValue, 0)
-    const supWeight = supRows.reduce((s, r) => s + r.totalGrossWeight, 0)
+    const supRevenueTarget = supRows.reduce((s, r) => s + Math.max(r.financialTarget, 0), 0)
+    const supRevenuePct = supRevenueTarget > 0 ? supValue / supRevenueTarget : 0
+    const supWeight = supRows.reduce((s, r) => s + Math.max(r.weightSoldKgByGroup, 0), 0)
+    const supWeightTarget = supRows.reduce((s, r) => s + Math.max(r.weightTargetKg, 0), 0)
+    const supWeightPct = supWeightTarget > 0 ? supWeight / supWeightTarget : 0
     const supBaseClients = supRows.reduce((s, r) => s + Math.max(r.baseClients, 0), 0)
     const supMetasHit = supRows.reduce((s, r) => s + Math.max(r.metasHit, 0), 0)
     const supMetasTotal = supRows.reduce((s, r) => s + Math.max(r.metasTotal, 0), 0)
@@ -684,8 +691,30 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     )
     metricCard(ws, 6, 10, 14, 'MÉDIA GERAL DE ATINGIMENTO', fmtPct(supAvg), 'Percentual médio no escopo selecionado', 'ok')
 
-    metricCard(ws, 9, 1, 3, 'VLR. DOS PEDIDOS REALIZADOS', fmtCurr(supValue), 'Valor dos pedidos registrados pelos vendedores da equipe', 'info')
-    metricCard(ws, 9, 4, 6, 'PESO TOTAL DOS PEDIDOS', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
+    metricCard(
+      ws,
+      9,
+      1,
+      3,
+      'VLR. DOS PEDIDOS REALIZADOS',
+      fmtCurr(supValue),
+      supRevenueTarget > 0
+        ? `Meta financeira: ${fmtCurr(supRevenueTarget)} | ${fmt(supRevenuePct * 100, 1)}% da meta`
+        : 'Meta financeira não parametrizada para a equipe',
+      'info'
+    )
+    metricCard(
+      ws,
+      9,
+      4,
+      6,
+      'PESO TOTAL DOS PEDIDOS',
+      `${fmt(supWeight, 2)} kg`,
+      supWeightTarget > 0
+        ? `Meta de peso: ${fmt(supWeightTarget, 2)} kg | ${fmt(supWeightPct * 100, 1)}% da meta`
+        : 'Meta de peso não parametrizada para a equipe',
+      'info'
+    )
     metricCard(
       ws,
       9,
@@ -717,11 +746,12 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     ws['!rows'][10] = { hpt: 26 }
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
-    headers.forEach((h, i) => setCell(ws, 12, i + 1, h, tableHeaderStyle()))
-    ws['!rows'][11] = { hpt: 26 }
+    ws['!rows'][11] = { hpt: 6 } // linha 12 vazia (espaço visual igual ao separador do topo)
+    headers.forEach((h, i) => setCell(ws, 13, i + 1, h, tableHeaderStyle()))
+    ws['!rows'][12] = { hpt: 26 }
 
     supRows.forEach((r, idx) => {
-      const row = 13 + idx
+      const row = 14 + idx
       const alt = idx % 2 === 1
       const rowMeta = ws['!rows'] ?? (ws['!rows'] = [])
       const stages = [
@@ -800,10 +830,10 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     })
 
-    addAutoFilter(ws, 12, 1, 12 + supRows.length, 13)
+    addAutoFilter(ws, 13, 1, 13 + supRows.length, 13)
     // Ajuste fino da aba de supervisor: mesmas proporções da aba principal, respeitando o conjunto de colunas local.
     setCols(ws, [5, 22, 15, 11, 12, 11, 10, 18, 14, 14, 14, 14, 15, 8])
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 13 + supRows.length, c: 13 } })
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 14 + supRows.length, c: 13 } })
 
     const safeName = supervisorTabLabel(sup).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, safeName)
