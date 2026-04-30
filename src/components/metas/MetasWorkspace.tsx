@@ -6543,7 +6543,13 @@ export default function MetasWorkspace() {
                             })),
                           },
                         })
-                        const filename = `Relatorio_Metas_${MONTHS[month]}_${year}_${new Date().toISOString().slice(0, 10)}.xlsx`
+                        const now = new Date()
+                        const dd = String(now.getDate()).padStart(2, '0')
+                        const mm = String(now.getMonth() + 1).padStart(2, '0')
+                        const yy = String(now.getFullYear()).slice(-2)
+                        const hh = String(now.getHours()).padStart(2, '0')
+                        const min = String(now.getMinutes()).padStart(2, '0')
+                        const filename = `Relatorio_Metas_${MONTHS[month]}_${year}-${dd}-${mm}-${yy}_${hh}-${min}.xlsx`
                         downloadBuffer(buf, filename)
                       } catch (err) {
                         console.error('Erro ao exportar relatório:', err)

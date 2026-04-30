@@ -677,11 +677,12 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     const supDistribTotal = supRows.length
     const supDistribPct = supDistribTotal > 0 ? (supDistribHit / supDistribTotal) * 100 : 0
     const supDistribPctDisplay = `${fmt(supDistribPct, Math.abs(supDistribPct - Math.round(supDistribPct)) < 0.05 ? 0 : 1)}%`
-    const supDistribClientsHit = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsHit, 0), 0)
-    const supDistribClientsTarget = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsTarget, 0), 0)
-    const supDistribClientsPct = supDistribClientsTarget > 0 ? (supDistribClientsHit / supDistribClientsTarget) * 100 : 0
     const distribBasePctSetting = supRows.length > 0 ? Math.max(supRows[0].distribuicaoBasePctSetting, 0) : 0
     const distribItemsPctSetting = supRows.length > 0 ? Math.max(supRows[0].distribuicaoItemsPctSetting, 0) : 0
+    const supDistribClientsHit = supRows.reduce((s, r) => s + Math.max(r.distribuicaoClientsHit, 0), 0)
+    // Alvo de cobertura igual ao painel web: cálculo consolidado por supervisor (não soma ceil por vendedor).
+    const supDistribClientsTarget = Math.ceil(supBaseClients * (distribBasePctSetting / 100))
+    const supDistribClientsPct = supDistribClientsTarget > 0 ? (supDistribClientsHit / supDistribClientsTarget) * 100 : 0
     const supRewardPercentRows = supRows.filter((r) => r.rewardMode === 'PERCENT')
     const supRewardCurrencyRows = supRows.filter((r) => r.rewardMode === 'CURRENCY')
     const supRewardPercentTotal = supRewardPercentRows.reduce((s, r) => s + r.rewardAchieved, 0)
