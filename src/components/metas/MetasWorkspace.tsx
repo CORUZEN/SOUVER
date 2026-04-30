@@ -6513,7 +6513,9 @@ export default function MetasWorkspace() {
                             rewardTarget: rewardDonut.totalTarget,
                             totalOrders: corporateTotalOrders,
                             weightTarget: corporateWeightTargetPerSeller,
-                            totalWeight: corporateTotalGrossWeight,
+                            // Alinhar com o card "Vendido (kg)" de "Peso por grupo"
+                            // para evitar usar peso bruto de todos os pedidos.
+                            totalWeight: kpiGeneralScopedSummary.volumeTotalKg,
                             metasHit: kpiGeneralScopedSummary.metasHit,
                             metasTotal: kpiGeneralScopedSummary.metasTotal,
                             uniqueClients: kpiGeneralScopedSummary.uniqueClients,

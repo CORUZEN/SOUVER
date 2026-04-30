@@ -520,7 +520,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     ws1,
     15,
     4,
-    6,
+    5,
     'COBERTURA DA BASE',
     `${fmt(ex?.distributionClientsWithItems ?? 0, 0)}/${fmt(ex?.distributionClientsTarget ?? 0, 0)}`,
     `${fmt((ex?.distributionClientsTarget ?? 0) > 0 ? ((ex?.distributionClientsWithItems ?? 0) / (ex?.distributionClientsTarget ?? 1)) * 100 : 0, 1)}% da cobertura configurada`,
@@ -529,7 +529,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   metricCard(
     ws1,
     15,
-    7,
+    6,
     8,
     'CLIENTES ÚNICOS / BASE',
     `${fmt(ex?.uniqueClients ?? totalClients, 0)}/${fmt(ex?.totalBaseClients ?? 0, 0)}`,
