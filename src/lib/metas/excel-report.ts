@@ -665,22 +665,29 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
 
     metricCard(ws, 11, 1, 4, 'FATURAMENTO', fmtCurr(supValue), 'Valor faturado pela equipe', 'info')
     metricCard(ws, 11, 5, 8, 'PESO', `${fmt(supWeight, 2)} kg`, 'Peso total dos pedidos', 'info')
-    metricCard(ws, 11, 9, 11, 'PONTOS', fmt(supPoints, 2), 'Pontos conquistados no período', 'info')
+    metricCard(ws, 11, 9, 10, 'PONTOS', fmt(supPoints, 2), 'Pontos conquistados no período', 'info')
     const supRewardDisplay = supRewardCurrencyRows.length === 0
       ? `${fmt(supRewardPercentTotal, 2)}%`
       : supRewardPercentRows.length === 0
         ? fmtCurr(supRewardCurrencyTotal)
-        : `${fmt(supRewardPercentTotal, 2)}% + ${fmtCurr(supRewardCurrencyTotal)}`
+        : `${fmt(supRewardPercentTotal, 2)}% | ${fmtCurr(supRewardCurrencyTotal)}`
     const supRewardNote = supRewardCurrencyRows.length === 0
       ? 'Percentual consolidado por perfil (1% e 1,5%)'
       : supRewardPercentRows.length === 0
         ? 'Premiação consolidada da equipe'
-        : 'Consolidado misto: percentual e valor fixo'
-    metricCard(ws, 11, 12, 14, 'PREMIAÇÃO', supRewardDisplay, supRewardNote, 'warn')
+        : 'Formatos distintos por perfil (não somar % com valor fixo)'
+    metricCard(ws, 11, 11, 14, 'PREMIAÇÃO', supRewardDisplay, supRewardNote, 'warn')
+
+    ws['!rows'] = ws['!rows'] || []
+    ws['!rows'][6] = { hpt: 18 }
+    ws['!rows'][7] = { hpt: 30 }
+    ws['!rows'][8] = { hpt: 22 }
+    ws['!rows'][10] = { hpt: 18 }
+    ws['!rows'][11] = { hpt: 32 }
+    ws['!rows'][12] = { hpt: 26 }
 
     const headers = ['#', 'Vendedor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', '1ª Sem', '2ª Sem', '3ª Sem', 'Fechamento']
     headers.forEach((h, i) => setCell(ws, 16, i + 1, h, tableHeaderStyle()))
-    ws['!rows'] = ws['!rows'] || []
     ws['!rows'][15] = { hpt: 26 }
 
     supRows.forEach((r, idx) => {
