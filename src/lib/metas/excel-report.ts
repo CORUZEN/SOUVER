@@ -192,9 +192,9 @@ function styleHeaderBand(title: string, accent = false): CellStyle {
 
 function sectionRibbonStyle(): CellStyle {
   return {
-    font: { bold: true, color: { rgb: C.white }, sz: 11 },
+    font: { bold: true, color: { rgb: C.white }, sz: 13 },
     fill: { fgColor: { rgb: '0C5E4A' } },
-    alignment: { horizontal: 'left', vertical: 'center' },
+    alignment: { horizontal: 'center', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: '0C5E4A' } },
       bottom: { style: 'thin', color: { rgb: '0C5E4A' } },
@@ -559,9 +559,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const detailFrameColor = '8FA9A1'
   const detailInnerColor = 'C9D8D3'
   const detailSectionStyle: CellStyle = {
-    font: { bold: true, color: { rgb: C.white }, sz: 11 },
+    font: { bold: true, color: { rgb: C.white }, sz: 13 },
     fill: { fgColor: { rgb: '0E5A45' } },
-    alignment: { horizontal: 'left', vertical: 'center' },
+    alignment: { horizontal: 'center', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: detailFrameColor } },
       bottom: { style: 'thin', color: { rgb: '0E5A45' } },
@@ -643,8 +643,9 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     ws1['!rows']![r] = { hpt: 28 }
     ws1['!rows']![r + 1] = { hpt: 20 }
   })
-  ws1['!rows']![24] = { hpt: 20 }
+  ws1['!rows']![24] = { hpt: 26 }
   ws1['!rows']![25] = { hpt: 20 }
+  ;[6, 14, 19].forEach((r) => { ws1['!rows']![r - 1] = { hpt: 24 } })
   setCols(ws1, [19, 15, 15, 15, 15, 15, 15, 13, 13, 12])
   ws1['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 36, c: 9 } })
   XLSX.utils.book_append_sheet(wb, ws1, 'Resumo Executivo')

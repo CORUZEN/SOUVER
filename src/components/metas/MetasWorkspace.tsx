@@ -9262,16 +9262,16 @@ export default function MetasWorkspace() {
                 <div className="pl-4">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">Peso total dos pedidos</p>
                   <p className={`mt-1 text-2xl font-semibold ${
-                    corporateWeightTargetPerSeller > 0 && corporateTotalGrossWeight >= corporateWeightTargetPerSeller
+                    corporateWeightTargetPerSeller > 0 && kpiGeneralScopedSummary.volumeTotalKg >= corporateWeightTargetPerSeller
                       ? 'text-emerald-600'
                       : 'text-surface-900'
-                  }`}>{num(corporateTotalGrossWeight, 2)} kg</p>
+                  }`}>{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
                   {corporateWeightTargetPerSeller > 0 ? (
                     <p className="mt-1 text-[10px] text-surface-400">
-                      {num(Math.min(corporateTotalGrossWeight / corporateWeightTargetPerSeller * 100, 999), 1)}% da meta de peso
+                      {num(Math.min(kpiGeneralScopedSummary.volumeTotalKg / corporateWeightTargetPerSeller * 100, 999), 1)}% da meta de peso
                     </p>
                   ) : (
-                    <p className="mt-1 text-[10px] text-surface-400">Soma do peso bruto dos pedidos no período</p>
+                    <p className="mt-1 text-[10px] text-surface-400">Soma do vendido (kg) nos grupos de produto no período</p>
                   )}
                 </div>
               </div>
@@ -10269,7 +10269,7 @@ export default function MetasWorkspace() {
                       {(() => {
                         const prev = previousPeriodScopedTotals
                         const weightTargetPct = kpiGeneralScopedSummary.volumeTargetKg > 0
-                          ? (kpiGeneralScopedSummary.totalGrossWeight / kpiGeneralScopedSummary.volumeTargetKg) * 100
+                          ? (kpiGeneralScopedSummary.volumeTotalKg / kpiGeneralScopedSummary.volumeTargetKg) * 100
                           : 0
                         const devolucaoPct = kpiGeneralScopedSummary.devolucaoRatePct
                         const devolucaoLimitPct = kpiGeneralScopedSummary.devolucaoLimitPct
@@ -10418,7 +10418,7 @@ export default function MetasWorkspace() {
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.totalGrossWeight, 2)} kg</p>
+                              <p className="mt-1.5 text-[clamp(1.2rem,1.35vw,1.6rem)] leading-[1.15] font-semibold tabular-nums tracking-tight text-slate-900">{num(kpiGeneralScopedSummary.volumeTotalKg, 2)} kg</p>
                               <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
                                 Meta de peso: {num(kpiGeneralScopedSummary.volumeTargetKg, 2)} kg
                               </p>
@@ -10426,7 +10426,7 @@ export default function MetasWorkspace() {
                                 <div className={`h-full rounded-full transition-[width] duration-700 ${weightTargetPct >= 100 ? 'bg-emerald-500' : weightTargetPct >= 85 ? 'bg-cyan-600' : 'bg-amber-500'}`} style={{ width: `${weightBarPct}%` }} />
                               </div>
                               <p className="mt-0.5 text-[9px] text-slate-500">
-                                {weightTargetPct >= 100 ? 'Meta de peso atingida.' : `${num(Math.max(kpiGeneralScopedSummary.volumeTargetKg - kpiGeneralScopedSummary.totalGrossWeight, 0), 2)} kg restantes para a meta.`}
+                                {weightTargetPct >= 100 ? 'Meta de peso atingida.' : `${num(Math.max(kpiGeneralScopedSummary.volumeTargetKg - kpiGeneralScopedSummary.volumeTotalKg, 0), 2)} kg restantes para a meta.`}
                               </p>
                             </div>
                             <div className={`group relative min-h-29 overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${devolucaoTone.border} ${devolucaoTone.background} ${devolucaoTone.hoverBorder}`}>
