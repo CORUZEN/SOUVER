@@ -10,6 +10,7 @@ export interface PdfKpiRule {
   targetText: string
   progress: number
   points: number
+  rewardValue: number
 }
 
 export interface PdfExportData {
@@ -54,6 +55,10 @@ function formatPercent(value: number, decimals = 1): string {
 
 function formatPercentExact(value: number): string {
   return `${formatNumber(value * 100, 2)}%`
+}
+
+function formatRewardPercent(value: number): string {
+  return `${formatNumber(value, 2)}%`
 }
 
 function stageLabel(key: string): string {
@@ -128,8 +133,9 @@ export function generateSellerPdfReport(options: {
 
   const financialPct = row.financialTarget > 0 ? row.totalValue / row.financialTarget : 0
 
+  // Premiação: for PERCENT mode, use formatRewardPercent (no *100) to match web panel
   const rewardDisplay = row.rewardMode === 'PERCENT'
-    ? formatPercentExact(row.kpiRewardAchieved)
+    ? formatRewardPercent(row.kpiRewardAchieved)
     : formatCurrency(row.kpiRewardAchieved)
 
   const summaryData = [
@@ -159,6 +165,7 @@ export function generateSellerPdfReport(options: {
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
   // --- KPI DETAIL ---
+  let tableEndY = y
   if (row.rules.length > 0) {
     doc.setFontSize(10)
     doc.setTextColor(textDark)
@@ -174,48 +181,70 @@ export function generateSellerPdfReport(options: {
       rulesByStage.set(rule.stage, list)
     }
 
-    const allRows: Array<[string, string, string, string, string]> = []
+    const allRows: Array<[string, string, string, string, string, string]> = []
+    let totalRewardValue = 0
     for (const stageKey of stageOrder) {
       const rules = rulesByStage.get(stageKey)
       if (!rules || rules.length === 0) continue
       for (const r of rules) {
         const progressPct = r.progress
         const diff = progressPct >= 1 ? 'Meta atingida' : `Faltam ${formatPercent(1 - progressPct, 1)}`
+        const rewardLabel = row.rewardMode === 'PERCENT'
+          ? formatRewardPercent(r.rewardValue)
+          : formatCurrency(r.rewardValue)
+        totalRewardValue += r.rewardValue
         allRows.push([
           stageLabel(r.stage),
           r.kpi,
           r.targetText,
           formatPercent(progressPct, 1),
           diff,
+          rewardLabel,
         ])
       }
     }
+
+    // Total row
+    const totalRewardLabel = row.rewardMode === 'PERCENT'
+      ? formatRewardPercent(totalRewardValue)
+      : formatCurrency(totalRewardValue)
+    allRows.push([
+      'Totais',
+      `${allRows.length} KPIs`,
+      `Meta: ${formatCurrency(row.financialTarget)}`,
+      '',
+      `1 vendedor(es)`,
+      totalRewardLabel,
+    ])
 
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
       tableWidth: contentWidth,
-      head: [['Etapa', 'KPI', 'Meta', 'Atingimento', 'Diferença']],
+      head: [['Etapa', 'KPI', 'Meta', 'Atingimento', 'Diferença', 'Premiação']],
       body: allRows,
       theme: 'striped',
       headStyles: { fillColor: '#e8f5f0', textColor: primaryColor, fontStyle: 'bold', fontSize: 8 },
       styles: { fontSize: 8.5, cellPadding: 2.5, font: 'helvetica' },
       columnStyles: {
-        0: { cellWidth: 28 },
-        1: { cellWidth: 48 },
-        2: { cellWidth: 32 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 'auto' },
+        0: { cellWidth: 26 },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 26 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 'auto' },
       },
       bodyStyles: { textColor: textDark },
       alternateRowStyles: { fillColor: '#f8faf9' },
+      footStyles: { fillColor: primaryColor, textColor: '#ffffff', fontStyle: 'bold', fontSize: 8.5 },
+      showFoot: 'lastPage',
     })
 
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+    tableEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
   }
 
   // --- SIGNATURE AREA ---
-  const sigY = Math.min(y, 255)
+  const sigY = Math.min(tableEndY, 270)
   doc.setDrawColor(accentColor)
   doc.setLineWidth(0.3)
   doc.line(margin, sigY, margin + 70, sigY)
@@ -231,7 +260,7 @@ export function generateSellerPdfReport(options: {
   doc.text(row.supervisorName || '—', pageWidth - margin - 70, sigY + 8)
 
   // --- FOOTER ---
-  const footerY = 285
+  const footerY = 288
   doc.setFontSize(7)
   doc.setTextColor('#999999')
   doc.text(`Documento gerado em ${new Date().toLocaleDateString('pt-BR')} · Sistema Ouro Verde · Confidencial`, pageWidth / 2, footerY, { align: 'center' })

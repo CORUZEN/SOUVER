@@ -6496,6 +6496,7 @@ export default function MetasWorkspace() {
           targetText: rule.targetText,
           progress,
           points: rule.points,
+          rewardValue: rule.rewardValue,
         }
       })
 
