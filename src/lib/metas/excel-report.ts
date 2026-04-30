@@ -33,6 +33,44 @@ export interface ExportPayload {
   monthLabel: string
   scopeLabel: string
   generatedBy?: string
+  executive?: ExportExecutiveSummary
+}
+
+export interface ExportExecutiveSummary {
+  financialTarget: number
+  totalRevenue: number
+  rewardTotal: number
+  rewardTarget: number
+  totalOrders: number
+  weightTarget: number
+  totalWeight: number
+  metasHit: number
+  metasTotal: number
+  uniqueClients: number
+  totalBaseClients: number
+  averageOverallPct: number
+  totalVolumes: number
+  previousTotalVolumes?: number
+  previousMetasHit?: number
+  distributionSellersHit: number
+  distributionSellersTotal: number
+  distributionClientsWithItems: number
+  distributionClientsTarget: number
+  devolucaoValue: number
+  devolucaoPct: number
+  devolucaoLimitPct: number
+  inadimplenciaValue: number
+  inadimplenciaPct: number
+  inadimplenciaLimitPct: number
+  inadimplenciaLimitDays: number
+  inadimplenciaTitlesCount: number
+  weightByBrand: Array<{
+    brand: string
+    targetKg: number
+    soldKg: number
+    hitSellers: number
+    sellerCount: number
+  }>
 }
 
 type CellStyle = Record<string, unknown>
@@ -139,14 +177,14 @@ function styleHeaderBand(title: string, accent = false): CellStyle {
 
 function sectionRibbonStyle(): CellStyle {
   return {
-    font: { bold: true, color: { rgb: C.deep }, sz: 10 },
-    fill: { fgColor: { rgb: 'EAF7F1' } },
+    font: { bold: true, color: { rgb: C.white }, sz: 10 },
+    fill: { fgColor: { rgb: '0E5A45' } },
     alignment: { horizontal: 'left', vertical: 'center' },
     border: {
       top: { style: 'thin', color: { rgb: C.accent } },
       bottom: { style: 'thin', color: { rgb: C.accent } },
-      left: { style: 'thin', color: { rgb: C.line } },
-      right: { style: 'thin', color: { rgb: C.line } },
+      left: { style: 'thin', color: { rgb: C.deep } },
+      right: { style: 'thin', color: { rgb: C.deep } },
     },
   }
 }
@@ -223,6 +261,85 @@ function addSheetTitleRibbon(ws: XLSX.WorkSheet, r: number, c1: number, c2: numb
   setCell(ws, r, c1, title, sectionRibbonStyle())
 }
 
+function metricCard(
+  ws: XLSX.WorkSheet,
+  row: number,
+  c1: number,
+  c2: number,
+  label: string,
+  value: string,
+  note: string,
+  tone: 'ok' | 'warn' | 'bad' | 'info' = 'info'
+) {
+  const toneColor = tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : tone === 'bad' ? C.bad : C.h2
+  const toneHeader = tone === 'ok' ? '0B5D4B' : tone === 'warn' ? '8A4B08' : tone === 'bad' ? '9F1239' : '0B4F75'
+  const toneBorder = tone === 'ok' ? '0F766E' : tone === 'warn' ? 'B45309' : tone === 'bad' ? 'BE123C' : '0369A1'
+  const bodyBg = 'FBFDFC'
+  for (let c = c1; c <= c2; c++) {
+    setCell(ws, row, c, '', {
+      fill: { fgColor: { rgb: toneHeader } },
+      border: {
+        top: { style: 'medium', color: { rgb: toneBorder } },
+        bottom: { style: 'thin', color: { rgb: toneBorder } },
+        left: { style: 'medium', color: { rgb: toneBorder } },
+        right: { style: 'medium', color: { rgb: toneBorder } },
+      },
+    })
+    setCell(ws, row + 1, c, '', {
+      fill: { fgColor: { rgb: bodyBg } },
+      border: {
+        bottom: { style: 'thin', color: { rgb: C.line } },
+        left: { style: 'medium', color: { rgb: toneBorder } },
+        right: { style: 'medium', color: { rgb: toneBorder } },
+      },
+    })
+    setCell(ws, row + 2, c, '', {
+      fill: { fgColor: { rgb: bodyBg } },
+      border: {
+        bottom: { style: 'medium', color: { rgb: toneBorder } },
+        left: { style: 'medium', color: { rgb: toneBorder } },
+        right: { style: 'medium', color: { rgb: toneBorder } },
+      },
+    })
+  }
+
+  merge(ws, row, c1, row, c2)
+  merge(ws, row + 1, c1, row + 1, c2)
+  merge(ws, row + 2, c1, row + 2, c2)
+
+  setCell(ws, row, c1, label, {
+    font: { bold: true, color: { rgb: C.white }, sz: 9 },
+    fill: { fgColor: { rgb: toneHeader } },
+    alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+    border: {
+      top: { style: 'medium', color: { rgb: toneBorder } },
+      bottom: { style: 'thin', color: { rgb: toneBorder } },
+      left: { style: 'medium', color: { rgb: toneBorder } },
+      right: { style: 'medium', color: { rgb: toneBorder } },
+    },
+  })
+  setCell(ws, row + 1, c1, value, {
+    font: { bold: true, color: { rgb: C.text }, sz: 17 },
+    fill: { fgColor: { rgb: bodyBg } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: {
+      bottom: { style: 'thin', color: { rgb: C.line } },
+      left: { style: 'medium', color: { rgb: toneBorder } },
+      right: { style: 'medium', color: { rgb: toneBorder } },
+    },
+  })
+  setCell(ws, row + 2, c1, note, {
+    font: { color: { rgb: C.muted }, sz: 9 },
+    fill: { fgColor: { rgb: bodyBg } },
+    alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+    border: {
+      bottom: { style: 'medium', color: { rgb: toneBorder } },
+      left: { style: 'medium', color: { rgb: toneBorder } },
+      right: { style: 'medium', color: { rgb: toneBorder } },
+    },
+  })
+}
+
 function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[]) {
   const headers = ['#', 'Vendedor', 'Supervisor', 'Perfil', '% Geral', 'Premiação', 'Clientes', 'Pedidos', 'Valor Faturado', 'Peso (kg)', 'Ticket Médio', '1ª Semana', '2ª Semana', '3ª Semana', 'Fechamento']
   headers.forEach((h, i) => setCell(ws, startRow, i + 1, h, tableHeaderStyle()))
@@ -281,12 +398,12 @@ function writeMainTable(ws: XLSX.WorkSheet, startRow: number, rows: ExportRow[])
 }
 
 export async function generateMetasReport(payload: ExportPayload): Promise<Buffer> {
-  const { rows, monthLabel, scopeLabel, generatedBy } = payload
+  const { rows, monthLabel, scopeLabel, generatedBy, executive } = payload
   const wb = XLSX.utils.book_new()
 
   const ws1: XLSX.WorkSheet = {}
   buildHeader(ws1, 10, 'RELATÓRIO EXECUTIVO DE METAS', scopeLabel, monthLabel, generatedBy)
-  addSheetTitleRibbon(ws1, 6, 1, 10, 'VISÃO GERAL DO PERÍODO')
+  addSheetTitleRibbon(ws1, 6, 1, 10, 'RESUMO EXECUTIVO CONSOLIDADO')
 
   const totalVendors = rows.length
   const totalOrders = rows.reduce((s, r) => s + r.totalOrders, 0)
@@ -297,36 +414,110 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
   const totalReward = rows.reduce((s, r) => s + r.rewardAchieved, 0)
   const avgAchieve = totalVendors ? rows.reduce((s, r) => s + r.pointsRatio, 0) / totalVendors : 0
 
-  const metrics = [
-    ['VENDEDORES', String(totalVendors)],
-    ['PEDIDOS', String(totalOrders)],
-    ['CLIENTES ÚNICOS', String(totalClients)],
-    ['FATURAMENTO TOTAL', fmtCurr(totalValue)],
-    ['PESO TOTAL', `${fmt(totalWeight, 2)} kg`],
-    ['PONTOS CONQUISTADOS', fmt(totalPoints, 2)],
-    ['PREMIAÇÃO TOTAL', fmtCurr(totalReward)],
-    ['ATINGIMENTO MÉDIO', fmtPct(avgAchieve)],
-  ]
-  metrics.forEach((m, i) => {
-    setCell(ws1, 7, i + 1, m[0], {
-      font: { bold: true, color: { rgb: C.muted }, sz: 9 },
-      fill: { fgColor: { rgb: 'ECFDF5' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: { top: { style: 'thin', color: { rgb: C.accent } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } },
-    })
-    setCell(ws1, 8, i + 1, m[1], {
-      font: { bold: true, color: { rgb: C.deep }, sz: 14 },
-      fill: { fgColor: { rgb: C.white } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: { bottom: { style: 'medium', color: { rgb: C.accent } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } },
-    })
-  })
-  ws1['!rows'] = ws1['!rows'] || []
-  ws1['!rows'][5] = { hpt: 22 }
-  ws1['!rows'][6] = { hpt: 22 }
-  ws1['!rows'][7] = { hpt: 30 }
+  const ex = executive
+  const financialTarget = ex?.financialTarget ?? 0
+  const totalRevenueConsolidated = ex?.totalRevenue ?? totalValue
+  const financialPct = financialTarget > 0 ? totalRevenueConsolidated / financialTarget : 0
+  const financialGap = Math.max(financialTarget - totalRevenueConsolidated, 0)
+  const financialOver = Math.max(totalRevenueConsolidated - financialTarget, 0)
 
-  addSheetTitleRibbon(ws1, 10, 1, 4, 'DISTRIBUIÇÃO DE STATUS')
+  const rewardTarget = ex?.rewardTarget ?? 0
+  const rewardValue = ex?.rewardTotal ?? totalReward
+  const rewardPct = rewardTarget > 0 ? rewardValue / rewardTarget : 0
+
+  const weightTarget = ex?.weightTarget ?? 0
+  const weightSold = ex?.totalWeight ?? totalWeight
+  const weightPct = weightTarget > 0 ? weightSold / weightTarget : 0
+  const weightGap = Math.max(weightTarget - weightSold, 0)
+  const weightOver = Math.max(weightSold - weightTarget, 0)
+
+  const metasHit = ex?.metasHit ?? 0
+  const metasTotal = ex?.metasTotal ?? 0
+
+  // 4 cards por linha no topo (A:J), aproveitando melhor a largura útil.
+  metricCard(ws1, 7, 1, 3, 'META DE FATURAMENTO', `${fmt(financialPct * 100, 1)}%`, financialOver > 0 ? `${fmtCurr(financialOver)} acima da meta` : `${fmtCurr(financialGap)} restantes para atingir`, financialPct >= 1 ? 'ok' : financialPct >= 0.85 ? 'warn' : 'bad')
+  metricCard(ws1, 7, 4, 5, 'CUSTO DE PREMIAÇÕES', fmtCurr(rewardValue), rewardTarget > 0 ? `${fmt(rewardPct * 100, 1)}% comprometido de ${fmtCurr(rewardTarget)}` : 'Previsão não parametrizada', rewardPct <= 0.8 ? 'ok' : rewardPct <= 1 ? 'warn' : 'bad')
+  metricCard(ws1, 7, 6, 8, 'PEDIDOS NO MÊS', fmt(ex?.totalOrders ?? totalOrders, 0), 'Consolidado dos vendedores monitorados', 'info')
+  metricCard(ws1, 7, 9, 10, 'MÉDIA GERAL', `${fmt(ex?.averageOverallPct ?? (avgAchieve * 100), 2)}%`, `${fmt(metasHit, 0)}/${fmt(metasTotal, 0)} metas`, 'info')
+
+  metricCard(ws1, 10, 1, 3, 'META DE PESO CONSOLIDADA', `${fmt(weightTarget, 2)} kg`, weightOver > 0 ? `${fmt(weightOver, 2)} kg acima` : `${fmt(weightGap, 2)} kg restantes`, weightPct >= 1 ? 'ok' : weightPct >= 0.85 ? 'warn' : 'bad')
+  metricCard(ws1, 10, 4, 5, 'PESO TOTAL DOS PEDIDOS', `${fmt(weightSold, 2)} kg`, `${fmt(weightPct * 100, 1)}% da meta`, weightPct >= 1 ? 'ok' : 'info')
+  metricCard(ws1, 10, 6, 8, 'META FINANCEIRA CONSOLIDADA', fmtCurr(financialTarget), 'Soma das metas da equipe', 'info')
+  metricCard(ws1, 10, 9, 10, 'VALOR TOTAL DE PEDIDOS', fmtCurr(totalRevenueConsolidated), `${fmt(financialPct * 100, 1)}% da meta`, financialPct >= 1 ? 'ok' : 'info')
+
+  addSheetTitleRibbon(ws1, 14, 1, 10, 'DISTRIBUIÇÃO, COBERTURA E QUALIDADE DA CARTEIRA')
+  metricCard(
+    ws1,
+    15,
+    1,
+    3,
+    'DISTRIBUIÇÃO DE ITENS',
+    `${fmt(ex?.distributionSellersHit ?? 0, 0)}/${fmt(ex?.distributionSellersTotal ?? 0, 0)}`,
+    `${fmt((ex?.distributionSellersTotal ?? 0) > 0 ? ((ex?.distributionSellersHit ?? 0) / (ex?.distributionSellersTotal ?? 1)) * 100 : 0, 1)}% dos vendedores no alvo`,
+    'info'
+  )
+  metricCard(
+    ws1,
+    15,
+    4,
+    6,
+    'COBERTURA DA BASE',
+    `${fmt(ex?.distributionClientsWithItems ?? 0, 0)}/${fmt(ex?.distributionClientsTarget ?? 0, 0)}`,
+    `${fmt((ex?.distributionClientsTarget ?? 0) > 0 ? ((ex?.distributionClientsWithItems ?? 0) / (ex?.distributionClientsTarget ?? 1)) * 100 : 0, 1)}% da cobertura configurada`,
+    'info'
+  )
+  metricCard(
+    ws1,
+    15,
+    7,
+    8,
+    'CLIENTES ÚNICOS / BASE',
+    `${fmt(ex?.uniqueClients ?? totalClients, 0)}/${fmt(ex?.totalBaseClients ?? 0, 0)}`,
+    `${fmt((ex?.totalBaseClients ?? 0) > 0 ? ((ex?.uniqueClients ?? 0) / (ex?.totalBaseClients ?? 1)) * 100 : 0, 1)}% de cobertura geral`,
+    'info'
+  )
+  metricCard(
+    ws1,
+    15,
+    9,
+    10,
+    'METAS CONQUISTADAS',
+    `${fmt(metasHit, 0)}/${fmt(metasTotal, 0)}`,
+    `${fmt(metasTotal > 0 ? (metasHit / metasTotal) * 100 : 0, 1)}% de atingimento geral`,
+    metasTotal > 0 && metasHit / metasTotal >= 0.85 ? 'ok' : 'info'
+  )
+
+  addSheetTitleRibbon(ws1, 19, 1, 10, 'INADIMPLÊNCIA, DEVOLUÇÃO E COMPARATIVO MENSAL')
+  const devolOver = (ex?.devolucaoPct ?? 0) - (ex?.devolucaoLimitPct ?? 0)
+  const inadOver = (ex?.inadimplenciaPct ?? 0) - (ex?.inadimplenciaLimitPct ?? 0)
+  metricCard(ws1, 20, 1, 3, 'DEVOLUÇÃO GERAL', fmtCurr(ex?.devolucaoValue ?? 0), `${fmt(ex?.devolucaoPct ?? 0, 3)}% | limite ${fmt(ex?.devolucaoLimitPct ?? 0, 2)}%`, devolOver <= 0 ? 'ok' : 'warn')
+  metricCard(ws1, 20, 4, 6, 'INADIMPLÊNCIA GERAL', fmtCurr(ex?.inadimplenciaValue ?? 0), `${fmt(ex?.inadimplenciaPct ?? 0, 3)}% | ${fmt(ex?.inadimplenciaTitlesCount ?? 0, 0)} títulos > ${fmt(ex?.inadimplenciaLimitDays ?? 45, 0)} dias`, inadOver <= 0 ? 'ok' : 'warn')
+  const volumeDelta = (ex?.previousTotalVolumes ?? 0) > 0 ? (ex!.totalVolumes - (ex?.previousTotalVolumes ?? 0)) : 0
+  metricCard(ws1, 20, 7, 8, 'VOLUMES VS MÊS ANTERIOR', fmt(ex?.totalVolumes ?? 0, 0), ex?.previousTotalVolumes != null ? `${volumeDelta >= 0 ? '+' : '-'}${fmt(Math.abs(volumeDelta), 0)} volumes` : 'Sem base comparativa', 'info')
+  metricCard(ws1, 20, 9, 10, 'TOTAL DE CLIENTES ÚNICOS', fmt(ex?.uniqueClients ?? totalClients, 0), `Base ativa: ${fmt(ex?.totalBaseClients ?? 0, 0)} clientes`, 'info')
+
+  addSheetTitleRibbon(ws1, 24, 1, 7, 'DETALHES DE META DE PESO POR GRUPO')
+  addSheetTitleRibbon(ws1, 24, 8, 10, 'DISTRIBUIÇÃO DE STATUS')
+  const weightHeaders = ['GRUPO', 'META (KG)', 'VENDIDO (KG)', 'ATINGIMENTO', 'NO ALVO']
+  ;[1, 3, 5, 7].forEach((col, i) => {
+    const c2 = col + 1
+    for (let c = col; c <= c2; c++) setCell(ws1, 25, c, '', tableHeaderStyle())
+    merge(ws1, 25, col, 25, c2)
+    setCell(ws1, 25, col, weightHeaders[i], tableHeaderStyle())
+  })
+  setCell(ws1, 25, 7, weightHeaders[3], tableHeaderStyle())
+  const brands = (ex?.weightByBrand ?? []).slice(0, 6)
+  brands.forEach((b, i) => {
+    const r = 26 + i
+    const ratio = b.targetKg > 0 ? b.soldKg / b.targetKg : 0
+    setCell(ws1, r, 1, b.brand || '-', dataStyle(i % 2 === 1))
+    merge(ws1, r, 1, r, 2)
+    setCell(ws1, r, 3, `${fmt(b.targetKg, 2)} kg`, dataStyle(i % 2 === 1, true))
+    merge(ws1, r, 3, r, 4)
+    setCell(ws1, r, 5, `${fmt(b.soldKg, 2)} kg`, dataStyle(i % 2 === 1, true))
+    merge(ws1, r, 5, r, 6)
+    setCell(ws1, r, 7, `${fmt(ratio * 100, 1)}%`, { ...dataStyle(i % 2 === 1, true), font: { bold: true, color: { rgb: ratio >= 1 ? C.ok : C.h2 }, sz: 10 } })
+  })
   const statusRows: Array<[string, number, string]> = [
     ['Superou meta', rows.filter((r) => r.status === 'SUPEROU').length, C.ok],
     ['No alvo', rows.filter((r) => r.status === 'NO_ALVO').length, C.ok],
@@ -334,12 +525,22 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     ['Crítico', rows.filter((r) => r.status === 'CRITICO').length, C.bad],
   ]
   statusRows.forEach((r, i) => {
-    setCell(ws1, 11 + i, 1, r[0], dataStyle(false))
-    setCell(ws1, 11 + i, 2, r[1], { ...dataStyle(false, true), font: { bold: true, color: { rgb: r[2] }, sz: 11 } })
+    setCell(ws1, 26 + i, 8, r[0], dataStyle(false))
+    merge(ws1, 26 + i, 8, 26 + i, 9)
+    setCell(ws1, 26 + i, 10, r[1], { ...dataStyle(false, true), font: { bold: true, color: { rgb: r[2] }, sz: 11 } })
   })
 
-  setCols(ws1, [24, 20, 20, 24, 22, 22, 24, 20, 14, 14])
-  ws1['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 30, c: 15 } })
+  ws1['!rows'] = ws1['!rows'] || []
+  ;[13, 18, 23].forEach((r) => { ws1['!rows']![r - 1] = { hpt: 5 } })
+  ;[7, 10, 15, 20].forEach((r) => {
+    ws1['!rows']![r - 1] = { hpt: 16 }
+    ws1['!rows']![r] = { hpt: 24 }
+    ws1['!rows']![r + 1] = { hpt: 18 }
+  })
+  ws1['!rows']![24] = { hpt: 20 }
+  ws1['!rows']![25] = { hpt: 20 }
+  setCols(ws1, [19, 15, 15, 15, 15, 15, 15, 13, 13, 12])
+  ws1['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 36, c: 9 } })
   XLSX.utils.book_append_sheet(wb, ws1, 'Resumo Executivo')
 
   const ws2: XLSX.WorkSheet = {}

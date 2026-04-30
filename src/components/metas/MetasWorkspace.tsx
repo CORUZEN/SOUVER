@@ -1416,7 +1416,6 @@ export default function MetasWorkspace() {
   const isDeveloperUser = currentUserRoleCode === 'DEVELOPER'
   const isItAnalystUser = currentUserRoleCode === 'IT_ANALYST' || currentUserRoleCode === 'ANALISTA_TI'
   const canAccessDistributionDiagnostics = isDeveloperUser || isItAnalystUser
-  const canViewTelemetry = canAccessDistributionDiagnostics
   const strategicPanelMaintenance = maintenanceBlocks[STRATEGIC_METRICS_PANEL_BLOCK_KEY] ?? { enabled: false }
   const trendPanelMaintenance = maintenanceBlocks[TREND_EVOLUTION_PANEL_BLOCK_KEY] ?? { enabled: false }
   const weeklyAdherencePanelMaintenance = maintenanceBlocks[WEEKLY_ADHERENCE_PANEL_BLOCK_KEY] ?? { enabled: false }
@@ -6461,6 +6460,42 @@ export default function MetasWorkspace() {
                           monthLabel,
                           scopeLabel,
                           generatedBy: authData?.user?.name || undefined,
+                          executive: {
+                            financialTarget: corporateTotalTarget,
+                            totalRevenue: corporateTotalRevenue,
+                            rewardTotal: rewardDonut.totalEarned,
+                            rewardTarget: rewardDonut.totalTarget,
+                            totalOrders: corporateTotalOrders,
+                            weightTarget: corporateWeightTargetPerSeller,
+                            totalWeight: corporateTotalGrossWeight,
+                            metasHit: kpiGeneralScopedSummary.metasHit,
+                            metasTotal: kpiGeneralScopedSummary.metasTotal,
+                            uniqueClients: kpiGeneralScopedSummary.uniqueClients,
+                            totalBaseClients: kpiGeneralScopedSummary.totalBaseClients,
+                            averageOverallPct: kpiGeneralScopedSummary.averageOverallPct,
+                            totalVolumes: kpiGeneralScopedSummary.totalVolumes,
+                            previousTotalVolumes: previousPeriodScopedTotals?.totalVolumes,
+                            previousMetasHit: previousPeriodScopedTotals?.metasHit,
+                            distributionSellersHit: kpiGeneralScopedSummary.distribuicaoBySellerHit,
+                            distributionSellersTotal: kpiGeneralScopedSummary.distribuicaoBySellerTotal,
+                            distributionClientsWithItems: kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems,
+                            distributionClientsTarget: kpiGeneralScopedSummary.distribuicaoClientsTarget40pct,
+                            devolucaoValue: kpiGeneralScopedSummary.devolucaoTotalValue,
+                            devolucaoPct: kpiGeneralScopedSummary.devolucaoRatePct,
+                            devolucaoLimitPct: kpiGeneralScopedSummary.devolucaoLimitPct,
+                            inadimplenciaValue: kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue,
+                            inadimplenciaPct: kpiGeneralScopedSummary.inadimplenciaRatePct,
+                            inadimplenciaLimitPct: kpiGeneralScopedSummary.inadimplenciaLimitPct,
+                            inadimplenciaLimitDays: kpiGeneralScopedSummary.inadimplenciaLimitDays,
+                            inadimplenciaTitlesCount: kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount,
+                            weightByBrand: weightOverviewByBrand.map((row) => ({
+                              brand: row.brand,
+                              targetKg: row.targetKg,
+                              soldKg: row.soldKg,
+                              hitSellers: row.hitSellers,
+                              sellerCount: row.sellerCount,
+                            })),
+                          },
                         })
                         const filename = `Relatorio_Metas_${MONTHS[month]}_${year}_${new Date().toISOString().slice(0, 10)}.xlsx`
                         downloadBuffer(buf, filename)
@@ -6479,7 +6514,7 @@ export default function MetasWorkspace() {
                   </button>
                 )}
 
-                {(canViewConfig || canViewSellers || canViewProducts || canViewTelemetry) && (
+                {(canViewConfig || canViewSellers || canViewProducts) && (
                   <div className="h-5 w-px bg-white/20" />
                 )}
 
@@ -6513,16 +6548,7 @@ export default function MetasWorkspace() {
                     Produtos
                   </button>
                 )}
-                {canViewTelemetry && (
-                  <button
-                    type="button"
-                    onClick={() => { window.location.href = '/metas/telemetria' }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/40 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-100 backdrop-blur-sm transition-all hover:bg-cyan-500/25"
-                  >
-                    <Activity size={14} />
-                    Telemetria
-                  </button>
-                )}
+
               </>
             )}
           </div>

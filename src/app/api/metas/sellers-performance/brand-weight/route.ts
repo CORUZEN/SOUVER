@@ -7,7 +7,6 @@ import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { withRequestCache } from '@/lib/server/request-cache'
 import { withConcurrencyLimit } from '@/lib/server/concurrency-limit'
-import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 import { sanitizeSellerCodes, buildSafeSellerInClause } from '@/lib/metas/seller-code-validation'
 
 type RawRecord = Record<string, unknown>
@@ -336,15 +335,8 @@ ORDER BY CAB.CODVEND, PRO.MARCA`.trim()
 }
 
 export async function GET(req: NextRequest) {
-  const routeId = 'api/metas/sellers-performance/brand-weight'
-  const startedAt = Date.now()
-  let responseStatus = 200
-  recordRouteRequest(routeId)
   const authUser = await getAuthUser(req)
   if (!authUser) {
-    responseStatus = 401
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Nao autenticado.' }, { status: 401 })
   }
 
@@ -375,16 +367,10 @@ export async function GET(req: NextRequest) {
     select: { id: true, baseUrl: true, configEncrypted: true },
   })
   if (!integration?.baseUrl) {
-    responseStatus = 412
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Nenhuma integracao Sankhya ativa.' }, { status: 412 })
   }
   const baseUrl = normalizeBaseUrl(integration.baseUrl)
   if (!baseUrl) {
-    responseStatus = 412
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'URL Sankhya invalida.' }, { status: 412 })
   }
   const config = parseStoredConfig(integration.configEncrypted)
@@ -440,7 +426,6 @@ export async function GET(req: NextRequest) {
       const brands = [...new Set(rows.map((r) => r.brand))].sort()
       return { rows, brands, year, month }
     })
-    responseStatus = 200
     return NextResponse.json(payload, {
       headers: {
         'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
@@ -448,11 +433,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consultar peso por marca.'
-    responseStatus = 502
     return NextResponse.json({ message }, { status: 502 })
-  } finally {
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
   }
 }
 

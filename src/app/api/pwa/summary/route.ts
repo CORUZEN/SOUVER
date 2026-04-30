@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma'
 import { readSellerAllowlist } from '@/lib/metas/seller-allowlist-store'
 import { getActiveAllowedSellersFromList } from '@/lib/metas/seller-allowlist'
 import { withRequestCache } from '@/lib/server/request-cache'
-import { observeRouteDuration, recordRouteRequest, recordRouteStatus } from '@/lib/server/telemetry'
 
 const NO_CACHE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -24,15 +23,8 @@ const CACHE_5MIN = {
  * delivered as a compact payload optimized for mobile rendering.
  */
 export async function GET(req: NextRequest) {
-  const routeId = 'api/pwa/summary'
-  const startedAt = Date.now()
-  let responseStatus = 200
-  recordRouteRequest(routeId)
   const user = await getAuthUser(req)
   if (!user) {
-    responseStatus = 401
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Não autenticado.' }, { status: 401, headers: NO_CACHE })
   }
 
@@ -46,9 +38,6 @@ export async function GET(req: NextRequest) {
     'SELLER',
   ])
   if (!ALLOWED_ROLES.has(roleCode)) {
-    responseStatus = 403
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
     return NextResponse.json({ message: 'Sem acesso a este recurso.' }, { status: 403, headers: NO_CACHE })
   }
 
@@ -312,14 +301,9 @@ export async function GET(req: NextRequest) {
     configuredAt: configRow?.updatedAt ?? null,
   }
     })
-    responseStatus = 200
     return NextResponse.json(payload, { headers: CACHE_5MIN })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao consolidar resumo do PWA.'
-    responseStatus = 502
     return NextResponse.json({ message }, { status: 502, headers: NO_CACHE })
-  } finally {
-    recordRouteStatus(routeId, responseStatus)
-    observeRouteDuration(routeId, Date.now() - startedAt)
   }
 }
