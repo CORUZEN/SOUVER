@@ -1470,12 +1470,10 @@ export default function MetasWorkspace() {
     const shouldAutoExport = params.get('autoExport') === '1'
     if (!shouldAutoExport) return
     if (view !== 'dashboard' || exporting) return
-
     const exportButton = document.getElementById('metas-export-button')
     if (!exportButton) return
-
     autoExportTriggeredRef.current = true
-    exportButton.click()
+    handleExportReport()
 
     const cleanUrl = new URL(window.location.href)
     cleanUrl.searchParams.delete('autoExport')
@@ -6258,6 +6256,177 @@ export default function MetasWorkspace() {
     FULL: 'bg-primary-500',
   }
 
+  async function handleExportReport() {
+    const notifyParentExport = (ok: boolean, message?: string) => {
+      if (typeof window === 'undefined') return
+      const payload = { type: 'metas-export-finished', ok, message: message ?? '' }
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(payload, window.location.origin)
+      }
+      if (window.opener && window.opener !== window) {
+        window.opener.postMessage(payload, window.location.origin)
+      }
+    }
+
+    setExporting(true)
+    try {
+      const scopeLabel = companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'
+      const monthLabel = `${MONTHS[month]} ${year}`
+
+      const exportRows = sellerWeeklyHeatmap
+        .map((heatmapRow) => {
+          const snapshot = snapshots.find((s) => s.seller.id === heatmapRow.seller.id)
+          if (!snapshot) return null
+          const snapshotBlock =
+            ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
+            findBlockForSeller(heatmapRow.seller.id, ruleBlocks) ??
+            null
+          const resolvedProfileType = snapshotBlock
+            ? resolveBlockProfileType(snapshotBlock)
+            : (resolveSellerProfileForId(heatmapRow.seller.id) ?? 'NOVATO')
+          const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
+          const blockRules = snapshotBlock?.rules ?? []
+          const metasTotal = blockRules.length
+          const metasHit = blockRules.reduce((count, rule) => {
+            const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
+            return count + (progress >= 1 ? 1 : 0)
+          }, 0)
+          const sellerCode = toSellerCodeFromId(snapshot.seller.id)
+          const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
+          const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
+          const soldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
+          const activeProductsCount = Math.max(productAllowlist.filter((product) => product.active).length, 0)
+          const requiredItems = activeProductsCount > 0
+            ? Math.ceil(activeProductsCount * (distribuicaoItemsPct / 100))
+            : 0
+          const clientsWithItems = sellerRows.reduce((sum, row) => {
+            const productsByStage = getDistribuicaoProductsByStage(row, 'FULL')
+            return sum + (productsByStage >= 1 ? 1 : 0)
+          }, 0)
+          const baseTotalClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
+          const requiredClients = baseTotalClients > 0
+            ? Math.ceil(baseTotalClients * (distribuicaoBasePct / 100))
+            : 0
+          const itemsProgress = requiredItems > 0 ? soldItems / Math.max(requiredItems, 1) : 0
+          const clientsProgress = requiredClients > 0 ? clientsWithItems / Math.max(requiredClients, 1) : 0
+          const distribuicaoProgress = requiredItems > 0 && requiredClients > 0
+            ? Math.min(itemsProgress, clientsProgress)
+            : 0
+          const distribuicaoSellerHit: 0 | 1 = distribuicaoProgress >= 1 ? 1 : 0
+          const financialTarget = Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0)
+          const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
+          const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
+          const weightSoldKgByGroup = Math.max(Number(weightPerfRow?.totalSoldKg ?? 0), 0)
+          const fallbackWeightTargetKg = (snapshotBlock?.weightTargets ?? []).reduce(
+            (sum: number, target: { targetKg: number }) => sum + Math.max(Number(target.targetKg ?? 0), 0),
+            0
+          )
+
+          return {
+            rank: 0,
+            name: heatmapRow.seller.name,
+            supervisorName: snapshot.seller.supervisorName || '',
+            profileTypeLabel: SELLER_PROFILE_LABEL[resolvedProfileType],
+            status: snapshot.status,
+            pointsRatio: Math.min(Math.max(pointsRatio, 0), 1),
+            rewardAchieved: snapshot.rewardAchieved,
+            rewardMode: snapshot.rewardMode,
+            uniqueClients: snapshot.uniqueClients,
+            baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
+            totalOrders: snapshot.totalOrders,
+            totalValue: snapshot.totalValue,
+            financialTarget,
+            totalGrossWeight: snapshot.totalGrossWeight,
+            weightSoldKgByGroup,
+            weightTargetKg: weightTargetKgByGroup > 0 ? weightTargetKgByGroup : fallbackWeightTargetKg,
+            averageTicket: snapshot.averageTicket,
+            stages: heatmapRow.cells.map((c) => ({
+              stageKey: c.stageKey,
+              stageLabel: c.stage,
+              ratio: c.ratio,
+            })),
+            pointsAchieved: snapshot.pointsAchieved,
+            pointsTarget: snapshot.pointsTarget,
+            metasHit,
+            metasTotal,
+            distribuicaoSellerHit,
+            distribuicaoClientsHit: clientsWithItems,
+            distribuicaoClientsTarget: requiredClients,
+            distribuicaoBasePctSetting: distribuicaoBasePct,
+            distribuicaoItemsPctSetting: distribuicaoItemsPct,
+            kpiRewardAchieved: snapshot.kpiRewardAchieved,
+            gapToTarget: snapshot.gapToTarget,
+          }
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null)
+        .sort((a, b) => {
+          if (b.pointsRatio !== a.pointsRatio) return b.pointsRatio - a.pointsRatio
+          if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
+          return a.name.localeCompare(b.name, 'pt-BR')
+        })
+
+      exportRows.forEach((r, i) => { r.rank = i + 1 })
+
+      const buf = await generateMetasReport({
+        rows: exportRows,
+        monthLabel,
+        scopeLabel,
+        generatedBy: authData?.user?.name || undefined,
+        executive: {
+          financialTarget: corporateTotalTarget,
+          totalRevenue: corporateTotalRevenue,
+          rewardTotal: rewardDonut.totalEarned,
+          rewardTarget: rewardDonut.totalTarget,
+          totalOrders: corporateTotalOrders,
+          weightTarget: corporateWeightTargetPerSeller,
+          totalWeight: kpiGeneralScopedSummary.volumeTotalKg,
+          metasHit: kpiGeneralScopedSummary.metasHit,
+          metasTotal: kpiGeneralScopedSummary.metasTotal,
+          uniqueClients: kpiGeneralScopedSummary.uniqueClients,
+          totalBaseClients: kpiGeneralScopedSummary.totalBaseClients,
+          averageOverallPct: kpiGeneralScopedSummary.averageOverallPct,
+          totalVolumes: kpiGeneralScopedSummary.totalVolumes,
+          previousTotalVolumes: previousPeriodScopedTotals?.totalVolumes,
+          previousMetasHit: previousPeriodScopedTotals?.metasHit,
+          distributionSellersHit: kpiGeneralScopedSummary.distribuicaoBySellerHit,
+          distributionSellersTotal: kpiGeneralScopedSummary.distribuicaoBySellerTotal,
+          distributionClientsWithItems: kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems,
+          distributionClientsTarget: kpiGeneralScopedSummary.distribuicaoClientsTarget40pct,
+          devolucaoValue: kpiGeneralScopedSummary.devolucaoTotalValue,
+          devolucaoPct: kpiGeneralScopedSummary.devolucaoRatePct,
+          devolucaoLimitPct: kpiGeneralScopedSummary.devolucaoLimitPct,
+          inadimplenciaValue: kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue,
+          inadimplenciaPct: kpiGeneralScopedSummary.inadimplenciaRatePct,
+          inadimplenciaLimitPct: kpiGeneralScopedSummary.inadimplenciaLimitPct,
+          inadimplenciaLimitDays: kpiGeneralScopedSummary.inadimplenciaLimitDays,
+          inadimplenciaTitlesCount: kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount,
+          weightByBrand: weightOverviewByBrand.map((row) => ({
+            brand: row.brand,
+            targetKg: row.targetKg,
+            soldKg: row.soldKg,
+            hitSellers: row.hitSellers,
+            sellerCount: row.sellerCount,
+          })),
+        },
+      })
+      const now = new Date()
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const yy = String(now.getFullYear()).slice(-2)
+      const hh = String(now.getHours()).padStart(2, '0')
+      const min = String(now.getMinutes()).padStart(2, '0')
+      const filename = `Relatorio_Metas_${MONTHS[month]}_${year}-${dd}-${mm}-${yy}_${hh}-${min}.xlsx`
+      downloadBuffer(buf, filename)
+      notifyParentExport(true)
+    } catch (err) {
+      console.error('Erro ao exportar relatório:', err)
+      notifyParentExport(false, err instanceof Error ? err.message : 'Falha ao gerar relatório')
+      alert('Erro ao gerar relatório. Tente novamente.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
       <Card className="relative border border-[#2f5f47]/42 bg-linear-to-br from-[#0f281d] via-[#1a4432] to-[#1a5a4b] shadow-[0_18px_34px_rgba(6,16,11,0.28)]">
@@ -6433,166 +6602,7 @@ export default function MetasWorkspace() {
                   <button
                     id="metas-export-button"
                     type="button"
-                    onClick={async () => {
-                      setExporting(true)
-                      try {
-                        const scopeLabel = companyScopeFilter === 'all' ? 'Empresas: 1 e 2' : companyScopeFilter === '2' ? 'Empresa 2 — Maceió' : 'Empresa 1 — Ouro Verde'
-                        const monthLabel = `${MONTHS[month]} ${year}`
-
-                        // Construir dados de exportação exatamente como no painel
-                        const exportRows = sellerWeeklyHeatmap
-                          .map((heatmapRow) => {
-                            const snapshot = snapshots.find((s) => s.seller.id === heatmapRow.seller.id)
-                            if (!snapshot) return null
-                            const snapshotBlock =
-                              ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ??
-                              findBlockForSeller(heatmapRow.seller.id, ruleBlocks) ??
-                              null
-                            const resolvedProfileType = snapshotBlock
-                              ? resolveBlockProfileType(snapshotBlock)
-                              : (resolveSellerProfileForId(heatmapRow.seller.id) ?? 'NOVATO')
-                            const pointsRatio = snapshot.pointsTarget > 0 ? snapshot.pointsAchieved / snapshot.pointsTarget : 0
-                            const blockRules = snapshotBlock?.rules ?? []
-                            const metasTotal = blockRules.length
-                            const metasHit = blockRules.reduce((count, rule) => {
-                              const progress = snapshot.ruleProgress.find((item) => item.ruleId === rule.id)?.progress ?? 0
-                              return count + (progress >= 1 ? 1 : 0)
-                            }, 0)
-                            const sellerCode = toSellerCodeFromId(snapshot.seller.id)
-                            const sellerRows = distributionBySellerProduct.get(sellerCode) ?? []
-                            const sellerItemsRow = distributionItemsBySeller.get(sellerCode)
-                            const soldItems = getDistribuicaoItemsByStage(sellerItemsRow, 'FULL')
-                            const activeProductsCount = Math.max(productAllowlist.filter((product) => product.active).length, 0)
-                            const requiredItems = activeProductsCount > 0
-                              ? Math.ceil(activeProductsCount * (distribuicaoItemsPct / 100))
-                              : 0
-                            const clientsWithItems = sellerRows.reduce((sum, row) => {
-                              const productsByStage = getDistribuicaoProductsByStage(row, 'FULL')
-                              return sum + (productsByStage >= 1 ? 1 : 0)
-                            }, 0)
-                            const baseTotalClients = Math.max(snapshot.seller.baseClientCount ?? 0, 0)
-                            const requiredClients = baseTotalClients > 0
-                              ? Math.ceil(baseTotalClients * (distribuicaoBasePct / 100))
-                              : 0
-                            const itemsProgress = requiredItems > 0 ? soldItems / Math.max(requiredItems, 1) : 0
-                            const clientsProgress = requiredClients > 0 ? clientsWithItems / Math.max(requiredClients, 1) : 0
-                            const distribuicaoProgress = requiredItems > 0 && requiredClients > 0
-                              ? Math.min(itemsProgress, clientsProgress)
-                              : 0
-                            const distribuicaoSellerHit: 0 | 1 = distribuicaoProgress >= 1 ? 1 : 0
-                            const financialTarget = Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0)
-                            const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
-                            const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
-                            const weightSoldKgByGroup = Math.max(Number(weightPerfRow?.totalSoldKg ?? 0), 0)
-                            const fallbackWeightTargetKg = (snapshotBlock?.weightTargets ?? []).reduce(
-                              (sum: number, target: { targetKg: number }) => sum + Math.max(Number(target.targetKg ?? 0), 0),
-                              0
-                            )
-
-                            return {
-                              rank: 0,
-                              name: heatmapRow.seller.name,
-                              supervisorName: snapshot.seller.supervisorName || '',
-                              profileTypeLabel: SELLER_PROFILE_LABEL[resolvedProfileType],
-                              status: snapshot.status,
-                              pointsRatio: Math.min(Math.max(pointsRatio, 0), 1),
-                              rewardAchieved: snapshot.rewardAchieved,
-                              rewardMode: snapshot.rewardMode,
-                              uniqueClients: snapshot.uniqueClients,
-                              baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
-                              totalOrders: snapshot.totalOrders,
-                              totalValue: snapshot.totalValue,
-                              financialTarget,
-                              totalGrossWeight: snapshot.totalGrossWeight,
-                              weightSoldKgByGroup,
-                              weightTargetKg: weightTargetKgByGroup > 0 ? weightTargetKgByGroup : fallbackWeightTargetKg,
-                              averageTicket: snapshot.averageTicket,
-                              stages: heatmapRow.cells.map((c) => ({
-                                stageKey: c.stageKey,
-                                stageLabel: c.stage,
-                                ratio: c.ratio,
-                              })),
-                              pointsAchieved: snapshot.pointsAchieved,
-                              pointsTarget: snapshot.pointsTarget,
-                              metasHit,
-                              metasTotal,
-                              distribuicaoSellerHit,
-                              distribuicaoClientsHit: clientsWithItems,
-                              distribuicaoClientsTarget: requiredClients,
-                              distribuicaoBasePctSetting: distribuicaoBasePct,
-                              distribuicaoItemsPctSetting: distribuicaoItemsPct,
-                              kpiRewardAchieved: snapshot.kpiRewardAchieved,
-                              gapToTarget: snapshot.gapToTarget,
-                            }
-                          })
-                          .filter((r): r is NonNullable<typeof r> => r !== null)
-                          .sort((a, b) => {
-                            if (b.pointsRatio !== a.pointsRatio) return b.pointsRatio - a.pointsRatio
-                            if (b.pointsAchieved !== a.pointsAchieved) return b.pointsAchieved - a.pointsAchieved
-                            return a.name.localeCompare(b.name, 'pt-BR')
-                          })
-
-                        exportRows.forEach((r, i) => { r.rank = i + 1 })
-
-                        const buf = await generateMetasReport({
-                          rows: exportRows,
-                          monthLabel,
-                          scopeLabel,
-                          generatedBy: authData?.user?.name || undefined,
-                          executive: {
-                            financialTarget: corporateTotalTarget,
-                            totalRevenue: corporateTotalRevenue,
-                            rewardTotal: rewardDonut.totalEarned,
-                            rewardTarget: rewardDonut.totalTarget,
-                            totalOrders: corporateTotalOrders,
-                            weightTarget: corporateWeightTargetPerSeller,
-                            // Alinhar com o card "Vendido (kg)" de "Peso por grupo"
-                            // para evitar usar peso bruto de todos os pedidos.
-                            totalWeight: kpiGeneralScopedSummary.volumeTotalKg,
-                            metasHit: kpiGeneralScopedSummary.metasHit,
-                            metasTotal: kpiGeneralScopedSummary.metasTotal,
-                            uniqueClients: kpiGeneralScopedSummary.uniqueClients,
-                            totalBaseClients: kpiGeneralScopedSummary.totalBaseClients,
-                            averageOverallPct: kpiGeneralScopedSummary.averageOverallPct,
-                            totalVolumes: kpiGeneralScopedSummary.totalVolumes,
-                            previousTotalVolumes: previousPeriodScopedTotals?.totalVolumes,
-                            previousMetasHit: previousPeriodScopedTotals?.metasHit,
-                            distributionSellersHit: kpiGeneralScopedSummary.distribuicaoBySellerHit,
-                            distributionSellersTotal: kpiGeneralScopedSummary.distribuicaoBySellerTotal,
-                            distributionClientsWithItems: kpiGeneralScopedSummary.distribuicaoClientsWithAnyItems,
-                            distributionClientsTarget: kpiGeneralScopedSummary.distribuicaoClientsTarget40pct,
-                            devolucaoValue: kpiGeneralScopedSummary.devolucaoTotalValue,
-                            devolucaoPct: kpiGeneralScopedSummary.devolucaoRatePct,
-                            devolucaoLimitPct: kpiGeneralScopedSummary.devolucaoLimitPct,
-                            inadimplenciaValue: kpiGeneralScopedSummary.inadimplenciaOpenTitlesValue,
-                            inadimplenciaPct: kpiGeneralScopedSummary.inadimplenciaRatePct,
-                            inadimplenciaLimitPct: kpiGeneralScopedSummary.inadimplenciaLimitPct,
-                            inadimplenciaLimitDays: kpiGeneralScopedSummary.inadimplenciaLimitDays,
-                            inadimplenciaTitlesCount: kpiGeneralScopedSummary.inadimplenciaOpenTitlesCount,
-                            weightByBrand: weightOverviewByBrand.map((row) => ({
-                              brand: row.brand,
-                              targetKg: row.targetKg,
-                              soldKg: row.soldKg,
-                              hitSellers: row.hitSellers,
-                              sellerCount: row.sellerCount,
-                            })),
-                          },
-                        })
-                        const now = new Date()
-                        const dd = String(now.getDate()).padStart(2, '0')
-                        const mm = String(now.getMonth() + 1).padStart(2, '0')
-                        const yy = String(now.getFullYear()).slice(-2)
-                        const hh = String(now.getHours()).padStart(2, '0')
-                        const min = String(now.getMinutes()).padStart(2, '0')
-                        const filename = `Relatorio_Metas_${MONTHS[month]}_${year}-${dd}-${mm}-${yy}_${hh}-${min}.xlsx`
-                        downloadBuffer(buf, filename)
-                      } catch (err) {
-                        console.error('Erro ao exportar relatório:', err)
-                        alert('Erro ao gerar relatório. Tente novamente.')
-                      } finally {
-                        setExporting(false)
-                      }
-                    }}
+                    onClick={handleExportReport}
                     disabled={exporting}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-100 backdrop-blur-sm transition-all hover:bg-emerald-500/25 disabled:opacity-50"
                   >

@@ -54,7 +54,6 @@ const DEFAULT_MODULE: ModuleKey = 'metas'
 const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
 const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
   metas: '/metas',
-  relatorios: '/relatorios',
   integracoes: '/integracoes',
 }
 
@@ -170,7 +169,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const isActive = moduleKey === 'integracoes'
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' || moduleKey === 'relatorios' ? null : '(Em breve)'
+    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : '(Em breve)'
     const iconClass = cn(
       'w-4 h-4 shrink-0 transition-all duration-300',
       isActive
@@ -512,4 +511,3 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     </>
   )
 }
-
