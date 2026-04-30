@@ -191,6 +191,16 @@ function sectionRibbonStyle(): CellStyle {
   }
 }
 
+function supervisorTabLabel(name: string): string {
+  const upper = (name || '').toLocaleUpperCase('pt-BR')
+  if (upper.includes('ROGERIO')) return 'SUP: ROGERIO'
+  if (upper.includes('JOSELIA')) return 'SUP: JOSELIA'
+  if (upper.includes('JOSE CLAUDIO')) return 'SUP: JOSE CLAUDIO'
+  if (upper.includes('EGLINAURIA')) return 'SUP: EGLINAURIA'
+  const short = shortPersonName(name).toLocaleUpperCase('pt-BR')
+  return `SUP: ${short}`
+}
+
 function tableHeaderStyle(): CellStyle {
   return {
     font: { bold: true, color: { rgb: C.white }, sz: 10 },
@@ -775,7 +785,7 @@ export async function generateMetasReport(payload: ExportPayload): Promise<Buffe
     setCols(ws, [5, 22, 15, 11, 12, 11, 10, 18, 14, 14, 14, 14, 15, 8])
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 17 + supRows.length, c: 13 } })
 
-    const safeName = (`Sup ${shortSup}`).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
+    const safeName = supervisorTabLabel(sup).replace(/[\\/*?:\[\]]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, safeName)
   }
 
