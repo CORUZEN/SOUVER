@@ -225,7 +225,7 @@ export function generateSellerPdfReport(options: {
       body: allRows,
       theme: 'striped',
       headStyles: { fillColor: '#e8f5f0', textColor: primaryColor, fontStyle: 'bold', fontSize: 8 },
-      styles: { fontSize: 8.5, cellPadding: 2.5, font: 'helvetica' },
+      styles: { fontSize: 8.5, cellPadding: 1.8, font: 'helvetica' },
       columnStyles: {
         0: { cellWidth: 26 },
         1: { cellWidth: 42 },
@@ -240,7 +240,7 @@ export function generateSellerPdfReport(options: {
       showFoot: 'lastPage',
     })
 
-    tableEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    tableEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
   }
 
   // --- SIGNATURE AREA ---
