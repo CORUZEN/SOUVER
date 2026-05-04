@@ -35,6 +35,7 @@ interface OrderItem {
   group: string
   unit: string
   quantity: number
+  volume: number
   weightKg: number
 }
 
@@ -594,6 +595,53 @@ export default function PrevisaoDeEstoque() {
     }
   }, [filteredOrders])
 
+  const stockMap = useMemo(() => {
+    const map = new Map<string, number>()
+    if (!data) return map
+    for (const p of data.products) {
+      map.set(p.productCode, p.stockQty)
+    }
+    return map
+  }, [data])
+
+  const productAggregates = useMemo(() => {
+    const map = new Map<string, { productCode: string; productName: string; unit: string; quantity: number; weightKg: number }>()
+    for (const order of filteredOrders) {
+      for (const item of order.items) {
+        const existing = map.get(item.productCode)
+        if (existing) {
+          existing.quantity += item.quantity
+          existing.weightKg += item.weightKg
+        } else {
+          map.set(item.productCode, {
+            productCode: item.productCode,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.quantity,
+            weightKg: item.weightKg,
+          })
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.productName.localeCompare(b.productName))
+  }, [filteredOrders])
+
+  const cityAggregates = useMemo(() => {
+    const map = new Map<string, { city: string; uf: string; orderCount: number; weightKg: number }>()
+    for (const order of filteredOrders) {
+      const key = order.uf ? `${order.city} - ${order.uf}` : order.city
+      const existing = map.get(key)
+      const orderWeight = order.items.reduce((s, i) => s + i.weightKg, 0)
+      if (existing) {
+        existing.orderCount += 1
+        existing.weightKg += orderWeight
+      } else {
+        map.set(key, { city: order.city, uf: order.uf, orderCount: 1, weightKg: orderWeight })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.weightKg - a.weightKg)
+  }, [filteredOrders])
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
 
@@ -603,7 +651,7 @@ export default function PrevisaoDeEstoque() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-200/70">Logística</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Previsão de Estoque</h1>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Previsão de Pedidos</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-emerald-100">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -703,6 +751,94 @@ export default function PrevisaoDeEstoque() {
           <StatBadge label="Bonificações" value={groupedOrders.BONIFICACAO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.BONIFICACAO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Box className="w-5 h-5" />} colorKey="BONIFICACAO" onClick={() => setModalType('BONIFICACAO')} />
           <StatBadge label="Trocas" value={groupedOrders.TROCA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.TROCA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Truck className="w-5 h-5" />} colorKey="TROCA" onClick={() => setModalType('TROCA')} />
           <StatBadge label="Não Confirmados" value={groupedOrders.NAO_CONFIRMADO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.NAO_CONFIRMADO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<AlertTriangle className="w-5 h-5" />} colorKey="NAO_CONFIRMADO" onClick={() => setModalType('NAO_CONFIRMADO')} />
+        </div>
+      )}
+
+      {/* ── Grid 2x2: Produtos + Cidades ── */}
+      {data && filteredOrders.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Produtos */}
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+              <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-600" />
+                Produtos — {productAggregates.length} item{productAggregates.length !== 1 ? 's' : ''}
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Un</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Qtd</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Peso (kg)</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Estoque</th>
+                    <th className="text-center px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {productAggregates.map((p) => (
+                    <tr key={p.productCode} className="hover:bg-slate-50/60">
+                      <td className="px-3 py-2 text-slate-500 font-mono text-[10px]">{p.productCode}</td>
+                      <td className="px-3 py-2 font-medium text-slate-700">{p.productName}</td>
+                      <td className="px-3 py-2 text-center text-slate-500">{p.unit}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtQty(p.quantity)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtKg(p.weightKg)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtQty(stockMap.get(p.productCode) ?? 0)}</td>
+                      {(() => {
+                        const stock = stockMap.get(p.productCode) ?? 0
+                        const diff = stock - p.quantity
+                        if (diff >= 0) {
+                          return (
+                            <td className="px-3 py-2 text-center">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Suficiente
+                              </span>
+                            </td>
+                          )
+                        }
+                        return (
+                          <td className="px-3 py-2 text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              Faltam {fmtQty(Math.abs(diff))}
+                            </span>
+                          </td>
+                        )
+                      })()}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Cidades */}
+          <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+              <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                Cidades Atendidas — {cityAggregates.length} cidade{cityAggregates.length !== 1 ? 's' : ''}
+              </h3>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {cityAggregates.map((c) => (
+                <div key={c.city + c.uf} className="flex items-start justify-between px-5 py-3 hover:bg-slate-50/60 transition-colors gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-700 leading-snug">{c.city}{c.uf ? ` - ${c.uf}` : ''}</p>
+                    <p className="text-[11px] text-slate-500">{c.orderCount} pedido{c.orderCount !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-bold text-slate-700">{fmtKg(c.weightKg)} <span className="text-[10px] font-medium text-slate-500">kg</span></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/40 text-[11px] text-slate-500 text-right">
+              Peso total: <strong className="text-slate-700">{fmtKg(cityAggregates.reduce((a, c) => a + c.weightKg, 0))} kg</strong>
+            </div>
+          </div>
         </div>
       )}
 

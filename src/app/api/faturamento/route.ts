@@ -16,6 +16,7 @@ export type OrderItem = {
   group: string
   unit: string
   quantity: number
+  volume: number
   weightKg: number
 }
 
@@ -356,6 +357,7 @@ SELECT
   UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
   UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
   SUM(I.QTDNEG)                              AS QUANTIDADE,
+  SUM(NVL(I.QTDVOL, 0))                      AS VOLUME,
   SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG,
   NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO,
   NVL(CAB.APROVADO, 'N')                     AS APROVADO,
@@ -387,13 +389,15 @@ ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 
 function buildStockSql(productCodes: string[]): string {
   const codList = productCodes.map(Number).filter(Boolean).join(', ')
-  const filter = codList ? `WHERE E.CODPROD IN (${codList})` : ''
+  const productFilter = codList ? `AND E.CODPROD IN (${codList})` : ''
   return `
 SELECT
   TO_CHAR(E.CODPROD) AS CODPROD,
   SUM(NVL(E.ESTOQUE, 0)) AS ESTOQUE_ATUAL
 FROM TGFEST E
-${filter}
+WHERE E.CODEMP = 1
+  AND E.CODLOCAL IN (1004000, 2003000, 3003000, 4003000)
+  ${productFilter}
 GROUP BY E.CODPROD
 `.trim()
 }
@@ -422,6 +426,7 @@ type RawItemRow = {
   group: string
   unit: string
   quantity: number
+  volume: number
   weightKg: number
 }
 
@@ -454,6 +459,7 @@ function parseItemRow(r: RawRecord): RawItemRow {
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
     unit: String(r.UNIDADE ?? r.CODVOL ?? '').trim(),
     quantity: parseNumber(r.QUANTIDADE ?? r.QTDNEG),
+    volume: parseNumber(r.VOLUME ?? r.QTDVOL),
     weightKg: parseNumber(r.PESO_KG ?? r.PESOBRUTO),
   }
 }
@@ -561,6 +567,7 @@ export async function GET(request: NextRequest) {
         group: row.group,
         unit: row.unit,
         quantity: row.quantity,
+        volume: row.volume,
         weightKg: row.weightKg,
       })
     }

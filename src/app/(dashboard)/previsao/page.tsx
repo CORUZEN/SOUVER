@@ -1,7 +1,7 @@
 import PrevisaoDeEstoque from '@/components/faturamento/PlanejamentoDiario'
 
 export const metadata = {
-  title: 'Previsão de Estoque',
+  title: 'Previsão de Pedidos',
   description: 'Visualize pedidos em aberto por vendedor, cidade e período.',
 }
 
