@@ -154,8 +154,8 @@ export function generateSellerPdfReport(options: {
 
   const summaryData = [
     ['Pontuação', formatPercent(row.pointsRatio, 2), 'Meta Financeira', `${formatCurrency(row.financialTarget)} (${formatPercent(financialPct, 1)})`],
-    ['Premiação', rewardDisplay, 'Vlr. Total de Pedidos', formatCurrency(row.totalValue)],
-    ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Pedidos', String(row.totalOrders)],
+    ['Premiação Total', rewardDisplay, 'Vlr. Total de Pedidos', formatCurrency(row.totalValue)],
+    ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Pedidos Realizados', String(row.totalOrders)],
     ['Peso Bruto Total', `${formatNumber(row.totalGrossWeight, 2)} kg`, 'Peso por Grupo', `${formatNumber(row.weightSoldKgByGroup, 2)} / ${formatNumber(row.weightTargetKg, 2)} kg`],
     ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`, '', ''],
   ]
@@ -223,7 +223,7 @@ export function generateSellerPdfReport(options: {
     allRows.push([
       'Totais',
       `${row.rules.length} KPIs`,
-      `Meta: ${formatCurrency(row.financialTarget)}`,
+      '',
       '',
       `${row.metasHit} atingido(s)`,
       totalRewardLabel,
