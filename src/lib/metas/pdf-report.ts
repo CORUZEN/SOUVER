@@ -95,28 +95,32 @@ export function generateSellerPdfReport(options: {
   doc.rect(0, 0, pageWidth, 32, 'F')
 
   let headerTextX = margin
+  let separatorX = margin
   if (logoBase64) {
     const logoH = 20
     const logoAspectRatio = 200 / 112  // width / height of ouroverde-pdf.png
     const logoW = logoH * logoAspectRatio
     doc.addImage(logoBase64, 'PNG', margin, 6, logoW, logoH)
-    headerTextX = margin + logoW + 4
+    separatorX = margin + logoW + 3
+    headerTextX = margin + logoW + 7
+
+    // Elegant vertical separator line
+    doc.setDrawColor('#ffffff')
+    doc.setLineWidth(0.4)
+    doc.line(separatorX, 8, separatorX, 24)
   }
 
   doc.setTextColor('#ffffff')
-  doc.setFontSize(16)
+  doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
-  doc.text('OURO VERDE', headerTextX, 14)
+  doc.text('Relatório Individual de Metas', headerTextX, 15)
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text('Sistema Empresarial · Relatório Individual de Metas', headerTextX, 20)
-
-  doc.setFontSize(8)
-  doc.text(`${scopeLabel} · ${monthLabel}`, headerTextX, 26)
+  doc.text(monthLabel, headerTextX, 21)
 
   if (generatedBy) {
-    doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 26, { align: 'right' })
+    doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 21, { align: 'right' })
   }
 
   y = 40
@@ -150,7 +154,7 @@ export function generateSellerPdfReport(options: {
 
   const summaryData = [
     ['Pontuação', formatPercent(row.pointsRatio, 2), 'Meta Financeira', `${formatCurrency(row.financialTarget)} (${formatPercent(financialPct, 1)})`],
-    ['Premiação', rewardDisplay, 'Total de Pedidos', formatCurrency(row.totalValue)],
+    ['Premiação', rewardDisplay, 'Vlr. Total de Pedidos', formatCurrency(row.totalValue)],
     ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Pedidos', String(row.totalOrders)],
     ['Peso Bruto Total', `${formatNumber(row.totalGrossWeight, 2)} kg`, 'Peso por Grupo', `${formatNumber(row.weightSoldKgByGroup, 2)} / ${formatNumber(row.weightTargetKg, 2)} kg`],
     ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`, '', ''],
