@@ -17,6 +17,7 @@ import {
   FileDown,
   FileSpreadsheet,
   FileText,
+  Menu,
   Plus,
   Pencil,
   RefreshCw,
@@ -1390,6 +1391,7 @@ export default function MetasWorkspace() {
   const performanceRequestKeyRef = useRef(performanceRequestKey)
   const pendingBeforePeriodChangeRef = useRef(false)
   const shouldRebaselineAfterAutoMonthInitRef = useRef(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false)
@@ -1399,6 +1401,7 @@ export default function MetasWorkspace() {
   const [isRebaseliningConfig, setIsRebaseliningConfig] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [pdfSellerId, setPdfSellerId] = useState<string>('')
   const [pdfGenerating, setPdfGenerating] = useState(false)
   const input = 'mt-1 w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40'
@@ -1469,6 +1472,18 @@ export default function MetasWorkspace() {
       setMonth(monthParam - 1)
     }
   }, [])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [menuOpen])
 
   useEffect(() => {
     if (autoExportTriggeredRef.current) return
@@ -6589,7 +6604,7 @@ export default function MetasWorkspace() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#b9c7ae]">Gestão Comercial · Metas</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#b9c7ae]">Gestão Comercial</p>
             <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[#edf0e2]">
               {view === 'config'
                 ? 'Configurações do Painel de Metas'
@@ -6597,7 +6612,7 @@ export default function MetasWorkspace() {
                 ? 'Lista de vendedores liberados'
                 : view === 'products'
                 ? 'Lista de produtos das metas'
-                : 'Painel de Metas — Ouro Verde'}
+                : 'Painel de Metas'}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
@@ -6635,16 +6650,16 @@ export default function MetasWorkspace() {
                   <button
                     type="button"
                     onClick={() => setShowPeriodPicker((v) => !v)}
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold backdrop-blur-sm transition-all ${
+                    className={`group relative inline-flex items-center gap-2 overflow-hidden rounded-xl border px-4 py-2.5 text-xs font-bold backdrop-blur-md transition-all active:scale-[0.98] ${
                       showPeriodPicker
-                        ? 'border-primary-400/60 bg-primary-500/20 text-primary-200 ring-1 ring-primary-400/30'
-                        : 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+                        ? 'border-emerald-300/60 bg-linear-to-r from-emerald-400/25 via-emerald-300/15 to-emerald-500/10 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-emerald-300/40'
+                        : 'border-white/30 bg-linear-to-r from-white/20 via-white/15 to-emerald-400/10 text-white shadow-lg shadow-black/10 hover:scale-[1.02] hover:border-white/50 hover:from-white/30 hover:via-white/20 hover:to-emerald-400/20 hover:shadow-xl hover:shadow-emerald-900/20'
                     }`}
                   >
-                    <CalendarDays size={14} />
-                    <span>{MONTHS[month]} {year}</span>
-                    {standby && <span className="rounded bg-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">Standby</span>}
-                    <ChevronDown size={12} className={`transition-transform ${showPeriodPicker ? 'rotate-180' : ''}`} />
+                    <CalendarDays size={15} className="relative z-10" />
+                    <span className="relative z-10">{MONTHS[month]} {year}</span>
+                    {standby && <span className="relative z-10 rounded bg-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">Standby</span>}
+                    <ChevronDown size={12} className={`relative z-10 transition-transform ${showPeriodPicker ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showPeriodPicker && (
@@ -6755,46 +6770,65 @@ export default function MetasWorkspace() {
                     type="button"
                     onClick={() => setExportModalOpen(true)}
                     disabled={exporting || pdfGenerating}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-100 backdrop-blur-sm transition-all hover:bg-emerald-500/25 disabled:opacity-50"
+                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl border border-white/30 bg-linear-to-r from-white/20 via-white/15 to-emerald-400/10 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-black/10 backdrop-blur-md transition-all hover:scale-[1.02] hover:border-white/50 hover:from-white/30 hover:via-white/20 hover:to-emerald-400/20 hover:shadow-xl hover:shadow-emerald-900/20 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
                   >
-                    <FileDown size={14} />
-                    {exporting || pdfGenerating ? 'Gerando…' : 'Exportar Relatório'}
+                    <span className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                    <FileDown size={15} className="relative z-10" />
+                    <span className="relative z-10">
+                      {exporting || pdfGenerating ? 'Gerando…' : 'Exportar Relatório'}
+                    </span>
                   </button>
                 )}
 
                 {(canViewConfig || canViewSellers || canViewProducts) && (
-                  <div className="h-5 w-px bg-white/20" />
-                )}
+                  <div className="relative" ref={menuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setMenuOpen((prev) => !prev)}
+                      className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 p-2.5 text-white/90 backdrop-blur-sm transition-all hover:border-white/40 hover:bg-white/15 hover:text-white"
+                      aria-label="Abrir menu"
+                      aria-expanded={menuOpen}
+                    >
+                      <Menu size={18} />
+                    </button>
 
-                {canViewConfig && (
-                  <button
-                    type="button"
-                    onClick={() => setView('config')}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-primary-500"
-                  >
-                    <Settings2 size={14} />
-                    Configurações
-                  </button>
-                )}
-                {canViewSellers && (
-                  <button
-                    type="button"
-                    onClick={() => setView('sellers')}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
-                  >
-                    <Users size={14} />
-                    Vendedores
-                  </button>
-                )}
-                {canViewProducts && (
-                  <button
-                    type="button"
-                    onClick={() => setView('products')}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
-                  >
-                    <Boxes size={14} />
-                    Produtos
-                  </button>
+                    {menuOpen && (
+                      <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#1a3a2f]/95 shadow-2xl shadow-black/30 backdrop-blur-xl">
+                        <div className="flex flex-col p-1.5">
+                          {canViewConfig && (
+                            <button
+                              type="button"
+                              onClick={() => { setView('config'); setMenuOpen(false) }}
+                              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                            >
+                              <Settings2 size={14} className="shrink-0 text-emerald-300" />
+                              Configurações
+                            </button>
+                          )}
+                          {canViewSellers && (
+                            <button
+                              type="button"
+                              onClick={() => { setView('sellers'); setMenuOpen(false) }}
+                              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                            >
+                              <Users size={14} className="shrink-0 text-emerald-300" />
+                              Vendedores
+                            </button>
+                          )}
+                          {canViewProducts && (
+                            <button
+                              type="button"
+                              onClick={() => { setView('products'); setMenuOpen(false) }}
+                              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                            >
+                              <Boxes size={14} className="shrink-0 text-emerald-300" />
+                              Produtos
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
               </>
