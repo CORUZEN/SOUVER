@@ -30,7 +30,6 @@ export const MODULE_MENU_SECTIONS: Array<{
       'logistica',
       'qualidade',
       'rh',
-      'relatorios',
       'contabilidade',
       'comunicacao',
     ],
