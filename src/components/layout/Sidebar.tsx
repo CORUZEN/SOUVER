@@ -422,7 +422,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                               <span className={cn(
                                 'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
                                 isFaturamentoActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
-                              )}>Planejamento de Faturamento</span>
+                              )}>Previsão de Estoque</span>
                             </Link>
                           )}
                         </div>

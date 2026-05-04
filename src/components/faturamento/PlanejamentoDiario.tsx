@@ -352,7 +352,7 @@ function CitiesView({ cities, onBack, onSyncDone }: CitiesViewProps) {
         <div className="absolute inset-x-3 top-0 h-0.5 bg-linear-to-r from-blue-500 via-cyan-400 to-emerald-400" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Logística · Planejamento de Faturamento</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Previsão de Estoque</p>
             <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Lista de Cidades</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300">
@@ -723,8 +723,8 @@ export default function PlanejamentoDiario() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Branding */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Logística · Planejamento</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Planejamento de Faturamento</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Logística</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-white">Previsão de Estoque</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-300">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
