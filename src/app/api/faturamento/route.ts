@@ -190,27 +190,31 @@ function buildHeaders(config: SankhyaConfig, bearerToken: string | null): Record
   return headers
 }
 
-function getSqlEndpoints(baseUrl: string, appKey?: string | null, hasBearer = false) {
+function getSqlEndpoints(baseUrl: string, appKey?: string | null, hasBearer = false, sessionId?: string | null) {
   const appKeyParam = appKey ? `&appkey=${encodeURIComponent(appKey)}` : ''
+  const sessionParam = sessionId ? `&jsessionid=${encodeURIComponent(sessionId)}` : ''
   const query = `serviceName=DbExplorerSP.executeQuery&outputType=json${appKeyParam}`
   if (hasBearer) {
     return [
       `https://api.sankhya.com.br/gateway/v1/mge/service.sbr?${query}`,
-      `${baseUrl}/mge/service.sbr?${query}`,
+      `${baseUrl}/mge/service.sbr?${query}${sessionParam}`,
     ]
   }
-  return [`${baseUrl}/mge/service.sbr?${query}`]
+  return [`${baseUrl}/mge/service.sbr?${query}${sessionParam}`]
 }
 
 function extractServiceError(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null
   const obj = data as RawRecord
-  const status = String(obj.status ?? obj.statusMessage ?? '').toLowerCase()
-  if (status.includes('error') || status.includes('erro') || status === '1') {
-    const msg = obj.statusMessage ?? obj.message ?? obj.error
-    return typeof msg === 'string' ? msg : 'Erro de serviço Sankhya'
+  const status = String(obj.status ?? '').trim()
+  const statusMessage = String(obj.statusMessage ?? '').trim()
+  if (!status && !statusMessage) return null
+  // Status '0' is success, but if statusMessage contains an exception, it's an error
+  if (status === '0' && statusMessage && !statusMessage.toLowerCase().includes('sucesso') && !statusMessage.toLowerCase().includes('success')) {
+    return statusMessage
   }
-  return null
+  if (status === '1' || status.toUpperCase() === 'SUCCESS') return null
+  return statusMessage || `Falha no servico Sankhya (status ${status || 'desconhecido'}).`
 }
 
 function collectRecords(obj: unknown, bucket: RawRecord[]): void {
@@ -292,12 +296,18 @@ async function queryRows(
     { requestBody: { sql } },
     { serviceName: 'DbExplorerSP.executeQuery', requestBody: { statement: sql } },
   ]
-  for (const endpoint of getSqlEndpoints(baseUrl, appKey, /^Bearer\s+/i.test(headers.Authorization ?? ''))) {
+  const bearerToken = headers.Authorization?.replace(/^Bearer\s+/i, '') ?? null
+  for (const endpoint of getSqlEndpoints(baseUrl, appKey, /^Bearer\s+/i.test(headers.Authorization ?? ''), bearerToken)) {
     for (const payload of payloadVariants) {
       try {
+        const fetchHeaders = { ...headers }
+        // For local endpoint, pass sessionId as cookie
+        if (endpoint.includes('ouroverde.nuvemdatacom.com.br') && bearerToken) {
+          fetchHeaders.Cookie = `JSESSIONID=${bearerToken}`
+        }
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers,
+          headers: fetchHeaders,
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(30_000),
         })
@@ -333,7 +343,7 @@ function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: numbe
       : `AND NVL(CAB.STATUSNOTA, 'L') <> 'C'`
 
   const dateFilter = mode === 'no_date'
-    ? ''
+    ? `AND CAB.DTNEG >= ADD_MONTHS(SYSDATE, -3)`
     : `AND CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
   AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')`
 
@@ -355,8 +365,8 @@ SELECT
   UPPER(TRIM(P.DESCRPROD))                   AS PRODUTO,
   UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
   UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
-  I.QTDNEG                                   AS QUANTIDADE,
-  NVL(I.PESO, 0)                             AS PESO_KG,
+  SUM(I.QTDNEG)                              AS QUANTIDADE,
+  SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG,
   NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO
 FROM TGFCAB CAB
 INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
@@ -371,6 +381,9 @@ WHERE CAB.CODVEND > 0
   ${dateFilter}
   ${sellerFilter}
   ${rownumGuard}
+GROUP BY CAB.NUNOTA, CAB.CODVEND, VEN.APELIDO, CAB.CODPARC, PAR.NOMEPARC,
+         CID.NOMECID, UF.UF, CAB.CODTIPOPER, CAB.TIPMOV, CAB.DTNEG,
+         I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, TOP.BONIFICACAO
 ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
@@ -520,7 +533,6 @@ export async function GET(request: NextRequest) {
     if (rawRows.length === 0) {
       queryMode = 'failed'
     }
-    console.log('[faturamento] attempts:', attemptLog.join(' | '), '| sellerCodes:', sellerCodes, '| finalMode:', queryMode, '| rows:', rawRows.length)
 
     // Parse rows into order map
     const orderMap = new Map<string, DailyOrder>()

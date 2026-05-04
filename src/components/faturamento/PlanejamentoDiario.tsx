@@ -575,17 +575,6 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Diagnostics ── */}
-      {data?.diagnostics && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-600 text-xs">
-          <p className="font-semibold text-slate-700">Diagnóstico da consulta</p>
-          <p className="mt-1">Modo: <strong>{data.diagnostics.queryMode ?? '?'}</strong> | Linhas brutas: {data.diagnostics.orderRows} | Pedidos: {data.totalOrders} | Erro: {data.diagnostics.queryError ?? 'nenhum'}</p>
-          {data.diagnostics.sqlPreview && (
-            <pre className="mt-2 bg-white rounded-lg p-2 overflow-x-auto border border-slate-100">{data.diagnostics.sqlPreview}...</pre>
-          )}
-        </div>
-      )}
-
       {/* ── Stats ── */}
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
