@@ -34,6 +34,9 @@ export type DailyOrder = {
   tipMov: string
   codTipOper: string
   dtNeg: string
+  aprovado: string
+  pendente: string
+  statusNota: string
   items: OrderItem[]
 }
 
@@ -332,22 +335,9 @@ async function queryRows(
    SQL builders
 ───────────────────────────────────────────── */
 
-function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: number[], mode: 'pending' | 'status_p' | 'all' | 'no_date' = 'pending'): string {
+function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: number[]): string {
   const codList = sellerCodes.join(', ')
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${codList})` : ''
-
-  const pendingFilter = mode === 'pending'
-    ? `AND NVL(CAB.PENDENTE, 'N') = 'S'`
-    : mode === 'status_p'
-      ? `AND NVL(CAB.STATUSNOTA, 'L') = 'P'`
-      : `AND NVL(CAB.STATUSNOTA, 'L') <> 'C'`
-
-  const dateFilter = mode === 'no_date'
-    ? `AND CAB.DTNEG >= ADD_MONTHS(SYSDATE, -3)`
-    : `AND CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
-  AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')`
-
-  const rownumGuard = mode === 'no_date' ? 'AND ROWNUM <= 500' : ''
 
   return `
 SELECT
@@ -358,7 +348,7 @@ SELECT
   UPPER(TRIM(PAR.NOMEPARC))                  AS CLIENTE,
   UPPER(TRIM(NVL(CID.NOMECID, 'SEM CIDADE'))) AS CIDADE,
   UPPER(TRIM(NVL(UF.UF, '')))                AS UF,
-  TO_CHAR(CAB.CODTIPOPER)                    AS CODTIPOPER,
+  TRIM(TO_CHAR(CAB.CODTIPOPER, 'FM9999999999')) AS CODTIPOPER,
   UPPER(TRIM(CAB.TIPMOV))                    AS TIPMOV,
   TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD')           AS DTNEG,
   TO_CHAR(I.CODPROD)                         AS CODPROD,
@@ -367,7 +357,10 @@ SELECT
   UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
   SUM(I.QTDNEG)                              AS QUANTIDADE,
   SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG,
-  NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO
+  NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO,
+  NVL(CAB.APROVADO, 'N')                     AS APROVADO,
+  NVL(CAB.PENDENTE, 'N')                     AS PENDENTE,
+  NVL(CAB.STATUSNOTA, 'L')                   AS STATUSNOTA
 FROM TGFCAB CAB
 INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
@@ -376,14 +369,18 @@ INNER JOIN TGFPAR PAR ON PAR.CODPARC = CAB.CODPARC
 LEFT  JOIN TSICID CID ON CID.CODCID = PAR.CODCID
 LEFT  JOIN TSIUFS UF  ON UF.CODUF   = CID.UF
 LEFT  JOIN TGFTOP TOP ON TOP.CODTIPOPER = CAB.CODTIPOPER
+  AND TOP.DHALTER = (SELECT MAX(DHALTER) FROM TGFTOP WHERE CODTIPOPER = CAB.CODTIPOPER)
 WHERE CAB.CODVEND > 0
-  ${pendingFilter}
-  ${dateFilter}
+  AND CAB.CODTIPOPER IN (1001, 1051, 1053)
+  AND NVL(CAB.PENDENTE, 'N') = 'S'
+  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
+  AND CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
+  AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')
   ${sellerFilter}
-  ${rownumGuard}
 GROUP BY CAB.NUNOTA, CAB.CODVEND, VEN.APELIDO, CAB.CODPARC, PAR.NOMEPARC,
          CID.NOMECID, UF.UF, CAB.CODTIPOPER, CAB.TIPMOV, CAB.DTNEG,
-         I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, TOP.BONIFICACAO
+         I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, TOP.BONIFICACAO,
+         CAB.APROVADO, CAB.PENDENTE, CAB.STATUSNOTA
 ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
@@ -417,6 +414,9 @@ type RawItemRow = {
   dhTipOper: string
   tipMov: string
   dtNeg: string
+  aprovado: string
+  pendente: string
+  statusNota: string
   productCode: string
   productName: string
   group: string
@@ -425,11 +425,11 @@ type RawItemRow = {
   weightKg: number
 }
 
-function classifyOrderType(tipMov: string, codTipOper: string, isBonif: boolean): OrderType {
-  const tm = tipMov.trim().toUpperCase()
-  if (isBonif) return 'BONIFICACAO'
-  if (tm === 'D') return 'TROCA'
-  if (tm === 'V' || tm === 'P') return 'VENDA'
+function classifyOrderType(codTipOper: string): OrderType {
+  const cto = String(codTipOper).trim()
+  if (cto === '1001') return 'VENDA'
+  if (cto === '1051') return 'BONIFICACAO'
+  if (cto === '1053') return 'TROCA'
   return 'OUTROS'
 }
 
@@ -446,6 +446,9 @@ function parseItemRow(r: RawRecord): RawItemRow {
     dhTipOper: String(r.DHTIPOPER ?? '').trim(),
     tipMov: String(r.TIPMOV ?? '').trim(),
     dtNeg: String(r.DTNEG ?? '').trim(),
+    aprovado: String(r.APROVADO ?? '').trim(),
+    pendente: String(r.PENDENTE ?? '').trim(),
+    statusNota: String(r.STATUSNOTA ?? '').trim(),
     productCode: String(r.CODPROD ?? '').trim(),
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
@@ -509,40 +512,30 @@ export async function GET(request: NextRequest) {
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
 
-    // Query open orders + items (cascade: no_date -> pending -> status_p -> all)
+    // Query open orders + items
     let rawRows: RawRecord[] = []
-    let queryMode: 'no_date' | 'pending' | 'status_p' | 'all' | 'failed' = 'no_date'
     let queryError: string | null = null
-    let attemptLog: string[] = []
-
-    for (const mode of ['no_date', 'pending', 'status_p', 'all'] as const) {
-      try {
-        const sql = buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes, mode)
-        const rows = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
-        attemptLog.push(`${mode}: ${rows.length} rows`)
-        rawRows = rows
-        queryMode = mode
-        queryError = null
-        if (rows.length > 0) break
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : `Query ${mode} falhou`
-        attemptLog.push(`${mode}: ERROR - ${msg}`)
-        queryError = msg
-      }
-    }
-    if (rawRows.length === 0) {
-      queryMode = 'failed'
+    try {
+      const sql = buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes)
+      rawRows = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+    } catch (err) {
+      queryError = err instanceof Error ? err.message : 'Query falhou'
     }
 
     // Parse rows into order map
     const orderMap = new Map<string, DailyOrder>()
+    const debugRows = rawRows.slice(0, 10)
+    console.log('[faturamento] sample raw rows:', debugRows.map(r => ({
+      NUNOTA: r.NUNOTA, CODTIPOPER: r.CODTIPOPER, TIPMOV: r.TIPMOV,
+      BONIFICACAO: r.BONIFICACAO, APROVADO: r.APROVADO, PENDENTE: r.PENDENTE
+    })))
     for (const r of rawRows) {
       const row = parseItemRow(r)
       if (!row.nunota || !row.productCode) continue
 
       if (!orderMap.has(row.nunota)) {
-        const isBonif = String(r.BONIFICACAO ?? '').trim().toUpperCase() === 'S'
-        const orderType = classifyOrderType(row.tipMov, row.codTipOper, isBonif)
+        const orderType = classifyOrderType(row.codTipOper)
+        console.log(`[faturamento] order ${row.nunota} -> codTipOper=${row.codTipOper}, type=${orderType}, aprovado=${row.aprovado}, pendente=${row.pendente}`)
         orderMap.set(row.nunota, {
           orderNumber: row.nunota,
           sellerCode: row.sellerCode,
@@ -556,6 +549,9 @@ export async function GET(request: NextRequest) {
           tipMov: row.tipMov,
           codTipOper: row.codTipOper,
           dtNeg: row.dtNeg,
+          aprovado: row.aprovado,
+          pendente: row.pendente,
+          statusNota: row.statusNota,
           items: [],
         })
       }
@@ -630,18 +626,14 @@ export async function GET(request: NextRequest) {
         stockRows: stockRows.length,
         sellersUsed: sellerCodes,
         queryError,
-        queryMode,
+        queryMode: 'direct',
         dateFrom: dateFromParam,
         dateTo: dateToParam,
-        sqlPreview: buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes, queryMode === 'failed' ? 'all' : (queryMode as 'no_date' | 'pending' | 'status_p' | 'all')).slice(0, 500),
+        sqlPreview: buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes).slice(0, 500),
       },
     }
 
-    return NextResponse.json(response, {
-      headers: {
-        'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-      },
-    })
+    return NextResponse.json(response)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro interno'
     console.error('[faturamento/route] Erro:', message)

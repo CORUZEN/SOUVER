@@ -38,7 +38,7 @@ interface OrderItem {
   weightKg: number
 }
 
-type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'OUTROS'
+type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'NAO_CONFIRMADO' | 'OUTROS'
 
 interface OpenOrder {
   orderNumber: string
@@ -53,6 +53,9 @@ interface OpenOrder {
   tipMov: string
   codTipOper: string
   dtNeg: string
+  aprovado: string
+  pendente: string
+  statusNota: string
   items: OrderItem[]
 }
 
@@ -111,6 +114,7 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
   VENDA: 'Venda',
   BONIFICACAO: 'Bonificação',
   TROCA: 'Troca',
+  NAO_CONFIRMADO: 'Não Confirmados',
   OUTROS: 'Outros',
 }
 
@@ -136,6 +140,13 @@ const ORDER_TYPE_COLOR: Record<OrderType, { bg: string; border: string; text: st
     badge: 'bg-amber-100 text-amber-700',
     icon: 'text-amber-600',
   },
+  NAO_CONFIRMADO: {
+    bg: 'bg-rose-50',
+    border: 'border-rose-200',
+    text: 'text-rose-700',
+    badge: 'bg-rose-100 text-rose-700',
+    icon: 'text-rose-600',
+  },
   OUTROS: {
     bg: 'bg-slate-50',
     border: 'border-slate-200',
@@ -149,26 +160,34 @@ const ORDER_TYPE_COLOR: Record<OrderType, { bg: string; border: string; text: st
    Sub-components
 ───────────────────────────────────────────── */
 
-function StatBadge({ label, value, sub, icon, colorKey }: {
+function StatBadge({ label, value, sub, icon, colorKey, onClick }: {
   label: string
   value: string
   sub?: string
   icon: React.ReactNode
   colorKey: OrderType | 'default'
+  onClick?: () => void
 }) {
   const colors = colorKey === 'default'
     ? { bg: 'bg-white', border: 'border-slate-200', text: 'text-slate-700', icon: 'text-slate-500' }
     : ORDER_TYPE_COLOR[colorKey]
 
+  const clickable = !!onClick
+
   return (
-    <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 ${colors.bg} ${colors.border}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left w-full transition-all ${colors.bg} ${colors.border} ${clickable ? 'hover:shadow-md hover:scale-[1.02] active:scale-[0.99]' : ''}`}
+    >
       <div className={`shrink-0 ${colors.icon}`}>{icon}</div>
       <div className="min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-wider opacity-60 truncate">{label}</p>
         <p className={`text-xl font-bold leading-tight ${colors.text}`}>{value}</p>
         {sub && <p className="text-[11px] opacity-60 mt-0.5 truncate">{sub}</p>}
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -274,8 +293,19 @@ function MultiSelect({
   )
 }
 
-function OrderTable({ orders, title, type }: { orders: OpenOrder[]; title: string; type: OrderType }) {
+function OrderModal({
+  orders,
+  title,
+  type,
+  onClose,
+}: {
+  orders: OpenOrder[]
+  title: string
+  type: OrderType
+  onClose: () => void
+}) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
   const colors = ORDER_TYPE_COLOR[type]
 
   function toggle(nunota: string) {
@@ -287,100 +317,184 @@ function OrderTable({ orders, title, type }: { orders: OpenOrder[]; title: strin
     })
   }
 
-  const totalWeight = useMemo(() => orders.reduce((acc, o) => acc + o.items.reduce((s, i) => s + i.weightKg, 0), 0), [orders])
-  const totalItems = useMemo(() => orders.reduce((acc, o) => acc + o.items.length, 0), [orders])
+  const filteredOrders = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return orders
+    return orders.filter(
+      (o) =>
+        o.orderNumber.includes(q) ||
+        o.clientName.toLowerCase().includes(q) ||
+        o.sellerName.toLowerCase().includes(q) ||
+        o.city.toLowerCase().includes(q)
+    )
+  }, [orders, search])
+
+  const totalWeight = useMemo(
+    () => filteredOrders.reduce((acc, o) => acc + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+    [filteredOrders]
+  )
+  const totalItems = useMemo(
+    () => filteredOrders.reduce((acc, o) => acc + o.items.length, 0),
+    [filteredOrders]
+  )
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
-    <div className={`rounded-2xl border ${colors.border} bg-white shadow-sm overflow-hidden`}>
-      <div className={`flex items-center justify-between px-5 py-3.5 border-b ${colors.border} ${colors.bg}`}>
-        <div className="flex items-center gap-2.5">
-          <ClipboardList className={`w-5 h-5 ${colors.icon}`} />
-          <h3 className={`text-sm font-bold ${colors.text}`}>{title}</h3>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${colors.badge}`}>
-            {orders.length} pedido{orders.length !== 1 ? 's' : ''}
-          </span>
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${colors.border} ${colors.bg}`}>
+          <div className="flex items-center gap-2.5">
+            <ClipboardList className={`w-5 h-5 ${colors.icon}`} />
+            <h3 className={`text-sm font-bold ${colors.text}`}>{title}</h3>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${colors.badge}`}>
+              {filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-xs text-slate-500">
+              <strong>{fmtKg(totalWeight)}</strong> kg · <strong>{totalItems}</strong> item{totalItems !== 1 ? 's' : ''}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-black/5 text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span><strong>{fmtKg(totalWeight)}</strong> kg</span>
-          <span><strong>{totalItems}</strong> item{totalItems !== 1 ? 's' : ''}</span>
+
+        {/* Search */}
+        <div className="px-5 py-3 border-b border-slate-100">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por número, cliente, vendedor ou cidade…"
+              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
+          {filteredOrders.length === 0 ? (
+            <div className="px-5 py-12 text-center text-slate-400 text-sm">
+              {search ? 'Nenhum pedido encontrado para esta busca.' : 'Nenhum pedido em aberto nesta categoria para os filtros aplicados.'}
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredOrders.map((order) => {
+                const isOpen = expanded.has(order.orderNumber)
+                const orderWeight = order.items.reduce((s, i) => s + i.weightKg, 0)
+                const confirmada = order.statusNota === 'L' ? 'Sim' : 'Não'
+                const pendente = order.pendente === 'S' ? 'Sim' : 'Não'
+                return (
+                  <div key={order.orderNumber} className="transition-colors hover:bg-slate-50/50">
+                    <button
+                      type="button"
+                      onClick={() => toggle(order.orderNumber)}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${colors.bg} ${colors.border} border`}>
+                          <Package className={`w-4 h-4 ${colors.icon}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">
+                            Pedido {order.orderNumber}
+                            <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {order.clientName}
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            {order.city}{order.uf ? ` - ${order.uf}` : ''}
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            Neg. {formatDate(order.dtNeg)}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${order.statusNota === 'L' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                              Confirmada: {confirmada}
+                            </span>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${order.pendente === 'S' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                              Pendente: {pendente}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-3">
+                        <span className="text-xs font-semibold text-slate-600 hidden sm:inline">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
+                        <span className="text-xs font-bold text-slate-700">{fmtKg(orderWeight)} kg</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    {isOpen && (
+                      <div className="px-5 pb-4">
+                        <div className="rounded-xl border border-slate-100 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Produto</th>
+                                <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Grupo</th>
+                                <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Qtd</th>
+                                <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Peso (kg)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {order.items.map((item, idx) => (
+                                <tr key={`${item.productCode}-${idx}`} className="hover:bg-slate-50/60">
+                                  <td className="px-3 py-2 font-medium text-slate-700">
+                                    <span className="text-[10px] text-slate-400 block">{item.productCode}</span>
+                                    {item.productName}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-500">{item.group}</td>
+                                  <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtQty(item.quantity)} <span className="text-[10px] text-slate-400">{item.unit}</span></td>
+                                  <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtKg(item.weightKg)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <span className="text-xs text-slate-500">
+            <strong>{filteredOrders.length}</strong> pedido{filteredOrders.length !== 1 ? 's' : ''} · <strong>{fmtKg(totalWeight)}</strong> kg
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Fechar
+          </button>
         </div>
       </div>
-
-      {orders.length === 0 ? (
-        <div className="px-5 py-8 text-center text-slate-400 text-sm">
-          Nenhum pedido em aberto nesta categoria para os filtros aplicados.
-        </div>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {orders.map((order) => {
-            const isOpen = expanded.has(order.orderNumber)
-            const orderWeight = order.items.reduce((s, i) => s + i.weightKg, 0)
-            return (
-              <div key={order.orderNumber} className="transition-colors hover:bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => toggle(order.orderNumber)}
-                  className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${colors.bg} ${colors.border} border`}>
-                      <Package className={`w-4 h-4 ${colors.icon}`} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
-                        Pedido {order.orderNumber}
-                        <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">
-                        {order.clientName}
-                        <span className="mx-1.5 text-slate-300">·</span>
-                        {order.city}{order.uf ? ` - ${order.uf}` : ''}
-                        <span className="mx-1.5 text-slate-300">·</span>
-                        Neg. {formatDate(order.dtNeg)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-600">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
-                    <span className="text-xs font-bold text-slate-700">{fmtKg(orderWeight)} kg</span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-
-                {isOpen && (
-                  <div className="px-5 pb-4">
-                    <div className="rounded-xl border border-slate-100 overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Produto</th>
-                            <th className="text-left px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Grupo</th>
-                            <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Qtd</th>
-                            <th className="text-right px-3 py-2 font-semibold text-slate-500 uppercase tracking-wider">Peso (kg)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {order.items.map((item, idx) => (
-                            <tr key={`${item.productCode}-${idx}`} className="hover:bg-slate-50/60">
-                              <td className="px-3 py-2 font-medium text-slate-700">
-                                <span className="text-[10px] text-slate-400 block">{item.productCode}</span>
-                                {item.productName}
-                              </td>
-                              <td className="px-3 py-2 text-slate-500">{item.group}</td>
-                              <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtQty(item.quantity)} <span className="text-[10px] text-slate-400">{item.unit}</span></td>
-                              <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtKg(item.weightKg)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
@@ -401,6 +515,7 @@ export default function PrevisaoDeEstoque() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastFetched, setLastFetched] = useState<string | null>(null)
+  const [modalType, setModalType] = useState<OrderType | null>(null)
 
   const { data: allowlistData } = useSellersAllowlist()
   const sellers: AllowedSeller[] = useMemo(() => {
@@ -423,7 +538,7 @@ export default function PrevisaoDeEstoque() {
       const params = new URLSearchParams({ date: from, dateFrom: from, dateTo: to })
       if (sellerCodeList) params.set('sellers', sellerCodeList)
 
-      const res = await fetch(`/api/faturamento?${params}`)
+      const res = await fetch(`/api/faturamento?${params}`, { cache: 'no-store' })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `HTTP ${res.status}`)
@@ -457,8 +572,13 @@ export default function PrevisaoDeEstoque() {
   }, [data, selectedSellers, selectedCities])
 
   const groupedOrders = useMemo(() => {
-    const groups = { VENDA: [] as OpenOrder[], BONIFICACAO: [] as OpenOrder[], TROCA: [] as OpenOrder[], OUTROS: [] as OpenOrder[] }
+    const groups = { VENDA: [] as OpenOrder[], BONIFICACAO: [] as OpenOrder[], TROCA: [] as OpenOrder[], NAO_CONFIRMADO: [] as OpenOrder[], OUTROS: [] as OpenOrder[] }
     for (const order of filteredOrders) {
+      // Pedidos pendentes mas não confirmados (não liberados) vão para atenção especial
+      if (order.pendente === 'S' && order.statusNota !== 'L') {
+        groups.NAO_CONFIRMADO.push(order)
+        continue
+      }
       if (groups[order.orderType]) groups[order.orderType].push(order)
       else groups.OUTROS.push(order)
     }
@@ -577,22 +697,23 @@ export default function PrevisaoDeEstoque() {
 
       {/* ── Stats ── */}
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           <StatBadge label="Total de pedidos" value={totals.orders.toLocaleString('pt-BR')} sub={`${totals.clients} cliente${totals.clients !== 1 ? 's' : ''}`} icon={<ClipboardList className="w-5 h-5" />} colorKey="default" />
-          <StatBadge label="Vendas" value={groupedOrders.VENDA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.VENDA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<ShoppingCart className="w-5 h-5" />} colorKey="VENDA" />
-          <StatBadge label="Bonificações" value={groupedOrders.BONIFICACAO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.BONIFICACAO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Box className="w-5 h-5" />} colorKey="BONIFICACAO" />
-          <StatBadge label="Trocas" value={groupedOrders.TROCA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.TROCA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Truck className="w-5 h-5" />} colorKey="TROCA" />
+          <StatBadge label="Vendas" value={groupedOrders.VENDA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.VENDA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<ShoppingCart className="w-5 h-5" />} colorKey="VENDA" onClick={() => setModalType('VENDA')} />
+          <StatBadge label="Bonificações" value={groupedOrders.BONIFICACAO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.BONIFICACAO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Box className="w-5 h-5" />} colorKey="BONIFICACAO" onClick={() => setModalType('BONIFICACAO')} />
+          <StatBadge label="Trocas" value={groupedOrders.TROCA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.TROCA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Truck className="w-5 h-5" />} colorKey="TROCA" onClick={() => setModalType('TROCA')} />
+          <StatBadge label="Não Confirmados" value={groupedOrders.NAO_CONFIRMADO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.NAO_CONFIRMADO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<AlertTriangle className="w-5 h-5" />} colorKey="NAO_CONFIRMADO" onClick={() => setModalType('NAO_CONFIRMADO')} />
         </div>
       )}
 
-      {/* ── Orders by type ── */}
-      {data && (
-        <div className="space-y-4">
-          <OrderTable orders={groupedOrders.VENDA} title="Pedidos de Venda" type="VENDA" />
-          <OrderTable orders={groupedOrders.BONIFICACAO} title="Pedidos de Bonificação" type="BONIFICACAO" />
-          <OrderTable orders={groupedOrders.TROCA} title="Pedidos de Troca" type="TROCA" />
-          <OrderTable orders={groupedOrders.OUTROS} title="Outros Pedidos" type="OUTROS" />
-        </div>
+      {/* ── Order Modal ── */}
+      {modalType && data && (
+        <OrderModal
+          orders={groupedOrders[modalType]}
+          title={modalType === 'VENDA' ? 'Pedidos de Venda' : modalType === 'BONIFICACAO' ? 'Pedidos de Bonificação' : modalType === 'TROCA' ? 'Pedidos de Troca' : modalType === 'NAO_CONFIRMADO' ? 'Pedidos Não Confirmados' : 'Outros Pedidos'}
+          type={modalType}
+          onClose={() => setModalType(null)}
+        />
       )}
 
       {/* ── Empty ── */}
