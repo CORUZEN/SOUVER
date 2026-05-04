@@ -327,7 +327,7 @@ function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: numbe
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${codList})` : ''
 
   const pendingFilter = mode === 'pending'
-    ? `AND NVL(CAB.AD_PENDENTE, 'N') = 'S'`
+    ? `AND NVL(CAB.PENDENTE, 'N') = 'S'`
     : mode === 'status_p'
       ? `AND NVL(CAB.STATUSNOTA, 'L') = 'P'`
       : `AND NVL(CAB.STATUSNOTA, 'L') <> 'C'`
@@ -346,8 +346,8 @@ SELECT
   UPPER(TRIM(NVL(VEN.APELIDO, 'SEM VENDEDOR'))) AS VENDEDOR,
   TO_CHAR(CAB.CODPARC)                       AS CODPARC,
   UPPER(TRIM(PAR.NOMEPARC))                  AS CLIENTE,
-  UPPER(TRIM(NVL(PAR.CIDADE, 'SEM CIDADE'))) AS CIDADE,
-  UPPER(TRIM(NVL(PAR.UF, '')))               AS UF,
+  UPPER(TRIM(NVL(CID.NOMECID, 'SEM CIDADE'))) AS CIDADE,
+  UPPER(TRIM(NVL(UF.UF, '')))                AS UF,
   TO_CHAR(CAB.CODTIPOPER)                    AS CODTIPOPER,
   UPPER(TRIM(CAB.TIPMOV))                    AS TIPMOV,
   TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD')           AS DTNEG,
@@ -356,18 +356,22 @@ SELECT
   UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
   UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
   I.QTDNEG                                   AS QUANTIDADE,
-  NVL(I.PESOBRUTO, 0) * I.QTDNEG            AS PESO_KG
+  NVL(I.PESO, 0)                             AS PESO_KG,
+  NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO
 FROM TGFCAB CAB
 INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 INNER JOIN TGFPAR PAR ON PAR.CODPARC = CAB.CODPARC
+LEFT  JOIN TSICID CID ON CID.CODCID = PAR.CODCID
+LEFT  JOIN TSIUFS UF  ON UF.CODUF   = CID.UF
+LEFT  JOIN TGFTOP TOP ON TOP.CODTIPOPER = CAB.CODTIPOPER
 WHERE CAB.CODVEND > 0
   ${pendingFilter}
   ${dateFilter}
   ${sellerFilter}
   ${rownumGuard}
-ORDER BY CAB.DTNEG DESC, VEN.APELIDO, PAR.CIDADE, CAB.NUNOTA, I.CODPROD
+ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
 
@@ -408,9 +412,9 @@ type RawItemRow = {
   weightKg: number
 }
 
-function classifyOrderType(tipMov: string, _codTipOper: string): OrderType {
+function classifyOrderType(tipMov: string, codTipOper: string, isBonif: boolean): OrderType {
   const tm = tipMov.trim().toUpperCase()
-  // TODO: ajustar códigos específicos da OURO VERDE conforme necessário
+  if (isBonif) return 'BONIFICACAO'
   if (tm === 'D') return 'TROCA'
   if (tm === 'V' || tm === 'P') return 'VENDA'
   return 'OUTROS'
@@ -525,7 +529,8 @@ export async function GET(request: NextRequest) {
       if (!row.nunota || !row.productCode) continue
 
       if (!orderMap.has(row.nunota)) {
-        const orderType = classifyOrderType(row.tipMov, row.codTipOper)
+        const isBonif = String(r.BONIFICACAO ?? '').trim().toUpperCase() === 'S'
+        const orderType = classifyOrderType(row.tipMov, row.codTipOper, isBonif)
         orderMap.set(row.nunota, {
           orderNumber: row.nunota,
           sellerCode: row.sellerCode,
