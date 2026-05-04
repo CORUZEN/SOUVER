@@ -152,7 +152,7 @@ export function generateSellerPdfReport(options: {
     tableWidth: contentWidth,
     body: summaryData,
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2.5, font: 'helvetica' },
+    styles: { fontSize: 9, cellPadding: 1.8, font: 'helvetica' },
     columnStyles: {
       0: { fontStyle: 'bold', textColor: textLight, cellWidth: 38 },
       1: { textColor: textDark, cellWidth: 56 },
@@ -190,9 +190,9 @@ export function generateSellerPdfReport(options: {
         const progressPct = r.progress
         const diff = progressPct >= 1 ? 'Meta atingida' : `Faltam ${formatPercent(1 - progressPct, 1)}`
         const rewardLabel = row.rewardMode === 'PERCENT'
-          ? formatRewardPercent(r.rewardValue)
+          ? formatRewardPercent(r.points)
           : formatCurrency(r.rewardValue)
-        totalRewardValue += r.rewardValue
+        totalRewardValue += r.points
         allRows.push([
           stageLabel(r.stage),
           r.kpi,
@@ -243,8 +243,8 @@ export function generateSellerPdfReport(options: {
     tableEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
   }
 
-  // --- SIGNATURE AREA ---
-  const sigY = Math.min(tableEndY, 270)
+  // --- SIGNATURE AREA (fixed at bottom of page) ---
+  const sigY = 265
   doc.setDrawColor(accentColor)
   doc.setLineWidth(0.3)
   doc.line(margin, sigY, margin + 70, sigY)
