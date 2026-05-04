@@ -19,6 +19,8 @@ export type OrderItem = {
   weightKg: number
 }
 
+export type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'OUTROS'
+
 export type DailyOrder = {
   orderNumber: string
   sellerCode: string
@@ -27,6 +29,11 @@ export type DailyOrder = {
   clientName: string
   city: string
   uf: string
+  orderType: OrderType
+  orderTypeRaw: string
+  tipMov: string
+  codTipOper: string
+  dtNeg: string
   items: OrderItem[]
 }
 
@@ -52,6 +59,10 @@ export type FaturamentoResponse = {
     stockRows: number
     sellersUsed: number[]
     endpointUsed?: string
+    queryError?: string | null
+    dateFrom?: string
+    dateTo?: string
+    sqlPreview?: string
   }
 }
 
@@ -310,8 +321,7 @@ async function queryRows(
    SQL builders
 ───────────────────────────────────────────── */
 
-function buildOrderItemsSql(date: string, sellerCodes: number[]): string {
-  const dateStr = date // YYYY-MM-DD
+function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: number[]): string {
   const codList = sellerCodes.join(', ')
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${codList})` : ''
 
@@ -324,6 +334,9 @@ SELECT
   UPPER(TRIM(PAR.NOMEPARC))                  AS CLIENTE,
   UPPER(TRIM(NVL(PAR.CIDADE, 'SEM CIDADE'))) AS CIDADE,
   UPPER(TRIM(NVL(PAR.UF, '')))               AS UF,
+  TO_CHAR(CAB.CODTIPOPER)                    AS CODTIPOPER,
+  UPPER(TRIM(CAB.TIPMOV))                    AS TIPMOV,
+  TO_CHAR(CAB.DTNEG, 'YYYY-MM-DD')           AS DTNEG,
   TO_CHAR(I.CODPROD)                         AS CODPROD,
   UPPER(TRIM(P.DESCRPROD))                   AS PRODUTO,
   UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
@@ -335,45 +348,12 @@ INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 INNER JOIN TGFPAR PAR ON PAR.CODPARC = CAB.CODPARC
-WHERE CAB.DTNEG = TO_DATE('${dateStr}', 'YYYY-MM-DD')
-  AND NVL(CAB.STATUSNOTA, 'L') NOT IN ('C')
-  AND CAB.TIPMOV IN ('P', 'V', 'O')
+WHERE CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
+  AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')
+  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
   AND CAB.CODVEND > 0
   ${sellerFilter}
-ORDER BY VEN.APELIDO, PAR.CIDADE, CAB.NUNOTA, I.CODPROD
-`.trim()
-}
-
-function buildOrderItemsSqlNoTipmov(date: string, sellerCodes: number[]): string {
-  const dateStr = date
-  const codList = sellerCodes.join(', ')
-  const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${codList})` : ''
-
-  return `
-SELECT
-  TO_CHAR(CAB.NUNOTA)                        AS NUNOTA,
-  TO_CHAR(CAB.CODVEND)                       AS CODVEND,
-  UPPER(TRIM(NVL(VEN.APELIDO, 'SEM VENDEDOR'))) AS VENDEDOR,
-  TO_CHAR(CAB.CODPARC)                       AS CODPARC,
-  UPPER(TRIM(PAR.NOMEPARC))                  AS CLIENTE,
-  UPPER(TRIM(NVL(PAR.CIDADE, 'SEM CIDADE'))) AS CIDADE,
-  UPPER(TRIM(NVL(PAR.UF, '')))               AS UF,
-  TO_CHAR(I.CODPROD)                         AS CODPROD,
-  UPPER(TRIM(P.DESCRPROD))                   AS PRODUTO,
-  UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
-  UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
-  I.QTDNEG                                   AS QUANTIDADE,
-  NVL(I.PESOBRUTO, 0) * I.QTDNEG            AS PESO_KG
-FROM TGFCAB CAB
-INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
-INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
-INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
-INNER JOIN TGFPAR PAR ON PAR.CODPARC = CAB.CODPARC
-WHERE CAB.DTNEG = TO_DATE('${dateStr}', 'YYYY-MM-DD')
-  AND NVL(CAB.STATUSNOTA, 'L') NOT IN ('C')
-  AND CAB.CODVEND > 0
-  ${sellerFilter}
-ORDER BY VEN.APELIDO, PAR.CIDADE, CAB.NUNOTA, I.CODPROD
+ORDER BY CAB.DTNEG DESC, VEN.APELIDO, PAR.CIDADE, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
 
@@ -402,12 +382,24 @@ type RawItemRow = {
   clientName: string
   city: string
   uf: string
+  codTipOper: string
+  dhTipOper: string
+  tipMov: string
+  dtNeg: string
   productCode: string
   productName: string
   group: string
   unit: string
   quantity: number
   weightKg: number
+}
+
+function classifyOrderType(tipMov: string, _codTipOper: string): OrderType {
+  const tm = tipMov.trim().toUpperCase()
+  // TODO: ajustar códigos específicos da OURO VERDE conforme necessário
+  if (tm === 'D') return 'TROCA'
+  if (tm === 'V' || tm === 'P') return 'VENDA'
+  return 'OUTROS'
 }
 
 function parseItemRow(r: RawRecord): RawItemRow {
@@ -419,6 +411,10 @@ function parseItemRow(r: RawRecord): RawItemRow {
     clientName: String(r.CLIENTE ?? r.NOMEPARC ?? '').trim() || 'SEM CLIENTE',
     city: String(r.CIDADE ?? '').trim() || 'SEM CIDADE',
     uf: String(r.UF ?? '').trim(),
+    codTipOper: String(r.CODTIPOPER ?? '').trim(),
+    dhTipOper: String(r.DHTIPOPER ?? '').trim(),
+    tipMov: String(r.TIPMOV ?? '').trim(),
+    dtNeg: String(r.DTNEG ?? '').trim(),
     productCode: String(r.CODPROD ?? '').trim(),
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
@@ -441,14 +437,17 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date') ?? new Date().toISOString().slice(0, 10)
+    const dateFromParam = searchParams.get('dateFrom') ?? dateParam
+    const dateToParam = searchParams.get('dateTo') ?? dateParam
     const sellersParam = searchParams.get('sellers') ?? ''
     const sellerCodes: number[] = sellersParam
       ? sellersParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0)
       : []
 
-    // Validate date
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-      return NextResponse.json({ error: 'Parâmetro date inválido (YYYY-MM-DD)' }, { status: 400 })
+    // Validate dates
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!dateRegex.test(dateFromParam) || !dateRegex.test(dateToParam)) {
+      return NextResponse.json({ error: 'Parâmetro dateFrom/dateTo inválido (YYYY-MM-DD)' }, { status: 400 })
     }
 
     // Load integration config
@@ -479,13 +478,14 @@ export async function GET(request: NextRequest) {
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
 
-    // Query orders + items
+    // Query open orders + items
     let rawRows: RawRecord[] = []
+    let queryError: string | null = null
     try {
-      rawRows = await queryRows(baseUrl, headers, buildOrderItemsSql(dateParam, sellerCodes), appKey)
-    } catch {
-      // fallback without TIPMOV filter
-      rawRows = await queryRows(baseUrl, headers, buildOrderItemsSqlNoTipmov(dateParam, sellerCodes), appKey, { allowEmpty: true })
+      rawRows = await queryRows(baseUrl, headers, buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes), appKey, { allowEmpty: true })
+    } catch (err) {
+      queryError = err instanceof Error ? err.message : 'Query falhou'
+      rawRows = []
     }
 
     // Parse rows into order map
@@ -495,6 +495,7 @@ export async function GET(request: NextRequest) {
       if (!row.nunota || !row.productCode) continue
 
       if (!orderMap.has(row.nunota)) {
+        const orderType = classifyOrderType(row.tipMov, row.codTipOper)
         orderMap.set(row.nunota, {
           orderNumber: row.nunota,
           sellerCode: row.sellerCode,
@@ -503,6 +504,11 @@ export async function GET(request: NextRequest) {
           clientName: row.clientName,
           city: row.city,
           uf: row.uf,
+          orderType,
+          orderTypeRaw: `${row.tipMov}|${row.codTipOper}`,
+          tipMov: row.tipMov,
+          codTipOper: row.codTipOper,
+          dtNeg: row.dtNeg,
           items: [],
         })
       }
@@ -576,6 +582,10 @@ export async function GET(request: NextRequest) {
         orderRows: rawRows.length,
         stockRows: stockRows.length,
         sellersUsed: sellerCodes,
+        queryError,
+        dateFrom: dateFromParam,
+        dateTo: dateToParam,
+        sqlPreview: buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes).slice(0, 500),
       },
     }
 
