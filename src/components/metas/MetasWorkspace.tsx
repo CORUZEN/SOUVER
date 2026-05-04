@@ -6536,11 +6536,28 @@ export default function MetasWorkspace() {
         rules: pdfRules,
       }
 
+      // Load logo as base64 for PDF header
+      let logoBase64: string | undefined
+      try {
+        const logoRes = await fetch('/branding/ouroverde.png')
+        if (logoRes.ok) {
+          const logoBlob = await logoRes.blob()
+          logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+        }
+      } catch {
+        // ignore logo load errors
+      }
+
       const doc = generateSellerPdfReport({
         row: exportRow,
         monthLabel,
         scopeLabel,
         generatedBy: authData?.user?.name || undefined,
+        logoBase64,
       })
 
       const now = new Date()

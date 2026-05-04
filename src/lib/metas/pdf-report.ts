@@ -76,8 +76,9 @@ export function generateSellerPdfReport(options: {
   monthLabel: string
   scopeLabel: string
   generatedBy?: string
+  logoBase64?: string
 }): jsPDF {
-  const { row, monthLabel, scopeLabel, generatedBy } = options
+  const { row, monthLabel, scopeLabel, generatedBy, logoBase64 } = options
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 16
@@ -93,17 +94,25 @@ export function generateSellerPdfReport(options: {
   doc.setFillColor(primaryColor)
   doc.rect(0, 0, pageWidth, 32, 'F')
 
+  const headerTextX = logoBase64 ? margin + 28 : margin
+
+  if (logoBase64) {
+    const logoH = 20
+    const logoW = 24
+    doc.addImage(logoBase64, 'PNG', margin, 6, logoW, logoH)
+  }
+
   doc.setTextColor('#ffffff')
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  doc.text('OURO VERDE', margin, 14)
+  doc.text('OURO VERDE', headerTextX, 14)
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text('Sistema Empresarial · Relatório Individual de Metas', margin, 20)
+  doc.text('Sistema Empresarial · Relatório Individual de Metas', headerTextX, 20)
 
   doc.setFontSize(8)
-  doc.text(`${scopeLabel} · ${monthLabel}`, margin, 26)
+  doc.text(`${scopeLabel} · ${monthLabel}`, headerTextX, 26)
 
   if (generatedBy) {
     doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 26, { align: 'right' })
@@ -236,6 +245,22 @@ export function generateSellerPdfReport(options: {
       alternateRowStyles: { fillColor: '#f8faf9' },
       footStyles: { fillColor: primaryColor, textColor: '#ffffff', fontStyle: 'bold', fontSize: 8.5 },
       showFoot: 'lastPage',
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.row.index !== undefined) {
+          const rowIndex = data.row.index
+          const isTotalRow = rowIndex === allRows.length - 1
+          if (!isTotalRow) {
+            const diffValue = allRows[rowIndex]?.[4]
+            if (diffValue === 'Meta atingida') {
+              data.cell.styles.fillColor = '#ecfdf5'
+              data.cell.styles.textColor = '#065f46'
+              if (data.column.index === 4) {
+                data.cell.styles.fontStyle = 'bold'
+              }
+            }
+          }
+        }
+      },
     })
 
     tableEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
