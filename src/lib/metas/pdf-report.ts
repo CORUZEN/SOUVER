@@ -94,12 +94,13 @@ export function generateSellerPdfReport(options: {
   doc.setFillColor(primaryColor)
   doc.rect(0, 0, pageWidth, 32, 'F')
 
-  const headerTextX = logoBase64 ? margin + 28 : margin
-
+  let headerTextX = margin
   if (logoBase64) {
     const logoH = 20
-    const logoW = 24
+    const logoAspectRatio = 200 / 112  // width / height of ouroverde-pdf.png
+    const logoW = logoH * logoAspectRatio
     doc.addImage(logoBase64, 'PNG', margin, 6, logoW, logoH)
+    headerTextX = margin + logoW + 4
   }
 
   doc.setTextColor('#ffffff')

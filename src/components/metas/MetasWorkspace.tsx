@@ -6539,7 +6539,7 @@ export default function MetasWorkspace() {
       // Load logo as base64 for PDF header
       let logoBase64: string | undefined
       try {
-        const logoRes = await fetch('/branding/ouroverde.png')
+        const logoRes = await fetch('/branding/ouroverde-pdf.png')
         if (logoRes.ok) {
           const logoBlob = await logoRes.blob()
           logoBase64 = await new Promise<string>((resolve) => {
