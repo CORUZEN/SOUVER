@@ -201,7 +201,7 @@ export function generateSellerPdfReport(options: {
       if (!rules || rules.length === 0) continue
       for (const r of rules) {
         const progressPct = r.progress
-        const diff = progressPct >= 1 ? 'Meta atingida' : `Faltam ${formatPercent(1 - progressPct, 1)}`
+        const diff = progressPct >= 1 ? 'Meta atingida' : `Faltou ${formatPercent(1 - progressPct, 1)}`
         const rewardLabel = row.rewardMode === 'PERCENT'
           ? formatRewardPercent(r.rewardValue)
           : formatCurrency(r.rewardValue)
@@ -254,7 +254,14 @@ export function generateSellerPdfReport(options: {
         if (data.section === 'body' && data.row.index !== undefined) {
           const rowIndex = data.row.index
           const isTotalRow = rowIndex === allRows.length - 1
-          if (!isTotalRow) {
+          if (isTotalRow) {
+            // Executive total row styling — soft, elegant highlight
+            data.cell.styles.fillColor = '#e8f5f0'
+            data.cell.styles.textColor = '#0f281d'
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.fontSize = 9
+            data.cell.styles.cellPadding = { top: 2.2, bottom: 2.2, left: 1.8, right: 1.8 }
+          } else {
             const diffValue = allRows[rowIndex]?.[4]
             if (diffValue === 'Meta atingida') {
               data.cell.styles.fillColor = '#ecfdf5'
