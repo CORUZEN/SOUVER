@@ -1,10 +1,5 @@
-import PlanejamentoDiario from '@/components/faturamento/PlanejamentoDiario'
+import { redirect } from 'next/navigation'
 
-export const metadata = {
-  title: 'Previsão de Estoque',
-  description: 'Visualize estimativas de produtos que serão faturados a cada dia.',
-}
-
-export default function PlanejamentoDiarioPage() {
-  return <PlanejamentoDiario />
+export default function FaturamentoDiarioRedirectPage() {
+  redirect('/previsao')
 }

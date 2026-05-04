@@ -395,7 +395,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                     }
 
                     if (moduleKey === 'logistica') {
-                      const isFaturamentoActive = pathname === '/logistica/faturamento-diario'
+                      const isFaturamentoActive = pathname === '/previsao'
                       return (
                         <div key={moduleKey} className="space-y-0.5">
                           {renderMenuItem('logistica', {
@@ -405,7 +405,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                           })}
                           {!isCollapsed && isLogisticaExpanded && (
                             <Link
-                              href="/logistica/faturamento-diario"
+                              href="/previsao"
                               className={cn(
                                 'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-pointer text-left',
                                 isFaturamentoActive

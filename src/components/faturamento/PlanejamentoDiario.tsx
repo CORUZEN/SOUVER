@@ -68,6 +68,7 @@ interface PrevisaoResponse {
     stockRows: number
     sellersUsed: number[]
     queryError?: string | null
+    queryMode?: 'no_date' | 'pending' | 'status_p' | 'all' | 'failed' | string
     dateFrom?: string
     dateTo?: string
     sqlPreview?: string
@@ -574,13 +575,13 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Diagnostics (dev) ── */}
-      {data?.diagnostics?.queryError && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-amber-800 text-xs">
-          <p className="font-semibold">Diagnóstico da consulta</p>
-          <p className="mt-1 opacity-80">{data.diagnostics.queryError}</p>
+      {/* ── Diagnostics ── */}
+      {data?.diagnostics && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-600 text-xs">
+          <p className="font-semibold text-slate-700">Diagnóstico da consulta</p>
+          <p className="mt-1">Modo: <strong>{data.diagnostics.queryMode ?? '?'}</strong> | Linhas brutas: {data.diagnostics.orderRows} | Pedidos: {data.totalOrders} | Erro: {data.diagnostics.queryError ?? 'nenhum'}</p>
           {data.diagnostics.sqlPreview && (
-            <pre className="mt-2 bg-white/50 rounded-lg p-2 overflow-x-auto">{data.diagnostics.sqlPreview}...</pre>
+            <pre className="mt-2 bg-white rounded-lg p-2 overflow-x-auto border border-slate-100">{data.diagnostics.sqlPreview}...</pre>
           )}
         </div>
       )}

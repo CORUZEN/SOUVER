@@ -60,6 +60,7 @@ export type FaturamentoResponse = {
     sellersUsed: number[]
     endpointUsed?: string
     queryError?: string | null
+    queryMode?: 'no_date' | 'pending' | 'status_p' | 'all' | 'failed' | string
     dateFrom?: string
     dateTo?: string
     sqlPreview?: string
@@ -321,9 +322,22 @@ async function queryRows(
    SQL builders
 ───────────────────────────────────────────── */
 
-function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: number[]): string {
+function buildOpenOrdersSql(dateFrom: string, dateTo: string, sellerCodes: number[], mode: 'pending' | 'status_p' | 'all' | 'no_date' = 'pending'): string {
   const codList = sellerCodes.join(', ')
   const sellerFilter = sellerCodes.length > 0 ? `AND CAB.CODVEND IN (${codList})` : ''
+
+  const pendingFilter = mode === 'pending'
+    ? `AND NVL(CAB.AD_PENDENTE, 'N') = 'S'`
+    : mode === 'status_p'
+      ? `AND NVL(CAB.STATUSNOTA, 'L') = 'P'`
+      : `AND NVL(CAB.STATUSNOTA, 'L') <> 'C'`
+
+  const dateFilter = mode === 'no_date'
+    ? ''
+    : `AND CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
+  AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')`
+
+  const rownumGuard = mode === 'no_date' ? 'AND ROWNUM <= 500' : ''
 
   return `
 SELECT
@@ -348,11 +362,11 @@ INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
 INNER JOIN TGFVEN VEN ON VEN.CODVEND = CAB.CODVEND
 INNER JOIN TGFPAR PAR ON PAR.CODPARC = CAB.CODPARC
-WHERE CAB.DTNEG >= TO_DATE('${dateFrom}', 'YYYY-MM-DD')
-  AND CAB.DTNEG <= TO_DATE('${dateTo}', 'YYYY-MM-DD')
-  AND NVL(CAB.STATUSNOTA, 'L') <> 'C'
-  AND CAB.CODVEND > 0
+WHERE CAB.CODVEND > 0
+  ${pendingFilter}
+  ${dateFilter}
   ${sellerFilter}
+  ${rownumGuard}
 ORDER BY CAB.DTNEG DESC, VEN.APELIDO, PAR.CIDADE, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
@@ -478,15 +492,31 @@ export async function GET(request: NextRequest) {
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
 
-    // Query open orders + items
+    // Query open orders + items (cascade: no_date -> pending -> status_p -> all)
     let rawRows: RawRecord[] = []
+    let queryMode: 'no_date' | 'pending' | 'status_p' | 'all' | 'failed' = 'no_date'
     let queryError: string | null = null
-    try {
-      rawRows = await queryRows(baseUrl, headers, buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes), appKey, { allowEmpty: true })
-    } catch (err) {
-      queryError = err instanceof Error ? err.message : 'Query falhou'
-      rawRows = []
+    let attemptLog: string[] = []
+
+    for (const mode of ['no_date', 'pending', 'status_p', 'all'] as const) {
+      try {
+        const sql = buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes, mode)
+        const rows = await queryRows(baseUrl, headers, sql, appKey, { allowEmpty: true })
+        attemptLog.push(`${mode}: ${rows.length} rows`)
+        rawRows = rows
+        queryMode = mode
+        queryError = null
+        if (rows.length > 0) break
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : `Query ${mode} falhou`
+        attemptLog.push(`${mode}: ERROR - ${msg}`)
+        queryError = msg
+      }
     }
+    if (rawRows.length === 0) {
+      queryMode = 'failed'
+    }
+    console.log('[faturamento] attempts:', attemptLog.join(' | '), '| sellerCodes:', sellerCodes, '| finalMode:', queryMode, '| rows:', rawRows.length)
 
     // Parse rows into order map
     const orderMap = new Map<string, DailyOrder>()
@@ -583,9 +613,10 @@ export async function GET(request: NextRequest) {
         stockRows: stockRows.length,
         sellersUsed: sellerCodes,
         queryError,
+        queryMode,
         dateFrom: dateFromParam,
         dateTo: dateToParam,
-        sqlPreview: buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes).slice(0, 500),
+        sqlPreview: buildOpenOrdersSql(dateFromParam, dateToParam, sellerCodes, queryMode === 'failed' ? 'all' : (queryMode as 'no_date' | 'pending' | 'status_p' | 'all')).slice(0, 500),
       },
     }
 
