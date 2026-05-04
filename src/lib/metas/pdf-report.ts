@@ -95,7 +95,7 @@ export function generateSellerPdfReport(options: {
 
   // --- HEADER ---
   doc.setFillColor(primaryColor)
-  doc.rect(0, 0, pageWidth, 32, 'F')
+  doc.rect(0, 0, pageWidth, 28, 'F')
 
   let headerTextX = margin
   let separatorX = margin
@@ -103,43 +103,43 @@ export function generateSellerPdfReport(options: {
     const logoH = 20
     const logoAspectRatio = 200 / 112  // width / height of ouroverde-pdf.png
     const logoW = logoH * logoAspectRatio
-    doc.addImage(logoBase64, 'PNG', margin, 6, logoW, logoH)
+    doc.addImage(logoBase64, 'PNG', margin, 4, logoW, logoH)
     separatorX = margin + logoW + 3
     headerTextX = margin + logoW + 7
 
     // Elegant vertical separator line
     doc.setDrawColor('#ffffff')
     doc.setLineWidth(0.4)
-    doc.line(separatorX, 8, separatorX, 24)
+    doc.line(separatorX, 6, separatorX, 22)
   }
 
   doc.setTextColor('#ffffff')
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
-  doc.text('Relatório Individual de Metas', headerTextX, 15)
+  doc.text('Relatório Individual de Metas', headerTextX, 13)
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text(monthLabel, headerTextX, 21)
+  doc.text(monthLabel, headerTextX, 19)
 
   if (generatedBy) {
-    doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 21, { align: 'right' })
+    doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 19, { align: 'right' })
   }
 
-  y = 44
+  y = 38
 
   // --- SELLER INFO (professional card-style header) ---
   doc.setTextColor(primaryColor)
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
   doc.text(row.name, margin, y)
-  y += 5
+  y += 4
 
   // Accent underline
   doc.setDrawColor(accentColor)
   doc.setLineWidth(0.4)
   doc.line(margin, y, margin + contentWidth, y)
-  y += 5
+  y += 4
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
@@ -195,20 +195,50 @@ export function generateSellerPdfReport(options: {
       if (data.section === 'body' && data.row.index !== undefined) {
         const rIdx = data.row.index
         const cIdx = data.column.index
-        // Row 0: Meta Financeira value (col 3) when hit
-        if (rIdx === 0 && cIdx === 3 && isFinancialHit) {
-          data.cell.styles.textColor = '#065f46'
-          data.cell.styles.fontStyle = 'bold'
+        // Row 0: Meta Financeira value (col 3)
+        if (rIdx === 0 && cIdx === 3) {
+          if (isFinancialHit) {
+            data.cell.styles.textColor = '#065f46'
+            data.cell.styles.fontStyle = 'bold'
+          } else {
+            data.cell.styles.textColor = '#92400e'
+            data.cell.styles.fontStyle = 'bold'
+          }
         }
         // Row 1: Premiação Total value (col 1)
         if (rIdx === 1 && cIdx === 1 && row.kpiRewardAchieved > 0) {
           data.cell.styles.textColor = '#065f46'
           data.cell.styles.fontStyle = 'bold'
         }
-        // Row 3: Peso por Grupo value (col 3) when hit
-        if (rIdx === 3 && cIdx === 3 && isWeightHit) {
-          data.cell.styles.textColor = '#065f46'
-          data.cell.styles.fontStyle = 'bold'
+        // Row 3: Peso por Grupo value (col 3)
+        if (rIdx === 3 && cIdx === 3) {
+          if (isWeightHit) {
+            data.cell.styles.textColor = '#065f46'
+            data.cell.styles.fontStyle = 'bold'
+          } else {
+            data.cell.styles.textColor = '#92400e'
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+        // Row 4: Metas Batidas value (col 1)
+        if (rIdx === 4 && cIdx === 1) {
+          if (row.metasHit >= row.metasTotal) {
+            data.cell.styles.textColor = '#065f46'
+            data.cell.styles.fontStyle = 'bold'
+          } else {
+            data.cell.styles.textColor = '#92400e'
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+        // Row 4: Produtos Positivados value (col 3)
+        if (rIdx === 4 && cIdx === 3) {
+          if (positivadosPct >= 1) {
+            data.cell.styles.textColor = '#065f46'
+            data.cell.styles.fontStyle = 'bold'
+          } else {
+            data.cell.styles.textColor = '#92400e'
+            data.cell.styles.fontStyle = 'bold'
+          }
         }
       }
     },
@@ -271,7 +301,7 @@ export function generateSellerPdfReport(options: {
       startY: y,
       margin: { left: margin, right: margin },
       tableWidth: contentWidth,
-      head: [['Etapa', 'KPI', 'Meta', 'Atingimento', 'Diferença', 'Premiação']],
+      head: [['Etapa', 'KPI', 'Meta', 'Progresso', 'Atingimento', 'Premiação']],
       body: allRows,
       theme: 'striped',
       headStyles: { fillColor: '#e8f5f0', textColor: primaryColor, fontStyle: 'bold', fontSize: 8 },
