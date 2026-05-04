@@ -6503,6 +6503,7 @@ export default function MetasWorkspace() {
       const exportRow = {
         rank: 0,
         name: heatmapRow.seller.name,
+        sellerCode: sellerCode || '',
         supervisorName: snapshot.seller.supervisorName || '',
         profileTypeLabel: SELLER_PROFILE_LABEL[resolvedProfileType],
         status: snapshot.status,
@@ -6531,6 +6532,8 @@ export default function MetasWorkspace() {
         distribuicaoSellerHit: (requiredItems > 0 && soldItems >= requiredItems ? 1 : 0) as 0 | 1,
         distribuicaoClientsHit: clientsWithItems,
         distribuicaoClientsTarget: requiredClients,
+        soldItems,
+        activeProductsCount,
         kpiRewardAchieved: snapshot.kpiRewardAchieved,
         gapToTarget: snapshot.gapToTarget,
         rules: pdfRules,

@@ -15,6 +15,7 @@ export interface PdfKpiRule {
 
 export interface PdfExportData {
   name: string
+  sellerCode: string
   supervisorName: string
   profileTypeLabel: string
   status: string
@@ -38,6 +39,8 @@ export interface PdfExportData {
   metasTotal: number
   kpiRewardAchieved: number
   gapToTarget: number
+  soldItems: number
+  activeProductsCount: number
   rules: PdfKpiRule[]
 }
 
@@ -123,14 +126,20 @@ export function generateSellerPdfReport(options: {
     doc.text(`Emitido por: ${generatedBy}`, pageWidth - margin, 21, { align: 'right' })
   }
 
-  y = 40
+  y = 44
 
-  // --- SELLER INFO (simplified) ---
-  doc.setTextColor(textDark)
-  doc.setFontSize(14)
+  // --- SELLER INFO (professional card-style header) ---
+  doc.setTextColor(primaryColor)
+  doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
   doc.text(row.name, margin, y)
-  y += 6
+  y += 5
+
+  // Accent underline
+  doc.setDrawColor(accentColor)
+  doc.setLineWidth(0.4)
+  doc.line(margin, y, margin + contentWidth, y)
+  y += 5
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
@@ -152,12 +161,17 @@ export function generateSellerPdfReport(options: {
     ? formatRewardPercent(row.kpiRewardAchieved)
     : formatCurrency(row.kpiRewardAchieved)
 
+  const positivadosPct = row.activeProductsCount > 0 ? row.soldItems / row.activeProductsCount : 0
+  const positivadosLabel = row.activeProductsCount > 0
+    ? `${row.soldItems} / ${row.activeProductsCount} ${formatPercent(positivadosPct, 0)}`
+    : '—'
+
   const summaryData = [
     ['Pontuação', formatPercent(row.pointsRatio, 2), 'Meta Financeira', `${formatCurrency(row.financialTarget)} (${formatPercent(financialPct, 1)})`],
     ['Premiação Total', rewardDisplay, 'Vlr. Total de Pedidos', formatCurrency(row.totalValue)],
     ['Clientes Únicos', `${row.uniqueClients} / ${row.baseClients}`, 'Pedidos Realizados', String(row.totalOrders)],
     ['Peso Bruto Total', `${formatNumber(row.totalGrossWeight, 2)} kg`, 'Peso por Grupo', `${formatNumber(row.weightSoldKgByGroup, 2)} / ${formatNumber(row.weightTargetKg, 2)} kg`],
-    ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`, '', ''],
+    ['Metas Batidas', `${row.metasHit} / ${row.metasTotal}`, 'Produtos Positivados', positivadosLabel],
   ]
 
   const isFinancialHit = financialPct >= 1
