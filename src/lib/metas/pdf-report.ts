@@ -183,19 +183,16 @@ export function generateSellerPdfReport(options: {
         const cIdx = data.column.index
         // Row 0: Meta Financeira value (col 3) when hit
         if (rIdx === 0 && cIdx === 3 && isFinancialHit) {
-          data.cell.styles.fillColor = '#ecfdf5'
           data.cell.styles.textColor = '#065f46'
           data.cell.styles.fontStyle = 'bold'
         }
         // Row 1: Premiação Total value (col 1)
         if (rIdx === 1 && cIdx === 1 && row.kpiRewardAchieved > 0) {
-          data.cell.styles.fillColor = '#ecfdf5'
           data.cell.styles.textColor = '#065f46'
           data.cell.styles.fontStyle = 'bold'
         }
         // Row 3: Peso por Grupo value (col 3) when hit
         if (rIdx === 3 && cIdx === 3 && isWeightHit) {
-          data.cell.styles.fillColor = '#ecfdf5'
           data.cell.styles.textColor = '#065f46'
           data.cell.styles.fontStyle = 'bold'
         }
