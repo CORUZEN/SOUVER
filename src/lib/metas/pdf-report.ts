@@ -182,7 +182,6 @@ export function generateSellerPdfReport(options: {
     }
 
     const allRows: Array<[string, string, string, string, string, string]> = []
-    let totalRewardValue = 0
     for (const stageKey of stageOrder) {
       const rules = rulesByStage.get(stageKey)
       if (!rules || rules.length === 0) continue
@@ -190,9 +189,8 @@ export function generateSellerPdfReport(options: {
         const progressPct = r.progress
         const diff = progressPct >= 1 ? 'Meta atingida' : `Faltam ${formatPercent(1 - progressPct, 1)}`
         const rewardLabel = row.rewardMode === 'PERCENT'
-          ? formatRewardPercent(r.points)
+          ? formatRewardPercent(r.rewardValue)
           : formatCurrency(r.rewardValue)
-        totalRewardValue += r.points
         allRows.push([
           stageLabel(r.stage),
           r.kpi,
@@ -204,16 +202,16 @@ export function generateSellerPdfReport(options: {
       }
     }
 
-    // Total row
+    // Total row — uses kpiRewardAchieved (actual earned reward), not sum of all configured rewards
     const totalRewardLabel = row.rewardMode === 'PERCENT'
-      ? formatRewardPercent(totalRewardValue)
-      : formatCurrency(totalRewardValue)
+      ? formatRewardPercent(row.kpiRewardAchieved)
+      : formatCurrency(row.kpiRewardAchieved)
     allRows.push([
       'Totais',
-      `${allRows.length} KPIs`,
+      `${row.rules.length} KPIs`,
       `Meta: ${formatCurrency(row.financialTarget)}`,
       '',
-      `1 vendedor(es)`,
+      `${row.metasHit} atingido(s)`,
       totalRewardLabel,
     ])
 
