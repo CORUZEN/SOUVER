@@ -1324,6 +1324,26 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
+      {/* -- Loading State (consulta em andamento) -- */}
+      {loading && !data && !error && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 rounded-full bg-emerald-500/15 blur-xl" />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-emerald-200 bg-white shadow-[0_10px_28px_rgba(20,150,111,0.18)]">
+              <div className="h-11 w-11 animate-spin rounded-full border-[3px] border-emerald-100 border-t-emerald-600 border-r-emerald-500" />
+            </div>
+          </div>
+          <h2 className="text-lg font-bold text-slate-800">Consultando pedidos em aberto...</h2>
+          <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-500">
+            Estamos processando os dados de pedidos, estoque e cidades atendidas.
+          </p>
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            Carregando dados em tempo real
+          </div>
+        </div>
+      )}
+
       {/* -- Empty State (antes de consultar) -- */}
       {!data && !loading && !error && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
