@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Activity,
   Database,
@@ -202,12 +202,12 @@ export default function DiagnosticoPage() {
   const runningRef = useRef<Set<string>>(new Set())
 
   // Check auth on mount
-  useState(() => {
+  useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setAuthOk(d?.user?.roleCode === 'DEVELOPER'))
       .finally(() => setChecking(false))
-  })
+  }, [])
 
   const run = useCallback(async (testId: string, action: string, params: Record<string, string> = {}) => {
     if (runningRef.current.has(testId)) return
