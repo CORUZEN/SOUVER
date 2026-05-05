@@ -240,13 +240,13 @@ function MultiSelect({
     <div ref={ref} className="relative min-w-[16rem] flex-1">
       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
       <div
-        className={`min-h-[2.625rem] flex flex-wrap gap-1.5 items-center border rounded-xl px-3 py-2 bg-white cursor-text transition-all
+        className={`min-h-10.5 flex flex-wrap gap-1.5 items-center border rounded-xl px-3 py-2 bg-white cursor-text transition-all
           ${open ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
         onClick={() => setOpen(true)}
       >
         <span className="text-slate-400 shrink-0">{icon}</span>
         {selected.map((s) => (
-          <span key={s} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium px-2 py-0.5 rounded-full max-w-[10rem]">
+          <span key={s} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium px-2 py-0.5 rounded-full max-w-40">
             <span className="truncate">{s}</span>
             <button type="button" className="hover:text-red-500 transition-colors shrink-0" onClick={(e) => { e.stopPropagation(); remove(s) }}>
               <X className="w-3 h-3" />
@@ -259,7 +259,7 @@ function MultiSelect({
           onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           placeholder={selected.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[6rem] text-sm outline-none bg-transparent placeholder:text-slate-400"
+          className="flex-1 min-w-24 text-sm outline-none bg-transparent placeholder:text-slate-400"
         />
         <button type="button" className="ml-auto shrink-0 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); setOpen((p) => !p); setSearch('') }}>
           <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -350,7 +350,7 @@ function OrderModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-100 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -696,7 +696,7 @@ export default function PrevisaoDeEstoque() {
             onChange={setSelectedCities}
             icon={<MapPin className="w-4 h-4" />}
           />
-          <div className="min-w-[10rem]">
+          <div className="min-w-40">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Período de</label>
             <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-white hover:border-slate-300 transition-colors">
               <CalendarDays className="w-4 h-4 text-slate-400" />
@@ -708,7 +708,7 @@ export default function PrevisaoDeEstoque() {
               />
             </div>
           </div>
-          <div className="min-w-[10rem]">
+          <div className="min-w-40">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">até</label>
             <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-white hover:border-slate-300 transition-colors">
               <CalendarDays className="w-4 h-4 text-slate-400" />
