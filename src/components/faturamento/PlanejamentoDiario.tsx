@@ -1150,10 +1150,16 @@ export default function PrevisaoDeEstoque() {
               type="button"
               onClick={() => fetchData(dateFrom, dateTo)}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/80 border border-emerald-400/40 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 transition-colors shadow-sm"
+              className={cn(
+                'group relative inline-flex items-center gap-2 overflow-hidden rounded-xl border px-4 py-2.5 text-xs font-bold backdrop-blur-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100',
+                loading
+                  ? 'border-emerald-300/60 bg-linear-to-r from-emerald-400/25 via-emerald-300/15 to-emerald-500/10 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-emerald-300/40'
+                  : 'border-white/30 bg-linear-to-r from-white/20 via-white/15 to-emerald-400/10 text-white shadow-lg shadow-black/10 hover:scale-[1.02] hover:border-white/50 hover:from-white/30 hover:via-white/20 hover:to-emerald-400/20 hover:shadow-xl hover:shadow-emerald-900/20'
+              )}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              {loading ? 'Carregando…' : 'Consultar'}
+              <span className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+              {loading ? <Loader2 className="relative z-10 h-4 w-4 animate-spin" /> : <Search className="relative z-10 h-4 w-4" />}
+              <span className="relative z-10">{loading ? 'Carregando…' : 'Consultar'}</span>
             </button>
 
             {/* Period config dropdown */}
@@ -1162,14 +1168,14 @@ export default function PrevisaoDeEstoque() {
                 type="button"
                 onClick={() => setShowPeriodDropdown((p) => !p)}
                 className={cn(
-                  'inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
+                  'inline-flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-sm transition-all',
                   showPeriodDropdown
-                    ? 'bg-white/15 border-white/30 text-white'
-                    : 'bg-white/8 border-white/15 text-emerald-100 hover:bg-white/15 hover:border-white/25'
+                    ? 'border-emerald-300/60 bg-linear-to-r from-emerald-400/25 via-emerald-300/15 to-emerald-500/10 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-emerald-300/40'
+                    : 'border-white/20 bg-white/5 text-white/90 hover:border-white/40 hover:bg-white/15 hover:text-white'
                 )}
                 title="Configurar período"
               >
-                <Settings2 className="h-4 w-4" />
+                <Settings2 className="h-[18px] w-[18px]" />
               </button>
               {showPeriodDropdown && (
                 <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
@@ -1288,8 +1294,6 @@ export default function PrevisaoDeEstoque() {
           <h2 className="text-lg font-bold text-slate-800">Previsão de Pedidos</h2>
           <p className="mt-1.5 max-w-md text-sm text-slate-500 leading-relaxed">
             Consulte para visualizar todos os pedidos em aberto, estoque disponível e cidades atendidas.
-            <br />
-            Após a consulta você poderá filtrar por vendedor e cidade.
           </p>
           <div className="mt-6 flex items-center gap-2 text-xs text-slate-400">
             <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
