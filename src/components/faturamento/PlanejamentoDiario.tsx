@@ -6,8 +6,10 @@ import {
   AlertTriangle,
   Box,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ClipboardList,
+  CircleAlert,
   Loader2,
   MapPin,
   Package,
@@ -762,51 +764,60 @@ export default function PrevisaoDeEstoque() {
 
       {/* ── Produtos (bloco único, largura total) ── */}
       {data && filteredOrders.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60">
-            <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
-              <Package className="w-5 h-5 text-emerald-600" />
-              Produtos — {productAggregates.length} item{productAggregates.length !== 1 ? 's' : ''}
-            </h3>
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col">
+          <div className="border-b border-slate-200 bg-linear-to-r from-slate-50 to-white px-6 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50">
+                  <Package className="h-4 w-4 text-emerald-700" />
+                </span>
+                Produtos
+              </h3>
+              <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                {productAggregates.length} item{productAggregates.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-20">SKU</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
-                  <th className="text-center px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-16">Un</th>
-                  <th className="text-right px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-24">Qtd</th>
-                  <th className="text-right px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-28">Peso (kg)</th>
-                  <th className="text-right px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-24">Estoque</th>
-                  <th className="text-center px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider w-32">Status</th>
+            <table className="w-full min-w-[860px] text-sm">
+              <thead className="bg-slate-100/80">
+                <tr className="[&_th]:whitespace-nowrap">
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">SKU</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">Descrição</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-16">UN</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-28">Qtd</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-32">Peso (kg)</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-28">Estoque</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-40">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {productAggregates.map((p) => (
-                  <tr key={p.productCode} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.productCode}</td>
-                    <td className="px-4 py-3 font-medium text-slate-700">{p.productName}</td>
-                    <td className="px-4 py-3 text-center text-slate-500">{p.unit}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-700">{fmtQty(p.quantity)}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-700">{fmtKg(p.weightKg)}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-700">{fmtQty(stockMap.get(p.productCode) ?? 0)}</td>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {productAggregates.map((p, index) => (
+                  <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
+                    <td className="px-4 py-3.5 font-mono text-[12px] text-slate-500">{p.productCode}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-800">{p.productName}</td>
+                    <td className="px-4 py-3.5 text-center font-medium text-slate-600">{p.unit}</td>
+                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(p.quantity)}</td>
+                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtKg(p.weightKg)}</td>
+                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(stockMap.get(p.productCode) ?? 0)}</td>
                     {(() => {
                       const stock = stockMap.get(p.productCode) ?? 0
                       const diff = stock - p.quantity
-                      if (diff >= 0) {
-                        return (
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Suficiente
-                            </span>
-                          </td>
-                        )
-                      }
+                      const hasStock = diff >= 0
+
                       return (
-                        <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            Faltam {fmtQty(Math.abs(diff))}
+                        <td className="px-4 py-3.5 text-center">
+                          <span
+                            className={`inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]
+                              ${hasStock
+                                ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
+                                : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
+                              }`}
+                          >
+                            {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+                            <span className="tracking-[0.01em]">
+                              {hasStock ? 'SUFICIENTE' : `FALTA ${fmtQty(Math.abs(diff))}`}
+                            </span>
                           </span>
                         </td>
                       )

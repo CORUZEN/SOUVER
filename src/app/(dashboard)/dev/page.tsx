@@ -148,70 +148,53 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
   )
 }
 
-/* ─── Side Panel Card (Atalhos + Ambiente) ──────────────────────────── */
-function SidePanelCard({ isDeveloper, basePath }: { isDeveloper: boolean; basePath: string }) {
+/* ─── Side Panel Card (Ambiente Corporativo) ────────────────────────── */
+function SidePanelCard() {
+  const services = [
+    { label: 'Base', value: 'Produção' },
+    { label: 'Sankhya', value: 'Conectado' },
+    { label: 'API', value: 'Operacional' },
+    { label: 'Cache', value: 'Ativo' },
+  ]
+
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm">
-      {/* Atalhos */}
-      <div className="flex-1 p-5">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">Atalhos Rápidos</h3>
-        <div className="mt-3 space-y-2">
-          <SideLink href={`${basePath}/gestao-usuarios`} icon={<Users className="h-3.5 w-3.5" />} label="Gerenciar usuários" />
-          <SideLink href={`${basePath}/gestao-permissoes`} icon={<KeyRound className="h-3.5 w-3.5" />} label="Configurar permissões" />
-          {isDeveloper && (
-            <>
-              <SideLink href={`${basePath}/diagnostico`} icon={<Database className="h-3.5 w-3.5" />} label="Executar diagnóstico" />
-              <SideLink href="/metas/telemetria" icon={<Server className="h-3.5 w-3.5" />} label="Telemetria do sistema" />
-            </>
-          )}
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-[#3f6d57]/30 bg-linear-to-b from-[#f2f5f0] to-white shadow-md">
+      {/* Header */}
+      <div className="border-b border-[#3f6d57]/15 bg-linear-to-r from-[#07160f] to-[#0f2a1d] px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Server className="h-4 w-4 text-[#aac0a2]" />
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#d3dcc8]">Status do Ambiente</h3>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="h-px bg-surface-100" />
+      {/* Services */}
+      <div className="flex-1 p-1">
+        {services.map((s, i) => (
+          <div
+            key={s.label}
+            className={cn(
+              'flex items-center justify-between px-4 py-3',
+              i !== services.length - 1 && 'border-b border-[#e8ece3]'
+            )}
+          >
+            <span className="text-sm font-medium text-[#4a5d45]">{s.label}</span>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#14966f] opacity-30" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#14966f]" />
+              </span>
+              <span className="text-xs font-semibold text-[#0f7f5b]">{s.value}</span>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      {/* Ambiente */}
-      <div className="p-5">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">Ambiente</h3>
-        <div className="mt-3 space-y-2.5">
-          <SideEnvRow icon={<Globe className="h-3.5 w-3.5" />} label="Base" value="Produção" />
-          <SideEnvRow icon={<Database className="h-3.5 w-3.5" />} label="Sankhya" value="Conectado" />
-          <SideEnvRow icon={<Code2 className="h-3.5 w-3.5" />} label="API" value="Operacional" />
-          <SideEnvRow icon={<Terminal className="h-3.5 w-3.5" />} label="Cache" value="Ativo" />
+      {/* Footer */}
+      <div className="border-t border-[#3f6d57]/10 bg-[#f6f8f4] px-5 py-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#7ea07d]">Sistema operacional</span>
+          <span className="text-[10px] text-[#9eb09a]">Atualizado agora</span>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function SideLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-surface-50"
-    >
-      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-50 text-surface-400 ring-1 ring-surface-100 transition-colors group-hover:text-emerald-600 group-hover:ring-emerald-100">
-        {icon}
-      </div>
-      <span className="flex-1 text-xs font-medium text-surface-600 group-hover:text-surface-900">{label}</span>
-      <ArrowUpRight className="h-3.5 w-3.5 text-surface-300 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-    </Link>
-  )
-}
-
-function SideEnvRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-50 text-surface-400 ring-1 ring-surface-100">
-        {icon}
-      </div>
-      <span className="flex-1 text-xs font-medium text-surface-500">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        </span>
-        <span className="text-[11px] font-semibold text-surface-700">{value}</span>
       </div>
     </div>
   )
@@ -400,7 +383,7 @@ export default function DevPage() {
           />
 
           {/* Side Panel — Atalhos + Ambiente */}
-          <SidePanelCard isDeveloper={isDeveloper} basePath={basePath} />
+          <SidePanelCard />
         </div>
       </section>
 
