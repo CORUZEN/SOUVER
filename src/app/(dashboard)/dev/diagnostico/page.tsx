@@ -160,7 +160,7 @@ function FieldsTable({ rows }: { rows: Record<string, unknown>[] }) {
             {Object.keys(rows[0]).filter(k => !k.startsWith('_')).map(k => (
               <th key={k} className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">{k}</th>
             ))}
-            {rows[0]._derived && <th className="px-3 py-2 text-left font-semibold text-emerald-700 bg-emerald-50 whitespace-nowrap">⚡ RESULTADO SOUVER</th>}
+            {!!rows[0]._derived && <th className="px-3 py-2 text-left font-semibold text-emerald-700 bg-emerald-50 whitespace-nowrap">⚡ RESULTADO SOUVER</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-surface-100">
@@ -169,7 +169,7 @@ function FieldsTable({ rows }: { rows: Record<string, unknown>[] }) {
               {Object.entries(row).filter(([k]) => !k.startsWith('_')).map(([k, v]) => (
                 <td key={k} className="px-3 py-2 text-surface-700 whitespace-nowrap font-mono">{String(v ?? '—')}</td>
               ))}
-              {row._derived && (
+              {!!row._derived && (
                 <td className="px-3 py-2 bg-emerald-50">
                   <div className="font-bold text-emerald-800">{(row._derived as Record<string, unknown>).sankhya_portal_expects as string}</div>
                   <div className="text-emerald-600 text-[10px]">medaux={String((row._derived as Record<string, unknown>).medaux_effective)}</div>
