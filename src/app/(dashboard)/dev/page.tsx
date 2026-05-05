@@ -29,147 +29,7 @@ interface CurrentUser {
   roleCode?: string | null
 }
 
-/* ─── Liquid Glass Card ─────────────────────────────────────────────── */
-interface LiquidGlassCardProps {
-  href: string
-  icon: React.ReactNode
-  title: string
-  description: string
-  cta: string
-  variant?: 'emerald' | 'slate' | 'amber'
-  badge?: string
-  isExternal?: boolean
-}
-
-function LiquidGlassCard({
-  href,
-  icon,
-  title,
-  description,
-  cta,
-  variant = 'emerald',
-  badge,
-  isExternal = false,
-}: LiquidGlassCardProps) {
-  const tone =
-    variant === 'slate'
-      ? {
-          border: 'border-white/[0.08]',
-          bg: 'bg-white/[0.03]',
-          bgHover: 'hover:bg-white/[0.06]',
-          iconBg: 'bg-white/[0.06]',
-          iconText: 'text-slate-300',
-          iconRing: 'ring-white/[0.08]',
-          title: 'text-white',
-          desc: 'text-slate-400',
-          cta: 'text-emerald-400',
-          ctaHover: 'group-hover:text-emerald-300',
-          glow: 'bg-emerald-500/10',
-          badgeBg: 'bg-emerald-500/15',
-          badgeText: 'text-emerald-400',
-        }
-      : variant === 'amber'
-        ? {
-            border: 'border-amber-200/[0.15]',
-            bg: 'bg-amber-50/[0.03]',
-            bgHover: 'hover:bg-amber-50/[0.06]',
-            iconBg: 'bg-amber-500/10',
-            iconText: 'text-amber-300',
-            iconRing: 'ring-amber-200/20',
-            title: 'text-white',
-            desc: 'text-slate-400',
-            cta: 'text-amber-300',
-            ctaHover: 'group-hover:text-amber-200',
-            glow: 'bg-amber-500/10',
-            badgeBg: 'bg-amber-500/15',
-            badgeText: 'text-amber-300',
-          }
-        : {
-            border: 'border-emerald-200/[0.12]',
-            bg: 'bg-emerald-50/[0.03]',
-            bgHover: 'hover:bg-emerald-50/[0.06]',
-            iconBg: 'bg-emerald-500/10',
-            iconText: 'text-emerald-300',
-            iconRing: 'ring-emerald-200/20',
-            title: 'text-white',
-            desc: 'text-slate-400',
-            cta: 'text-emerald-400',
-            ctaHover: 'group-hover:text-emerald-300',
-            glow: 'bg-emerald-500/10',
-            badgeBg: 'bg-emerald-500/15',
-            badgeText: 'text-emerald-400',
-          }
-
-  const Wrapper = isExternal ? 'a' : Link
-  const wrapperProps = isExternal
-    ? { href, target: '_blank', rel: 'noopener noreferrer' }
-    : { href }
-
-  return (
-    <Wrapper
-      {...wrapperProps}
-      className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border p-6 backdrop-blur-xl transition-all duration-500',
-        'hover:-translate-y-1 hover:shadow-2xl',
-        tone.border,
-        tone.bg,
-        tone.bgHover
-      )}
-    >
-      {/* Top highlight (liquid glass reflection) */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-4 top-0 h-8 bg-linear-to-b from-white/[0.04] to-transparent rounded-t-lg" />
-
-      {/* Radial glow on hover */}
-      <div
-        className={cn(
-          'pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full blur-3xl transition-opacity duration-700 opacity-0 group-hover:opacity-100',
-          tone.glow
-        )}
-      />
-
-      {/* Inner rim light */}
-      <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.04]" />
-
-      <div className="relative flex items-start justify-between">
-        <div
-          className={cn(
-            'inline-flex h-12 w-12 items-center justify-center rounded-xl backdrop-blur-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg',
-            tone.iconBg,
-            tone.iconText,
-            'ring-1',
-            tone.iconRing
-          )}
-        >
-          {icon}
-        </div>
-        {badge && (
-          <span
-            className={cn(
-              'rounded-full border border-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm',
-              tone.badgeBg,
-              tone.badgeText
-            )}
-          >
-            {badge}
-          </span>
-        )}
-      </div>
-
-      <div className="relative mt-5 flex-1">
-        <h2 className={cn('text-lg font-semibold tracking-tight', tone.title)}>{title}</h2>
-        <p className={cn('mt-1.5 text-sm leading-relaxed', tone.desc)}>{description}</p>
-      </div>
-
-      <div className="relative mt-5 flex items-center gap-2 text-sm font-semibold">
-        <span className={cn('transition-colors duration-300', tone.cta, tone.ctaHover)}>{cta}</span>
-        <ArrowRight className={cn('h-4 w-4 transition-all duration-300 group-hover:translate-x-1', tone.cta, tone.ctaHover)} />
-      </div>
-    </Wrapper>
-  )
-}
-
-/* ─── Liquid Glass Stat Pill ────────────────────────────────────────── */
+/* ─── Liquid Glass Stat Pill (para os 4 cards da hero) ──────────────── */
 function LiquidGlassStat({
   icon,
   label,
@@ -180,21 +40,111 @@ function LiquidGlassStat({
   value: string
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl transition-all duration-300 hover:bg-white/[0.05] hover:shadow-lg">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-3 top-0 h-6 bg-linear-to-b from-white/[0.03] to-transparent rounded-t-lg" />
-      <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/[0.03]" />
+    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.10] bg-white/[0.06] p-4 backdrop-blur-2xl transition-all duration-500 hover:bg-white/[0.10] hover:shadow-xl hover:shadow-emerald-950/20">
+      {/* Liquid glass reflections */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/30 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b from-white/[0.06] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.04]" />
+
+      {/* Hover glow */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-400/10 blur-3xl transition-opacity duration-700 opacity-0 group-hover:opacity-100" />
 
       <div className="relative flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-emerald-300 ring-1 ring-white/[0.08] backdrop-blur-md transition-transform duration-300 group-hover:scale-110">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-emerald-300 ring-1 ring-white/[0.10] backdrop-blur-md transition-transform duration-300 group-hover:scale-110">
           {icon}
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">{label}</p>
-          <p className="text-base font-bold text-white tabular-nums">{value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+          <p className="text-lg font-bold text-white tabular-nums leading-tight">{value}</p>
         </div>
       </div>
     </div>
+  )
+}
+
+/* ─── Dev Tool Card (estilo anterior, NÃO liquid glass) ─────────────── */
+interface DevToolCardProps {
+  href: string
+  icon: React.ReactNode
+  title: string
+  description: string
+  cta: string
+  variant?: 'default' | 'accent' | 'dark'
+  badge?: string
+}
+
+function DevToolCard({ href, icon, title, description, cta, variant = 'default', badge }: DevToolCardProps) {
+  const isDark = variant === 'dark'
+  const isAccent = variant === 'accent'
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300',
+        'hover:-translate-y-0.5 hover:shadow-lg',
+        isDark
+          ? 'border-slate-700/60 bg-slate-900/95 text-white hover:border-slate-500 hover:bg-slate-800'
+          : isAccent
+            ? 'border-emerald-200/80 bg-emerald-50/60 hover:border-emerald-300 hover:bg-emerald-50'
+            : 'border-surface-200/80 bg-white/80 hover:border-primary-300 hover:bg-white hover:shadow-md'
+      )}
+    >
+      <div className="relative flex items-start justify-between">
+        <div
+          className={cn(
+            'inline-flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105',
+            isDark
+              ? 'bg-slate-700 text-slate-200'
+              : isAccent
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-primary-100 text-primary-700'
+          )}
+        >
+          {icon}
+        </div>
+        {badge && (
+          <span
+            className={cn(
+              'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+              isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+            )}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+
+      <div className="relative mt-4 flex-1">
+        <h2 className={cn('text-lg font-semibold', isDark ? 'text-white' : 'text-surface-900')}>{title}</h2>
+        <p className={cn('mt-1 text-sm', isDark ? 'text-slate-400' : 'text-surface-600')}>{description}</p>
+      </div>
+
+      <div className="relative mt-4 flex items-center gap-2 text-sm font-semibold">
+        <span
+          className={cn(
+            'transition-colors duration-300',
+            isDark
+              ? 'text-emerald-400 group-hover:text-emerald-300'
+              : isAccent
+                ? 'text-emerald-700 group-hover:text-emerald-800'
+                : 'text-primary-700 group-hover:text-primary-800'
+          )}
+        >
+          {cta}
+        </span>
+        <ArrowRight
+          className={cn(
+            'h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5',
+            isDark
+              ? 'text-emerald-400 group-hover:text-emerald-300'
+              : isAccent
+                ? 'text-emerald-700 group-hover:text-emerald-800'
+                : 'text-primary-700 group-hover:text-primary-800'
+          )}
+        />
+      </div>
+    </Link>
   )
 }
 
@@ -241,9 +191,9 @@ export default function DevPage() {
   if (!authLoaded) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-4 backdrop-blur-xl">
+        <div className="flex items-center gap-3 rounded-2xl border border-surface-200 bg-white px-6 py-4 shadow-sm">
           <Spinner />
-          <span className="text-sm font-medium text-slate-400">Validando credenciais de acesso...</span>
+          <span className="text-sm font-medium text-surface-600">Validando credenciais de acesso...</span>
         </div>
       </div>
     )
@@ -252,16 +202,16 @@ export default function DevPage() {
   if (!canAccess) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center px-4">
-        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] shadow-2xl backdrop-blur-xl">
-          <div className="h-1 bg-red-500" />
+        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-red-200 bg-white shadow-lg">
+          <div className="h-1.5 bg-red-500" />
           <div className="p-8">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400 ring-1 ring-red-400/20 backdrop-blur-md">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
                 <Lock className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Acesso restrito</h1>
-                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                <h1 className="text-xl font-bold text-surface-900">Acesso restrito</h1>
+                <p className="mt-2 text-sm leading-relaxed text-surface-500">
                   Esta área é exclusiva para administradores de sistema. Se você precisa de acesso, entre em contato com o time de Tecnologia.
                 </p>
               </div>
@@ -274,22 +224,18 @@ export default function DevPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-10">
-      {/* Hero — Liquid Glass Panel */}
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.06] bg-linear-to-br from-[#05120c] via-[#0a1f16] to-[#0d2e20] px-6 py-10 shadow-2xl sm:px-10 sm:py-14">
-        {/* Ambient orbs */}
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-3xl border border-emerald-900/10 bg-linear-to-br from-[#07160f] via-[#0f2a1d] to-[#14966f] px-6 py-10 shadow-xl sm:px-10 sm:py-14">
+        {/* Ambient glows */}
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-16 -top-16 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />
-          <div className="absolute -bottom-16 -right-16 h-72 w-72 rounded-full bg-[#c6a277]/8 blur-3xl" />
-          <div className="absolute left-1/2 top-0 h-48 w-48 -translate-x-1/2 rounded-full bg-emerald-400/5 blur-3xl" />
+          <div className="absolute -left-10 -top-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+          <div className="absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-[#c6a277]/10 blur-3xl" />
         </div>
-
-        {/* Liquid glass overlay on hero */}
-        <div className="pointer-events-none absolute inset-0 bg-white/[0.01] backdrop-blur-[1px]" />
 
         <div className="relative">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 backdrop-blur-md">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1">
                 <Zap className="h-3.5 w-3.5 text-emerald-300" />
                 <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-200">
                   {isDeveloper ? 'Área Dev' : 'Administração'}
@@ -298,14 +244,14 @@ export default function DevPage() {
               <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 {isDeveloper ? 'Central do Desenvolvedor' : 'Gestão de Usuários e Permissões'}
               </h1>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-400 sm:text-base">
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-emerald-100/80 sm:text-base">
                 {isDeveloper
                   ? 'Governança técnica, diagnóstico operacional e administração centralizada do ecossistema empresarial.'
                   : 'Administração corporativa de contas, grupos e permissões do sistema empresarial.'}
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 backdrop-blur-xl">
+            <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
               <Shield className="h-4 w-4 text-emerald-300" />
               <span className="text-xs font-semibold text-emerald-100">
                 {isDeveloper ? 'Perfil Desenvolvedor' : 'Perfil Analista de TI'}
@@ -313,7 +259,7 @@ export default function DevPage() {
             </div>
           </div>
 
-          {/* Stats row — Liquid Glass */}
+          {/* Quick stats — Liquid Glass */}
           <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <LiquidGlassStat icon={<Users className="h-4 w-4" />} label="Usuários" value={stats.users} />
             <LiquidGlassStat icon={<KeyRound className="h-4 w-4" />} label="Grupos" value={stats.groups} />
@@ -323,92 +269,86 @@ export default function DevPage() {
         </div>
       </section>
 
-      {/* Tools Grid — 5 Liquid Glass Cards */}
+      {/* Tools Grid — estilo anterior (NÃO liquid glass) */}
       <section>
         <div className="mb-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-white/[0.06]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">
+          <div className="h-px flex-1 bg-surface-200" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">
             Ferramentas de Governança
           </span>
-          <div className="h-px flex-1 bg-white/[0.06]" />
+          <div className="h-px flex-1 bg-surface-200" />
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          <LiquidGlassCard
+          <DevToolCard
             href={`${basePath}/gestao-usuarios`}
             icon={<Users className="h-5 w-5" />}
             title="Gestão de Usuários"
             description="Cadastro, edição, status, vínculos com vendedores/supervisores e ciclo de vida completo das contas corporativas."
             cta="Acessar seção"
-            variant="emerald"
+            variant="default"
           />
 
-          <LiquidGlassCard
+          <DevToolCard
             href={`${basePath}/gestao-permissoes`}
             icon={<KeyRound className="h-5 w-5" />}
             title="Gestão de Permissões"
             description="Controle granular de grupos, privilégios por módulo e atribuição dinâmica de acessos por usuário."
             cta="Acessar seção"
-            variant="emerald"
+            variant="accent"
           />
 
           {isDeveloper && (
-            <LiquidGlassCard
+            <DevToolCard
               href={`${basePath}/diagnostico`}
               icon={<Activity className="h-5 w-5" />}
               title="Central de Diagnóstico"
               description="Testes de conectividade, autenticação Sankhya, inspeção de campos e execução de SQL livre."
               cta="Abrir diagnóstico"
-              variant="slate"
+              variant="dark"
               badge="Dev Only"
             />
           )}
 
-          <LiquidGlassCard
+          <DevToolCard
             href="/metas/telemetria"
             icon={<BarChart3 className="h-5 w-5" />}
             title="Telemetria do Sistema"
             description="Monitoramento em tempo real de requisições, latência, cache hit rate e métricas de concorrência."
             cta="Visualizar métricas"
-            variant="emerald"
+            variant="default"
           />
 
-          <LiquidGlassCard
+          <DevToolCard
             href="/auditoria"
             icon={<ClipboardList className="h-5 w-5" />}
             title="Auditoria Corporativa"
             description="Rastreamento de ações críticas, exportação de logs e análise de comportamento do sistema."
             cta="Consultar logs"
-            variant="amber"
+            variant="accent"
           />
         </div>
       </section>
 
-      {/* System Status / Quick Links — Liquid Glass */}
+      {/* System Status / Quick Links — Clean light style (como estava antes) */}
       <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-xl lg:col-span-2">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.03]" />
-
-          <h3 className="relative text-sm font-bold uppercase tracking-wider text-slate-400">Atalhos Rápidos</h3>
-          <div className="relative mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <LiquidQuickLink href={`${basePath}/gestao-usuarios`} icon={<Users className="h-4 w-4" />} label="Gerenciar usuários" />
-            <LiquidQuickLink href={`${basePath}/gestao-permissoes`} icon={<KeyRound className="h-4 w-4" />} label="Configurar permissões" />
+        <div className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm lg:col-span-2">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-surface-500">Atalhos Rápidos</h3>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <QuickLink href={`${basePath}/gestao-usuarios`} icon={<Users className="h-4 w-4" />} label="Gerenciar usuários" />
+            <QuickLink href={`${basePath}/gestao-permissoes`} icon={<KeyRound className="h-4 w-4" />} label="Configurar permissões" />
             {isDeveloper && (
               <>
-                <LiquidQuickLink href={`${basePath}/diagnostico`} icon={<Database className="h-4 w-4" />} label="Executar diagnóstico" />
-                <LiquidQuickLink href="/metas/telemetria" icon={<Server className="h-4 w-4" />} label="Telemetria do sistema" />
+                <QuickLink href={`${basePath}/diagnostico`} icon={<Database className="h-4 w-4" />} label="Executar diagnóstico" />
+                <QuickLink href="/metas/telemetria" icon={<Server className="h-4 w-4" />} label="Telemetria do sistema" />
               </>
             )}
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-xl">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.03]" />
-
-          <h3 className="relative text-sm font-bold uppercase tracking-wider text-slate-400">Ambiente</h3>
-          <div className="relative mt-4 space-y-3">
+        <div className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-surface-500">Ambiente</h3>
+          <div className="mt-4 space-y-3">
             <EnvRow icon={<Globe className="h-4 w-4" />} label="Base" value="Produção" status="online" />
             <EnvRow icon={<Database className="h-4 w-4" />} label="Sankhya" value="Conectado" status="online" />
             <EnvRow icon={<Code2 className="h-4 w-4" />} label="API" value="Operacional" status="online" />
@@ -417,33 +357,30 @@ export default function DevPage() {
         </div>
       </section>
 
-      {/* Footer note — Liquid Glass */}
-      <section className="relative overflow-hidden rounded-xl border border-white/[0.06] bg-emerald-500/[0.03] px-4 py-3 backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-emerald-400/20 to-transparent" />
-        <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-300/80">
-          <Shield className="h-3.5 w-3.5" />
-          {isDeveloper
-            ? 'Área restrita ao perfil Desenvolvedor. Todas as ações são registradas em auditoria.'
-            : 'Acesso liberado para Analista de TI com permissões de leitura e edição limitadas.'}
-        </div>
+      {/* Footer note — clean style */}
+      <section className="flex items-center justify-center rounded-xl border border-surface-200 bg-surface-50 p-4 text-sm text-surface-600">
+        <p className="inline-flex items-center gap-2 font-medium text-surface-700">
+          <Shield className="h-4 w-4" />
+          {isDeveloper ? 'Uso restrito ao perfil Desenvolvedor.' : 'Acesso liberado para Analista de TI.'}
+        </p>
       </section>
     </div>
   )
 }
 
-/* ─── Sub-components ────────────────────────────────────────────────── */
+/* ─── Sub-components (clean light style, como estavam antes) ────────── */
 
-function LiquidQuickLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 backdrop-blur-md transition-all duration-300 hover:border-emerald-200/15 hover:bg-emerald-500/[0.04]"
+      className="group flex items-center gap-3 rounded-xl border border-surface-200/60 bg-surface-50/60 px-4 py-3 transition-all hover:border-emerald-200 hover:bg-emerald-50/50"
     >
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-slate-400 ring-1 ring-white/[0.06] transition-all duration-300 group-hover:text-emerald-300 group-hover:ring-emerald-200/20">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-surface-500 shadow-sm ring-1 ring-surface-100 transition-colors group-hover:text-emerald-700 group-hover:ring-emerald-200">
         {icon}
       </div>
-      <span className="flex-1 text-sm font-medium text-slate-300 transition-colors group-hover:text-white">{label}</span>
-      <ArrowUpRight className="h-4 w-4 text-slate-500 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-400" />
+      <span className="flex-1 text-sm font-medium text-surface-700 group-hover:text-surface-900">{label}</span>
+      <ArrowUpRight className="h-4 w-4 text-surface-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-600" />
     </Link>
   )
 }
@@ -464,18 +401,18 @@ function EnvRow({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.03] text-slate-500 ring-1 ring-white/[0.05]">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-50 text-surface-400 ring-1 ring-surface-100">
         {icon}
       </div>
       <div className="flex-1">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <p className="text-xs font-medium text-surface-500">{label}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="relative flex h-2 w-2">
           <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-40', statusColor)} />
           <span className={cn('relative inline-flex h-2 w-2 rounded-full', statusColor)} />
         </span>
-        <span className="text-xs font-semibold text-slate-300">{value}</span>
+        <span className="text-xs font-semibold text-surface-700">{value}</span>
       </div>
     </div>
   )

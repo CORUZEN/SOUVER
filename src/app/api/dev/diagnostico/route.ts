@@ -113,29 +113,36 @@ export async function GET(req: NextRequest) {
     const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
-    const sqlRaw = `SELECT I.NUNOTA, I.SEQUENCIA, I.CODPROD, P.DESCRPROD, P.CODVOL AS PRD_CODVOL, P.MEDAUX AS PRD_MEDAUX, P.QTDEMB AS PRD_QTDEMB, P.MULTIPVENDA AS PRD_MULTIPVENDA, P.PESOBRUTO AS PRD_PESOBRUTO, I.CODVOL AS ITE_CODVOL, I.QTDNEG, I.QTDVOL, I.VLRUNIT, I.PESO FROM TGFITE I INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE I.NUNOTA = ${nunota} ORDER BY I.SEQUENCIA`
-    const sqlSim = `SELECT TO_CHAR(CAB.NUNOTA) AS NUNOTA, TO_CHAR(I.CODPROD) AS CODPROD, UPPER(TRIM(P.DESCRPROD)) AS PRODUTO, UPPER(TRIM(TO_CHAR(P.CODVOL))) AS PRD_CODVOL, UPPER(TRIM(TO_CHAR(I.CODVOL))) AS ITE_CODVOL, NVL(P.MEDAUX, 1) AS MEDAUX, SUM(I.QTDNEG) AS QTDNEG_SUM, SUM(NVL(I.QTDVOL, 0)) AS QTDVOL_SUM, SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG, NVL(CAB.APROVADO, 'N') AS APROVADO, NVL(CAB.PENDENTE, 'N') AS PENDENTE FROM TGFCAB CAB INNER JOIN TGFITE I ON I.NUNOTA = CAB.NUNOTA INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE CAB.NUNOTA = ${nunota} GROUP BY CAB.NUNOTA, I.CODPROD, P.DESCRPROD, P.CODVOL, I.CODVOL, P.MEDAUX, CAB.APROVADO, CAB.PENDENTE ORDER BY I.CODPROD`
+    const sqlRaw = `SELECT I.NUNOTA, I.SEQUENCIA, I.CODPROD, P.DESCRPROD, P.CODVOL AS PRD_CODVOL, P.MEDAUX AS PRD_MEDAUX, P.CONVERVOL AS PRD_CONVERVOL, P.FATTOTAL AS PRD_FATTOTAL, P.QTDEMB AS PRD_QTDEMB, P.MULTIPVENDA AS PRD_MULTIPVENDA, P.PESOBRUTO AS PRD_PESOBRUTO, I.CODVOL AS ITE_CODVOL, I.QTDNEG, I.QTDVOL, I.VLRUNIT, I.PESO FROM TGFITE I INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE I.NUNOTA = ${nunota} ORDER BY I.SEQUENCIA`
+    const sqlSim = `SELECT TO_CHAR(CAB.NUNOTA) AS NUNOTA, TO_CHAR(I.CODPROD) AS CODPROD, UPPER(TRIM(P.DESCRPROD)) AS PRODUTO, UPPER(TRIM(TO_CHAR(P.CODVOL))) AS PRD_CODVOL, UPPER(TRIM(NVL(TO_CHAR(I.CODVOL), TO_CHAR(P.CODVOL)))) AS ITE_CODVOL, NVL(P.MEDAUX, 1) AS MEDAUX, NVL(P.CONVERVOL, 1) AS CONVERVOL, NVL(P.FATTOTAL, 1) AS FATTOTAL, SUM(I.QTDNEG) AS QTDNEG_SUM, SUM(NVL(I.QTDVOL, 0)) AS QTDVOL_SUM, SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG, NVL(CAB.APROVADO, 'N') AS APROVADO, NVL(CAB.PENDENTE, 'N') AS PENDENTE FROM TGFCAB CAB INNER JOIN TGFITE I ON I.NUNOTA = CAB.NUNOTA INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE CAB.NUNOTA = ${nunota} GROUP BY CAB.NUNOTA, I.CODPROD, P.DESCRPROD, P.CODVOL, I.CODVOL, P.MEDAUX, P.CONVERVOL, P.FATTOTAL, CAB.APROVADO, CAB.PENDENTE ORDER BY I.CODPROD`
     const start = Date.now()
     const [rawResult, simResult] = await Promise.allSettled([runSql(baseUrl, headers, sqlRaw, appKey), runSql(baseUrl, headers, sqlSim, appKey)])
     const simRows = simResult.status === 'fulfilled'
       ? simResult.value.records.map(r => {
           const medaux = Math.max(1, parseNumber(r.MEDAUX) || 1)
+          const convervol = Math.max(1, parseNumber(r.CONVERVOL) || 1)
+          const fattotal = Math.max(1, parseNumber(r.FATTOTAL) || 1)
+          const factor = convervol > 1 ? convervol : fattotal > 1 ? fattotal : medaux
           const qtdneg = parseNumber(r.QTDNEG_SUM)
           const qtdvol = parseNumber(r.QTDVOL_SUM)
           const prdUnit = String(r.PRD_CODVOL ?? '')
           const iteUnit = String(r.ITE_CODVOL ?? '')
           const unitMismatch = iteUnit !== prdUnit && iteUnit !== ''
-          const unitFinal = medaux > 1 ? 'UN' : (iteUnit || prdUnit)
-          const qtyFinal = medaux > 1 ? Math.round(qtdneg * medaux) : qtdneg
+          const unitFinal = factor > 1 ? 'UN' : (iteUnit || prdUnit)
+          const qtyFinal = factor > 1 ? Math.round(qtdneg * factor) : qtdneg
           return {
             ...r,
             _analysis: {
-              medaux, qtdneg, qtdvol,
+              medaux, convervol, fattotal, factor, qtdneg, qtdvol,
               ite_unit: iteUnit, prd_unit: prdUnit, unit_mismatch: unitMismatch,
               unit_final: unitFinal, qty_final: qtyFinal,
               souver_displays: `${qtyFinal} ${unitFinal}`,
-              conversion_source: medaux > 1 ? 'MEDAUX' : qtdvol > 0 ? 'QTDVOL' : 'none',
-              diagnosis: unitMismatch ? `ITE_CODVOL(${iteUnit}) ≠ PRD_CODVOL(${prdUnit}) — use ITE_CODVOL` : medaux > 1 ? `MEDAUX=${medaux} → ${qtdneg} ${prdUnit} × ${medaux} = ${qtyFinal} UN` : qtdvol > 0 ? `QTDVOL=${qtdvol} → usar diretamente` : `Sem conversão detectada — exibe ${qtdneg} ${iteUnit || prdUnit}`,
+              conversion_source: convervol > 1 ? 'CONVERVOL' : fattotal > 1 ? 'FATTOTAL' : medaux > 1 ? 'MEDAUX' : qtdvol > 0 ? 'QTDVOL' : 'none',
+              diagnosis: convervol > 1
+                ? `CONVERVOL=${convervol} → ${qtdneg} × ${convervol} = ${qtyFinal} UN`
+                : fattotal > 1
+                  ? `FATTOTAL=${fattotal} → ${qtdneg} × ${fattotal} = ${qtyFinal} UN`
+                  : unitMismatch ? `ITE_CODVOL(${iteUnit}) ≠ PRD_CODVOL(${prdUnit}) — use ITE_CODVOL` : medaux > 1 ? `MEDAUX=${medaux} → ${qtdneg} × ${medaux} = ${qtyFinal} UN` : qtdvol > 0 ? `QTDVOL=${qtdvol} → usar diretamente` : `Sem fator detectado — exibe ${qtdneg} ${iteUnit || prdUnit}`,
             },
           }
         })

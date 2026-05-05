@@ -481,7 +481,7 @@ export default function DiagnosticoPage() {
                           <table className="w-full text-xs">
                             <thead className="bg-surface-50">
                               <tr>
-                                {['CODPROD', 'PRODUTO', 'ITE_CODVOL', 'PRD_CODVOL', 'MEDAUX', 'QTDNEG', 'QTDVOL'].map(h => (
+                                {['CODPROD', 'PRODUTO', 'ITE_CODVOL', 'PRD_CODVOL', 'CONVERVOL', 'FATTOTAL', 'MEDAUX', 'QTDNEG', 'QTDVOL'].map(h => (
                                   <th key={h} className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">{h}</th>
                                 ))}
                                 <th className="px-3 py-2 text-left font-semibold text-emerald-700 bg-emerald-50 whitespace-nowrap">SOUVER EXIBE</th>
@@ -499,6 +499,7 @@ export default function DiagnosticoPage() {
                                     <td className="px-3 py-2 text-surface-700 max-w-48 truncate">{String(r.PRODUTO)}</td>
                                     <td className={`px-3 py-2 font-mono font-semibold ${mismatch ? 'text-amber-700' : 'text-blue-700'}`}>{String(r.ITE_CODVOL)}</td>
                                     <td className="px-3 py-2 font-mono text-surface-500">{String(r.PRD_CODVOL)}</td>
+                                    <td className={`px-3 py-2 font-mono ${Number(a?.convervol) > 1 ? 'text-emerald-700 font-bold' : 'text-surface-400'}`}>{String(r.CONVERVOL ?? '—')}</td>
                                     <td className={`px-3 py-2 font-mono ${Number(a?.medaux) > 1 ? 'text-emerald-700 font-semibold' : 'text-surface-400'}`}>{String(r.MEDAUX)}</td>
                                     <td className="px-3 py-2 font-mono font-semibold">{String(a?.qtdneg ?? '—')}</td>
                                     <td className={`px-3 py-2 font-mono ${Number(a?.qtdvol) > 0 ? 'text-emerald-600 font-semibold' : 'text-surface-400'}`}>{String(a?.qtdvol ?? '—')}</td>
@@ -589,9 +590,9 @@ export default function DiagnosticoPage() {
             <p className="text-xs font-semibold text-surface-600 mb-2">Queries úteis:</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {[
-                { label: 'Campos TGFPRO prod 18,30', sql: 'SELECT P.CODPROD, P.DESCRPROD, P.CODVOL, P.MEDAUX, P.QTDEMB, P.MULTIPVENDA FROM TGFPRO P WHERE P.CODPROD IN (18,30)' },
-                { label: 'Items pedido 243986', sql: 'SELECT I.CODPROD, I.CODVOL, I.QTDNEG, I.QTDVOL FROM TGFITE I WHERE I.NUNOTA = 243986' },
-                { label: 'Tabela TGFUNI (conv. unid.)', sql: "SELECT U.CODVOL, U.DESCVOL, U.FATORCONVERSAO FROM TGFUNI U WHERE UPPER(U.CODVOL) = 'FD'" },
+                { label: 'Todos campos TGFITE (243986)', sql: 'SELECT I.* FROM TGFITE I WHERE I.NUNOTA = 243986 ORDER BY I.SEQUENCIA' },
+                { label: 'TGFPRO completo prod 18,30', sql: 'SELECT P.* FROM TGFPRO P WHERE P.CODPROD IN (18, 30)' },
+                { label: 'TGFUNI — tabela de unidades', sql: "SELECT U.CODVOL, U.DESCVOL FROM TGFUNI U ORDER BY U.CODVOL" },
                 { label: 'Usuários Sankhya', sql: 'SELECT V.CODVEND, V.APELIDO FROM TGFVEN V WHERE ROWNUM <= 10 ORDER BY V.CODVEND' },
               ].map(({ label, sql }) => (
                 <button
