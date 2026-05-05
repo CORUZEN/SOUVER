@@ -780,16 +780,16 @@ export default function PrevisaoDeEstoque() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-slate-100/80">
                 <tr className="[&_th]:whitespace-nowrap">
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">SKU</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">Descrição</th>
-                  <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-16">UN</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-28">Qtd</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-32">Peso (kg)</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-28">Estoque</th>
-                  <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-40">Status</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-20">SKU</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">Descrição</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-14">UN</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">Qtd</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">Peso (kg)</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">Estoque</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-52">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -800,24 +800,27 @@ export default function PrevisaoDeEstoque() {
 
                   return (
                     <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
-                      <td className="px-4 py-3.5 text-sm font-medium text-slate-600">{p.productCode}</td>
-                      <td className="px-4 py-3.5 font-semibold text-slate-800">{p.productName}</td>
-                      <td className="px-4 py-3.5 text-center font-medium text-slate-600">{p.unit}</td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(p.quantity)}</td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
-                      <td className={cn('px-4 py-3.5 text-right font-semibold tabular-nums', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
-                      <td className="px-4 py-3.5 text-center">
+                      <td className="px-3 py-3.5 text-sm font-medium text-slate-600 whitespace-nowrap">{p.productCode}</td>
+                      <td className="px-3 py-3.5 font-semibold text-slate-800">{p.productName}</td>
+                      <td className="px-3 py-3.5 text-center font-medium text-slate-600 whitespace-nowrap">{p.unit}</td>
+                      <td className="px-3 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">{fmtQty(p.quantity)}</td>
+                      <td className="px-3 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
+                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
+                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
                         <span
                           className={cn(
-                            'inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
+                            'inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
                             hasStock
                               ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
                               : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
                           )}
                         >
                           {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                          <span className="tracking-[0.01em]">
-                            {hasStock ? 'SUFICIENTE' : `FALTA ${fmtQty(Math.abs(diff))}`}
+                          <span className="tracking-[0.01em] whitespace-nowrap">
+                            {hasStock
+                              ? 'SUFICIENTE'
+                              : `FALTA ${fmtQty(Math.abs(diff))} ${p.unit} · ${fmtKg(Math.abs(diff) * (p.quantity > 0 ? p.weightKg / p.quantity : 0))} kg`
+                            }
                           </span>
                         </span>
                       </td>

@@ -84,7 +84,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
         'group relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300',
         'hover:-translate-y-0.5 hover:shadow-xl',
         isDark
-          ? 'border-emerald-900/30 bg-linear-to-br from-[#151f3a] via-[#172645] to-[#1b2f57] text-white hover:border-emerald-500/30'
+          ? 'border-[#3f6d57]/45 bg-linear-to-br from-[#07160f] via-[#0f2a1d] to-[#173c2c] text-white hover:border-[#5a8f75]/55'
           : isAccent
             ? 'border-emerald-300/55 bg-linear-to-br from-[#f2fbf7] via-[#ecf8f2] to-[#e4f4eb] hover:border-emerald-400/60'
             : 'border-slate-200/90 bg-linear-to-br from-white via-[#fbfdfc] to-[#f2f8f5] hover:border-emerald-300/55'
@@ -95,7 +95,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
         <div
           className={cn(
             'absolute -right-12 -top-12 h-28 w-28 rounded-full blur-2xl',
-            isDark ? 'bg-emerald-300/10' : 'bg-emerald-400/10'
+            isDark ? 'bg-[#31b8a2]/12' : 'bg-emerald-400/10'
           )}
         />
       </div>
@@ -105,7 +105,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           className={cn(
             'inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-transform duration-300 group-hover:scale-105',
             isDark
-              ? 'border-emerald-200/20 bg-emerald-200/10 text-emerald-200'
+              ? 'border-[#c6a277]/26 bg-[#edf0e2]/8 text-[#dce6d2]'
               : isAccent
                 ? 'border-emerald-200/60 bg-emerald-100/80 text-emerald-800'
                 : 'border-emerald-200/70 bg-emerald-50 text-emerald-800'
@@ -117,7 +117,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           <span
             className={cn(
               'rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em]',
-              isDark ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-300' : 'border-emerald-200 bg-emerald-100 text-emerald-700'
+              isDark ? 'border-[#c6a277]/30 bg-[#edf0e2]/10 text-[#dce6d2]' : 'border-emerald-200 bg-emerald-100 text-emerald-700'
             )}
           >
             {badge}
@@ -135,7 +135,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           className={cn(
             'transition-colors duration-300',
             isDark
-              ? 'text-emerald-300 group-hover:text-emerald-200'
+              ? 'text-[#7ff0cb] group-hover:text-[#b4f5de]'
               : isAccent
                 ? 'text-emerald-700 group-hover:text-emerald-800'
                 : 'text-emerald-700 group-hover:text-emerald-800'
@@ -147,7 +147,7 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           className={cn(
             'h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5',
             isDark
-              ? 'text-emerald-300 group-hover:text-emerald-200'
+              ? 'text-[#7ff0cb] group-hover:text-[#b4f5de]'
               : isAccent
                 ? 'text-emerald-700 group-hover:text-emerald-800'
                 : 'text-emerald-700 group-hover:text-emerald-800'
@@ -170,17 +170,17 @@ function SidePanelCard() {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[#3f6d57]/30 bg-linear-to-b from-[#f2f5f0] to-white shadow-md">
       {/* Header */}
-      <div className="relative overflow-hidden border-b border-emerald-900/30 bg-linear-to-r from-[#04120c] via-[#0a281c] to-[#13543d] px-5 py-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
+      <div className="relative overflow-hidden border-b border-[#3f6d57]/35 bg-linear-to-r from-[#07160f] via-[#0f2a1d] to-[#173c2c] px-5 py-4 shadow-[inset_0_-1px_0_rgba(242,245,234,0.08)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-emerald-200/60 to-transparent" />
-          <div className="absolute -top-10 right-8 h-24 w-24 rounded-full bg-emerald-300/15 blur-2xl" />
-          <div className="absolute -left-8 -bottom-10 h-20 w-20 rounded-full bg-[#c6a277]/20 blur-2xl" />
+          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[#edf0e2]/60 to-transparent" />
+          <div className="absolute -top-10 right-8 h-24 w-24 rounded-full bg-[#31b8a2]/18 blur-2xl" />
+          <div className="absolute -left-8 -bottom-10 h-20 w-20 rounded-full bg-[#c6a277]/18 blur-2xl" />
         </div>
         <div className="relative flex items-center gap-2">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-emerald-300/30 bg-emerald-200/10">
-            <Server className="h-3.5 w-3.5 text-emerald-200" />
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#c6a277]/28 bg-[#edf0e2]/8">
+            <Server className="h-3.5 w-3.5 text-[#dce6d2]" />
           </span>
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-50/95">Status do Ambiente</h3>
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#edf0e2]">Status do Ambiente</h3>
         </div>
       </div>
 
