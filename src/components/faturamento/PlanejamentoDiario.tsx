@@ -798,30 +798,34 @@ export default function PrevisaoDeEstoque() {
                   const diff = stock - p.quantity
                   const hasStock = diff >= 0
 
+                  const missingKg = Math.abs(diff) * (p.quantity > 0 ? p.weightKg / p.quantity : 0)
+
                   return (
                     <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
-                      <td className="px-3 py-3.5 text-sm font-medium text-slate-600 whitespace-nowrap">{p.productCode}</td>
-                      <td className="px-3 py-3.5 font-semibold text-slate-800">{p.productName}</td>
-                      <td className="px-3 py-3.5 text-center font-medium text-slate-600 whitespace-nowrap">{p.unit}</td>
-                      <td className="px-3 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">{fmtQty(p.quantity)}</td>
-                      <td className="px-3 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
+                      <td className={cn('px-3 py-3.5 text-sm font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.productCode}</td>
+                      <td className={cn('px-3 py-3.5 font-semibold', hasStock ? 'text-slate-800' : 'text-rose-700')}>{p.productName}</td>
+                      <td className={cn('px-3 py-3.5 text-center font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.unit}</td>
+                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(p.quantity)}</td>
+                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
                       <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
                       <td className="px-3 py-3.5 text-center whitespace-nowrap">
                         <span
                           className={cn(
-                            'inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
+                            'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
                             hasStock
                               ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
                               : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
                           )}
                         >
                           {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                          <span className="tracking-[0.01em] whitespace-nowrap">
-                            {hasStock
-                              ? 'SUFICIENTE'
-                              : `FALTA ${fmtQty(Math.abs(diff))} ${p.unit} · ${fmtKg(Math.abs(diff) * (p.quantity > 0 ? p.weightKg / p.quantity : 0))} kg`
-                            }
-                          </span>
+                          {hasStock ? (
+                            <span className="tracking-[0.01em]">SUFICIENTE</span>
+                          ) : (
+                            <span className="flex flex-col items-start leading-tight">
+                              <span className="tracking-[0.01em]">FALTA {fmtQty(Math.abs(diff))} {p.unit}</span>
+                              <span className="text-[10px] font-medium opacity-80">{fmtKg(missingKg)} kg</span>
+                            </span>
+                          )}
                         </span>
                       </td>
                     </tr>
