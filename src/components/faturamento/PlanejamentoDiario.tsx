@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { useSellersAllowlist } from '@/lib/client/hooks/use-metas'
 import {
   AlertTriangle,
@@ -792,38 +793,37 @@ export default function PrevisaoDeEstoque() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {productAggregates.map((p, index) => (
-                  <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
-                    <td className="px-4 py-3.5 font-mono text-[12px] text-slate-500">{p.productCode}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-800">{p.productName}</td>
-                    <td className="px-4 py-3.5 text-center font-medium text-slate-600">{p.unit}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(p.quantity)}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtKg(p.weightKg)}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(stockMap.get(p.productCode) ?? 0)}</td>
-                    {(() => {
-                      const stock = stockMap.get(p.productCode) ?? 0
-                      const diff = stock - p.quantity
-                      const hasStock = diff >= 0
+                {productAggregates.map((p, index) => {
+                  const stock = stockMap.get(p.productCode) ?? 0
+                  const diff = stock - p.quantity
+                  const hasStock = diff >= 0
 
-                      return (
-                        <td className="px-4 py-3.5 text-center">
-                          <span
-                            className={`inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]
-                              ${hasStock
-                                ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
-                                : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
-                              }`}
-                          >
-                            {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                            <span className="tracking-[0.01em]">
-                              {hasStock ? 'SUFICIENTE' : `FALTA ${fmtQty(Math.abs(diff))}`}
-                            </span>
+                  return (
+                    <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
+                      <td className="px-4 py-3.5 text-sm font-medium text-slate-600">{p.productCode}</td>
+                      <td className="px-4 py-3.5 font-semibold text-slate-800">{p.productName}</td>
+                      <td className="px-4 py-3.5 text-center font-medium text-slate-600">{p.unit}</td>
+                      <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtQty(p.quantity)}</td>
+                      <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums">{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
+                      <td className={cn('px-4 py-3.5 text-right font-semibold tabular-nums', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span
+                          className={cn(
+                            'inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
+                            hasStock
+                              ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
+                              : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
+                          )}
+                        >
+                          {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+                          <span className="tracking-[0.01em]">
+                            {hasStock ? 'SUFICIENTE' : `FALTA ${fmtQty(Math.abs(diff))}`}
                           </span>
-                        </td>
-                      )
-                    })()}
-                  </tr>
-                ))}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

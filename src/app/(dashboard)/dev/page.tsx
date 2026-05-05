@@ -82,23 +82,33 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
       href={href}
       className={cn(
         'group relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300',
-        'hover:-translate-y-0.5 hover:shadow-lg',
+        'hover:-translate-y-0.5 hover:shadow-xl',
         isDark
-          ? 'border-slate-700/60 bg-slate-900/95 text-white hover:border-slate-500 hover:bg-slate-800'
+          ? 'border-emerald-900/30 bg-linear-to-br from-[#151f3a] via-[#172645] to-[#1b2f57] text-white hover:border-emerald-500/30'
           : isAccent
-            ? 'border-emerald-200/80 bg-emerald-50/60 hover:border-emerald-300 hover:bg-emerald-50'
-            : 'border-surface-200/80 bg-white/80 hover:border-primary-300 hover:bg-white hover:shadow-md'
+            ? 'border-emerald-300/55 bg-linear-to-br from-[#f2fbf7] via-[#ecf8f2] to-[#e4f4eb] hover:border-emerald-400/60'
+            : 'border-slate-200/90 bg-linear-to-br from-white via-[#fbfdfc] to-[#f2f8f5] hover:border-emerald-300/55'
       )}
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/70 to-transparent" />
+        <div
+          className={cn(
+            'absolute -right-12 -top-12 h-28 w-28 rounded-full blur-2xl',
+            isDark ? 'bg-emerald-300/10' : 'bg-emerald-400/10'
+          )}
+        />
+      </div>
+
       <div className="relative flex items-start justify-between">
         <div
           className={cn(
-            'inline-flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105',
+            'inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-transform duration-300 group-hover:scale-105',
             isDark
-              ? 'bg-slate-700 text-slate-200'
+              ? 'border-emerald-200/20 bg-emerald-200/10 text-emerald-200'
               : isAccent
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-primary-100 text-primary-700'
+                ? 'border-emerald-200/60 bg-emerald-100/80 text-emerald-800'
+                : 'border-emerald-200/70 bg-emerald-50 text-emerald-800'
           )}
         >
           {icon}
@@ -106,8 +116,8 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
         {badge && (
           <span
             className={cn(
-              'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-              isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+              'rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em]',
+              isDark ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-300' : 'border-emerald-200 bg-emerald-100 text-emerald-700'
             )}
           >
             {badge}
@@ -116,8 +126,8 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
       </div>
 
       <div className="relative mt-4 flex-1">
-        <h2 className={cn('text-lg font-semibold', isDark ? 'text-white' : 'text-surface-900')}>{title}</h2>
-        <p className={cn('mt-1 text-sm', isDark ? 'text-slate-400' : 'text-surface-600')}>{description}</p>
+        <h2 className={cn('text-lg font-semibold tracking-tight', isDark ? 'text-white' : 'text-slate-900')}>{title}</h2>
+        <p className={cn('mt-1 text-sm leading-relaxed', isDark ? 'text-slate-300/90' : 'text-slate-600')}>{description}</p>
       </div>
 
       <div className="relative mt-4 flex items-center gap-2 text-sm font-semibold">
@@ -125,10 +135,10 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           className={cn(
             'transition-colors duration-300',
             isDark
-              ? 'text-emerald-400 group-hover:text-emerald-300'
+              ? 'text-emerald-300 group-hover:text-emerald-200'
               : isAccent
                 ? 'text-emerald-700 group-hover:text-emerald-800'
-                : 'text-primary-700 group-hover:text-primary-800'
+                : 'text-emerald-700 group-hover:text-emerald-800'
           )}
         >
           {cta}
@@ -137,10 +147,10 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           className={cn(
             'h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5',
             isDark
-              ? 'text-emerald-400 group-hover:text-emerald-300'
+              ? 'text-emerald-300 group-hover:text-emerald-200'
               : isAccent
                 ? 'text-emerald-700 group-hover:text-emerald-800'
-                : 'text-primary-700 group-hover:text-primary-800'
+                : 'text-emerald-700 group-hover:text-emerald-800'
           )}
         />
       </div>
@@ -160,10 +170,17 @@ function SidePanelCard() {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[#3f6d57]/30 bg-linear-to-b from-[#f2f5f0] to-white shadow-md">
       {/* Header */}
-      <div className="border-b border-[#3f6d57]/15 bg-linear-to-r from-[#07160f] to-[#0f2a1d] px-5 py-4">
-        <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-[#aac0a2]" />
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#d3dcc8]">Status do Ambiente</h3>
+      <div className="relative overflow-hidden border-b border-emerald-900/30 bg-linear-to-r from-[#04120c] via-[#0a281c] to-[#13543d] px-5 py-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-emerald-200/60 to-transparent" />
+          <div className="absolute -top-10 right-8 h-24 w-24 rounded-full bg-emerald-300/15 blur-2xl" />
+          <div className="absolute -left-8 -bottom-10 h-20 w-20 rounded-full bg-[#c6a277]/20 blur-2xl" />
+        </div>
+        <div className="relative flex items-center gap-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-emerald-300/30 bg-emerald-200/10">
+            <Server className="h-3.5 w-3.5 text-emerald-200" />
+          </span>
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-50/95">Status do Ambiente</h3>
         </div>
       </div>
 
