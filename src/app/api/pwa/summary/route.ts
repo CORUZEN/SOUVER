@@ -61,6 +61,26 @@ export async function GET(req: NextRequest) {
   const metaConfigs = (configRow?.metaConfigs as Record<string, unknown> | null) ?? {}
   const monthConfigs = (configRow?.monthConfigs as Record<string, unknown> | null) ?? {}
 
+  // ── Load Sankhya targets (same source as desktop dashboard) ─────────────────
+  let sankhyaTargetsMap = new Map<string, number>()
+  try {
+    const sankhyaRes = await fetch(`${req.nextUrl.origin}/api/metas/sankhya-targets?year=${year}&month=${month}`, {
+      headers: { cookie: req.headers.get('cookie') ?? '' },
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (sankhyaRes.ok) {
+      const sankhyaData = await sankhyaRes.json().catch(() => ({}))
+      const sellersArr = Array.isArray(sankhyaData?.sellers) ? sankhyaData.sellers : []
+      for (const s of sellersArr) {
+        const sc = String(s.sellerCode ?? '').trim()
+        const ft = Number(s.financialTarget ?? 0)
+        if (sc && ft > 0) sankhyaTargetsMap.set(sc, ft)
+      }
+    }
+  } catch {
+    // Sankhya unavailable — fall back to manual/legacy targets
+  }
+
   // ── Active key ────────────────────────────────────────────────────────────
   const activeKey = `${year}-${String(month).padStart(2, '0')}`
   const metaConfig = (metaConfigs[activeKey] as Record<string, unknown> | null) ?? null
@@ -162,10 +182,13 @@ export async function GET(req: NextRequest) {
     const maxReward: number = (block?.rules ?? []).reduce((sum: number, r: { rewardValue?: number }) => sum + (r.rewardValue ?? 0), 0)
 
     // Resolve the monthly target for the specific period being requested.
-    // Priority: manualFinancialByPeriod[YYYY-MM] → legacy block.monthlyTarget.
-    // This matches the same priority used by MetasWorkspace snapshot scoring so that
-    // the comparison panel (loadPreviousConsolidated) uses the correct base target.
+    // Priority: Sankhya live data → manualFinancialByPeriod[YYYY-MM] → legacy block.monthlyTarget.
+    // This matches the same priority used by MetasWorkspace snapshot scoring.
     const resolvedMonthlyTarget = (() => {
+      // 1) Sankhya live data
+      const sankhyaTarget = sankhyaTargetsMap.get(normalizedCode) ?? sankhyaTargetsMap.get(canonicalCode) ?? 0
+      if (sankhyaTarget > 0) return sankhyaTarget
+      // 2) Manual per-period override
       const manualMap = (block as { manualFinancialByPeriod?: Record<string, number> } | null)?.manualFinancialByPeriod ?? {}
       const periodKeyPadded = `${year}-${String(month).padStart(2, '0')}`
       const periodKeyUnpadded = `${year}-${month}`
@@ -177,6 +200,7 @@ export async function GET(req: NextRequest) {
         Number(manualMap[periodKeySlash] ?? 0) ||
         Number(manualMap[periodKeySlashUnpadded] ?? 0)
       if (exact > 0) return exact
+      // 3) Legacy block base value
       return Number(block?.monthlyTarget ?? 0)
     })()
 
