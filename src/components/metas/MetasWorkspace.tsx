@@ -3,6 +3,7 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -1452,6 +1453,83 @@ export default function MetasWorkspace() {
     () => getMaintenanceMetaText(trendPanelMaintenance),
     [getMaintenanceMetaText, trendPanelMaintenance]
   )
+
+  // Detect sellers that exist in previous months' blocks but are missing from current month
+  const orphanedSellersFromPreviousMonths = useMemo(() => {
+    const activeSellerIds = new Set(
+      allowlist.filter((a) => a.active !== false).map((a) => {
+        const code = normalizeEntityCode(String(a.code ?? ''))
+        return code ? `sankhya-${code}` : `sankhya-${a.name.toLowerCase().replace(/\s+/g, '-')}`
+      })
+    )
+    const currentBlockSellerIds = new Set(
+      ruleBlocks.flatMap((b) => b.sellerIds.map((id) => String(id).trim()))
+    )
+    const orphans: Array<{ sellerId: string; sellerName: string; sourceBlock: RuleBlock; sourceMonthKey: string }> = []
+    for (const sellerId of activeSellerIds) {
+      if (currentBlockSellerIds.has(sellerId)) continue
+      // Search backwards through metaConfigs for a block containing this seller
+      const sortedMonthKeys = Object.keys(metaConfigs)
+        .filter((k) => parseMonthKeyToYearMonth(k) !== null)
+        .sort()
+        .reverse()
+      for (const monthKeyCandidate of sortedMonthKeys) {
+        if (monthKeyCandidate >= activeKey) continue
+        const config = metaConfigs[monthKeyCandidate]
+        if (!config || !Array.isArray(config.ruleBlocks)) continue
+        const block = config.ruleBlocks.find((b) =>
+          b.sellerIds.some((id) => String(id).trim() === sellerId)
+        )
+        if (block) {
+          const sellerName = sellers.find((s) => s.id === sellerId)?.name ?? sellerId.replace(/^sankhya-/, '')
+          orphans.push({ sellerId, sellerName, sourceBlock: block, sourceMonthKey: monthKeyCandidate })
+          break
+        }
+      }
+    }
+    return orphans
+  }, [activeKey, allowlist, metaConfigs, ruleBlocks, sellers])
+
+  function syncOrphanedSellersFromPreviousMonths() {
+    if (orphanedSellersFromPreviousMonths.length === 0) return
+    const newBlocks: RuleBlock[] = []
+    for (const orphan of orphanedSellersFromPreviousMonths) {
+      const newId = `block-${Date.now()}-${orphan.sellerId.replace(/\W/g, '')}`
+      const cloned: RuleBlock = {
+        ...orphan.sourceBlock,
+        id: newId,
+        title: stripLegacySellerCounterSuffix(orphan.sellerName).split(' ').slice(0, 2).join(' '),
+        sellerIds: [orphan.sellerId],
+        rules: cloneRulesWithFreshIds(orphan.sourceBlock.rules, `rule-${orphan.sourceBlock.sellerProfileType ?? 'NOVATO'}-${newId}`),
+      }
+      newBlocks.push(cloned)
+    }
+    setRuleBlocks((prev) => [...prev, ...newBlocks])
+    // Update metaConfigs for current month AND future months that already have configs
+    setMetaConfigs((prevConfigs) => {
+      const next = { ...prevConfigs }
+      // Current month
+      next[activeKey] = {
+        ...prevConfigs[activeKey],
+        ruleBlocks: [...(prevConfigs[activeKey]?.ruleBlocks ?? []), ...newBlocks],
+      }
+      // Future months that already have saved configs
+      for (const [monthKeyCandidate, config] of Object.entries(prevConfigs)) {
+        if (!parseMonthKeyToYearMonth(monthKeyCandidate)) continue
+        if (monthKeyCandidate <= activeKey) continue
+        const existingBlocks = Array.isArray(config.ruleBlocks) ? config.ruleBlocks : []
+        const missingBlocks = newBlocks.filter((nb) =>
+          !existingBlocks.some((b) => b.sellerIds.some((id) => String(id).trim() === nb.sellerIds[0]))
+        )
+        if (missingBlocks.length === 0) continue
+        next[monthKeyCandidate] = {
+          ...config,
+          ruleBlocks: [...existingBlocks, ...missingBlocks],
+        }
+      }
+      return next
+    })
+  }
   const weeklyAdherencePanelMaintenanceMeta = useMemo(
     () => getMaintenanceMetaText(weeklyAdherencePanelMaintenance),
     [getMaintenanceMetaText, weeklyAdherencePanelMaintenance]
@@ -7246,6 +7324,27 @@ export default function MetasWorkspace() {
             </button>
           </div>
 
+          {/* Sync orphaned sellers banner */}
+          {orphanedSellersFromPreviousMonths.length > 0 && canMutateConfig && (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                <p className="text-sm text-amber-800">
+                  <strong>{orphanedSellersFromPreviousMonths.length}</strong> vendedor{orphanedSellersFromPreviousMonths.length !== 1 ? 'es' : ''} de meses anteriores não {orphanedSellersFromPreviousMonths.length !== 1 ? 'estão' : 'está'} em nenhum grupo neste mês:{' '}
+                  <span className="font-medium">{orphanedSellersFromPreviousMonths.map((o) => o.sellerName).join(', ')}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={syncOrphanedSellersFromPreviousMonths}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
+              >
+                <RefreshCw size={12} />
+                Sincronizar
+              </button>
+            </div>
+          )}
+
           {(() => {
             const block = ruleBlocks.find((b) => b.id === selectedBlockId) ?? ruleBlocks[0]
             const activeBlockProfileType = resolveBlockProfileType(block)
@@ -12078,6 +12177,29 @@ export default function MetasWorkspace() {
                 setRuleBlocks((prev) => [...prev, cloned])
                 setSelectedBlockId(newId)
                 setAddGroupModal({ open: false, search: '', selectedSellerId: '', profileType: 'NOVATO' })
+
+                // Propagate new block to future months that already have a saved config
+                // so the seller doesn't disappear when switching to those months
+                setMetaConfigs((prevConfigs) => {
+                  const next = { ...prevConfigs }
+                  let changed = false
+                  for (const [monthKeyCandidate, config] of Object.entries(prevConfigs)) {
+                    if (!parseMonthKeyToYearMonth(monthKeyCandidate)) continue
+                    if (monthKeyCandidate <= activeKey) continue
+                    const existingBlocks = Array.isArray(config.ruleBlocks) ? config.ruleBlocks : []
+                    // Skip if seller already has a block in this future month
+                    const alreadyHasBlock = existingBlocks.some((b) =>
+                      b.sellerIds.some((id) => String(id).trim() === seller.id)
+                    )
+                    if (alreadyHasBlock) continue
+                    next[monthKeyCandidate] = {
+                      ...config,
+                      ruleBlocks: [...existingBlocks, cloned],
+                    }
+                    changed = true
+                  }
+                  return changed ? next : prevConfigs
+                })
               }}
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
