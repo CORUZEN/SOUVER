@@ -686,3 +686,18 @@ model FaturamentoCity {
   @@index([ufCode])
   @@map("faturamento_cities")
 }
+
+// ──────────────────────────────────────────────
+// FATURAMENTO — FILTROS PRÉ-DEFINIDOS POR VENDEDOR
+// ──────────────────────────────────────────────
+model SellerCityFilterPreset {
+  id         String   @id @default(cuid())
+  sellerName String   @map("seller_name")
+  cityKey    String   @map("city_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([sellerName, cityKey])
+  @@index([sellerName])
+  @@map("seller_city_filter_presets")
+}

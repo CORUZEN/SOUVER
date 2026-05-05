@@ -576,6 +576,203 @@ function OrderModal({
    Main component
 ───────────────────────────────────────────── */
 
+function UnselectedCitiesModal({
+  cities,
+  cityOrdersByKey,
+  onClose,
+}: {
+  cities: { key: string; orderCount: number; weightKg: number }[]
+  cityOrdersByKey: Map<string, OpenOrder[]>
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [expandedCity, setExpandedCity] = useState<string | null>(null)
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return cities
+    return cities.filter((c) => c.key.toLowerCase().includes(q))
+  }, [cities, search])
+
+  const totalOrders = useMemo(() => cities.reduce((s, c) => s + c.orderCount, 0), [cities])
+  const totalWeight = useMemo(() => cities.reduce((s, c) => s + c.weightKg, 0), [cities])
+
+  function toggleOrder(nunota: string) {
+    setExpandedOrders((prev) => {
+      const next = new Set(prev)
+      if (next.has(nunota)) next.delete(nunota)
+      else next.add(nunota)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-100 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-amber-200 bg-amber-50">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <h3 className="text-sm font-bold text-amber-900">Cidades não selecionadas</h3>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+              {filtered.length} cidade{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-xs text-amber-700/80">
+              <strong>{totalOrders}</strong> pedido{totalOrders !== 1 ? 's' : ''} · <strong>{fmtKg(totalWeight)}</strong> kg
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-black/5 text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 py-3 border-b border-slate-100">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar cidade…"
+              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
+          {filtered.length === 0 ? (
+            <div className="px-5 py-12 text-center text-slate-400 text-sm">
+              {search ? 'Nenhuma cidade encontrada para esta busca.' : 'Nenhuma cidade não selecionada.'}
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filtered.map((city) => {
+                const isOpen = expandedCity === city.key
+                const orders = cityOrdersByKey.get(city.key) ?? []
+                return (
+                  <div key={city.key} className="transition-colors hover:bg-slate-50/50">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCity(isOpen ? null : city.key)}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-amber-50 border border-amber-200">
+                          <MapPin className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{city.key}</p>
+                          <p className="text-xs text-slate-500">
+                            {city.orderCount} pedido{city.orderCount !== 1 ? 's' : ''} · {fmtKg(city.weightKg)} kg
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isOpen && (
+                      <div className="px-5 pb-4">
+                        <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                          {orders.map((order) => {
+                            const orderOpen = expandedOrders.has(order.orderNumber)
+                            const orderWeight = order.items.reduce((s, i) => s + i.weightKg, 0)
+                            return (
+                              <div key={order.orderNumber} className="bg-white">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleOrder(order.orderNumber)}
+                                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50/60 transition-colors"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800">
+                                      Pedido {order.orderNumber}
+                                      <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500 truncate">{order.clientName} · Neg. {formatDate(order.dtNeg)}</p>
+                                  </div>
+                                  <div className="shrink-0 flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-700">{fmtKg(orderWeight)} kg</span>
+                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${orderOpen ? 'rotate-180' : ''}`} />
+                                  </div>
+                                </button>
+                                {orderOpen && (
+                                  <div className="px-4 pb-3">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-slate-50">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-slate-500">Produto</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-slate-500">Qtd</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-slate-500">Peso (kg)</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-50">
+                                        {order.items.map((item, idx) => (
+                                          <tr key={`${item.productCode}-${idx}`} className="hover:bg-slate-50/60">
+                                            <td className="px-3 py-2 font-medium text-slate-700">
+                                              <span className="text-[10px] text-slate-400 block">{item.productCode}</span>
+                                              {item.productName}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtQty(item.quantity)} <span className="text-[10px] text-slate-400">{item.unit}</span></td>
+                                            <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtKg(item.weightKg)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <span className="text-xs text-slate-500">
+            <strong>{totalOrders}</strong> pedido{totalOrders !== 1 ? 's' : ''} · <strong>{fmtKg(totalWeight)}</strong> kg
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CityOrdersModal({
   aggregate,
   orders,
@@ -610,6 +807,11 @@ export default function PrevisaoDeEstoque() {
   const [lastFetched, setLastFetched] = useState<string | null>(null)
   const [modalType, setModalType] = useState<OrderType | null>(null)
   const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null)
+  const [showUnselectedCitiesModal, setShowUnselectedCitiesModal] = useState(false)
+
+  type SellerCityPreset = { id: string; sellerName: string; cityKey: string }
+  const [sellerPresets, setSellerPresets] = useState<SellerCityPreset[]>([])
+  const [presetsLoading, setPresetsLoading] = useState(false)
 
   type SortKey = 'productCode' | 'productName' | 'quantity' | 'weightKg' | 'stock' | 'status'
   const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' })
@@ -637,6 +839,52 @@ export default function PrevisaoDeEstoque() {
       ? list.map((s) => ({ code: s.code ?? null, name: s.name, active: s.active ?? true }))
       : []
   }, [allowlistData])
+
+  /* ── Carrega presets de vendedor-cidade ── */
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/faturamento/seller-city-presets', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json()
+        if (!cancelled && json.presets) {
+          setSellerPresets(json.presets as SellerCityPreset[])
+        }
+      } catch {
+        // silencioso
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  async function savePresetForSeller(sellerName: string, cityKeys: string[]) {
+    setPresetsLoading(true)
+    try {
+      const res = await fetch('/api/faturamento/seller-city-presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sellerName, cityKeys }),
+      })
+      if (!res.ok) throw new Error('Erro ao salvar')
+      const json = await res.json()
+      setSellerPresets((prev) => prev.filter((p) => p.sellerName !== sellerName).concat(json.presets ?? []))
+    } finally {
+      setPresetsLoading(false)
+    }
+  }
+
+  async function removePresetForSeller(sellerName: string) {
+    setPresetsLoading(true)
+    try {
+      const res = await fetch(`/api/faturamento/seller-city-presets?sellerName=${encodeURIComponent(sellerName)}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Erro ao remover')
+      setSellerPresets((prev) => prev.filter((p) => p.sellerName !== sellerName))
+    } finally {
+      setPresetsLoading(false)
+    }
+  }
 
   const fetchData = useCallback(async (from: string, to: string) => {
     setLoading(true)
@@ -673,6 +921,23 @@ export default function PrevisaoDeEstoque() {
     const set = new Set(data.orders.map((o) => o.uf ? `${o.city} - ${o.uf}` : o.city))
     return [...set].sort()
   }, [data])
+
+  /* ── Aplica presets automaticamente quando muda vendedor (após consulta) ── */
+  useEffect(() => {
+    if (!data || selectedSellers.length !== 1) return
+    const sellerName = selectedSellers[0]
+    const presetCities = sellerPresets
+      .filter((p) => p.sellerName === sellerName)
+      .map((p) => p.cityKey)
+    if (presetCities.length > 0) {
+      // Só aplica se houver cidades disponíveis no resultado atual que correspondam
+      const available = new Set(cityOptions)
+      const toSelect = presetCities.filter((c) => available.has(c))
+      if (toSelect.length > 0) {
+        setSelectedCities(toSelect)
+      }
+    }
+  }, [selectedSellers, data, sellerPresets, cityOptions])
 
   const filteredOrders = useMemo(() => {
     if (!data) return []
@@ -811,6 +1076,22 @@ export default function PrevisaoDeEstoque() {
     [cityAggregates, selectedCityKey]
   )
 
+  const unselectedCitiesAlert = useMemo(() => {
+    if (!data || selectedCities.length === 0) return null
+    const unselected = cityOptions
+      .filter((c) => !selectedCities.includes(c))
+      .map((key) => {
+        const orders = cityOrdersByKey.get(key) ?? []
+        return { key, orderCount: orders.length, weightKg: orders.reduce((s, o) => s + o.items.reduce((a, i) => a + i.weightKg, 0), 0) }
+      })
+      .filter((c) => c.orderCount > 0)
+      .sort((a, b) => b.weightKg - a.weightKg)
+    if (unselected.length === 0) return null
+    const totalOrders = unselected.reduce((s, c) => s + c.orderCount, 0)
+    const totalWeight = unselected.reduce((s, c) => s + c.weightKg, 0)
+    return { unselected, totalOrders, totalWeight }
+  }, [data, selectedCities, cityOptions, cityOrdersByKey])
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
 
@@ -853,22 +1134,60 @@ export default function PrevisaoDeEstoque() {
       {/* ── Filters ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div className="flex flex-wrap items-end gap-4">
-          <MultiSelect
-            label="Vendedores"
-            placeholder="Selecione um ou mais vendedores…"
-            options={sellers.filter((s) => s.active !== false).map((s) => s.name).sort()}
-            selected={selectedSellers}
-            onChange={setSelectedSellers}
-            icon={<Users className="w-4 h-4" />}
-          />
-          <MultiSelect
-            label="Cidades"
-            placeholder={data ? 'Filtrar por cidade…' : 'Consulte primeiro para carregar cidades'}
-            options={cityOptions}
-            selected={selectedCities}
-            onChange={setSelectedCities}
-            icon={<MapPin className="w-4 h-4" />}
-          />
+          {data && (
+            <>
+              <MultiSelect
+                label="Vendedores"
+                placeholder="Selecione um ou mais vendedores…"
+                options={sellers.filter((s) => s.active !== false).map((s) => s.name).sort()}
+                selected={selectedSellers}
+                onChange={setSelectedSellers}
+                icon={<Users className="w-4 h-4" />}
+              />
+              <MultiSelect
+                label="Cidades"
+                placeholder="Filtrar por cidade…"
+                options={cityOptions}
+                selected={selectedCities}
+                onChange={setSelectedCities}
+                icon={<MapPin className="w-4 h-4" />}
+              />
+
+              {/* Preset manager */}
+              {selectedSellers.length === 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Filtro pré-definido</label>
+                  {sellerPresets.some((p) => p.sellerName === selectedSellers[0]) ? (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {sellerPresets.filter((p) => p.sellerName === selectedSellers[0]).length} cidade(s) salva(s)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePresetForSeller(selectedSellers[0])}
+                        disabled={presetsLoading}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => savePresetForSeller(selectedSellers[0], selectedCities.length > 0 ? selectedCities : cityOptions)}
+                      disabled={presetsLoading || cityOptions.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                    >
+                      {presetsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
+                      Salvar cidades como padrão
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
           <div className="min-w-40">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Período de</label>
             <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-white hover:border-slate-300 transition-colors">
@@ -905,6 +1224,30 @@ export default function PrevisaoDeEstoque() {
         </div>
       </div>
 
+      {/* ── Empty State (antes de consultar) ── */}
+      {!data && !loading && !error && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="relative mb-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm">
+              <ClipboardList className="h-10 w-10 text-emerald-600" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 border-2 border-white shadow-sm">
+              <Search className="h-3.5 w-3.5 text-white" />
+            </div>
+          </div>
+          <h2 className="text-lg font-bold text-slate-800">Previsão de Pedidos</h2>
+          <p className="mt-1.5 max-w-md text-sm text-slate-500 leading-relaxed">
+            Consulte para visualizar todos os pedidos em aberto, estoque disponível e cidades atendidas.
+            <br />
+            Após a consulta você poderá filtrar por vendedor e cidade.
+          </p>
+          <div className="mt-6 flex items-center gap-2 text-xs text-slate-400">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Dados atualizados em tempo real do Sankhya
+          </div>
+        </div>
+      )}
+
       {/* ── Error ── */}
       {error && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4 text-red-700">
@@ -914,6 +1257,28 @@ export default function PrevisaoDeEstoque() {
             <p className="text-sm mt-0.5 opacity-80">{error}</p>
           </div>
         </div>
+      )}
+
+      {/* ── Aviso: cidades não selecionadas ── */}
+      {unselectedCitiesAlert && (
+        <button
+          type="button"
+          onClick={() => setShowUnselectedCitiesModal(true)}
+          className="flex w-full items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-left transition-all hover:bg-amber-100 hover:shadow-sm"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 border border-amber-200">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-900">
+              {unselectedCitiesAlert.unselected.length} cidade{unselectedCitiesAlert.unselected.length !== 1 ? 's' : ''} não selecionada{unselectedCitiesAlert.unselected.length !== 1 ? 's' : ''} com {unselectedCitiesAlert.totalOrders} pedido{unselectedCitiesAlert.totalOrders !== 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-amber-700/80 mt-0.5">
+              Clique para ver os detalhes dessas cidades e pedidos · {fmtKg(unselectedCitiesAlert.totalWeight)} kg
+            </p>
+          </div>
+          <ChevronDown className="h-4 w-4 text-amber-500 rotate-[-90deg]" />
+        </button>
       )}
 
       {/* ── Stats ── */}
@@ -1105,6 +1470,14 @@ export default function PrevisaoDeEstoque() {
           aggregate={selectedCityAggregate}
           orders={cityOrdersByKey.get(selectedCityAggregate.key) ?? []}
           onClose={() => setSelectedCityKey(null)}
+        />
+      )}
+
+      {showUnselectedCitiesModal && unselectedCitiesAlert && (
+        <UnselectedCitiesModal
+          cities={unselectedCitiesAlert.unselected}
+          cityOrdersByKey={cityOrdersByKey}
+          onClose={() => setShowUnselectedCitiesModal(false)}
         />
       )}
 
