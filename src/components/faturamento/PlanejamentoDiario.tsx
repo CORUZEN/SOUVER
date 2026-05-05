@@ -303,6 +303,8 @@ function MultiSelect({
   selected,
   onChange,
   icon,
+  className,
+  compact,
 }: {
   label: string
   placeholder: string
@@ -310,6 +312,8 @@ function MultiSelect({
   selected: string[]
   onChange: (values: string[]) => void
   icon: React.ReactNode
+  className?: string
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -341,20 +345,26 @@ function MultiSelect({
   }
 
   return (
-    <div ref={ref} className="relative min-w-[16rem] flex-1">
+    <div ref={ref} className={cn('relative min-w-[16rem] flex-1', className)}>
       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
       <div
-        className={`flex flex-wrap gap-1.5 items-center border rounded-xl px-3 py-2 bg-white cursor-text transition-all max-h-16 overflow-y-auto scrollbar-hide
-          ${open ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
+        className={cn(
+          'flex flex-wrap gap-1.5 items-center border bg-white cursor-text transition-all overflow-y-auto scrollbar-hide',
+          compact ? 'rounded-lg px-2 py-1 max-h-10' : 'rounded-xl px-3 py-2 max-h-16',
+          open ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm' : 'border-slate-200 hover:border-slate-300'
+        )}
         onClick={() => setOpen(true)}
         style={{ scrollbarWidth: 'none' }}
       >
-        <span className="text-slate-400 shrink-0 self-start mt-0.5">{icon}</span>
+        <span className={cn('text-slate-400 shrink-0 self-start', compact ? 'mt-0' : 'mt-0.5')}>{icon}</span>
         {selected.map((s) => (
-          <span key={s} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium px-2 py-0.5 rounded-full max-w-40 shrink-0">
+          <span key={s} className={cn(
+            'inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 font-medium rounded-full shrink-0',
+            compact ? 'text-[10px] px-1.5 py-0 max-w-32' : 'text-xs px-2 py-0.5 max-w-40'
+          )}>
             <span className="truncate">{s}</span>
             <button type="button" className="hover:text-red-500 transition-colors shrink-0" onClick={(e) => { e.stopPropagation(); remove(s) }}>
-              <X className="w-3 h-3" />
+              <X className={compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
             </button>
           </span>
         ))}
@@ -364,10 +374,10 @@ function MultiSelect({
           onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           placeholder={selected.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-24 text-sm outline-none focus:ring-0 focus-visible:ring-0 bg-transparent placeholder:text-slate-400"
+          className={cn('flex-1 outline-none focus:ring-0 focus-visible:ring-0 bg-transparent placeholder:text-slate-400', compact ? 'min-w-16 text-xs' : 'min-w-24 text-sm')}
         />
         <button type="button" className="ml-auto shrink-0 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); setOpen((p) => !p); setSearch('') }}>
-          <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown className={cn('transition-transform', compact ? 'w-3.5 h-3.5' : 'w-4 h-4', open ? 'rotate-180' : '')} />
         </button>
       </div>
 
@@ -525,7 +535,7 @@ function OrderModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b ${colors.border} ${colors.bg}`}>
           <div className="flex items-center gap-2.5">
@@ -584,152 +594,109 @@ function OrderModal({
 
           {/* Advanced filters panel */}
           {showFilters && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
-              {/* Tipo de Liberação */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Tipo de Liberação</p>
-                <div className="flex flex-wrap gap-2">
-                  {liberacaoOptions.map(({ key, label }) => (
-                    <label key={key} className={cn(
-                      'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors select-none',
-                      filterLiberacao.includes(key)
-                        ? 'bg-amber-50 text-amber-700 border-amber-300'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={filterLiberacao.includes(key)}
-                        onChange={() => setFilterLiberacao(prev => toggleArrayValue(prev, key))}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+              {/* Row 1: Liberação + Tipo */}
+              <div className="grid grid-cols-2 gap-3">
+                <MultiSelect
+                  label="Liberação"
+                  placeholder="Filtrar liberação..."
+                  options={liberacaoOptions.map(o => o.label)}
+                  selected={filterLiberacao.map(k => liberacaoOptions.find(o => o.key === k)?.label).filter(Boolean) as string[]}
+                  onChange={(vals) => {
+                    const keys = vals.map(v => liberacaoOptions.find(o => o.label === v)?.key).filter(Boolean) as string[]
+                    setFilterLiberacao(keys)
+                  }}
+                  icon={<Filter className="w-3.5 h-3.5" />}
+                  className="min-w-0 flex-none"
+                  compact
+                />
+                <MultiSelect
+                  label="Tipo"
+                  placeholder="Filtrar tipo..."
+                  options={tipoOptions.map(o => o.label)}
+                  selected={filterTipo.map(k => tipoOptions.find(o => o.key === k)?.label).filter(Boolean) as string[]}
+                  onChange={(vals) => {
+                    const keys = vals.map(v => tipoOptions.find(o => o.label === v)?.key).filter(Boolean) as string[]
+                    setFilterTipo(keys)
+                  }}
+                  icon={<ShoppingCart className="w-3.5 h-3.5" />}
+                  className="min-w-0 flex-none"
+                  compact
+                />
               </div>
 
-              {/* Tipo de Pedido */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Tipo de Pedido</p>
-                <div className="flex flex-wrap gap-2">
-                  {tipoOptions.map(({ key, label }) => (
-                    <label key={key} className={cn(
-                      'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors select-none',
-                      filterTipo.includes(key)
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={filterTipo.includes(key)}
-                        onChange={() => setFilterTipo(prev => toggleArrayValue(prev, key))}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+              {/* Row 2: Vendedor + Cidade */}
+              <div className="grid grid-cols-2 gap-3">
+                <MultiSelect
+                  label="Vendedor"
+                  placeholder="Selecione vendedores..."
+                  options={vendedorOptions}
+                  selected={filterVendedor}
+                  onChange={setFilterVendedor}
+                  icon={<Users className="w-3.5 h-3.5" />}
+                  className="min-w-0 flex-none"
+                  compact
+                />
+                <MultiSelect
+                  label="Cidade"
+                  placeholder="Selecione cidades..."
+                  options={cidadeOptions}
+                  selected={filterCidade}
+                  onChange={setFilterCidade}
+                  icon={<MapPin className="w-3.5 h-3.5" />}
+                  className="min-w-0 flex-none"
+                  compact
+                />
               </div>
 
-              {/* Vendedor */}
-              {vendedorOptions.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Vendedor</p>
-                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto scrollbar-thin">
-                    {vendedorOptions.map(name => (
-                      <label key={name} className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors select-none',
-                        filterVendedor.includes(name)
-                          ? 'bg-blue-50 text-blue-700 border-blue-300'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      )}>
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={filterVendedor.includes(name)}
-                          onChange={() => setFilterVendedor(prev => toggleArrayValue(prev, name))}
-                        />
-                        {name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Cidade */}
-              {cidadeOptions.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Cidade</p>
-                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto scrollbar-thin">
-                    {cidadeOptions.map(name => (
-                      <label key={name} className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors select-none',
-                        filterCidade.includes(name)
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-300'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      )}>
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={filterCidade.includes(name)}
-                          onChange={() => setFilterCidade(prev => toggleArrayValue(prev, name))}
-                        />
-                        {name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Data */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Período de Negociação</p>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              {/* Row 3: Período + clear */}
+              <div className="flex items-center gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">Período</p>
+                <div className="flex items-center gap-1.5 flex-1">
+                  <div className="relative flex-1 min-w-0">
+                    <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                     <input
                       type="date"
                       value={filterDateFrom}
                       onChange={(e) => setFilterDateFrom(e.target.value)}
-                      className="w-full pl-8 pr-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
+                      className="w-full pl-6 pr-1.5 py-1 text-[11px] border border-slate-200 rounded-md outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
                     />
                   </div>
-                  <span className="text-xs text-slate-400">até</span>
-                  <div className="relative flex-1">
-                    <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[10px] text-slate-400 shrink-0">até</span>
+                  <div className="relative flex-1 min-w-0">
+                    <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                     <input
                       type="date"
                       value={filterDateTo}
                       onChange={(e) => setFilterDateTo(e.target.value)}
-                      className="w-full pl-8 pr-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
+                      className="w-full pl-6 pr-1.5 py-1 text-[11px] border border-slate-200 rounded-md outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
                     />
                   </div>
                 </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterLiberacao([])
+                      setFilterTipo([])
+                      setFilterVendedor([])
+                      setFilterCidade([])
+                      setFilterDateFrom('')
+                      setFilterDateTo('')
+                    }}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                  >
+                    <span className="w-3 h-3 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">{activeFilterCount}</span>
+                    Limpar
+                  </button>
+                )}
               </div>
-
-              {/* Clear filters */}
-              {activeFilterCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilterLiberacao([])
-                    setFilterTipo([])
-                    setFilterVendedor([])
-                    setFilterCidade([])
-                    setFilterDateFrom('')
-                    setFilterDateTo('')
-                  }}
-                  className="text-xs text-slate-500 hover:text-red-600 transition-colors underline"
-                >
-                  Limpar todos os filtros
-                </button>
-              )}
             </div>
           )}
         </div>
 
         {/* Body */}
-        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {filteredOrders.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-400 text-sm">
               {search ? 'Nenhum pedido encontrado para esta busca.' : 'Nenhum pedido em aberto nesta categoria para os filtros aplicados.'}
@@ -911,7 +878,7 @@ function UnselectedCitiesModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-amber-200 bg-amber-50">
           <div className="flex items-center gap-2.5">
@@ -950,7 +917,7 @@ function UnselectedCitiesModal({
         </div>
 
         {/* Body */}
-        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {filtered.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-400 text-sm">
               {search ? 'Nenhuma cidade encontrada para esta busca.' : 'Nenhuma cidade não selecionada.'}
