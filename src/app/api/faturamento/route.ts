@@ -426,7 +426,10 @@ type RawItemRow = {
   productName: string
   group: string
   unit: string
+  prdUnit: string
   medaux: number
+  convervol: number
+  fattotal: number
   quantity: number
   volume: number
   weightKg: number
@@ -438,6 +441,13 @@ function classifyOrderType(codTipOper: string): OrderType {
   if (cto === '1051') return 'BONIFICACAO'
   if (cto === '1053') return 'TROCA'
   return 'OUTROS'
+}
+
+// Extrai fator de embalagem do nome do produto: "20X500G" → 20, "12X1KG" → 12
+function parsePackagingFactor(productName: string): number {
+  const m = productName.match(/\b(\d+)[Xx]\d/)
+  const n = m ? parseInt(m[1], 10) : 1
+  return n > 1 ? n : 1
 }
 
 function parseItemRow(r: RawRecord): RawItemRow {
@@ -460,7 +470,10 @@ function parseItemRow(r: RawRecord): RawItemRow {
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
     unit: String(r.UNIDADE ?? r.CODVOL ?? '').trim(),
+    prdUnit: String(r.PRD_UNIDADE ?? r.CODVOL ?? '').trim(),
     medaux: Math.max(1, parseNumber(r.MEDAUX) || 1),
+    convervol: Math.max(1, parseNumber(r.CONVERVOL) || 1),
+    fattotal: Math.max(1, parseNumber(r.FATTOTAL) || 1),
     quantity: parseNumber(r.QUANTIDADE ?? r.QTDNEG),
     volume: parseNumber(r.VOLUME ?? r.QTDVOL),
     weightKg: parseNumber(r.PESO_KG ?? r.PESOBRUTO),
@@ -562,9 +575,21 @@ export async function GET(request: NextRequest) {
         productCode: row.productCode,
         productName: row.productName,
         group: row.group,
-        // MEDAUX > 1 significa que CODVOL != UN (ex.: FD=20). Converter QTDNEG → UN.
-        unit: row.medaux > 1 ? 'UN' : row.unit,
-        quantity: row.medaux > 1 ? Math.round(row.quantity * row.medaux) : row.quantity,
+        // Conversão FD→UN apenas em Pedidos de Troca (1053)
+        // Ex.: 0.35 FD × 20 (do nome "20X500G") = 7 UN
+        ...(() => {
+          const isTroca = row.codTipOper === '1053'
+          const factor = isTroca
+            ? (row.convervol > 1 ? row.convervol
+              : row.fattotal > 1 ? row.fattotal
+              : row.medaux > 1 ? row.medaux
+              : parsePackagingFactor(row.productName))
+            : 1
+          return {
+            unit: factor > 1 ? 'UN' : row.unit,
+            quantity: factor > 1 ? Math.round(row.quantity * factor) : row.quantity,
+          }
+        })(),
         volume: row.volume,
         weightKg: row.weightKg,
       })

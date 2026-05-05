@@ -148,6 +148,75 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
   )
 }
 
+/* ─── Side Panel Card (Atalhos + Ambiente) ──────────────────────────── */
+function SidePanelCard({ isDeveloper, basePath }: { isDeveloper: boolean; basePath: string }) {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm">
+      {/* Atalhos */}
+      <div className="flex-1 p-5">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">Atalhos Rápidos</h3>
+        <div className="mt-3 space-y-2">
+          <SideLink href={`${basePath}/gestao-usuarios`} icon={<Users className="h-3.5 w-3.5" />} label="Gerenciar usuários" />
+          <SideLink href={`${basePath}/gestao-permissoes`} icon={<KeyRound className="h-3.5 w-3.5" />} label="Configurar permissões" />
+          {isDeveloper && (
+            <>
+              <SideLink href={`${basePath}/diagnostico`} icon={<Database className="h-3.5 w-3.5" />} label="Executar diagnóstico" />
+              <SideLink href="/metas/telemetria" icon={<Server className="h-3.5 w-3.5" />} label="Telemetria do sistema" />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="h-px bg-surface-100" />
+
+      {/* Ambiente */}
+      <div className="p-5">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">Ambiente</h3>
+        <div className="mt-3 space-y-2.5">
+          <SideEnvRow icon={<Globe className="h-3.5 w-3.5" />} label="Base" value="Produção" />
+          <SideEnvRow icon={<Database className="h-3.5 w-3.5" />} label="Sankhya" value="Conectado" />
+          <SideEnvRow icon={<Code2 className="h-3.5 w-3.5" />} label="API" value="Operacional" />
+          <SideEnvRow icon={<Terminal className="h-3.5 w-3.5" />} label="Cache" value="Ativo" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SideLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-surface-50"
+    >
+      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-50 text-surface-400 ring-1 ring-surface-100 transition-colors group-hover:text-emerald-600 group-hover:ring-emerald-100">
+        {icon}
+      </div>
+      <span className="flex-1 text-xs font-medium text-surface-600 group-hover:text-surface-900">{label}</span>
+      <ArrowUpRight className="h-3.5 w-3.5 text-surface-300 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-500" />
+    </Link>
+  )
+}
+
+function SideEnvRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-50 text-surface-400 ring-1 ring-surface-100">
+        {icon}
+      </div>
+      <span className="flex-1 text-xs font-medium text-surface-500">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        </span>
+        <span className="text-[11px] font-semibold text-surface-700">{value}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function DevPage() {
   const pathname = usePathname()
   const [authLoaded, setAuthLoaded] = useState(false)
@@ -269,7 +338,7 @@ export default function DevPage() {
         </div>
       </section>
 
-      {/* Tools Grid — estilo anterior (NÃO liquid glass) */}
+      {/* Tools Grid — 5 cards + Side Panel ao lado da Auditoria */}
       <section>
         <div className="mb-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-surface-200" />
@@ -280,6 +349,7 @@ export default function DevPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {/* Row 1 */}
           <DevToolCard
             href={`${basePath}/gestao-usuarios`}
             icon={<Users className="h-5 w-5" />}
@@ -310,6 +380,7 @@ export default function DevPage() {
             />
           )}
 
+          {/* Row 2 */}
           <DevToolCard
             href="/metas/telemetria"
             icon={<BarChart3 className="h-5 w-5" />}
@@ -327,93 +398,19 @@ export default function DevPage() {
             cta="Consultar logs"
             variant="accent"
           />
+
+          {/* Side Panel — Atalhos + Ambiente */}
+          <SidePanelCard isDeveloper={isDeveloper} basePath={basePath} />
         </div>
       </section>
 
-      {/* System Status / Quick Links — Clean light style (como estava antes) */}
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-surface-500">Atalhos Rápidos</h3>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <QuickLink href={`${basePath}/gestao-usuarios`} icon={<Users className="h-4 w-4" />} label="Gerenciar usuários" />
-            <QuickLink href={`${basePath}/gestao-permissoes`} icon={<KeyRound className="h-4 w-4" />} label="Configurar permissões" />
-            {isDeveloper && (
-              <>
-                <QuickLink href={`${basePath}/diagnostico`} icon={<Database className="h-4 w-4" />} label="Executar diagnóstico" />
-                <QuickLink href="/metas/telemetria" icon={<Server className="h-4 w-4" />} label="Telemetria do sistema" />
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-surface-500">Ambiente</h3>
-          <div className="mt-4 space-y-3">
-            <EnvRow icon={<Globe className="h-4 w-4" />} label="Base" value="Produção" status="online" />
-            <EnvRow icon={<Database className="h-4 w-4" />} label="Sankhya" value="Conectado" status="online" />
-            <EnvRow icon={<Code2 className="h-4 w-4" />} label="API" value="Operacional" status="online" />
-            <EnvRow icon={<Terminal className="h-4 w-4" />} label="Cache" value="Ativo" status="online" />
-          </div>
-        </div>
-      </section>
-
-      {/* Footer note — clean style */}
+      {/* Footer note */}
       <section className="flex items-center justify-center rounded-xl border border-surface-200 bg-surface-50 p-4 text-sm text-surface-600">
         <p className="inline-flex items-center gap-2 font-medium text-surface-700">
           <Shield className="h-4 w-4" />
           {isDeveloper ? 'Uso restrito ao perfil Desenvolvedor.' : 'Acesso liberado para Analista de TI.'}
         </p>
       </section>
-    </div>
-  )
-}
-
-/* ─── Sub-components (clean light style, como estavam antes) ────────── */
-
-function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-xl border border-surface-200/60 bg-surface-50/60 px-4 py-3 transition-all hover:border-emerald-200 hover:bg-emerald-50/50"
-    >
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-surface-500 shadow-sm ring-1 ring-surface-100 transition-colors group-hover:text-emerald-700 group-hover:ring-emerald-200">
-        {icon}
-      </div>
-      <span className="flex-1 text-sm font-medium text-surface-700 group-hover:text-surface-900">{label}</span>
-      <ArrowUpRight className="h-4 w-4 text-surface-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-600" />
-    </Link>
-  )
-}
-
-function EnvRow({
-  icon,
-  label,
-  value,
-  status,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  status: 'online' | 'offline' | 'warning'
-}) {
-  const statusColor =
-    status === 'online' ? 'bg-emerald-500' : status === 'warning' ? 'bg-amber-500' : 'bg-red-500'
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-50 text-surface-400 ring-1 ring-surface-100">
-        {icon}
-      </div>
-      <div className="flex-1">
-        <p className="text-xs font-medium text-surface-500">{label}</p>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="relative flex h-2 w-2">
-          <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-40', statusColor)} />
-          <span className={cn('relative inline-flex h-2 w-2 rounded-full', statusColor)} />
-        </span>
-        <span className="text-xs font-semibold text-surface-700">{value}</span>
-      </div>
     </div>
   )
 }

@@ -122,12 +122,13 @@ export async function GET(req: NextRequest) {
           const medaux = Math.max(1, parseNumber(r.MEDAUX) || 1)
           const convervol = Math.max(1, parseNumber(r.CONVERVOL) || 1)
           const fattotal = Math.max(1, parseNumber(r.FATTOTAL) || 1)
-          const factor = convervol > 1 ? convervol : fattotal > 1 ? fattotal : medaux
-          const qtdneg = parseNumber(r.QTDNEG_SUM)
-          const qtdvol = parseNumber(r.QTDVOL_SUM)
           const prdUnit = String(r.PRD_CODVOL ?? '')
           const iteUnit = String(r.ITE_CODVOL ?? '')
           const unitMismatch = iteUnit !== prdUnit && iteUnit !== ''
+          const nameFactor = unitMismatch ? (() => { const m = String(r.PRODUTO ?? '').match(/\b(\d+)[Xx]\d/); return m ? Math.max(1, parseInt(m[1], 10)) : 1 })() : 1
+          const factor = convervol > 1 ? convervol : fattotal > 1 ? fattotal : medaux > 1 ? medaux : nameFactor
+          const qtdneg = parseNumber(r.QTDNEG_SUM)
+          const qtdvol = parseNumber(r.QTDVOL_SUM)
           const unitFinal = factor > 1 ? 'UN' : (iteUnit || prdUnit)
           const qtyFinal = factor > 1 ? Math.round(qtdneg * factor) : qtdneg
           return {
@@ -137,12 +138,16 @@ export async function GET(req: NextRequest) {
               ite_unit: iteUnit, prd_unit: prdUnit, unit_mismatch: unitMismatch,
               unit_final: unitFinal, qty_final: qtyFinal,
               souver_displays: `${qtyFinal} ${unitFinal}`,
-              conversion_source: convervol > 1 ? 'CONVERVOL' : fattotal > 1 ? 'FATTOTAL' : medaux > 1 ? 'MEDAUX' : qtdvol > 0 ? 'QTDVOL' : 'none',
+              conversion_source: convervol > 1 ? 'CONVERVOL' : fattotal > 1 ? 'FATTOTAL' : medaux > 1 ? 'MEDAUX' : nameFactor > 1 ? 'NOME_PRODUTO' : qtdvol > 0 ? 'QTDVOL' : 'none',
               diagnosis: convervol > 1
                 ? `CONVERVOL=${convervol} → ${qtdneg} × ${convervol} = ${qtyFinal} UN`
                 : fattotal > 1
                   ? `FATTOTAL=${fattotal} → ${qtdneg} × ${fattotal} = ${qtyFinal} UN`
-                  : unitMismatch ? `ITE_CODVOL(${iteUnit}) ≠ PRD_CODVOL(${prdUnit}) — use ITE_CODVOL` : medaux > 1 ? `MEDAUX=${medaux} → ${qtdneg} × ${medaux} = ${qtyFinal} UN` : qtdvol > 0 ? `QTDVOL=${qtdvol} → usar diretamente` : `Sem fator detectado — exibe ${qtdneg} ${iteUnit || prdUnit}`,
+                  : medaux > 1
+                    ? `MEDAUX=${medaux} → ${qtdneg} × ${medaux} = ${qtyFinal} UN`
+                    : nameFactor > 1
+                      ? `Nome "${String(r.PRODUTO ?? '').match(/\d+[Xx]\d+[A-Za-z]*/)?.[0] ?? ''}" → fator ${nameFactor} → ${qtdneg} × ${nameFactor} = ${qtyFinal} UN`
+                      : unitMismatch ? `ITE_CODVOL(${iteUnit}) ≠ PRD_CODVOL(${prdUnit}) — fator não encontrado` : qtdvol > 0 ? `QTDVOL=${qtdvol} → usar diretamente` : `Sem fator detectado — exibe ${qtdneg} ${iteUnit || prdUnit}`,
             },
           }
         })
