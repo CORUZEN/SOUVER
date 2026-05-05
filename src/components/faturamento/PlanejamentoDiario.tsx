@@ -808,21 +808,21 @@ export default function PrevisaoDeEstoque() {
                       <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(p.quantity)}</td>
                       <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
                       <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
-                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                      <td className="px-1 py-3.5 text-center whitespace-nowrap">
                         <span
                           className={cn(
-                            'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
+                            'inline-flex min-h-[40px] items-center justify-center rounded-lg px-2 py-1 text-[11px] font-bold tracking-wide',
                             hasStock
-                              ? 'border-emerald-300/80 bg-linear-to-b from-emerald-50 to-emerald-100/70 text-emerald-800'
-                              : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
+                              ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60'
+                              : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200/60'
                           )}
                         >
                           {hasStock ? (
-                            <span className="tracking-[0.01em]">SUFICIENTE</span>
+                            <span>SUFICIENTE</span>
                           ) : (
-                            <span className="flex flex-col items-start leading-tight">
-                              <span className="tracking-[0.01em]">FALTA {fmtQty(Math.abs(diff))} {p.unit}</span>
-                              <span className="text-[10px] font-medium opacity-80">{fmtKg(missingKg)} kg</span>
+                            <span className="flex flex-col items-center leading-tight">
+                              <span>FALTA {fmtQty(Math.abs(diff))} {p.unit}</span>
+                              <span className="text-[10px] font-semibold opacity-75">{fmtKg(missingKg)} kg</span>
                             </span>
                           )}
                         </span>
