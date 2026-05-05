@@ -115,8 +115,17 @@ export async function GET(req: NextRequest) {
     const appKey = config.appKey || config.token || null
     const sqlRaw = `SELECT I.NUNOTA, I.SEQUENCIA, I.CODPROD, P.DESCRPROD, P.CODVOL AS PRD_CODVOL, P.MEDAUX AS PRD_MEDAUX, P.CONVERVOL AS PRD_CONVERVOL, P.FATTOTAL AS PRD_FATTOTAL, P.QTDEMB AS PRD_QTDEMB, P.MULTIPVENDA AS PRD_MULTIPVENDA, P.PESOBRUTO AS PRD_PESOBRUTO, I.CODVOL AS ITE_CODVOL, I.QTDNEG, I.QTDVOL, I.VLRUNIT, I.PESO FROM TGFITE I INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE I.NUNOTA = ${nunota} ORDER BY I.SEQUENCIA`
     const sqlSim = `SELECT TO_CHAR(CAB.NUNOTA) AS NUNOTA, TO_CHAR(I.CODPROD) AS CODPROD, UPPER(TRIM(P.DESCRPROD)) AS PRODUTO, UPPER(TRIM(TO_CHAR(P.CODVOL))) AS PRD_CODVOL, UPPER(TRIM(NVL(TO_CHAR(I.CODVOL), TO_CHAR(P.CODVOL)))) AS ITE_CODVOL, NVL(P.MEDAUX, 1) AS MEDAUX, NVL(P.CONVERVOL, 1) AS CONVERVOL, NVL(P.FATTOTAL, 1) AS FATTOTAL, SUM(I.QTDNEG) AS QTDNEG_SUM, SUM(NVL(I.QTDVOL, 0)) AS QTDVOL_SUM, SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG, NVL(CAB.APROVADO, 'N') AS APROVADO, NVL(CAB.PENDENTE, 'N') AS PENDENTE FROM TGFCAB CAB INNER JOIN TGFITE I ON I.NUNOTA = CAB.NUNOTA INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE CAB.NUNOTA = ${nunota} GROUP BY CAB.NUNOTA, I.CODPROD, P.DESCRPROD, P.CODVOL, I.CODVOL, P.MEDAUX, P.CONVERVOL, P.FATTOTAL, CAB.APROVADO, CAB.PENDENTE ORDER BY I.CODPROD`
+    const sqlCabLiberacao = `SELECT CAB.NUNOTA, CAB.NUMNOTA, TO_CHAR(CAB.DTNEG,'YYYY-MM-DD') AS DTNEG, CAB.PENDENTE, CAB.APROVADO, CAB.STATUSNOTA, CAB.LIBCONF, CAB.CONFIRMNOTAFAT, CAB.SEQCONFIRMA, CAB.CODUSU, CAB.CODUSUINC, CAB.CODVEND, CAB.CODTIPOPER, CAB.CODTIPVENDA, CAB.CODOBSPADRAO, CAB.OBSERVACAO, CAB.VLRNOTA, TO_CHAR(CAB.AD_DHCONFIRMVDY,'YYYY-MM-DD HH24:MI:SS') AS AD_DHCONFIRMVDY, TO_CHAR(CAB.DTALTER,'YYYY-MM-DD HH24:MI:SS') AS DTALTER, P.NOMEPARC, V.APELIDO AS VENDEDOR, U.NOMEUSU AS USUARIO, UIC.NOMEUSU AS USUARIO_INC, T.DESCROPER AS TIPO_OPERACAO FROM TGFCAB CAB LEFT JOIN TGFPAR P ON P.CODPARC = CAB.CODPARC LEFT JOIN TGFVEN V ON V.CODVEND = CAB.CODVEND LEFT JOIN TSIUSU U ON U.CODUSU = CAB.CODUSU LEFT JOIN TSIUSU UIC ON UIC.CODUSU = CAB.CODUSUINC LEFT JOIN TGFTOP T ON T.CODTIPOPER = CAB.CODTIPOPER WHERE CAB.NUNOTA = ${nunota}`
+    const sqlLiberacoes = `SELECT L.NUNOTA, L.CODUSU, U.NOMEUSU, TO_CHAR(L.DT,'YYYY-MM-DD HH24:MI:SS') AS DT, L.LIBERACOES, L.OBS FROM TGFLIB L LEFT JOIN TSIUSU U ON U.CODUSU = L.CODUSU WHERE L.NUNOTA = ${nunota} ORDER BY L.DT`
+    const sqlItensStatus = `SELECT I.NUNOTA, I.SEQUENCIA, I.CODPROD, P.DESCRPROD, I.PENDENTE, I.STATUSNOTA, I.QTDCONFERIDA, I.CODOBSPADRAO, I.QTDNEG, I.QTDVOL, I.VLRTOT FROM TGFITE I INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE I.NUNOTA = ${nunota} ORDER BY I.SEQUENCIA`
     const start = Date.now()
-    const [rawResult, simResult] = await Promise.allSettled([runSql(baseUrl, headers, sqlRaw, appKey), runSql(baseUrl, headers, sqlSim, appKey)])
+    const [rawResult, simResult, cabResult, libResult, itemResult] = await Promise.allSettled([
+      runSql(baseUrl, headers, sqlRaw, appKey),
+      runSql(baseUrl, headers, sqlSim, appKey),
+      runSql(baseUrl, headers, sqlCabLiberacao, appKey),
+      runSql(baseUrl, headers, sqlLiberacoes, appKey),
+      runSql(baseUrl, headers, sqlItensStatus, appKey),
+    ])
     const simRows = simResult.status === 'fulfilled'
       ? simResult.value.records.map(r => {
           const medaux = Math.max(1, parseNumber(r.MEDAUX) || 1)
@@ -157,6 +166,9 @@ export async function GET(req: NextRequest) {
       endpoint: simResult.status === 'fulfilled' ? simResult.value.endpoint : (rawResult.status === 'fulfilled' ? rawResult.value.endpoint : null),
       raw: { ok: rawResult.status === 'fulfilled', error: rawResult.status === 'rejected' ? String(rawResult.reason?.message) : null, rows: rawResult.status === 'fulfilled' ? rawResult.value.records : [] },
       simulation: { ok: simResult.status === 'fulfilled', error: simResult.status === 'rejected' ? String(simResult.reason?.message) : null, rows: simRows },
+      cabecalho: { ok: cabResult.status === 'fulfilled', error: cabResult.status === 'rejected' ? String(cabResult.reason?.message) : null, rows: cabResult.status === 'fulfilled' ? cabResult.value.records : [] },
+      liberacoes: { ok: libResult.status === 'fulfilled', error: libResult.status === 'rejected' ? String(libResult.reason?.message) : null, rows: libResult.status === 'fulfilled' ? libResult.value.records : [] },
+      itensStatus: { ok: itemResult.status === 'fulfilled', error: itemResult.status === 'rejected' ? String(itemResult.reason?.message) : null, rows: itemResult.status === 'fulfilled' ? itemResult.value.records : [] },
     })
   }
 

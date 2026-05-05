@@ -19,6 +19,11 @@ import {
   Code2,
   AlertTriangle,
   Server,
+  FileText,
+  Unlock,
+  ClipboardList,
+  UserCheck,
+  AlertCircle,
 } from 'lucide-react'
 import { Spinner } from '@/components/ui/Skeleton'
 
@@ -376,7 +381,7 @@ export default function DiagnosticoPage() {
                   <div>
                     <h3 className="font-semibold text-surface-900">Inspecionar Pedido</h3>
                     <p className="mt-0.5 text-sm text-surface-500">
-                      Analisa campos raw (TGFITE + TGFPRO) e simula a lógica do route.ts para um NUNOTA.
+                      Analisa campos raw (TGFITE + TGFPRO), simula a lógica do route.ts e exibe informações de liberação/confirmação do pedido no Sankhya.
                     </p>
                   </div>
                 </div>
@@ -417,10 +422,155 @@ export default function DiagnosticoPage() {
                 const d = t('inspect-pedido').data as Record<string, unknown>
                 const raw = d?.raw as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
                 const sim = d?.simulation as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
+                const cab = d?.cabecalho as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
+                const lib = d?.liberacoes as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
+                const its = d?.itensStatus as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
+
+                const cabRow = cab?.rows?.[0]
 
                 return (
                   <div className="mt-5 space-y-5">
-                    {/* Raw fields section */}
+                    {/* ── Cabeçalho — Liberação/Confirmação ── */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="h-3.5 w-3.5 text-surface-400" />
+                        <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
+                          Cabeçalho do Pedido — Liberação / Confirmação
+                        </span>
+                        {cab?.ok
+                          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                      </div>
+                      {cab?.error && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono mb-2">{cab.error}</div>
+                      )}
+                      {cabRow && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 rounded-lg border border-surface-200 bg-white p-3 text-xs">
+                          {[
+                            { label: 'NUNOTA', value: String(cabRow.NUNOTA ?? '—'), highlight: true },
+                            { label: 'NUMNOTA', value: String(cabRow.NUMNOTA ?? '—') },
+                            { label: 'DTNEG', value: String(cabRow.DTNEG ?? '—') },
+                            { label: 'CLIENTE', value: String(cabRow.NOMEPARC ?? '—') },
+                            { label: 'VENDEDOR', value: String(cabRow.VENDEDOR ?? '—') },
+                            { label: 'TIPO OPERAÇÃO', value: String(cabRow.TIPO_OPERACAO ?? '—') },
+                            { label: 'PENDENTE', value: String(cabRow.PENDENTE ?? '—'), alert: cabRow.PENDENTE === 'S' },
+                            { label: 'APROVADO', value: String(cabRow.APROVADO ?? '—'), alert: cabRow.APROVADO === 'N' },
+                            { label: 'STATUSNOTA', value: String(cabRow.STATUSNOTA ?? '—'), alert: cabRow.STATUSNOTA !== 'L' },
+                            { label: 'LIBCONF', value: String(cabRow.LIBCONF ?? '—') },
+                            { label: 'CONFIRMNOTAFAT', value: String(cabRow.CONFIRMNOTAFAT ?? '—') },
+                            { label: 'SEQCONFIRMA', value: String(cabRow.SEQCONFIRMA ?? '—') },
+                            { label: 'CODOBSPADRAO', value: String(cabRow.CODOBSPADRAO ?? '—'), alert: cabRow.CODOBSPADRAO === 66 || String(cabRow.CODOBSPADRAO ?? '').includes('66') },
+                            { label: 'OBSERVACAO', value: String(cabRow.OBSERVACAO ?? '—'), full: true },
+                            { label: 'VLRNOTA', value: String(cabRow.VLRNOTA ?? '—') },
+                            { label: 'USUÁRIO', value: String(cabRow.USUARIO ?? '—') },
+                            { label: 'USUÁRIO INC', value: String(cabRow.USUARIO_INC ?? '—') },
+                            { label: 'CODUSU', value: String(cabRow.CODUSU ?? '—') },
+                            { label: 'CODVEND', value: String(cabRow.CODVEND ?? '—') },
+                            { label: 'CODTIPOPER', value: String(cabRow.CODTIPOPER ?? '—') },
+                            { label: 'CODTIPVENDA', value: String(cabRow.CODTIPVENDA ?? '—') },
+                            { label: 'AD_DHCONFIRMVDY', value: String(cabRow.AD_DHCONFIRMVDY ?? '—') },
+                            { label: 'DTALTER', value: String(cabRow.DTALTER ?? '—') },
+                          ].map(({ label, value, highlight, alert, full }) => (
+                            <div key={label} className={`rounded-md px-2 py-1.5 ${full ? 'col-span-full' : ''} ${highlight ? 'bg-slate-50 font-semibold' : alert ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200' : 'bg-surface-50'}`}>
+                              <span className="block text-[10px] uppercase text-surface-400">{label}</span>
+                              <span className={`block truncate ${highlight ? 'text-surface-900' : alert ? 'text-amber-900' : 'text-surface-700'}`}>{value || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Liberações de Bloqueios (TGFLIB) ── */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Unlock className="h-3.5 w-3.5 text-surface-400" />
+                        <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
+                          Liberações de Bloqueios — TGFLIB
+                        </span>
+                        {lib?.ok
+                          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                      </div>
+                      {lib?.error && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono mb-2">{lib.error}</div>
+                      )}
+                      {lib?.rows?.length === 0 && (
+                        <div className="rounded-lg bg-surface-50 border border-surface-200 p-3 text-xs text-surface-500">
+                          Nenhuma liberação encontrada na TGFLIB para este pedido.
+                        </div>
+                      )}
+                      {lib?.rows && lib.rows.length > 0 && (
+                        <div className="overflow-x-auto rounded-lg border border-surface-200">
+                          <table className="w-full text-xs">
+                            <thead className="bg-surface-50">
+                              <tr>
+                                {['CODUSU', 'USUÁRIO', 'DATA', 'LIBERAÇÕES', 'OBS'].map(h => (
+                                  <th key={h} className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-100">
+                              {lib.rows.map((r, i) => (
+                                <tr key={i} className="hover:bg-surface-50">
+                                  <td className="px-3 py-2 font-mono">{String(r.CODUSU ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-700">{String(r.NOMEUSU ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.DT ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono font-semibold text-amber-700">{String(r.LIBERACOES ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-600 max-w-xs truncate">{String(r.OBS ?? '—')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Itens — Status de Liberação ── */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <ClipboardList className="h-3.5 w-3.5 text-surface-400" />
+                        <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
+                          Itens do Pedido — Status / Liberação
+                        </span>
+                        {its?.ok
+                          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                      </div>
+                      {its?.error && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono mb-2">{its.error}</div>
+                      )}
+                      {its?.rows && its.rows.length > 0 && (
+                        <div className="overflow-x-auto rounded-lg border border-surface-200">
+                          <table className="w-full text-xs">
+                            <thead className="bg-surface-50">
+                              <tr>
+                                {['SEQ', 'CODPROD', 'PRODUTO', 'PENDENTE', 'STATUSNOTA', 'QTDCONFERIDA', 'CODOBS', 'QTDNEG', 'QTDVOL', 'VLRTOT'].map(h => (
+                                  <th key={h} className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-100">
+                              {its.rows.map((r, i) => (
+                                <tr key={i} className="hover:bg-surface-50">
+                                  <td className="px-3 py-2 font-mono text-surface-500">{String(r.SEQUENCIA ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.CODPROD ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-700 max-w-48 truncate">{String(r.DESCRPROD ?? '—')}</td>
+                                  <td className={`px-3 py-2 font-mono font-semibold ${r.PENDENTE === 'S' ? 'text-amber-700' : 'text-emerald-600'}`}>{String(r.PENDENTE ?? '—')}</td>
+                                  <td className={`px-3 py-2 font-mono ${r.STATUSNOTA !== 'L' && r.STATUSNOTA != null ? 'text-amber-700 font-semibold' : 'text-surface-500'}`}>{String(r.STATUSNOTA ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.QTDCONFERIDA ?? '—')}</td>
+                                  <td className={`px-3 py-2 font-mono ${r.CODOBSPADRAO ? 'text-amber-700 font-semibold' : 'text-surface-400'}`}>{String(r.CODOBSPADRAO ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.QTDNEG ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.QTDVOL ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.VLRTOT ?? '—')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Campos Raw — TGFITE + TGFPRO ── */}
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
@@ -463,7 +613,7 @@ export default function DiagnosticoPage() {
                       )}
                     </div>
 
-                    {/* Simulation / analysis section */}
+                    {/* ── Simulação Route.ts + Diagnóstico ── */}
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
@@ -524,8 +674,8 @@ export default function DiagnosticoPage() {
           <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 flex gap-3">
             <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-amber-800">
-              Se <strong>ITE_CODVOL ≠ PRD_CODVOL</strong>, a unidade exibida está errada — o route.ts usa a unidade do produto (PRD_CODVOL) mas deveria usar a unidade do item (ITE_CODVOL).
-              Se <strong>MEDAUX = 1</strong> e <strong>QTDVOL = 0</strong>, nenhuma conversão está configurada no banco — use SQL Livre para consultar <code className="bg-amber-100 px-1 rounded text-xs">TGFUNI</code>.
+              Use esta aba para identificar por que um pedido não pode ser confirmado. Verifique <strong>PENDENTE</strong>, <strong>STATUSNOTA</strong>, <strong>CODOBSPADRAO</strong> e as liberações na <strong>TGFLIB</strong>.
+              Códigos de liberação (ex: 66) aparecem no campo <strong>LIBERACOES</strong> da TGFLIB ou em <strong>CODOBSPADRAO</strong> da TGFCAB. Use SQL Livre para explorar adicionalmente.
             </p>
           </div>
         </div>
@@ -594,6 +744,8 @@ export default function DiagnosticoPage() {
                 { label: 'TGFPRO completo prod 18,30', sql: 'SELECT P.* FROM TGFPRO P WHERE P.CODPROD IN (18, 30)' },
                 { label: 'TGFUNI — tabela de unidades', sql: "SELECT U.CODVOL, U.DESCVOL FROM TGFUNI U ORDER BY U.CODVOL" },
                 { label: 'Usuários Sankhya', sql: 'SELECT V.CODVEND, V.APELIDO FROM TGFVEN V WHERE ROWNUM <= 10 ORDER BY V.CODVEND' },
+                { label: 'TGFCAB — liberação (exemplo)', sql: "SELECT CAB.NUNOTA, CAB.PENDENTE, CAB.APROVADO, CAB.STATUSNOTA, CAB.LIBCONF, CAB.CONFIRMNOTAFAT, CAB.CODOBSPADRAO, CAB.CODUSU, CAB.CODVEND FROM TGFCAB CAB WHERE CAB.NUNOTA = 243986" },
+                { label: 'TGFLIB — liberações bloqueios', sql: "SELECT L.NUNOTA, L.CODUSU, U.NOMEUSU, L.DT, L.LIBERACOES, L.OBS FROM TGFLIB L LEFT JOIN TSIUSU U ON U.CODUSU = L.CODUSU WHERE L.NUNOTA = 243986 ORDER BY L.DT" },
               ].map(({ label, sql }) => (
                 <button
                   key={label}
