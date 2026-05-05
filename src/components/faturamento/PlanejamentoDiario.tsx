@@ -95,6 +95,14 @@ interface ProductSummary {
   stockQty: number
 }
 
+interface CityAggregate {
+  key: string
+  city: string
+  uf: string
+  orderCount: number
+  weightKg: number
+}
+
 /* ─────────────────────────────────────────────
    Constants & Helpers
 ───────────────────────────────────────────── */
@@ -161,6 +169,48 @@ const ORDER_TYPE_COLOR: Record<OrderType, { bg: string; border: string; text: st
     badge: 'bg-slate-100 text-slate-700',
     icon: 'text-slate-600',
   },
+}
+
+const CITY_TONE_FALLBACK = [
+  {
+    card: 'border-[#d8e8df] bg-linear-to-b from-[#f7fbf9] to-[#eef7f2]',
+    icon: 'bg-[#14966f]/12 text-[#14966f]',
+    badge: 'bg-[#14966f]/10 text-[#0f7f5b]',
+    accent: 'from-[#14966f]/70 via-[#31b8a2]/35 to-transparent',
+  },
+  {
+    card: 'border-[#dde3ef] bg-linear-to-b from-[#f8faff] to-[#eff3fc]',
+    icon: 'bg-[#3563a9]/12 text-[#3563a9]',
+    badge: 'bg-[#3563a9]/10 text-[#294d84]',
+    accent: 'from-[#3563a9]/70 via-[#7f9dd1]/35 to-transparent',
+  },
+  {
+    card: 'border-[#efe3d8] bg-linear-to-b from-[#fffaf6] to-[#fbf1e8]',
+    icon: 'bg-[#b9762f]/12 text-[#9d5f1d]',
+    badge: 'bg-[#b9762f]/12 text-[#8a4e12]',
+    accent: 'from-[#c68a3f]/70 via-[#d6aa72]/35 to-transparent',
+  },
+  {
+    card: 'border-[#eadcf0] bg-linear-to-b from-[#fcf8ff] to-[#f4edf9]',
+    icon: 'bg-[#7c4aa2]/12 text-[#6d3f90]',
+    badge: 'bg-[#7c4aa2]/12 text-[#5f347f]',
+    accent: 'from-[#7c4aa2]/70 via-[#ab86c8]/35 to-transparent',
+  },
+] as const
+
+const STATE_TONES: Record<string, (typeof CITY_TONE_FALLBACK)[number]> = {
+  PE: CITY_TONE_FALLBACK[0],
+  AL: CITY_TONE_FALLBACK[1],
+  BA: CITY_TONE_FALLBACK[2],
+  MG: CITY_TONE_FALLBACK[3],
+}
+
+function getUfTone(uf?: string | null) {
+  const normalized = String(uf ?? '').trim().toUpperCase()
+  if (STATE_TONES[normalized]) return STATE_TONES[normalized]
+  let sum = 0
+  for (let i = 0; i < normalized.length; i += 1) sum += normalized.charCodeAt(i)
+  return CITY_TONE_FALLBACK[sum % CITY_TONE_FALLBACK.length]
 }
 
 /* ─────────────────────────────────────────────
@@ -510,6 +560,158 @@ function OrderModal({
    Main component
 ───────────────────────────────────────────── */
 
+function CityOrdersModal({
+  aggregate,
+  orders,
+  onClose,
+}: {
+  aggregate: CityAggregate
+  orders: OpenOrder[]
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const tone = getUfTone(aggregate.uf)
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return orders
+    return orders.filter((o) =>
+      o.orderNumber.includes(q) ||
+      o.clientName.toLowerCase().includes(q) ||
+      o.sellerName.toLowerCase().includes(q) ||
+      o.city.toLowerCase().includes(q)
+    )
+  }, [orders, search])
+
+  const totalWeight = useMemo(
+    () => filtered.reduce((acc, o) => acc + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+    [filtered]
+  )
+  const totalItems = useMemo(() => filtered.reduce((acc, o) => acc + o.items.length, 0), [filtered])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-100 flex items-start justify-center bg-black/55 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl my-auto">
+        <div className={cn('relative border-b px-6 py-4', tone.card)}>
+          <div className={cn('absolute inset-x-0 top-0 h-0.5 bg-linear-to-r', tone.accent)} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tone.icon)}>
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800">{aggregate.city}</h3>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {aggregate.uf || 'UF não informada'} · Pedidos da cidade
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={cn('inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em]', tone.badge)}>
+                {filtered.length} pedido{filtered.length !== 1 ? 's' : ''}
+              </span>
+              <span className="hidden sm:inline text-sm font-semibold text-slate-600">
+                {fmtKg(totalWeight)} kg · {totalItems} itens
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-black/5 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b border-slate-100 px-6 py-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por pedido, cliente, vendedor ou cidade..."
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-9 pr-4 text-sm outline-none transition-all focus:border-[#14966f] focus:bg-white focus:ring-2 focus:ring-[#14966f]/15"
+            />
+          </div>
+        </div>
+
+        <div className="max-h-[62vh] overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-6 py-14 text-center text-slate-400">Nenhum pedido encontrado para a busca.</div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filtered.map((order) => {
+                const orderWeight = order.items.reduce((s, i) => s + i.weightKg, 0)
+                return (
+                  <div key={`${order.orderNumber}-${order.partnerCode}`} className="px-6 py-4 transition-colors hover:bg-slate-50/60">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-3xl font-bold text-slate-800">
+                          Pedido {order.orderNumber}
+                          <span className="ml-2 text-sm font-semibold text-slate-400">{order.sellerName}</span>
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-slate-600">
+                          {order.clientName} · {order.city}{order.uf ? ` - ${order.uf}` : ''} · Neg. {formatDate(order.dtNeg)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={cn(
+                            'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold',
+                            order.statusNota === 'L' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'
+                          )}>
+                            Confirmada: {order.statusNota === 'L' ? 'Sim' : 'Não'}
+                          </span>
+                          <span className={cn(
+                            'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold',
+                            order.pendente === 'S' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          )}>
+                            Pendente: {order.pendente === 'S' ? 'Sim' : 'Não'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold text-slate-700">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                        <p className="text-sm font-bold text-slate-800">{fmtKg(orderWeight)} <span className="text-xs font-medium text-slate-500">kg</span></p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/80 px-6 py-3">
+          <p className="text-sm text-slate-600">
+            <span className="font-bold text-slate-700">{filtered.length}</span> pedidos · <span className="font-bold text-slate-700">{fmtKg(totalWeight)}</span> kg
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PrevisaoDeEstoque() {
   const today = todayIso()
 
@@ -523,6 +725,7 @@ export default function PrevisaoDeEstoque() {
   const [error, setError] = useState<string | null>(null)
   const [lastFetched, setLastFetched] = useState<string | null>(null)
   const [modalType, setModalType] = useState<OrderType | null>(null)
+  const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null)
 
   type SortKey = 'productCode' | 'productName' | 'quantity' | 'weightKg' | 'stock' | 'status'
   const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' })
@@ -692,8 +895,8 @@ export default function PrevisaoDeEstoque() {
     return arr
   }, [productAggregates, sortConfig, stockMap])
 
-  const cityAggregates = useMemo(() => {
-    const map = new Map<string, { city: string; uf: string; orderCount: number; weightKg: number }>()
+  const cityAggregates = useMemo<CityAggregate[]>(() => {
+    const map = new Map<string, CityAggregate>()
     for (const order of filteredOrders) {
       const key = order.uf ? `${order.city} - ${order.uf}` : order.city
       const existing = map.get(key)
@@ -702,11 +905,27 @@ export default function PrevisaoDeEstoque() {
         existing.orderCount += 1
         existing.weightKg += orderWeight
       } else {
-        map.set(key, { city: order.city, uf: order.uf, orderCount: 1, weightKg: orderWeight })
+        map.set(key, { key, city: order.city, uf: order.uf, orderCount: 1, weightKg: orderWeight })
       }
     }
     return Array.from(map.values()).sort((a, b) => b.weightKg - a.weightKg)
   }, [filteredOrders])
+
+  const cityOrdersByKey = useMemo(() => {
+    const map = new Map<string, OpenOrder[]>()
+    for (const order of filteredOrders) {
+      const key = order.uf ? `${order.city} - ${order.uf}` : order.city
+      const list = map.get(key)
+      if (list) list.push(order)
+      else map.set(key, [order])
+    }
+    return map
+  }, [filteredOrders])
+
+  const selectedCityAggregate = useMemo(
+    () => cityAggregates.find((c) => c.key === selectedCityKey) ?? null,
+    [cityAggregates, selectedCityKey]
+  )
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
@@ -932,18 +1151,25 @@ export default function PrevisaoDeEstoque() {
           </div>
           <div className="p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {cityAggregates.map((c) => (
-                <div
-                  key={c.city + c.uf}
-                  className="group relative overflow-hidden rounded-xl border border-[#e8ece3] bg-linear-to-b from-white to-[#fafbf9] p-4 transition-all duration-300 hover:border-[#c6a277]/40 hover:shadow-md hover:-translate-y-0.5"
+              {cityAggregates.map((c) => {
+                const tone = getUfTone(c.uf)
+                return (
+                <button
+                  type="button"
+                  key={c.key}
+                  onClick={() => setSelectedCityKey(c.key)}
+                  className={cn(
+                    'group relative overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
+                    tone.card
+                  )}
                 >
                   {/* Subtle top accent */}
-                  <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-[#14966f]/60 via-[#c6a277]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className={cn('absolute inset-x-0 top-0 h-0.5 bg-linear-to-r opacity-70 transition-opacity duration-300 group-hover:opacity-100', tone.accent)} />
 
                   {/* Header */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#14966f]/8 text-[#14966f]">
+                      <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', tone.icon)}>
                         <MapPin className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -951,7 +1177,7 @@ export default function PrevisaoDeEstoque() {
                       </div>
                     </div>
                     {c.uf && (
-                      <span className="shrink-0 inline-flex items-center rounded-md bg-[#0f2a1d]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#4a5d45]">
+                      <span className={cn('shrink-0 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', tone.badge)}>
                         {c.uf}
                       </span>
                     )}
@@ -973,8 +1199,8 @@ export default function PrevisaoDeEstoque() {
                       <span className="text-xs font-bold text-[#0f2a1d]">{fmtKg(c.weightKg)} <span className="text-[10px] font-medium text-[#7ea07d]">kg</span></span>
                     </div>
                   </div>
-                </div>
-              ))}
+                </button>
+              )})}
             </div>
           </div>
         </div>
@@ -987,6 +1213,14 @@ export default function PrevisaoDeEstoque() {
           title={modalType === 'VENDA' ? 'Pedidos de Venda' : modalType === 'BONIFICACAO' ? 'Pedidos de Bonificação' : modalType === 'TROCA' ? 'Pedidos de Troca' : modalType === 'NAO_CONFIRMADO' ? 'Pedidos Não Confirmados' : 'Outros Pedidos'}
           type={modalType}
           onClose={() => setModalType(null)}
+        />
+      )}
+
+      {selectedCityAggregate && (
+        <CityOrdersModal
+          aggregate={selectedCityAggregate}
+          orders={cityOrdersByKey.get(selectedCityAggregate.key) ?? []}
+          onClose={() => setSelectedCityKey(null)}
         />
       )}
 
