@@ -51,10 +51,11 @@ const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
 }
 
 const DEFAULT_MODULE: ModuleKey = 'metas'
-const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
+const ACCESSIBLE_MODULES: ModuleKey[] = ['metas', 'logistica']
 const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
   metas: '/metas',
   integracoes: '/integracoes',
+  logistica: '/logistica',
 }
 
 function getModuleRoute(moduleKey: ModuleKey): string {
@@ -169,7 +170,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const isActive = moduleKey === 'integracoes'
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : '(Em breve)'
+    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' || moduleKey === 'logistica' ? null : '(Em breve)'
     const iconClass = cn(
       'w-4 h-4 shrink-0 transition-all duration-300',
       isActive
@@ -199,7 +200,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
     )
 
-    if (isAccessible) {
+    if (isAccessible && !expandable) {
       return (
         <Link
           key={moduleKey}
@@ -238,6 +239,10 @@ export default function Sidebar({ appVersion }: SidebarProps) {
             setIsCollapsed(false)
             return
           }
+          if (expandable) {
+            onToggleExpand?.()
+            return
+          }
           handleUnavailableClick(moduleKey)
         }}
         className={baseClass}
@@ -247,9 +252,11 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         {!isCollapsed && (
           <>
             <span className={labelClass}>{modulePlan.label}</span>
-            <span className={badgeClass}>
-              {badgeLabel}
-            </span>
+            {badgeLabel && (
+              <span className={badgeClass}>
+                {badgeLabel}
+              </span>
+            )}
             {expandable && (
               <span
                 role="button"

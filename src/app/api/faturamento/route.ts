@@ -356,6 +356,7 @@ SELECT
   UPPER(TRIM(P.DESCRPROD))                   AS PRODUTO,
   UPPER(TRIM(NVL(P.MARCA, '')))              AS GRUPO,
   UPPER(TRIM(TO_CHAR(P.CODVOL)))             AS UNIDADE,
+  NVL(P.MEDAUX, 1)                           AS MEDAUX,
   SUM(I.QTDNEG)                              AS QUANTIDADE,
   SUM(NVL(I.QTDVOL, 0))                      AS VOLUME,
   SUM(NVL(I.PESO, NVL(P.PESOBRUTO, 0) * I.QTDNEG)) AS PESO_KG,
@@ -381,7 +382,7 @@ WHERE CAB.CODVEND > 0
   ${sellerFilter}
 GROUP BY CAB.NUNOTA, CAB.CODVEND, VEN.APELIDO, CAB.CODPARC, PAR.NOMEPARC,
          CID.NOMECID, UF.UF, CAB.CODTIPOPER, CAB.TIPMOV, CAB.DTNEG,
-         I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, TOP.BONIFICACAO,
+         I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, P.MEDAUX, TOP.BONIFICACAO,
          CAB.APROVADO, CAB.PENDENTE, CAB.STATUSNOTA
 ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 `.trim()
@@ -425,6 +426,7 @@ type RawItemRow = {
   productName: string
   group: string
   unit: string
+  medaux: number
   quantity: number
   volume: number
   weightKg: number
@@ -458,6 +460,7 @@ function parseItemRow(r: RawRecord): RawItemRow {
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
     unit: String(r.UNIDADE ?? r.CODVOL ?? '').trim(),
+    medaux: Math.max(1, parseNumber(r.MEDAUX) || 1),
     quantity: parseNumber(r.QUANTIDADE ?? r.QTDNEG),
     volume: parseNumber(r.VOLUME ?? r.QTDVOL),
     weightKg: parseNumber(r.PESO_KG ?? r.PESOBRUTO),
@@ -530,18 +533,12 @@ export async function GET(request: NextRequest) {
 
     // Parse rows into order map
     const orderMap = new Map<string, DailyOrder>()
-    const debugRows = rawRows.slice(0, 10)
-    console.log('[faturamento] sample raw rows:', debugRows.map(r => ({
-      NUNOTA: r.NUNOTA, CODTIPOPER: r.CODTIPOPER, TIPMOV: r.TIPMOV,
-      BONIFICACAO: r.BONIFICACAO, APROVADO: r.APROVADO, PENDENTE: r.PENDENTE
-    })))
     for (const r of rawRows) {
       const row = parseItemRow(r)
       if (!row.nunota || !row.productCode) continue
 
       if (!orderMap.has(row.nunota)) {
         const orderType = classifyOrderType(row.codTipOper)
-        console.log(`[faturamento] order ${row.nunota} -> codTipOper=${row.codTipOper}, type=${orderType}, aprovado=${row.aprovado}, pendente=${row.pendente}`)
         orderMap.set(row.nunota, {
           orderNumber: row.nunota,
           sellerCode: row.sellerCode,
@@ -565,8 +562,9 @@ export async function GET(request: NextRequest) {
         productCode: row.productCode,
         productName: row.productName,
         group: row.group,
-        unit: row.unit,
-        quantity: row.quantity,
+        // MEDAUX > 1 significa que CODVOL != UN (ex.: FD=20). Converter QTDNEG → UN.
+        unit: row.medaux > 1 ? 'UN' : row.unit,
+        quantity: row.medaux > 1 ? Math.round(row.quantity * row.medaux) : row.quantity,
         volume: row.volume,
         weightKg: row.weightKg,
       })

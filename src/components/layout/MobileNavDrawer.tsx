@@ -55,10 +55,11 @@ const MODULE_ICONS: Record<ModuleKey, LucideIcon> = {
   configuracoes: Settings,
 }
 
-const ACCESSIBLE_MODULES: ModuleKey[] = ['metas']
+const ACCESSIBLE_MODULES: ModuleKey[] = ['metas', 'logistica']
 const DIRECT_ROUTES: Partial<Record<ModuleKey, string>> = {
   metas: '/metas',
   integracoes: '/integracoes',
+  logistica: '/logistica',
 }
 
 function getModuleRoute(moduleKey: ModuleKey): string {
@@ -318,7 +319,7 @@ function ProfileSection({
         <div className="space-y-1 pt-1">
               {user?.roleCode === 'DEVELOPER' && (
                 <Link
-                  href="/dev/gestao-usuarios"
+                  href="/dev"
                   onClick={onClose}
                   className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#c6d3bb] transition-colors hover:bg-[#edf0e2]/8 hover:text-[#edf0e2]"
                 >

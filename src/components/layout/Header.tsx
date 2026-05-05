@@ -390,7 +390,7 @@ function HeaderInner() {
                 </Link>
                 {user?.roleCode === 'DEVELOPER' && (
                   <Link
-                    href="/dev/gestao-usuarios"
+                    href="/dev"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-surface-50"
                   >
