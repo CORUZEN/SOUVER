@@ -723,11 +723,49 @@ export default function DiagnosticoPage() {
             </div>
           </div>
 
+          {/* Catálogo de Eventos de Liberação */}
+          <TestCard
+            id="catalogo-eventos"
+            icon={AlertCircle}
+            title="Catálogo de Eventos de Liberação"
+            description="Busca todos os códigos de evento (VGFLIBEVE) do Sankhya com suas descrições. Útil para entender quem libera o quê."
+            result={t('catalogo-eventos')}
+            onRun={() => run('catalogo-eventos', 'catalogo-eventos')}
+            accent="amber"
+          >
+            {t('catalogo-eventos').status === 'ok' && (() => {
+              const d = t('catalogo-eventos').data as Record<string, unknown>
+              const rows = d?.rows as Record<string, unknown>[] | null
+              return rows?.length
+                ? (
+                  <div className="overflow-x-auto rounded-lg border border-surface-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-surface-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">EVENTO</th>
+                          <th className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">DESCRIÇÃO</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-surface-100">
+                        {rows.map((r, i) => (
+                          <tr key={i} className="hover:bg-surface-50">
+                            <td className="px-3 py-2 font-mono font-semibold text-amber-700">{String(r.EVENTO ?? '—')}</td>
+                            <td className="px-3 py-2 text-surface-700">{String(r.DESCRICAO ?? '—')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+                : <p className="text-sm text-surface-500 italic">Nenhum evento encontrado.</p>
+            })()}
+          </TestCard>
+
           <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 flex gap-3">
             <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-amber-800">
-              Use esta aba para identificar por que um pedido não pode ser confirmado. Verifique <strong>PENDENTE</strong>, <strong>STATUSNOTA</strong>, <strong>CODOBSPADRAO</strong> e as liberações na <strong>TGFLIB</strong>.
-              Códigos de liberação (ex: 66) aparecem no campo <strong>LIBERACOES</strong> da TGFLIB ou em <strong>CODOBSPADRAO</strong> da TGFCAB. Use SQL Livre para explorar adicionalmente.
+              Use esta aba para identificar por que um pedido não pode ser confirmado. Verifique <strong>PENDENTE</strong>, <strong>STATUSNOTA</strong>, <strong>CODOBSPADRAO</strong> e as liberações na <strong>VSILIB</strong>.
+              Códigos de liberação aparecem no campo <strong>EVENTO</strong> da VSILIB. Use o catálogo acima para decifrar cada código.
             </p>
           </div>
         </div>

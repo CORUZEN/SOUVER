@@ -38,6 +38,7 @@ export type DailyOrder = {
   aprovado: string
   pendente: string
   statusNota: string
+  eventosLiberacao: string
   items: OrderItem[]
 }
 
@@ -363,7 +364,12 @@ SELECT
   NVL(TOP.BONIFICACAO, 'N')                  AS BONIFICACAO,
   NVL(CAB.APROVADO, 'N')                     AS APROVADO,
   NVL(CAB.PENDENTE, 'N')                     AS PENDENTE,
-  NVL(CAB.STATUSNOTA, 'L')                   AS STATUSNOTA
+  NVL(CAB.STATUSNOTA, 'L')                   AS STATUSNOTA,
+  (SELECT LISTAGG(DISTINCT V.EVENTO, ',') WITHIN GROUP (ORDER BY V.EVENTO)
+   FROM VSILIB V
+   WHERE V.NUNOTA = CAB.NUNOTA
+     AND V.REPROVADO = 'N'
+     AND (V.VLRLIBERADO IS NULL OR V.VLRLIBERADO = 0)) AS EVENTOS_LIBERACAO
 FROM TGFCAB CAB
 INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
@@ -422,6 +428,7 @@ type RawItemRow = {
   aprovado: string
   pendente: string
   statusNota: string
+  eventosLiberacao: string
   productCode: string
   productName: string
   group: string
@@ -466,6 +473,7 @@ function parseItemRow(r: RawRecord): RawItemRow {
     aprovado: String(r.APROVADO ?? '').trim(),
     pendente: String(r.PENDENTE ?? '').trim(),
     statusNota: String(r.STATUSNOTA ?? '').trim(),
+    eventosLiberacao: String(r.EVENTOS_LIBERACAO ?? '').trim(),
     productCode: String(r.CODPROD ?? '').trim(),
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
@@ -557,6 +565,7 @@ export async function GET(request: NextRequest) {
           sellerCode: row.sellerCode,
           sellerName: row.sellerName,
           partnerCode: row.partnerCode,
+          eventosLiberacao: row.eventosLiberacao,
           clientName: row.clientName,
           city: row.city,
           uf: row.uf,

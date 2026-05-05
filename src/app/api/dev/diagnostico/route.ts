@@ -175,6 +175,20 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  if (action === 'catalogo-eventos') {
+    const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
+    const headers = buildHeaders(config, bearerToken)
+    const appKey = config.appKey || config.token || null
+    const sql = `SELECT E.EVENTO, E.DESCRICAO FROM VGFLIBEVE E ORDER BY E.EVENTO`
+    const start = Date.now()
+    try {
+      const result = await runSql(baseUrl, headers, sql, appKey)
+      return NextResponse.json({ ok: true, elapsedMs: Date.now() - start, endpoint: result.endpoint, rowCount: result.records.length, rows: result.records })
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'query falhou' }, { status: 502 })
+    }
+  }
+
   if (action === 'custom-sql') {
     const sql = searchParams.get('sql')?.trim()
     if (!sql || sql.length < 6) return NextResponse.json({ ok: false, error: 'Parâmetro sql ausente.' }, { status: 400 })

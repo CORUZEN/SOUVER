@@ -47,6 +47,19 @@ interface OrderItem {
 
 type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'NAO_CONFIRMADO' | 'OUTROS'
 
+/* Mapeamento de eventos de liberação para setores responsáveis */
+function resolveLiberacaoSetores(eventosLiberacao: string): { setor: string; cor: string }[] {
+  if (!eventosLiberacao) return []
+  const eventos = eventosLiberacao.split(',').map(e => e.trim()).filter(Boolean)
+  const setores = new Map<string, string>()
+  for (const ev of eventos) {
+    if (ev === '8') setores.set('Financeiro', 'bg-blue-50 text-blue-700 border-blue-200')
+    else if (ev === '66') setores.set('T.I', 'bg-purple-50 text-purple-700 border-purple-200')
+    else if (['23', '24', '25', '44'].includes(ev)) setores.set('Supervisor', 'bg-amber-50 text-amber-700 border-amber-200')
+  }
+  return Array.from(setores.entries()).map(([setor, cor]) => ({ setor, cor }))
+}
+
 interface OpenOrder {
   orderNumber: string
   sellerCode: string
@@ -63,6 +76,7 @@ interface OpenOrder {
   aprovado: string
   pendente: string
   statusNota: string
+  eventosLiberacao: string
   items: OrderItem[]
 }
 
@@ -541,6 +555,11 @@ function OrderModal({
                         </div>
                       </div>
                       <div className="shrink-0 flex items-center gap-3">
+                        {resolveLiberacaoSetores(order.eventosLiberacao).map(({ setor, cor }) => (
+                          <span key={setor} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${cor}`}>
+                            Liberação: {setor}
+                          </span>
+                        ))}
                         <span className="text-xs font-semibold text-slate-600 hidden sm:inline">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
                         <span className="text-xs font-bold text-slate-700">{fmtKg(orderWeight)} kg</span>
                         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
