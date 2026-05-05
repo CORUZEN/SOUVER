@@ -293,6 +293,7 @@ interface SellerSnapshot {
   gapToTarget: number
   ruleProgress: RuleProgress[]
   blockId: string
+  resolvedMonthlyTarget: number
 }
 
 interface RuleBlock {
@@ -3961,6 +3962,7 @@ export default function MetasWorkspace() {
           gapToTarget: Math.max(blockPointsTarget - pointsAchieved, 0),
           ruleProgress,
           blockId: block.id,
+          resolvedMonthlyTarget,
         }
       })
       .filter((snapshot): snapshot is SellerSnapshot => Boolean(snapshot))
@@ -4055,10 +4057,9 @@ export default function MetasWorkspace() {
   const corporateTotalTarget = useMemo(
     () =>
       snapshots.reduce((sum, snapshot) => {
-        const block = ruleBlocks.find((b) => b.id === snapshot.blockId) ?? ruleBlocks[0]
-        return sum + (block.monthlyTarget > 0 ? block.monthlyTarget : 0)
+        return sum + Math.max(snapshot.resolvedMonthlyTarget, 0)
       }, 0),
-    [ruleBlocks, snapshots]
+    [snapshots]
   )
   // Sum of weight targets only for blocks that belong to sellers in this view's scope
   const corporateTotalWeightTarget = useMemo(() => {
@@ -4526,9 +4527,7 @@ export default function MetasWorkspace() {
     const totalGrossWeight = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalGrossWeight, 0)
     const totalRevenue = scopedSnapshots.reduce((sum, snapshot) => sum + snapshot.totalValue, 0)
     const totalRevenueTarget = scopedSnapshots.reduce((sum, snapshot) => {
-      const block = ruleBlocks.find((candidate) => candidate.id === snapshot.blockId) ?? findBlockForSeller(snapshot.seller.id, ruleBlocks)
-      const target = Math.max(Number(block?.monthlyTarget ?? 0), 0)
-      return sum + target
+      return sum + Math.max(snapshot.resolvedMonthlyTarget, 0)
     }, 0)
     const totalVolumes = scopedSellers.reduce(
       (sum, seller) => sum + seller.orders.reduce((inner, order) => inner + Math.max(Number(order.totalVolumes ?? 0), 0), 0),
@@ -6334,7 +6333,7 @@ export default function MetasWorkspace() {
             ? Math.min(itemsProgress, clientsProgress)
             : 0
           const distribuicaoSellerHit: 0 | 1 = distribuicaoProgress >= 1 ? 1 : 0
-          const financialTarget = Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0)
+          const financialTarget = Math.max(snapshot.resolvedMonthlyTarget, 0)
           const weightPerfRow = sellerWeightPerformanceRows.find((row) => row.sellerId === snapshot.seller.id)
           const weightTargetKgByGroup = Math.max(Number(weightPerfRow?.totalTargetKg ?? 0), 0)
           const weightSoldKgByGroup = Math.max(Number(weightPerfRow?.totalSoldKg ?? 0), 0)
@@ -6530,7 +6529,7 @@ export default function MetasWorkspace() {
         baseClients: Math.max(snapshot.seller.baseClientCount ?? 0, 0),
         totalOrders: snapshot.totalOrders,
         totalValue: snapshot.totalValue,
-        financialTarget: Math.max(Number(snapshotBlock?.monthlyTarget ?? 0), 0),
+        financialTarget: Math.max(snapshot.resolvedMonthlyTarget, 0),
         totalGrossWeight: snapshot.totalGrossWeight,
         weightSoldKgByGroup,
         weightTargetKg: weightTargetKgByGroup > 0 ? weightTargetKgByGroup : fallbackWeightTargetKg,
