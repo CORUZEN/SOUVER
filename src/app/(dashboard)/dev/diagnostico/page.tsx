@@ -425,6 +425,7 @@ export default function DiagnosticoPage() {
                 const cab = d?.cabecalho as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
                 const lib = d?.liberacoes as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
                 const its = d?.itensStatus as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
+                const vsi = d?.vsiLiberacoes as { ok: boolean; error: string | null; rows: Record<string, unknown>[] }
 
                 const cabRow = cab?.rows?.[0]
 
@@ -517,6 +518,57 @@ export default function DiagnosticoPage() {
                                   <td className="px-3 py-2 font-mono">{String(r.DT ?? '—')}</td>
                                   <td className="px-3 py-2 font-mono font-semibold text-amber-700">{String(r.LIBERACOES ?? '—')}</td>
                                   <td className="px-3 py-2 text-surface-600 max-w-xs truncate">{String(r.OBS ?? '—')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Liberações VSILIB (View Liberações) ── */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserCheck className="h-3.5 w-3.5 text-surface-400" />
+                        <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
+                          Liberações — VSILIB (View de Liberações)
+                        </span>
+                        {vsi?.ok
+                          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                      </div>
+                      {vsi?.error && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono mb-2">{vsi.error}</div>
+                      )}
+                      {vsi?.rows?.length === 0 && (
+                        <div className="rounded-lg bg-surface-50 border border-surface-200 p-3 text-xs text-surface-500">
+                          Nenhuma liberação encontrada na VSILIB para este pedido.
+                        </div>
+                      )}
+                      {vsi?.rows && vsi.rows.length > 0 && (
+                        <div className="overflow-x-auto rounded-lg border border-surface-200">
+                          <table className="w-full text-xs">
+                            <thead className="bg-surface-50">
+                              <tr>
+                                {['EVENTO', 'DESCRIÇÃO', 'USU SOLICIT', 'DHSOLICIT', 'VLRLIMITE', 'VLRLIBERADO', 'USU LIB', 'DHLIB', 'REPROVADO', 'OBSERVACAO', 'OBSLIB'].map(h => (
+                                  <th key={h} className="px-3 py-2 text-left font-semibold text-surface-600 whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-100">
+                              {vsi.rows.map((r, i) => (
+                                <tr key={i} className="hover:bg-surface-50">
+                                  <td className="px-3 py-2 font-mono font-semibold text-amber-700">{String(r.EVENTO ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-700 max-w-40 truncate">{String(r.EVENTO_DESCR ?? '—')}</td>
+                                  <td className="px-3 py-2">{String(r.USUARIO_SOLICIT ?? r.CODUSUSOLICIT ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.DHSOLICIT ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.VLRLIMITE ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono font-semibold text-emerald-700">{String(r.VLRLIBERADO ?? '—')}</td>
+                                  <td className="px-3 py-2">{String(r.USUARIO_LIB ?? r.CODUSULIB ?? '—')}</td>
+                                  <td className="px-3 py-2 font-mono">{String(r.DHLIB ?? '—')}</td>
+                                  <td className={`px-3 py-2 font-mono font-semibold ${r.REPROVADO === 'S' ? 'text-red-600' : 'text-surface-400'}`}>{String(r.REPROVADO ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-600 max-w-xs truncate">{String(r.OBSERVACAO ?? '—')}</td>
+                                  <td className="px-3 py-2 text-surface-600 max-w-xs truncate">{String(r.OBSLIB ?? '—')}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -746,6 +798,7 @@ export default function DiagnosticoPage() {
                 { label: 'Usuários Sankhya', sql: 'SELECT V.CODVEND, V.APELIDO FROM TGFVEN V WHERE ROWNUM <= 10 ORDER BY V.CODVEND' },
                 { label: 'TGFCAB — liberação (exemplo)', sql: "SELECT CAB.NUNOTA, CAB.PENDENTE, CAB.APROVADO, CAB.STATUSNOTA, CAB.LIBCONF, CAB.CONFIRMNOTAFAT, CAB.CODOBSPADRAO, CAB.CODUSU, CAB.CODVEND FROM TGFCAB CAB WHERE CAB.NUNOTA = 243986" },
                 { label: 'TGFLIB — liberações bloqueios', sql: "SELECT L.NUNOTA, L.CODUSU, U.NOMEUSU, L.DT, L.LIBERACOES, L.OBS FROM TGFLIB L LEFT JOIN TSIUSU U ON U.CODUSU = L.CODUSU WHERE L.NUNOTA = 243986 ORDER BY L.DT" },
+                { label: 'VSILIB — view liberações', sql: "SELECT V.NUNOTA, V.EVENTO, E.DESCRICAO, V.CODUSUSOLICIT, V.CODUSULIB, V.VLRLIBERADO, V.REPROVADO, V.OBSERVACAO FROM VSILIB V LEFT JOIN VGFLIBEVE E ON E.EVENTO = V.EVENTO WHERE V.NUNOTA = 243986 ORDER BY V.SEQUENCIA" },
               ].map(({ label, sql }) => (
                 <button
                   key={label}

@@ -118,13 +118,15 @@ export async function GET(req: NextRequest) {
     const sqlCabLiberacao = `SELECT CAB.NUNOTA, CAB.NUMNOTA, TO_CHAR(CAB.DTNEG,'YYYY-MM-DD') AS DTNEG, CAB.PENDENTE, CAB.APROVADO, CAB.STATUSNOTA, CAB.LIBCONF, CAB.CONFIRMNOTAFAT, CAB.SEQCONFIRMA, CAB.CODUSU, CAB.CODUSUINC, CAB.CODVEND, CAB.CODTIPOPER, CAB.CODTIPVENDA, CAB.CODOBSPADRAO, CAB.OBSERVACAO, CAB.VLRNOTA, TO_CHAR(CAB.AD_DHCONFIRMVDY,'YYYY-MM-DD HH24:MI:SS') AS AD_DHCONFIRMVDY, TO_CHAR(CAB.DTALTER,'YYYY-MM-DD HH24:MI:SS') AS DTALTER, P.NOMEPARC, V.APELIDO AS VENDEDOR, U.NOMEUSU AS USUARIO, UIC.NOMEUSU AS USUARIO_INC, T.DESCROPER AS TIPO_OPERACAO FROM TGFCAB CAB LEFT JOIN TGFPAR P ON P.CODPARC = CAB.CODPARC LEFT JOIN TGFVEN V ON V.CODVEND = CAB.CODVEND LEFT JOIN TSIUSU U ON U.CODUSU = CAB.CODUSU LEFT JOIN TSIUSU UIC ON UIC.CODUSU = CAB.CODUSUINC LEFT JOIN TGFTOP T ON T.CODTIPOPER = CAB.CODTIPOPER WHERE CAB.NUNOTA = ${nunota}`
     const sqlLiberacoes = `SELECT L.NUNOTA, L.CODUSU, U.NOMEUSU, TO_CHAR(L.DT,'YYYY-MM-DD HH24:MI:SS') AS DT, L.LIBERACOES, L.OBS FROM TGFLIB L LEFT JOIN TSIUSU U ON U.CODUSU = L.CODUSU WHERE L.NUNOTA = ${nunota} ORDER BY L.DT`
     const sqlItensStatus = `SELECT I.NUNOTA, I.SEQUENCIA, I.CODPROD, P.DESCRPROD, I.PENDENTE, I.STATUSNOTA, I.QTDCONFERIDA, I.CODOBSPADRAO, I.QTDNEG, I.QTDVOL, I.VLRTOT FROM TGFITE I INNER JOIN TGFPRO P ON P.CODPROD = I.CODPROD WHERE I.NUNOTA = ${nunota} ORDER BY I.SEQUENCIA`
+    const sqlVsiLib = `SELECT V.NUNOTA, V.NUCHAVE, V.EVENTO, E.DESCRICAO AS EVENTO_DESCR, V.SEQUENCIA, V.CODUSUSOLICIT, US.NOMEUSU AS USUARIO_SOLICIT, V.DHSOLICIT, V.VLRLIMITE, V.VLRATUAL, V.VLRLIBERADO, V.CODUSULIB, UL.NOMEUSU AS USUARIO_LIB, V.DHLIB, V.OBSERVACAO, V.OBSLIB, V.REPROVADO, V.VLRNOTA, V.STATUSNOTA, V.CODPARC, V.CODVEND, V.DTNEG, V.CODTIPOPER FROM VSILIB V LEFT JOIN VGFLIBEVE E ON E.EVENTO = V.EVENTO LEFT JOIN TSIUSU US ON US.CODUSU = V.CODUSUSOLICIT LEFT JOIN TSIUSU UL ON UL.CODUSU = V.CODUSULIB WHERE V.NUNOTA = ${nunota} ORDER BY V.SEQUENCIA, V.DHSOLICIT`
     const start = Date.now()
-    const [rawResult, simResult, cabResult, libResult, itemResult] = await Promise.allSettled([
+    const [rawResult, simResult, cabResult, libResult, itemResult, vsiResult] = await Promise.allSettled([
       runSql(baseUrl, headers, sqlRaw, appKey),
       runSql(baseUrl, headers, sqlSim, appKey),
       runSql(baseUrl, headers, sqlCabLiberacao, appKey),
       runSql(baseUrl, headers, sqlLiberacoes, appKey),
       runSql(baseUrl, headers, sqlItensStatus, appKey),
+      runSql(baseUrl, headers, sqlVsiLib, appKey),
     ])
     const simRows = simResult.status === 'fulfilled'
       ? simResult.value.records.map(r => {
@@ -169,6 +171,7 @@ export async function GET(req: NextRequest) {
       cabecalho: { ok: cabResult.status === 'fulfilled', error: cabResult.status === 'rejected' ? String(cabResult.reason?.message) : null, rows: cabResult.status === 'fulfilled' ? cabResult.value.records : [] },
       liberacoes: { ok: libResult.status === 'fulfilled', error: libResult.status === 'rejected' ? String(libResult.reason?.message) : null, rows: libResult.status === 'fulfilled' ? libResult.value.records : [] },
       itensStatus: { ok: itemResult.status === 'fulfilled', error: itemResult.status === 'rejected' ? String(itemResult.reason?.message) : null, rows: itemResult.status === 'fulfilled' ? itemResult.value.records : [] },
+      vsiLiberacoes: { ok: vsiResult.status === 'fulfilled', error: vsiResult.status === 'rejected' ? String(vsiResult.reason?.message) : null, rows: vsiResult.status === 'fulfilled' ? vsiResult.value.records : [] },
     })
   }
 
