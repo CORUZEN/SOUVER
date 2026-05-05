@@ -918,9 +918,23 @@ export default function PrevisaoDeEstoque() {
 
   const cityOptions = useMemo(() => {
     if (!data) return []
-    const set = new Set(data.orders.map((o) => o.uf ? `${o.city} - ${o.uf}` : o.city))
+    let orders = data.orders
+    if (selectedSellers.length > 0) {
+      orders = orders.filter((o) => selectedSellers.includes(o.sellerName))
+    }
+    const set = new Set(orders.map((o) => o.uf ? `${o.city} - ${o.uf}` : o.city))
     return [...set].sort()
-  }, [data])
+  }, [data, selectedSellers])
+
+  /* ── Limpa cidades selecionadas que não existem mais nas opções ── */
+  useEffect(() => {
+    if (!data) return
+    const available = new Set(cityOptions)
+    setSelectedCities((prev) => {
+      const filtered = prev.filter((c) => available.has(c))
+      return filtered.length === prev.length ? prev : filtered
+    })
+  }, [cityOptions, data])
 
   /* ── Aplica presets automaticamente quando muda vendedor (após consulta) ── */
   useEffect(() => {
