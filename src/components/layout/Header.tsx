@@ -218,6 +218,14 @@ function HeaderInner() {
       }
     }
 
+    if (pathname === '/previsao' || pathname.startsWith('/previsao')) {
+      return {
+        eyebrow: 'Logística • Previsão',
+        title: 'PREVISÃO DE PEDIDOS',
+        subtitle: 'Visualização consolidada de pedidos em aberto, estoque e cidades atendidas',
+      }
+    }
+
     return {
       eyebrow: 'Sistema Empresarial',
       title: 'Fábrica Café Ouro Verde',

@@ -507,8 +507,8 @@ function OrderModal({
 export default function PrevisaoDeEstoque() {
   const today = todayIso()
 
-  const [dateFrom, setDateFrom] = useState(today)
-  const [dateTo, setDateTo] = useState(today)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [selectedSellers, setSelectedSellers] = useState<string[]>([])
   const [selectedCities, setSelectedCities] = useState<string[]>([])
 
@@ -536,7 +536,9 @@ export default function PrevisaoDeEstoque() {
         .filter(Boolean)
         .join(',')
 
-      const params = new URLSearchParams({ date: from, dateFrom: from, dateTo: to })
+      const effectiveFrom = from || '2020-01-01'
+      const effectiveTo = to || today
+      const params = new URLSearchParams({ date: effectiveFrom, dateFrom: effectiveFrom, dateTo: effectiveTo })
       if (sellerCodeList) params.set('sellers', sellerCodeList)
 
       const res = await fetch(`/api/faturamento?${params}`, { cache: 'no-store' })
@@ -655,7 +657,11 @@ export default function PrevisaoDeEstoque() {
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-emerald-100">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                Pedidos em aberto — {formatDate(dateFrom)} a {formatDate(dateTo)}
+                {dateFrom && dateTo
+                  ? `Pedidos em aberto — ${formatDate(dateFrom)} a ${formatDate(dateTo)}`
+                  : dateTo
+                    ? `Pedidos em aberto — até ${formatDate(dateTo)}`
+                    : 'Pedidos em aberto — período não definido'}
               </span>
               {lastFetched && (
                 <span className="text-xs text-emerald-200/50">atualizado às {lastFetched}</span>
