@@ -817,7 +817,6 @@ export default function PrevisaoDeEstoque() {
                               : 'border-rose-300/80 bg-linear-to-b from-rose-50 to-rose-100/70 text-rose-800'
                           )}
                         >
-                          {hasStock ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
                           {hasStock ? (
                             <span className="tracking-[0.01em]">SUFICIENTE</span>
                           ) : (
