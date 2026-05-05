@@ -524,7 +524,7 @@ export default function PrevisaoDeEstoque() {
   const [lastFetched, setLastFetched] = useState<string | null>(null)
   const [modalType, setModalType] = useState<OrderType | null>(null)
 
-  type SortKey = 'productCode' | 'productName' | 'quantity' | 'stock' | 'status'
+  type SortKey = 'productCode' | 'productName' | 'quantity' | 'weightKg' | 'stock' | 'status'
   const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' })
 
   function handleSort(key: SortKey) {
@@ -668,6 +668,9 @@ export default function PrevisaoDeEstoque() {
           break
         case 'quantity':
           cmp = a.quantity - b.quantity
+          break
+        case 'weightKg':
+          cmp = a.weightKg - b.weightKg
           break
         case 'stock': {
           const stockA = stockMap.get(a.productCode) ?? 0
@@ -848,24 +851,28 @@ export default function PrevisaoDeEstoque() {
                   </th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">
                     <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
-                      Descrição <SortIcon column="productName" />
+                      DESCRIÇÃO <SortIcon column="productName" />
                     </button>
                   </th>
                   <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-14">UN</th>
                   <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
                     <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
-                      Qtd <SortIcon column="quantity" />
+                      QTD <SortIcon column="quantity" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">Peso (kg)</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
+                    <button type="button" onClick={() => handleSort('weightKg')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                      PESO TOTAL <SortIcon column="weightKg" />
+                    </button>
+                  </th>
                   <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
                     <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
-                      Estoque <SortIcon column="stock" />
+                      ESTOQUE <SortIcon column="stock" />
                     </button>
                   </th>
                   <th className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
                     <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-emerald-700 transition-colors">
-                      Status <SortIcon column="status" />
+                      COBERTURA <SortIcon column="status" />
                     </button>
                   </th>
                 </tr>
@@ -914,25 +921,57 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Cidades Atendidas (bloco único, grid 4 colunas) ── */}
+      {/* ── Cidades Atendidas (grid 3 colunas, design profissional) ── */}
       {data && filteredOrders.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60">
-            <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-blue-600" />
+          <div className="px-6 py-4 border-b border-slate-100 bg-linear-to-r from-[#f6f8f7] to-white">
+            <h3 className="text-base font-bold text-[#0f2a1d] flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-[#14966f]" />
               Cidades Atendidas — {cityAggregates.length} cidade{cityAggregates.length !== 1 ? 's' : ''}
             </h3>
           </div>
           <div className="p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {cityAggregates.map((c) => (
-                <div key={c.city + c.uf} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/40 px-4 py-3 hover:bg-slate-50 transition-colors">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-700 leading-snug">{c.city}{c.uf ? ` - ${c.uf}` : ''}</p>
-                    <p className="text-xs text-slate-500">{c.orderCount} pedido{c.orderCount !== 1 ? 's' : ''}</p>
+                <div
+                  key={c.city + c.uf}
+                  className="group relative overflow-hidden rounded-xl border border-[#e8ece3] bg-linear-to-b from-white to-[#fafbf9] p-4 transition-all duration-300 hover:border-[#c6a277]/40 hover:shadow-md hover:-translate-y-0.5"
+                >
+                  {/* Subtle top accent */}
+                  <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-[#14966f]/60 via-[#c6a277]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#14966f]/8 text-[#14966f]">
+                        <MapPin className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[#0f2a1d] truncate leading-tight">{c.city}</p>
+                      </div>
+                    </div>
+                    {c.uf && (
+                      <span className="shrink-0 inline-flex items-center rounded-md bg-[#0f2a1d]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#4a5d45]">
+                        {c.uf}
+                      </span>
+                    )}
                   </div>
-                  <div className="shrink-0 text-right ml-2">
-                    <p className="text-sm font-bold text-slate-700">{fmtKg(c.weightKg)} <span className="text-xs font-medium text-slate-500">kg</span></p>
+
+                  {/* Divider */}
+                  <div className="my-3 h-px bg-[#e8ece3]" />
+
+                  {/* Stats */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-[#7ea07d]" />
+                      <span className="text-xs text-[#5a6d55]">
+                        <span className="font-bold text-[#0f2a1d]">{c.orderCount}</span> pedido{c.orderCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Truck className="h-3.5 w-3.5 text-[#7ea07d]" />
+                      <span className="text-xs font-bold text-[#0f2a1d]">{fmtKg(c.weightKg)} <span className="text-[10px] font-medium text-[#7ea07d]">kg</span></span>
+                    </div>
                   </div>
                 </div>
               ))}
