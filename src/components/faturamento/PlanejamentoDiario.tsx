@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils'
 import { useSellersAllowlist } from '@/lib/client/hooks/use-metas'
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Box,
   CalendarDays,
   CheckCircle2,
@@ -521,6 +524,25 @@ export default function PrevisaoDeEstoque() {
   const [lastFetched, setLastFetched] = useState<string | null>(null)
   const [modalType, setModalType] = useState<OrderType | null>(null)
 
+  type SortKey = 'productCode' | 'productName' | 'quantity' | 'stock' | 'status'
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' })
+
+  function handleSort(key: SortKey) {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      }
+      return { key, direction: 'asc' }
+    })
+  }
+
+  function SortIcon({ column }: { column: SortKey }) {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-1 h-3 w-3 text-slate-400 opacity-60" />
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp className="ml-1 h-3 w-3 text-emerald-600" />
+      : <ArrowDown className="ml-1 h-3 w-3 text-emerald-600" />
+  }
+
   const { data: allowlistData } = useSellersAllowlist()
   const sellers: AllowedSeller[] = useMemo(() => {
     const list = allowlistData?.sellers ?? []
@@ -628,8 +650,44 @@ export default function PrevisaoDeEstoque() {
         }
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.productName.localeCompare(b.productName))
+    return Array.from(map.values())
   }, [filteredOrders])
+
+  const sortedProductAggregates = useMemo(() => {
+    const arr = [...productAggregates]
+    if (!sortConfig.key) return arr.sort((a, b) => a.productName.localeCompare(b.productName))
+
+    arr.sort((a, b) => {
+      let cmp = 0
+      switch (sortConfig.key) {
+        case 'productCode':
+          cmp = a.productCode.localeCompare(b.productCode)
+          break
+        case 'productName':
+          cmp = a.productName.localeCompare(b.productName)
+          break
+        case 'quantity':
+          cmp = a.quantity - b.quantity
+          break
+        case 'stock': {
+          const stockA = stockMap.get(a.productCode) ?? 0
+          const stockB = stockMap.get(b.productCode) ?? 0
+          cmp = stockA - stockB
+          break
+        }
+        case 'status': {
+          const stockA = stockMap.get(a.productCode) ?? 0
+          const stockB = stockMap.get(b.productCode) ?? 0
+          const diffA = stockA - a.quantity
+          const diffB = stockB - b.quantity
+          cmp = diffA - diffB
+          break
+        }
+      }
+      return sortConfig.direction === 'asc' ? cmp : -cmp
+    })
+    return arr
+  }, [productAggregates, sortConfig, stockMap])
 
   const cityAggregates = useMemo(() => {
     const map = new Map<string, { city: string; uf: string; orderCount: number; weightKg: number }>()
@@ -783,17 +841,37 @@ export default function PrevisaoDeEstoque() {
             <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-slate-100/80">
                 <tr className="[&_th]:whitespace-nowrap">
-                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-20">SKU</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">Descrição</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-20">
+                    <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
+                      SKU <SortIcon column="productCode" />
+                    </button>
+                  </th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                    <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
+                      Descrição <SortIcon column="productName" />
+                    </button>
+                  </th>
                   <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-14">UN</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">Qtd</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
+                    <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                      Qtd <SortIcon column="quantity" />
+                    </button>
+                  </th>
                   <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">Peso (kg)</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">Estoque</th>
-                  <th className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">Status</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
+                    <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                      Estoque <SortIcon column="stock" />
+                    </button>
+                  </th>
+                  <th className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
+                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                      Status <SortIcon column="status" />
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {productAggregates.map((p, index) => {
+                {sortedProductAggregates.map((p, index) => {
                   const stock = stockMap.get(p.productCode) ?? 0
                   const diff = stock - p.quantity
                   const hasStock = diff >= 0
