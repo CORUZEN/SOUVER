@@ -1145,6 +1145,17 @@ export default function PrevisaoDeEstoque() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Consultar geral */}
+            <button
+              type="button"
+              onClick={() => fetchData(dateFrom, dateTo)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/80 border border-emerald-400/40 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 transition-colors shadow-sm"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loading ? 'Carregando…' : 'Consultar'}
+            </button>
+
             {/* Period config dropdown */}
             <div ref={periodRef} className="relative">
               <button
