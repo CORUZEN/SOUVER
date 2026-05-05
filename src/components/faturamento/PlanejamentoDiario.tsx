@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -25,9 +25,9 @@ import {
   X,
 } from 'lucide-react'
 
-/* ─────────────────────────────────────────────
+/* --------------------------------------------
    Types
-───────────────────────────────────────────── */
+-------------------------------------------- */
 
 interface AllowedSeller {
   code?: string | null
@@ -103,9 +103,9 @@ interface CityAggregate {
   weightKg: number
 }
 
-/* ─────────────────────────────────────────────
+/* --------------------------------------------
    Constants & Helpers
-───────────────────────────────────────────── */
+-------------------------------------------- */
 
 function todayIso(): string {
   const d = new Date()
@@ -123,6 +123,19 @@ function fmtKg(n: number): string {
 
 function fmtQty(n: number): string {
   return n % 1 === 0 ? n.toLocaleString('pt-BR') : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const el = document.createElement('textarea')
+    el.value = text
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+  }
 }
 
 const ORDER_TYPE_LABEL: Record<OrderType, string> = {
@@ -223,9 +236,9 @@ function getUfTone(uf?: string | null) {
   return CITY_TONE_FALLBACK[sum % CITY_TONE_FALLBACK.length]
 }
 
-/* ─────────────────────────────────────────────
+/* --------------------------------------------
    Sub-components
-───────────────────────────────────────────── */
+-------------------------------------------- */
 
 function StatBadge({ label, value, sub, icon, colorKey, onClick }: {
   label: string
@@ -306,9 +319,10 @@ function MultiSelect({
     <div ref={ref} className="relative min-w-[16rem] flex-1">
       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
       <div
-        className={`flex flex-wrap gap-1.5 items-center border rounded-xl px-3 py-2 bg-white cursor-text transition-all max-h-24 overflow-y-auto
+        className={`flex flex-wrap gap-1.5 items-center border rounded-xl px-3 py-2 bg-white cursor-text transition-all max-h-16 overflow-y-auto scrollbar-hide
           ${open ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
         onClick={() => setOpen(true)}
+        style={{ scrollbarWidth: 'none' }}
       >
         <span className="text-slate-400 shrink-0 self-start mt-0.5">{icon}</span>
         {selected.map((s) => (
@@ -325,7 +339,7 @@ function MultiSelect({
           onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           placeholder={selected.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-24 text-sm outline-none bg-transparent placeholder:text-slate-400"
+          className="flex-1 min-w-24 text-sm outline-none focus:ring-0 focus-visible:ring-0 bg-transparent placeholder:text-slate-400"
         />
         <button type="button" className="ml-auto shrink-0 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); setOpen((p) => !p); setSearch('') }}>
           <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -335,7 +349,7 @@ function MultiSelect({
       {open && (
         <div className="absolute z-50 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50">
-            <span className="text-xs text-slate-500 font-medium">{filtered.length} opção{filtered.length !== 1 ? 'ões' : ''}</span>
+            <span className="text-xs text-slate-500 font-medium">{filtered.length} {filtered.length === 1 ? 'opção' : 'opções'}</span>
             <div className="flex gap-2">
               <button type="button" onClick={() => { onChange([...options]); setOpen(false); setSearch('') }} className="text-xs text-blue-600 hover:underline font-medium">Todos</button>
               {selected.length > 0 && (
@@ -453,7 +467,7 @@ function OrderModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por número, cliente, vendedor ou cidade…"
+              placeholder="Buscar por número, cliente, vendedor ou cidade..."
               className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
             />
           </div>
@@ -488,7 +502,22 @@ function OrderModal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-800 truncate">
-                            Pedido {order.orderNumber}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderNumber) }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  copyToClipboard(order.orderNumber)
+                                }
+                              }}
+                              className="cursor-pointer rounded px-1 -mx-1 hover:bg-slate-100 hover:text-emerald-700 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                              title="Clique para copiar número do pedido"
+                            >
+                              Pedido {order.orderNumber}
+                            </span>
                             <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
                           </p>
                           <p className="text-xs text-slate-500 truncate">
@@ -572,9 +601,9 @@ function OrderModal({
   )
 }
 
-/* ─────────────────────────────────────────────
+/* --------------------------------------------
    Main component
-───────────────────────────────────────────── */
+-------------------------------------------- */
 
 function UnselectedCitiesModal({
   cities,
@@ -654,7 +683,7 @@ function UnselectedCitiesModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar cidade…"
+              placeholder="Buscar cidade..."
               className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
             />
           </div>
@@ -707,7 +736,22 @@ function UnselectedCitiesModal({
                                 >
                                   <div className="min-w-0">
                                     <p className="text-sm font-semibold text-slate-800">
-                                      Pedido {order.orderNumber}
+                                      <span
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderNumber) }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            copyToClipboard(order.orderNumber)
+                                          }
+                                        }}
+                                        className="cursor-pointer rounded px-1 -mx-1 hover:bg-slate-100 hover:text-emerald-700 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                                        title="Clique para copiar número do pedido"
+                                      >
+                                        Pedido {order.orderNumber}
+                                      </span>
                                       <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
                                     </p>
                                     <p className="text-xs text-slate-500 truncate">{order.clientName} · Neg. {formatDate(order.dtNeg)}</p>
@@ -842,7 +886,7 @@ export default function PrevisaoDeEstoque() {
       : []
   }, [allowlistData])
 
-  /* ── Fecha dropdown de período ao clicar fora ── */
+  /* -- Fecha dropdown de período ao clicar fora -- */
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (periodRef.current && !periodRef.current.contains(e.target as Node)) {
@@ -853,7 +897,7 @@ export default function PrevisaoDeEstoque() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  /* ── Carrega presets de vendedor-cidade ── */
+  /* -- Carrega presets de vendedor-cidade -- */
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -939,7 +983,7 @@ export default function PrevisaoDeEstoque() {
     return [...set].sort()
   }, [data, selectedSellers])
 
-  /* ── Limpa cidades selecionadas que não existem mais nas opções ── */
+  /* -- Limpa cidades selecionadas que não existem mais nas opções -- */
   useEffect(() => {
     if (!data) return
     const available = new Set(cityOptions)
@@ -949,7 +993,7 @@ export default function PrevisaoDeEstoque() {
     })
   }, [cityOptions, data])
 
-  /* ── Aplica presets automaticamente quando muda vendedor (após consulta) ── */
+  /* -- Aplica presets automaticamente quando muda vendedor (após consulta) -- */
   useEffect(() => {
     if (!data || selectedSellers.length !== 1) return
     const sellerName = selectedSellers[0]
@@ -1122,7 +1166,7 @@ export default function PrevisaoDeEstoque() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
 
-      {/* ── Header ── */}
+      {/* -- Header -- */}
       <div className="relative rounded-2xl border-0 bg-linear-to-br from-[#0f2e1f] via-[#1a3a2f] to-[#0f2e1f] shadow-xl px-6 py-5">
         <div className="absolute inset-x-3 top-0 h-0.5 bg-linear-to-r from-emerald-500 via-emerald-300 to-emerald-500" />
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1159,7 +1203,7 @@ export default function PrevisaoDeEstoque() {
             >
               <span className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
               {loading ? <Loader2 className="relative z-10 h-4 w-4 animate-spin" /> : <Search className="relative z-10 h-4 w-4" />}
-              <span className="relative z-10">{loading ? 'Carregando…' : 'Consultar'}</span>
+              <span className="relative z-10">{loading ? 'Carregando...' : 'Consultar'}</span>
             </button>
 
             {/* Period config dropdown */}
@@ -1222,13 +1266,13 @@ export default function PrevisaoDeEstoque() {
         </div>
       </div>
 
-      {/* ── Filters ── */}
+      {/* -- Filters -- */}
       {data && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <div className="flex flex-wrap items-start gap-4">
             <MultiSelect
               label="Vendedores"
-              placeholder="Selecione um ou mais vendedores…"
+              placeholder="Selecione um ou mais vendedores..."
               options={sellers.filter((s) => s.active !== false).map((s) => s.name).sort()}
               selected={selectedSellers}
               onChange={setSelectedSellers}
@@ -1236,7 +1280,7 @@ export default function PrevisaoDeEstoque() {
             />
             <MultiSelect
               label="Cidades"
-              placeholder="Filtrar por cidade…"
+              placeholder="Filtrar por cidade..."
               options={cityOptions}
               selected={selectedCities}
               onChange={setSelectedCities}
@@ -1280,7 +1324,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Empty State (antes de consultar) ── */}
+      {/* -- Empty State (antes de consultar) -- */}
       {!data && !loading && !error && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="relative mb-6">
@@ -1302,7 +1346,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Error ── */}
+      {/* -- Error -- */}
       {error && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4 text-red-700">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -1313,7 +1357,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Aviso: cidades não selecionadas ── */}
+      {/* -- Aviso: cidades não selecionadas -- */}
       {unselectedCitiesAlert && (
         <button
           type="button"
@@ -1335,7 +1379,7 @@ export default function PrevisaoDeEstoque() {
         </button>
       )}
 
-      {/* ── Stats ── */}
+      {/* -- Stats -- */}
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           <StatBadge label="Total de pedidos" value={totals.orders.toLocaleString('pt-BR')} sub={`${totals.clients} cliente${totals.clients !== 1 ? 's' : ''}`} icon={<ClipboardList className="w-5 h-5" />} colorKey="default" />
@@ -1346,7 +1390,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Produtos (bloco único, largura total) ── */}
+      {/* -- Produtos (bloco único, largura total) -- */}
       {data && filteredOrders.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col">
           <div className="border-b border-slate-200 bg-linear-to-r from-slate-50 to-white px-6 py-4">
@@ -1443,7 +1487,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Cidades Atendidas (grid 3 colunas, design profissional) ── */}
+      {/* -- Cidades Atendidas (grid 3 colunas, design profissional) -- */}
       {data && filteredOrders.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="px-6 py-4 border-b border-slate-100 bg-linear-to-r from-[#f6f8f7] to-white">
@@ -1509,7 +1553,7 @@ export default function PrevisaoDeEstoque() {
         </div>
       )}
 
-      {/* ── Order Modal ── */}
+      {/* -- Order Modal -- */}
       {modalType && data && (
         <OrderModal
           orders={groupedOrders[modalType]}
@@ -1535,7 +1579,7 @@ export default function PrevisaoDeEstoque() {
         />
       )}
 
-      {/* ── Empty ── */}
+      {/* -- Empty -- */}
       {!loading && !error && data && data.orders.length === 0 && (
         <div className="py-16 flex flex-col items-center text-center text-slate-400 gap-3">
           <Package className="w-12 h-12 opacity-20" />
@@ -1548,3 +1592,6 @@ export default function PrevisaoDeEstoque() {
     </div>
   )
 }
+
+
+
