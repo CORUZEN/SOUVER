@@ -15,7 +15,7 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 ## Melhorias consolidadas (inclui últimas rodadas)
 
 ### 1) Distribuição de itens (regra de negócio e UX)
-- Card reestruturado para leit![alt text](image.png)ura profissional, com melhor aproveitamento de espaço.
+- Card reestruturado para leitura profissional, com melhor aproveitamento de espaço.
 - Ajustes de texto e hierarquia visual em:
   - `Vendedores` (antes “Consolidado”).
   - `Cobertura da base`.
