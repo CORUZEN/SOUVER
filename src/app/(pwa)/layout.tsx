@@ -20,10 +20,13 @@ export const viewport: Viewport = {
   themeColor: '#3f783d',
 }
 
+import PwaUpdateToast from '@/components/pwa/PwaUpdateToast'
+
 export default function PwaLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="pwa-theme min-h-dvh bg-surface-950 text-white antialiased">
       {children}
+      <PwaUpdateToast />
     </div>
   )
 }
