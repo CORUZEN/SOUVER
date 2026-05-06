@@ -27,11 +27,17 @@ export interface PrevisaoPdfMetrics {
   naoConfirmados: { count: number; weightKg: number }
 }
 
+export interface PrevisaoPdfSellerCities {
+  sellerName: string
+  cities: string[]
+}
+
 export interface PrevisaoPdfData {
   periodLabel: string
   generatedBy?: string
   selectedSellers: string[]
   selectedCities: string[]
+  sellerCityMap: PrevisaoPdfSellerCities[]
   totals: { orders: number; clients: number; weight: number }
   metrics: PrevisaoPdfMetrics
   products: PrevisaoPdfProduct[]
@@ -104,30 +110,6 @@ export function generatePrevisaoPdfReport(options: {
 
   y = 36
 
-  // --- FILTROS APLICADOS ---
-  const hasSellerFilter = reportData.selectedSellers.length > 0
-  const hasCityFilter = reportData.selectedCities.length > 0
-  if (hasSellerFilter || hasCityFilter) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(textLight)
-
-    const sellerText = hasSellerFilter
-      ? `Vendedores: ${reportData.selectedSellers.join(', ')}`
-      : 'Vendedores: Todos'
-    const cityText = hasCityFilter
-      ? `Cidades: ${reportData.selectedCities.join(', ')}`
-      : 'Cidades: Todas'
-
-    const sellerLines = doc.splitTextToSize(sellerText, contentWidth)
-    const cityLines = doc.splitTextToSize(cityText, contentWidth)
-
-    doc.text(sellerLines, margin, y)
-    y += sellerLines.length * 4.5
-    doc.text(cityLines, margin, y)
-    y += cityLines.length * 4.5 + 4
-  }
-
   // --- RESUMO EXECUTIVO ---
   doc.setTextColor(primaryColor)
   doc.setFontSize(16)
@@ -144,7 +126,7 @@ export function generatePrevisaoPdfReport(options: {
     ['Total de Pedidos', String(reportData.totals.orders), 'Clientes Únicos', String(reportData.totals.clients)],
     ['Vendas', `${reportData.metrics.vendas.count} · ${fmtKg(reportData.metrics.vendas.weightKg)} kg`, 'Bonificações', `${reportData.metrics.bonificacoes.count} · ${fmtKg(reportData.metrics.bonificacoes.weightKg)} kg`],
     ['Trocas', `${reportData.metrics.trocas.count} · ${fmtKg(reportData.metrics.trocas.weightKg)} kg`, 'Não Confirmados', `${reportData.metrics.naoConfirmados.count} · ${fmtKg(reportData.metrics.naoConfirmados.weightKg)} kg`],
-    ['Peso Total', `${fmtKg(reportData.totals.weight)} kg`, '', ''],
+    ['Peso Total', `${fmtKg(reportData.totals.weight)} kg`, 'Cidades Atendidas', `${reportData.cities.length}`],
   ]
 
   autoTable(doc, {
@@ -170,7 +152,8 @@ export function generatePrevisaoPdfReport(options: {
           if (rIdx === 0) data.cell.styles.textColor = '#065f46'
           else if (rIdx === 1) data.cell.styles.textColor = '#0369a1'
           else if (rIdx === 2) data.cell.styles.textColor = '#b45309'
-          else if (rIdx === 3) data.cell.styles.textColor = primaryColor
+          else if (rIdx === 3 && cIdx === 1) data.cell.styles.textColor = primaryColor
+          else if (rIdx === 3 && cIdx === 3) data.cell.styles.textColor = '#065f46'
         }
       }
     },
@@ -285,6 +268,64 @@ export function generatePrevisaoPdfReport(options: {
         if (cellData.section === 'head') {
           const headAligns: Array<'left' | 'center' | 'right'> = ['left', 'center', 'center', 'right']
           cellData.cell.styles.halign = headAligns[cellData.column.index] || 'left'
+        }
+      },
+    })
+
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+  }
+
+  // --- FILTROS APLICADOS ---
+  const hasSellerFilter = reportData.selectedSellers.length > 0
+  const hasCityFilter = reportData.selectedCities.length > 0
+  const hasFilters = hasSellerFilter || hasCityFilter
+  const sellerCityMap = reportData.sellerCityMap
+
+  if (hasFilters && sellerCityMap.length > 0) {
+    doc.setFontSize(10)
+    doc.setTextColor(textDark)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Filtros Aplicados', margin, y)
+    y += 4
+
+    doc.setDrawColor(accentColor)
+    doc.setLineWidth(0.4)
+    doc.line(margin, y, margin + contentWidth, y)
+    y += 6
+
+    const filterRows = sellerCityMap.map((sc) => [
+      sc.sellerName,
+      sc.cities.join(', '),
+    ])
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      tableWidth: contentWidth,
+      head: [['Vendedor', 'Cidades Atendidas']],
+      body: filterRows,
+      theme: 'striped',
+      headStyles: { fillColor: '#e8f5f0', textColor: primaryColor, fontStyle: 'bold', fontSize: 8.5 },
+      styles: { fontSize: 8.5, cellPadding: 2.2, font: 'helvetica' },
+      columnStyles: {
+        0: { cellWidth: 55, halign: 'left' },
+        1: { cellWidth: 'auto', halign: 'left' },
+      },
+      bodyStyles: { textColor: textDark },
+      alternateRowStyles: { fillColor: '#f8faf9' },
+      didParseCell: (cellData) => {
+        if (cellData.section === 'head') {
+          const headAligns: Array<'left' | 'center' | 'right'> = ['left', 'left']
+          cellData.cell.styles.halign = headAligns[cellData.column.index] || 'left'
+        }
+        if (cellData.section === 'body') {
+          if (cellData.column.index === 0) {
+            cellData.cell.styles.fontStyle = 'bold'
+            cellData.cell.styles.textColor = primaryColor
+          }
+          if (cellData.column.index === 1) {
+            cellData.cell.styles.fontStyle = 'bold'
+          }
         }
       },
     })

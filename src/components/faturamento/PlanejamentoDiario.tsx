@@ -1445,6 +1445,22 @@ export default function PrevisaoDeEstoque() {
         weightKg: c.weightKg,
       }))
 
+      // Mapeia cidades por vendedor para a seção de filtros do PDF
+      const sellerCityMap = Array.from(
+        filteredOrders.reduce((map, order) => {
+          const cityLabel = order.uf ? `${order.city} - ${order.uf}` : order.city
+          const set = map.get(order.sellerName) ?? new Set<string>()
+          set.add(cityLabel)
+          map.set(order.sellerName, set)
+          return map
+        }, new Map<string, Set<string>>())
+      )
+        .map(([sellerName, citySet]) => ({
+          sellerName,
+          cities: [...citySet].sort(),
+        }))
+        .sort((a, b) => a.sellerName.localeCompare(b.sellerName))
+
       const metrics = {
         vendas: {
           count: groupedOrders.VENDA.length,
@@ -1470,6 +1486,7 @@ export default function PrevisaoDeEstoque() {
           generatedBy: authData?.user?.name || undefined,
           selectedSellers,
           selectedCities,
+          sellerCityMap,
           totals,
           metrics,
           products,
