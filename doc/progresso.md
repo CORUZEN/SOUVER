@@ -118,7 +118,12 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 - **Correção**: `src/app/api/metas/sellers-performance/route.ts` agora recebe `endDateExclusive` e filtra `TGFPAR.DTCAD < TO_DATE(...)` nas 4 variantes de query. Isso garante que o denominador reflita apenas clientes cadastrados até o final do período selecionado.
 - Afeta tanto o **Dashboard Web** quanto o **PWA**, pois ambos consomem a mesma API.
 
-### 15) Bump de versão do PWA para invalidação de cache
+### 15) Indicador de novos clientes no card de cobertura
+- **Melhoria**: a descrição do card "Clientes únicos atendidos" agora mostra quantos clientes foram **novos no mês selecionado** (ex: "15 clientes novos cadastrados em Março de 2026").
+- **Cálculo**: simples subtração entre `totalBaseClients` do período atual e do período anterior (`previousPeriodScopedTotals`), usando dados que o Dashboard Web já carrega.
+- Quando não há período anterior ou não há novos clientes, mantém a descrição padrão de cobertura.
+
+### 16) Bump de versão do PWA para invalidação de cache
 - Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
 - Isso força o service worker a reinstalar e limpar caches antigos nos dispositivos dos usuários no próximo acesso.
 

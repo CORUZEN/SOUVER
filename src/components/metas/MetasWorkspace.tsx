@@ -10463,7 +10463,17 @@ export default function MetasWorkspace() {
                             </p>
                             {clientePct > 0 && <span className={`text-[12px] font-semibold tabular-nums tracking-tight ${pctToneClass(clientePct)}`}>{num(clientePct, 1)}%</span>}
                           </div>
-                          <p className="mt-1.5 text-[10px] text-surface-500">Cobertura de clientes no período selecionado.</p>
+                          <p className="mt-1.5 text-[10px] text-surface-500">
+                            {(() => {
+                              const prevBase = previousPeriodScopedTotals?.totalBaseClients ?? 0
+                              const currBase = kpiGeneralScopedSummary.totalBaseClients
+                              const newClients = Math.max(currBase - prevBase, 0)
+                              if (newClients > 0 && prevBase > 0) {
+                                return `${num(newClients, 0)} cliente${newClients === 1 ? '' : 's'} novo${newClients === 1 ? '' : 's'} cadastrado${newClients === 1 ? '' : 's'} em ${MONTHS[month]} de ${year}.`
+                              }
+                              return 'Cobertura de clientes no período selecionado.'
+                            })()}
+                          </p>
                         </div>
                         <div className="order-3 relative overflow-hidden rounded-xl border border-surface-200 bg-white px-4 py-3.5 shadow-sm">
                           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary-500" />
