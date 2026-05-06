@@ -39,6 +39,7 @@ export type DailyOrder = {
   pendente: string
   statusNota: string
   eventosLiberacao: string
+  ordemCarga: string
   items: OrderItem[]
 }
 
@@ -369,7 +370,8 @@ SELECT
    FROM VSILIB V
    WHERE V.NUNOTA = CAB.NUNOTA
      AND V.REPROVADO = 'N'
-     AND (V.VLRLIBERADO IS NULL OR V.VLRLIBERADO = 0)) AS EVENTOS_LIBERACAO
+     AND (V.VLRLIBERADO IS NULL OR V.VLRLIBERADO = 0)) AS EVENTOS_LIBERACAO,
+  TO_CHAR(CAB.ORDEMCARGA)                    AS ORDEMCARGA
 FROM TGFCAB CAB
 INNER JOIN TGFITE I   ON I.NUNOTA   = CAB.NUNOTA
 INNER JOIN TGFPRO P   ON P.CODPROD  = I.CODPROD
@@ -390,7 +392,7 @@ WHERE CAB.CODVEND > 0
 GROUP BY CAB.NUNOTA, CAB.CODVEND, VEN.APELIDO, CAB.CODPARC, PAR.NOMEPARC,
          CID.NOMECID, UF.UF, CAB.CODTIPOPER, CAB.TIPMOV, CAB.DTNEG,
          I.CODPROD, P.DESCRPROD, P.MARCA, P.CODVOL, P.MEDAUX, TOP.BONIFICACAO,
-         CAB.APROVADO, CAB.PENDENTE, CAB.STATUSNOTA
+         CAB.APROVADO, CAB.PENDENTE, CAB.STATUSNOTA, CAB.ORDEMCARGA
 ORDER BY CAB.DTNEG DESC, VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
 `.trim()
 }
@@ -430,6 +432,7 @@ type RawItemRow = {
   pendente: string
   statusNota: string
   eventosLiberacao: string
+  ordemCarga: string
   productCode: string
   productName: string
   group: string
@@ -475,6 +478,7 @@ function parseItemRow(r: RawRecord): RawItemRow {
     pendente: String(r.PENDENTE ?? '').trim(),
     statusNota: String(r.STATUSNOTA ?? '').trim(),
     eventosLiberacao: String(r.EVENTOS_LIBERACAO ?? '').trim(),
+    ordemCarga: String(r.ORDEMCARGA ?? '').trim(),
     productCode: String(r.CODPROD ?? '').trim(),
     productName: String(r.PRODUTO ?? r.DESCRPROD ?? '').trim(),
     group: String(r.GRUPO ?? r.MARCA ?? '').trim(),
@@ -567,6 +571,7 @@ export async function GET(request: NextRequest) {
           sellerName: row.sellerName,
           partnerCode: row.partnerCode,
           eventosLiberacao: row.eventosLiberacao,
+          ordemCarga: row.ordemCarga,
           clientName: row.clientName,
           city: row.city,
           uf: row.uf,

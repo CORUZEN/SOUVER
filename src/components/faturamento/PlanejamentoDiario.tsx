@@ -49,7 +49,7 @@ interface OrderItem {
   weightKg: number
 }
 
-type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'NAO_CONFIRMADO' | 'OUTROS'
+type OrderType = 'VENDA' | 'BONIFICACAO' | 'TROCA' | 'NAO_CONFIRMADO' | 'EM_CARGA' | 'OUTROS'
 
 /* Mapeamento de eventos de liberação para badges */
 function resolveLiberacaoBadges(eventosLiberacao: string): { label: string; cor: string }[] {
@@ -91,6 +91,7 @@ interface OpenOrder {
   pendente: string
   statusNota: string
   eventosLiberacao: string
+  ordemCarga: string
   items: OrderItem[]
 }
 
@@ -171,6 +172,7 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
   BONIFICACAO: 'Bonificação',
   TROCA: 'Troca',
   NAO_CONFIRMADO: 'Não Confirmados',
+  EM_CARGA: 'Em Carga',
   OUTROS: 'Outros',
 }
 
@@ -209,6 +211,13 @@ const ORDER_TYPE_COLOR: Record<OrderType, { bg: string; border: string; text: st
     text: 'text-slate-700',
     badge: 'bg-slate-100 text-slate-700',
     icon: 'text-slate-600',
+  },
+  EM_CARGA: {
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
+    text: 'text-violet-700',
+    badge: 'bg-violet-100 text-violet-700',
+    icon: 'text-violet-600',
   },
 }
 
@@ -743,6 +752,25 @@ function OrderModal({
                             >
                               Pedido {order.orderNumber}
                             </span>
+                            {order.ordemCarga && (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(order.ordemCarga) }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    copyToClipboard(order.ordemCarga)
+                                  }
+                                }}
+                                className="ml-2 inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200 cursor-pointer hover:bg-violet-100 transition-colors select-none"
+                                title="Clique para copiar número da carga"
+                              >
+                                <Truck className="w-3 h-3" />
+                                Carga {order.ordemCarga}
+                              </span>
+                            )}
                             <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
                           </p>
                           <p className="text-xs text-slate-500 truncate">
@@ -982,6 +1010,25 @@ function UnselectedCitiesModal({
                                       >
                                         Pedido {order.orderNumber}
                                       </span>
+                                      {order.ordemCarga && (
+                                        <span
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={(e) => { e.stopPropagation(); copyToClipboard(order.ordemCarga) }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault()
+                                              e.stopPropagation()
+                                              copyToClipboard(order.ordemCarga)
+                                            }
+                                          }}
+                                          className="ml-2 inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200 cursor-pointer hover:bg-violet-100 transition-colors select-none"
+                                          title="Clique para copiar número da carga"
+                                        >
+                                          <Truck className="w-3 h-3" />
+                                          Carga {order.ordemCarga}
+                                        </span>
+                                      )}
                                       <span className="ml-2 text-[11px] font-medium text-slate-400">{order.sellerName}</span>
                                     </p>
                                     <p className="text-xs text-slate-500 truncate">{order.clientName} · Neg. {formatDate(order.dtNeg)}</p>
@@ -1085,6 +1132,7 @@ export default function PrevisaoDeEstoque() {
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const periodRef = useRef<HTMLDivElement>(null)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [showInCarga, setShowInCarga] = useState(false)
 
   type SellerCityPreset = { id: string; sellerName: string; cityKey: string }
   const [sellerPresets, setSellerPresets] = useState<SellerCityPreset[]>([])
@@ -1211,9 +1259,12 @@ export default function PrevisaoDeEstoque() {
     if (selectedSellers.length > 0) {
       orders = orders.filter((o) => selectedSellers.includes(o.sellerName))
     }
+    if (!showInCarga) {
+      orders = orders.filter((o) => !o.ordemCarga)
+    }
     const set = new Set(orders.map((o) => o.uf ? `${o.city} - ${o.uf}` : o.city))
     return [...set].sort()
-  }, [data, selectedSellers])
+  }, [data, selectedSellers, showInCarga])
 
   /* -- Limpa cidades selecionadas que não existem mais nas opções -- */
   useEffect(() => {
@@ -1251,12 +1302,20 @@ export default function PrevisaoDeEstoque() {
     if (selectedCities.length > 0) {
       orders = orders.filter((o) => selectedCities.includes(o.uf ? `${o.city} - ${o.uf}` : o.city))
     }
+    if (!showInCarga) {
+      orders = orders.filter((o) => !o.ordemCarga)
+    }
     return orders
-  }, [data, selectedSellers, selectedCities])
+  }, [data, selectedSellers, selectedCities, showInCarga])
 
   const groupedOrders = useMemo(() => {
-    const groups = { VENDA: [] as OpenOrder[], BONIFICACAO: [] as OpenOrder[], TROCA: [] as OpenOrder[], NAO_CONFIRMADO: [] as OpenOrder[], OUTROS: [] as OpenOrder[] }
+    const groups = { VENDA: [] as OpenOrder[], BONIFICACAO: [] as OpenOrder[], TROCA: [] as OpenOrder[], NAO_CONFIRMADO: [] as OpenOrder[], EM_CARGA: [] as OpenOrder[], OUTROS: [] as OpenOrder[] }
     for (const order of filteredOrders) {
+      // Pedidos em ordem de carga vão para categoria separada
+      if (order.ordemCarga) {
+        groups.EM_CARGA.push(order)
+        continue
+      }
       // Pedidos pendentes mas não confirmados (não liberados) vão para atenção especial
       if (order.pendente === 'S' && order.statusNota !== 'L') {
         groups.NAO_CONFIRMADO.push(order)
@@ -1478,6 +1537,10 @@ export default function PrevisaoDeEstoque() {
           count: groupedOrders.NAO_CONFIRMADO.length,
           weightKg: groupedOrders.NAO_CONFIRMADO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
         },
+        emCarga: {
+          count: groupedOrders.EM_CARGA.length,
+          weightKg: groupedOrders.EM_CARGA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+        },
       }
 
       const doc = generatePrevisaoPdfReport({
@@ -1528,6 +1591,35 @@ export default function PrevisaoDeEstoque() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Mostrar em carga */}
+            {data && (
+              <button
+                type="button"
+                onClick={() => setShowInCarga((v) => !v)}
+                className={cn(
+                  'group inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-sm transition-all active:scale-95 select-none',
+                  showInCarga
+                    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-50 shadow-lg shadow-emerald-900/20'
+                    : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10 hover:border-white/30 hover:text-white/80'
+                )}
+              >
+                <span
+                  className={cn(
+                    'relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full transition-colors duration-200',
+                    showInCarga ? 'bg-emerald-400' : 'bg-white/20'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-[2px] left-[2px] inline-block h-[14px] w-[14px] rounded-full bg-white shadow-md transition-transform duration-200',
+                      showInCarga ? 'translate-x-[14px]' : 'translate-x-0'
+                    )}
+                  />
+                </span>
+                <span>Mostrar em carga</span>
+              </button>
+            )}
+
             {/* Consultar geral */}
             <button
               type="button"
@@ -1759,12 +1851,16 @@ export default function PrevisaoDeEstoque() {
 
       {/* -- Stats -- */}
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className={cn('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3', showInCarga ? 'xl:grid-cols-6' : 'xl:grid-cols-5')}
+        >
           <StatBadge label="Total de pedidos" value={totals.orders.toLocaleString('pt-BR')} sub={`${totals.clients} cliente${totals.clients !== 1 ? 's' : ''}`} icon={<ClipboardList className="w-5 h-5" />} colorKey="default" />
           <StatBadge label="Vendas" value={groupedOrders.VENDA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.VENDA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<ShoppingCart className="w-5 h-5" />} colorKey="VENDA" onClick={() => setModalType('VENDA')} />
           <StatBadge label="Bonificações" value={groupedOrders.BONIFICACAO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.BONIFICACAO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Box className="w-5 h-5" />} colorKey="BONIFICACAO" onClick={() => setModalType('BONIFICACAO')} />
           <StatBadge label="Trocas" value={groupedOrders.TROCA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.TROCA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Truck className="w-5 h-5" />} colorKey="TROCA" onClick={() => setModalType('TROCA')} />
           <StatBadge label="Não Confirmados" value={groupedOrders.NAO_CONFIRMADO.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.NAO_CONFIRMADO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<AlertTriangle className="w-5 h-5" />} colorKey="NAO_CONFIRMADO" onClick={() => setModalType('NAO_CONFIRMADO')} />
+          {showInCarga && (
+            <StatBadge label="Em Carga" value={groupedOrders.EM_CARGA.length.toLocaleString('pt-BR')} sub={`${fmtKg(groupedOrders.EM_CARGA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0))} kg`} icon={<Package className="w-5 h-5" />} colorKey="EM_CARGA" onClick={() => setModalType('EM_CARGA')} />
+          )}
         </div>
       )}
 
@@ -1935,7 +2031,7 @@ export default function PrevisaoDeEstoque() {
       {modalType && data && (
         <OrderModal
           orders={groupedOrders[modalType]}
-          title={modalType === 'VENDA' ? 'Pedidos de Venda' : modalType === 'BONIFICACAO' ? 'Pedidos de Bonificação' : modalType === 'TROCA' ? 'Pedidos de Troca' : modalType === 'NAO_CONFIRMADO' ? 'Pedidos Não Confirmados' : 'Outros Pedidos'}
+          title={modalType === 'VENDA' ? 'Pedidos de Venda' : modalType === 'BONIFICACAO' ? 'Pedidos de Bonificação' : modalType === 'TROCA' ? 'Pedidos de Troca' : modalType === 'NAO_CONFIRMADO' ? 'Pedidos Não Confirmados' : modalType === 'EM_CARGA' ? 'Pedidos em Carga' : 'Outros Pedidos'}
           type={modalType}
           onClose={() => setModalType(null)}
         />

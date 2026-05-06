@@ -25,6 +25,7 @@ export interface PrevisaoPdfMetrics {
   bonificacoes: { count: number; weightKg: number }
   trocas: { count: number; weightKg: number }
   naoConfirmados: { count: number; weightKg: number }
+  emCarga: { count: number; weightKg: number }
 }
 
 export interface PrevisaoPdfSellerCities {
@@ -126,7 +127,8 @@ export function generatePrevisaoPdfReport(options: {
     ['Total de Pedidos', String(reportData.totals.orders), 'Clientes Únicos', String(reportData.totals.clients)],
     ['Vendas', `${reportData.metrics.vendas.count} · ${fmtKg(reportData.metrics.vendas.weightKg)} kg`, 'Bonificações', `${reportData.metrics.bonificacoes.count} · ${fmtKg(reportData.metrics.bonificacoes.weightKg)} kg`],
     ['Trocas', `${reportData.metrics.trocas.count} · ${fmtKg(reportData.metrics.trocas.weightKg)} kg`, 'Não Confirmados', `${reportData.metrics.naoConfirmados.count} · ${fmtKg(reportData.metrics.naoConfirmados.weightKg)} kg`],
-    ['Peso Total', `${fmtKg(reportData.totals.weight)} kg`, 'Cidades Atendidas', `${reportData.cities.length}`],
+    ['Em Carga', `${reportData.metrics.emCarga.count} · ${fmtKg(reportData.metrics.emCarga.weightKg)} kg`, 'Peso Total', `${fmtKg(reportData.totals.weight)} kg`],
+    ['Cidades Atendidas', `${reportData.cities.length}`, '', ''],
   ]
 
   autoTable(doc, {
@@ -152,8 +154,9 @@ export function generatePrevisaoPdfReport(options: {
           if (rIdx === 0) data.cell.styles.textColor = '#065f46'
           else if (rIdx === 1) data.cell.styles.textColor = '#0369a1'
           else if (rIdx === 2) data.cell.styles.textColor = '#b45309'
-          else if (rIdx === 3 && cIdx === 1) data.cell.styles.textColor = primaryColor
-          else if (rIdx === 3 && cIdx === 3) data.cell.styles.textColor = '#065f46'
+          else if (rIdx === 3 && cIdx === 1) data.cell.styles.textColor = '#7c3aed'
+          else if (rIdx === 3 && cIdx === 3) data.cell.styles.textColor = primaryColor
+          else if (rIdx === 4 && cIdx === 1) data.cell.styles.textColor = '#065f46'
         }
       }
     },
