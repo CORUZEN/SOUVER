@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useSellersAllowlist } from '@/lib/client/hooks/use-metas'
+import { useAuth } from '@/lib/client/hooks/use-auth'
+import { generatePrevisaoPdfReport, downloadPrevisaoPdf } from '@/lib/faturamento/previsao-pdf-report'
 import {
   AlertTriangle,
   ArrowDown,
@@ -14,6 +16,7 @@ import {
   ChevronDown,
   ClipboardList,
   CircleAlert,
+  FileDown,
   Filter,
   Loader2,
   MapPin,
@@ -1081,6 +1084,7 @@ export default function PrevisaoDeEstoque() {
   const [showUnselectedCitiesModal, setShowUnselectedCitiesModal] = useState(false)
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const periodRef = useRef<HTMLDivElement>(null)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   type SellerCityPreset = { id: string; sellerName: string; cityKey: string }
   const [sellerPresets, setSellerPresets] = useState<SellerCityPreset[]>([])
@@ -1106,6 +1110,7 @@ export default function PrevisaoDeEstoque() {
   }
 
   const { data: allowlistData } = useSellersAllowlist()
+  const { data: authData } = useAuth()
   const sellers: AllowedSeller[] = useMemo(() => {
     const list = allowlistData?.sellers ?? []
     return Array.isArray(list)
@@ -1390,6 +1395,96 @@ export default function PrevisaoDeEstoque() {
     return { unselected, totalOrders, totalWeight }
   }, [data, selectedCities, cityOptions, cityOrdersByKey])
 
+  const handleExportPdf = useCallback(async () => {
+    if (!data) return
+    setExportingPdf(true)
+    try {
+      let logoBase64: string | undefined
+      try {
+        const logoRes = await fetch('/branding/ouroverde-pdf.png')
+        if (logoRes.ok) {
+          const blob = await logoRes.blob()
+          logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+        }
+      } catch {
+        // silencioso
+      }
+
+      const periodLabel = dateFrom && dateTo
+        ? `${formatDate(dateFrom)} a ${formatDate(dateTo)}`
+        : dateTo
+          ? `até ${formatDate(dateTo)}`
+          : new Date().toLocaleDateString('pt-BR')
+
+      const products = sortedProductAggregates.map((p) => {
+        const stock = stockMap.get(p.productCode) ?? 0
+        const diff = stock - p.quantity
+        const hasStock = diff >= 0
+        const missingKg = Math.abs(diff) * (p.quantity > 0 ? p.weightKg / p.quantity : 0)
+        return {
+          productCode: p.productCode,
+          productName: p.productName,
+          unit: p.unit,
+          quantity: p.quantity,
+          weightKg: p.weightKg,
+          stock,
+          hasStock,
+          diff,
+          missingKg,
+        }
+      })
+
+      const cities = cityAggregates.map((c) => ({
+        city: c.city,
+        uf: c.uf,
+        orderCount: c.orderCount,
+        weightKg: c.weightKg,
+      }))
+
+      const metrics = {
+        vendas: {
+          count: groupedOrders.VENDA.length,
+          weightKg: groupedOrders.VENDA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+        },
+        bonificacoes: {
+          count: groupedOrders.BONIFICACAO.length,
+          weightKg: groupedOrders.BONIFICACAO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+        },
+        trocas: {
+          count: groupedOrders.TROCA.length,
+          weightKg: groupedOrders.TROCA.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+        },
+        naoConfirmados: {
+          count: groupedOrders.NAO_CONFIRMADO.length,
+          weightKg: groupedOrders.NAO_CONFIRMADO.reduce((a, o) => a + o.items.reduce((s, i) => s + i.weightKg, 0), 0),
+        },
+      }
+
+      const doc = generatePrevisaoPdfReport({
+        data: {
+          periodLabel,
+          generatedBy: authData?.user?.name || undefined,
+          selectedSellers,
+          selectedCities,
+          totals,
+          metrics,
+          products,
+          cities,
+        },
+        logoBase64,
+      })
+
+      const safePeriod = periodLabel.replace(/\//g, '-').replace(/\s+/g, '_')
+      downloadPrevisaoPdf(doc, `Relatorio_Previsao_Pedidos_${safePeriod}.pdf`)
+    } finally {
+      setExportingPdf(false)
+    }
+  }, [data, dateFrom, dateTo, selectedSellers, selectedCities, sortedProductAggregates, stockMap, cityAggregates, groupedOrders, totals, authData])
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 [&_button:not(:disabled)]:cursor-pointer">
 
@@ -1432,6 +1527,25 @@ export default function PrevisaoDeEstoque() {
               {loading ? <Loader2 className="relative z-10 h-4 w-4 animate-spin" /> : <Search className="relative z-10 h-4 w-4" />}
               <span className="relative z-10">{loading ? 'Carregando...' : 'Consultar'}</span>
             </button>
+
+            {/* Exportar PDF */}
+            {data && (
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                className={cn(
+                  'group relative inline-flex items-center gap-2 overflow-hidden rounded-xl border px-4 py-2.5 text-xs font-bold backdrop-blur-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100',
+                  exportingPdf
+                    ? 'border-emerald-300/60 bg-linear-to-r from-emerald-400/25 via-emerald-300/15 to-emerald-500/10 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-emerald-300/40'
+                    : 'border-white/30 bg-linear-to-r from-white/20 via-white/15 to-emerald-400/10 text-white shadow-lg shadow-black/10 hover:scale-[1.02] hover:border-white/50 hover:from-white/30 hover:via-white/20 hover:to-emerald-400/20 hover:shadow-xl hover:shadow-emerald-900/20'
+                )}
+              >
+                <span className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                {exportingPdf ? <Loader2 className="relative z-10 h-4 w-4 animate-spin" /> : <FileDown className="relative z-10 h-4 w-4" />}
+                <span className="relative z-10">{exportingPdf ? 'Gerando...' : 'Exportar Relatório'}</span>
+              </button>
+            )}
 
             {/* Period config dropdown */}
             <div ref={periodRef} className="relative">
