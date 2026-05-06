@@ -1,6 +1,6 @@
 ﻿# Módulo de Metas e PWA — Progresso Técnico
 
-> Última atualização: 23/04/2026  
+> Última atualização: 06/05/2026  
 > Front principal: `src/components/metas/MetasWorkspace.tsx` e `src/app/(pwa)/app/supervisor/page.tsx`  
 > APIs núcleo: `src/app/api/metas/sellers-performance/*` e `src/app/api/pwa/summary/route.ts`
 
@@ -103,6 +103,19 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 - Remoção/organização de elementos que cortavam texto e números em telas compactas.
 - Revisões de nomenclatura e microcopy em múltiplos pontos para padrão corporativo.
 
+### 13) Alinhamento de weight targets entre PWA e Dashboard Web
+- **Problema**: volume do vendedor Erivaldo Ferreira aparecia `0%` no PWA, mas corretamente no dashboard web.
+- **Causa raiz**: o script `fix-erivaldo-meta.ts` zerou os `weightTargets` no banco local Prisma; o Dashboard Web faz fallback para os targets do Sankhya (`sankhya-targets`), mas o PWA usava apenas os dados locais.
+- **Correção**: `src/app/api/pwa/summary/route.ts` agora também busca os `weightTargets` do Sankhya e aplica a mesma hierarquia de fallback do Dashboard Web:
+  1. Sankhya live data por marca (`targetKg`);
+  2. `manualKgByPeriod` (quando Sankhya conectado mas sem dado para o período);
+  3. Legacy `targetKg` do bloco local.
+- Isso elimina divergências permanentes entre PWA e Dashboard para qualquer vendedor cujos targets locais tenham sido alterados/zerados.
+
+### 14) Bump de versão do PWA para invalidação de cache
+- Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
+- Isso força o service worker a reinstalar e limpar caches antigos nos dispositivos dos usuários no próximo acesso.
+
 ---
 
 ## Correções técnicas críticas tratadas
@@ -149,6 +162,7 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 - mensagens de erro de conectividade;
 - dedup/cache/concurrency em rotas críticas.
 3. Evoluir playbook operacional de incidentes 502 (thresholds e ações recomendadas).
+4. Considerar reavaliação do script `fix-erivaldo-meta.ts`: se o objetivo era apenas zerar a meta financeira, o script não deveria zerar `weightTargets` (ou deveria sincronizar com Sankhya em seguida).
 
 ---
 

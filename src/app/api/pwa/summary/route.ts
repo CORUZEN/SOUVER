@@ -62,7 +62,9 @@ export async function GET(req: NextRequest) {
   const monthConfigs = (configRow?.monthConfigs as Record<string, unknown> | null) ?? {}
 
   // ── Load Sankhya targets (same source as desktop dashboard) ─────────────────
+  // Financial targets + weight targets per brand (kg)
   let sankhyaTargetsMap = new Map<string, number>()
+  let sankhyaWeightTargetsMap = new Map<string, Array<{ brand: string; targetKg: number }>>()
   try {
     const sankhyaRes = await fetch(`${req.nextUrl.origin}/api/metas/sankhya-targets?year=${year}&month=${month}`, {
       headers: { cookie: req.headers.get('cookie') ?? '' },
@@ -75,6 +77,16 @@ export async function GET(req: NextRequest) {
         const sc = String(s.sellerCode ?? '').trim()
         const ft = Number(s.financialTarget ?? 0)
         if (sc && ft > 0) sankhyaTargetsMap.set(sc, ft)
+        const wts = Array.isArray(s.weightTargets) ? s.weightTargets : []
+        if (sc && wts.length > 0) {
+          sankhyaWeightTargetsMap.set(
+            sc,
+            wts.map((w: { brand?: unknown; targetKg?: unknown }) => ({
+              brand: String(w.brand ?? '').toUpperCase(),
+              targetKg: Number(w.targetKg ?? 0),
+            })).filter((w: { brand: string; targetKg: number }) => w.brand && w.targetKg > 0)
+          )
+        }
       }
     }
   } catch {
@@ -218,10 +230,26 @@ export async function GET(req: NextRequest) {
       focusTargetMode: block?.focusTargetMode === 'BASE_CLIENTS' ? 'BASE_CLIENTS' : 'KG',
       focusTargetBasePct: Number(block?.focusTargetBasePct ?? 0),
       maxReward,
-      weightTargets: (block?.weightTargets ?? []).map((wt: { brand?: unknown; targetKg?: unknown }) => ({
-        brand: String(wt.brand ?? '').toUpperCase(),
-        targetKg: Number(wt.targetKg ?? 0),
-      })).filter((wt) => wt.brand && wt.targetKg > 0),
+      // Resolve weight targets with same fallback priority as MetasWorkspace:
+      // 1) Sankhya live data per brand → 2) manualKgByPeriod → 3) legacy targetKg
+      weightTargets: (block?.weightTargets ?? []).map((wt: { brand?: unknown; targetKg?: unknown; manualKgByPeriod?: Record<string, number> }) => {
+        const brand = String(wt.brand ?? '').toUpperCase()
+        const sellerSankhyaWts = sankhyaWeightTargetsMap.get(normalizedCode) ?? sankhyaWeightTargetsMap.get(canonicalCode) ?? []
+        const sankhyaWt = sellerSankhyaWts.find((w: { brand: string }) => w.brand === brand)
+        if (sankhyaWt && sankhyaWt.targetKg > 0) {
+          return { brand, targetKg: sankhyaWt.targetKg }
+        }
+        const manualMap = wt.manualKgByPeriod ?? {}
+        const periodKeyPadded = `${year}-${String(month).padStart(2, '0')}`
+        const periodKeyUnpadded = `${year}-${month}`
+        const manualVal =
+          Number(manualMap[periodKeyPadded] ?? 0) ||
+          Number(manualMap[periodKeyUnpadded] ?? 0)
+        if (manualVal > 0) {
+          return { brand, targetKg: manualVal }
+        }
+        return { brand, targetKg: Number(wt.targetKg ?? 0) }
+      }).filter((wt) => wt.brand && wt.targetKg > 0),
       rules: (block?.rules ?? []).map((r) => ({
         id: r.id,
         stage: r.stage,

@@ -2,6 +2,12 @@
  * Script de correção: zera as metas (financeira e peso) do vendedor Erivaldo Ferreira
  * no banco LOCAL do SOUVER (Prisma). NÃO afeta o Sankhya.
  *
+ * ⚠️  ATENÇÃO (06/05/2026): zerar weightTargets aqui afeta o PWA, pois antes da
+ * correção o PWA não fazia fallback para Sankhya nos weight targets. Agora o PWA
+ * já consome sankhya-targets para peso também, mas este script ainda pode causar
+ * divergência temporária até o cache expirar (até 5 min).
+ * Se o objetivo for apenas zerar a meta FINANCEIRA, comente a seção de weightTargets.
+ *
  * Executar: npx tsx scripts/fix-erivaldo-meta.ts
  */
 import { config } from 'dotenv'
