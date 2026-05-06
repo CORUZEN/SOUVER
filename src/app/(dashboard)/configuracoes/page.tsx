@@ -1,133 +1,17 @@
-﻿'use client'
+﻿import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth/session'
+import { getModulePermissions } from '@/lib/auth/permissions'
+import ClientPage from './client-page'
 
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { Settings, ShieldCheck, Users, KeyRound, User, Monitor, Plug } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-
-const SETTINGS_CARDS = [
-  {
-    icon: User,
-    title: 'Meu Perfil',
-    description: 'Altere seu nome, telefone e senha de acesso.',
-    href: '/configuracoes/perfil',
-    color: 'text-primary-600',
-    bg: 'bg-primary-50',
-    available: true,
-  },
-  {
-    icon: KeyRound,
-    title: 'AutenticaÃ§Ã£o de Dois Fatores',
-    description: 'Adicione uma camada extra de seguranÃ§a com TOTP (Google Authenticator, Authy).',
-    href: '/configuracoes/2fa',
-    color: 'text-green-600',
-    bg: 'bg-green-50',
-    available: true,
-  },
-  {
-    icon: Users,
-    title: 'Perfis de Acesso',
-    description: 'Visualize os perfis e suas permissÃµes no sistema.',
-    href: '/configuracoes/perfis',
-    color: 'text-purple-600',
-    bg: 'bg-purple-50',
-    available: true,
-  },
-  {
-    icon: Monitor,
-    title: 'SessÃµes Ativas',
-    description: 'Visualize e encerre sessÃµes ativas em outros dispositivos.',
-    href: '/configuracoes/sessoes',
-    color: 'text-sky-600',
-    bg: 'bg-sky-50',
-    available: true,
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Trilha de Auditoria',
-    description: 'Acesse o histÃ³rico completo de aÃ§Ãµes realizadas no sistema.',
-    href: '/auditoria',
-    color: 'text-orange-600',
-    bg: 'bg-orange-50',
-    available: true,
-  },
-  {
-    icon: Plug,
-    title: 'IntegraÃ§Ãµes',
-    description: 'Gerencie integraÃ§Ãµes com Sankhya e outros sistemas externos.',
-    href: '/integracoes',
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    available: true,
-  },
-]
-
-export default function ConfiguracoesPage() {
-  const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setCanAccessIntegrations(Boolean(data?.user?.canAccessIntegrations)))
-      .catch(() => setCanAccessIntegrations(false))
-  }, [])
-
-  const visibleCards = SETTINGS_CARDS.filter((card) => {
-    if (card.href !== '/integracoes') return true
-    return canAccessIntegrations
-  })
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-surface-900 flex items-center gap-2">
-          <Settings className="w-5 h-5 text-primary-600" />
-          ConfiguraÃ§Ãµes
-        </h1>
-        <p className="text-sm text-surface-500 mt-0.5">
-          Gerencie suas preferÃªncias e configuraÃ§Ãµes do sistema.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {visibleCards.map(({ icon: Icon, title, description, href, color, bg, available }) => (
-          available ? (
-            <Link key={title} href={href} className="block group">
-              <Card className="h-full transition-shadow hover:shadow-md">
-                <div className="flex items-start gap-4">
-                  <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                    <Icon className={`w-5 h-5 ${color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-surface-900 group-hover:text-primary-700 transition-colors">
-                      {title}
-                    </p>
-                    <p className="text-xs text-surface-500 mt-1 leading-relaxed">{description}</p>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ) : (
-            <div key={title} className="opacity-50 cursor-not-allowed">
-              <Card className="h-full">
-                <div className="flex items-start gap-4">
-                  <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                    <Icon className={`w-5 h-5 ${color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-surface-900">{title}</p>
-                    <p className="text-xs text-surface-500 mt-1 leading-relaxed">{description}</p>
-                    <span className="inline-block mt-2 text-xs bg-surface-100 text-surface-500 rounded px-2 py-0.5">
-                      Em breve
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )
-        ))}
-      </div>
-    </div>
-  )
+export default async function Page() {
+  const token = (await cookies()).get('souver_token')?.value
+  if (token) {
+    const user = await getCurrentUser(token)
+    if (user) {
+      const perms = await getModulePermissions(user)
+      if (perms.configuracoes?.interact) return <ClientPage />
+    }
+  }
+  redirect('/acesso-negado')
 }
-

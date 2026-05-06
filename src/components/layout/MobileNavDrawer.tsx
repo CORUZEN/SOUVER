@@ -32,6 +32,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Lock,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -192,6 +193,24 @@ export default function MobileNavDrawer({
                       const Icon = MODULE_ICONS[mk]
                       const active = isActive(mk)
                       const isAccessible = ACCESSIBLE_MODULES.includes(mk) || Boolean(DIRECT_ROUTES[mk])
+
+                      const canInteract = modulePermissions[mk]?.interact ?? true
+                      if (!canInteract) {
+                        return (
+                          <div
+                            key={mk}
+                            className={cn(
+                              'group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all cursor-not-allowed opacity-50',
+                              'text-[#bac8b0]'
+                            )}
+                            title={`${plan.label} — Sem permissão para interagir`}
+                          >
+                            <Icon className="h-4 w-4 shrink-0 text-[#aac0a2]" />
+                            <span className="flex-1 text-sm font-medium text-[#c6d3bb]">{plan.label}</span>
+                            <Lock className="h-3 w-3 shrink-0 text-[#7ea07d]" />
+                          </div>
+                        )
+                      }
 
                       return (
                         <Link

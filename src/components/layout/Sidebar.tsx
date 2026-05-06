@@ -27,6 +27,7 @@ import {
   PanelLeftClose,
   Construction,
   X,
+  Lock,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -161,9 +162,12 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       expandable?: boolean
       expanded?: boolean
       onToggleExpand?: () => void
+      permissionKey?: string
     }
   ) {
-    const { isSubmenu = false, expandable = false, expanded = false, onToggleExpand } = options ?? {}
+    const { isSubmenu = false, expandable = false, expanded = false, onToggleExpand, permissionKey } = options ?? {}
+    const permKey = permissionKey ?? moduleKey
+    const canInteract = modulePermissions[permKey]?.interact ?? true
     const modulePlan = MODULE_PLANS[moduleKey]
     const Icon = MODULE_ICONS[moduleKey]
     const isAccessible = ACCESSIBLE_MODULES.includes(moduleKey) || Boolean(DIRECT_ROUTES[moduleKey])
@@ -189,7 +193,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     )
 
     const baseClass = cn(
-      'group w-full flex items-center rounded-lg transition-all duration-300 cursor-pointer text-left ring-1 ring-transparent',
+      'group w-full flex items-center rounded-lg transition-all duration-300 text-left ring-1 ring-transparent',
       isCollapsed
         ? 'justify-center px-0 py-2.5'
         : isSubmenu
@@ -200,12 +204,30 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
     )
 
+    if (isAccessible && !expandable && !canInteract) {
+      return (
+        <div
+          key={moduleKey}
+          className={cn(baseClass, 'cursor-not-allowed opacity-50')}
+          title={`${modulePlan.label} — Sem permissão para interagir`}
+        >
+          <Icon className={iconClass} />
+          {!isCollapsed && (
+            <>
+              <span className={labelClass}>{modulePlan.label}</span>
+              <Lock className="w-3 h-3 text-[#7ea07d] shrink-0" />
+            </>
+          )}
+        </div>
+      )
+    }
+
     if (isAccessible && !expandable) {
       return (
         <Link
           key={moduleKey}
           href={getModuleRoute(moduleKey)}
-          className={baseClass}
+          className={cn(baseClass, 'cursor-pointer')}
           title={modulePlan.label}
           onClick={(event) => {
             if (isCollapsed) {
@@ -245,7 +267,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
           }
           handleUnavailableClick(moduleKey)
         }}
-        className={baseClass}
+        className={cn(baseClass, 'cursor-pointer')}
         title={modulePlan.label}
       >
         <Icon className={iconClass} />
@@ -389,6 +411,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                     if (!modulePermissions[moduleKey]?.view) return null
 
                     if (moduleKey === 'rh') {
+                      const canSeeUsuarios = modulePermissions['usuarios']?.view ?? false
                       return (
                         <div key={moduleKey} className="space-y-0.5">
                           {renderMenuItem('rh', {
@@ -396,13 +419,15 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                             expanded: isRhExpanded,
                             onToggleExpand: () => setIsRhExpanded((prev) => !prev),
                           })}
-                          {!isCollapsed && isRhExpanded && renderMenuItem('usuarios', { isSubmenu: true })}
+                          {!isCollapsed && isRhExpanded && canSeeUsuarios && renderMenuItem('usuarios', { isSubmenu: true, permissionKey: 'usuarios' })}
                         </div>
                       )
                     }
 
                     if (moduleKey === 'logistica') {
                       const isFaturamentoActive = pathname === '/previsao'
+                      const canSeePrevisao = modulePermissions['previsao']?.view ?? false
+                      const canInteractPrevisao = modulePermissions['previsao']?.interact ?? true
                       return (
                         <div key={moduleKey} className="space-y-0.5">
                           {renderMenuItem('logistica', {
@@ -410,27 +435,41 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                             expanded: isLogisticaExpanded,
                             onToggleExpand: () => setIsLogisticaExpanded((prev) => !prev),
                           })}
-                          {!isCollapsed && isLogisticaExpanded && (
-                            <Link
-                              href="/previsao"
-                              className={cn(
-                                'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-pointer text-left',
-                                isFaturamentoActive
-                                  ? 'ring-[#3de0af]/35 bg-linear-to-r from-[#0f7f5b] via-[#14966f] to-[#1da88d] text-[#f2f5ea] shadow-[inset_0_1px_0_rgba(242,245,234,0.22),0_12px_26px_rgba(10,71,50,0.42)]'
-                                  : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
-                              )}
-                            >
-                              <ClipboardList className={cn(
-                                'w-4 h-4 shrink-0 transition-all duration-300',
-                                isFaturamentoActive
-                                  ? 'text-[#edf0e2] drop-shadow-[0_1px_6px_rgba(18,167,109,0.35)]'
-                                  : 'text-[#aac0a2] group-hover:text-[#dce6d2] group-hover:drop-shadow-[0_1px_4px_rgba(134,182,75,0.28)]'
-                              )} />
-                              <span className={cn(
-                                'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
-                                isFaturamentoActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
-                              )}>Previsão de Pedidos</span>
-                            </Link>
+                          {!isCollapsed && isLogisticaExpanded && canSeePrevisao && (
+                            canInteractPrevisao ? (
+                              <Link
+                                href="/previsao"
+                                className={cn(
+                                  'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-pointer text-left',
+                                  isFaturamentoActive
+                                    ? 'ring-[#3de0af]/35 bg-linear-to-r from-[#0f7f5b] via-[#14966f] to-[#1da88d] text-[#f2f5ea] shadow-[inset_0_1px_0_rgba(242,245,234,0.22),0_12px_26px_rgba(10,71,50,0.42)]'
+                                    : 'text-[#bac8b0] hover:ring-[#c6a277]/24 hover:bg-linear-to-r hover:from-[#0f7f5b]/22 hover:via-[#14966f]/14 hover:to-[#1da88d]/10 hover:text-[#f2f5ea] hover:shadow-[inset_0_1px_0_rgba(242,245,234,0.08),0_8px_18px_rgba(8,17,12,0.26)]'
+                                )}
+                              >
+                                <ClipboardList className={cn(
+                                  'w-4 h-4 shrink-0 transition-all duration-300',
+                                  isFaturamentoActive
+                                    ? 'text-[#edf0e2] drop-shadow-[0_1px_6px_rgba(18,167,109,0.35)]'
+                                    : 'text-[#aac0a2] group-hover:text-[#dce6d2] group-hover:drop-shadow-[0_1px_4px_rgba(134,182,75,0.28)]'
+                                )} />
+                                <span className={cn(
+                                  'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
+                                  isFaturamentoActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
+                                )}>Previsão de Pedidos</span>
+                              </Link>
+                            ) : (
+                              <div
+                                className={cn(
+                                  'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-not-allowed text-left opacity-50',
+                                  'text-[#bac8b0]'
+                                )}
+                                title="Previsão de Pedidos — Sem permissão para interagir"
+                              >
+                                <ClipboardList className="w-4 h-4 shrink-0 text-[#aac0a2]" />
+                                <span className="flex-1 min-w-0 truncate text-sm font-medium text-[#c6d3bb]">Previsão de Pedidos</span>
+                                <Lock className="w-3 h-3 text-[#7ea07d] shrink-0" />
+                              </div>
+                            )
                           )}
                         </div>
                       )

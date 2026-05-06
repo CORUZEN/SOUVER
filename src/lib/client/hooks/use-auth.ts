@@ -36,8 +36,8 @@ export function useAuth() {
   return useQuery<AuthMeResponse>({
     queryKey: ['auth', 'me'],
     queryFn: fetchAuthMe,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
     retry: 1,
   })
 }

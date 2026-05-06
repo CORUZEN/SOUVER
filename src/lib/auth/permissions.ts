@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { redirect } from 'next/navigation'
 import type { Prisma } from '@prisma/client'
 import { ROLE_CATALOG_CODES } from '@/lib/role-catalog'
 import { prisma } from '@/lib/prisma'
@@ -134,7 +135,10 @@ async function bootstrapMetasPermissionCatalog() {
     })
   }
 
-  const [roles, permissions] = await Promise.all([
+  const [roles, permissions]: [
+    Array<{ id: string; code: string }>,
+    Array<{ id: string; code: string }>,
+  ] = await Promise.all([
     prisma.role.findMany({
       where: { code: { in: ROLE_CATALOG_CODES } },
       select: { id: true, code: true },
@@ -153,11 +157,21 @@ async function bootstrapMetasPermissionCatalog() {
     .map((code) => permissionIdByCode.get(code))
     .filter((id): id is string => Boolean(id))
 
+  // Seed RolePermission ONLY for roles that have zero permissions.
+  // Once a role has any permission, bootstrap must never touch it again.
+  const roleIds = roles.map((r) => r.id)
+  const existingRolePermissions = await prisma.rolePermission.groupBy({
+    by: ['roleId'],
+    where: { roleId: { in: roleIds } },
+  })
+  const rolesWithPermissions = new Set<string>(existingRolePermissions.map((rp: { roleId: string }) => rp.roleId))
+
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const role of roles) {
       // COMMERCIAL_SUPERVISOR permissions are fully admin-controlled via gestao-permissoes.
-      // Bootstrap must not interfere or re-add permissions that the admin removed.
       if (role.code === 'COMMERCIAL_SUPERVISOR') continue
+      // Skip if this role already has any permission — admin owns it from now on.
+      if (rolesWithPermissions.has(role.id)) continue
 
       const permissionIds =
         role.code === 'DIRECTORATE'
@@ -171,15 +185,6 @@ async function bootstrapMetasPermissionCatalog() {
             permissionId,
           })),
           skipDuplicates: true,
-        })
-      }
-
-      if (role.code === 'DIRECTORATE' && mutatePermissionIds.length > 0) {
-        await tx.rolePermission.deleteMany({
-          where: {
-            roleId: role.id,
-            permissionId: { in: mutatePermissionIds },
-          },
         })
       }
     }
@@ -245,6 +250,20 @@ export const MODULE_PERMISSION_CODES = {
   CONFIGURACOES_INTERACT: 'module_configuracoes:interact',
   INTEGRACOES_VIEW: 'module_integracoes:view',
   INTEGRACOES_INTERACT: 'module_integracoes:interact',
+  PREVISAO_VIEW: 'module_previsao:view',
+  PREVISAO_INTERACT: 'module_previsao:interact',
+  USUARIOS_VIEW: 'module_usuarios:view',
+  USUARIOS_INTERACT: 'module_usuarios:interact',
+  ANALYTICS_VIEW: 'module_analytics:view',
+  ANALYTICS_INTERACT: 'module_analytics:interact',
+  AUDITORIA_VIEW: 'module_auditoria:view',
+  AUDITORIA_INTERACT: 'module_auditoria:interact',
+  DEPARTAMENTOS_VIEW: 'module_departamentos:view',
+  DEPARTAMENTOS_INTERACT: 'module_departamentos:interact',
+  NOTIFICACOES_VIEW: 'module_notificacoes:view',
+  NOTIFICACOES_INTERACT: 'module_notificacoes:interact',
+  DEV_VIEW: 'module_dev:view',
+  DEV_INTERACT: 'module_dev:interact',
 } as const
 
 const MODULE_PERMISSION_DEFINITIONS = [
@@ -270,6 +289,20 @@ const MODULE_PERMISSION_DEFINITIONS = [
   { module: 'module_configuracoes', action: 'interact', code: MODULE_PERMISSION_CODES.CONFIGURACOES_INTERACT, description: 'Acessar e interagir com o módulo Configurações.' },
   { module: 'module_integracoes', action: 'view', code: MODULE_PERMISSION_CODES.INTEGRACOES_VIEW, description: 'Visualizar o módulo Integrações no menu lateral.' },
   { module: 'module_integracoes', action: 'interact', code: MODULE_PERMISSION_CODES.INTEGRACOES_INTERACT, description: 'Acessar e interagir com o módulo Integrações.' },
+  { module: 'module_previsao', action: 'view', code: MODULE_PERMISSION_CODES.PREVISAO_VIEW, description: 'Visualizar o submenu Previsão de Pedidos no menu lateral.' },
+  { module: 'module_previsao', action: 'interact', code: MODULE_PERMISSION_CODES.PREVISAO_INTERACT, description: 'Acessar e interagir com a Previsão de Pedidos.' },
+  { module: 'module_usuarios', action: 'view', code: MODULE_PERMISSION_CODES.USUARIOS_VIEW, description: 'Visualizar o submenu Usuários no menu lateral.' },
+  { module: 'module_usuarios', action: 'interact', code: MODULE_PERMISSION_CODES.USUARIOS_INTERACT, description: 'Acessar e interagir com a gestão de Usuários.' },
+  { module: 'module_analytics', action: 'view', code: MODULE_PERMISSION_CODES.ANALYTICS_VIEW, description: 'Visualizar o módulo Analytics no menu lateral.' },
+  { module: 'module_analytics', action: 'interact', code: MODULE_PERMISSION_CODES.ANALYTICS_INTERACT, description: 'Acessar e interagir com o módulo Analytics.' },
+  { module: 'module_auditoria', action: 'view', code: MODULE_PERMISSION_CODES.AUDITORIA_VIEW, description: 'Visualizar o módulo Auditoria no menu lateral.' },
+  { module: 'module_auditoria', action: 'interact', code: MODULE_PERMISSION_CODES.AUDITORIA_INTERACT, description: 'Acessar e interagir com o módulo Auditoria.' },
+  { module: 'module_departamentos', action: 'view', code: MODULE_PERMISSION_CODES.DEPARTAMENTOS_VIEW, description: 'Visualizar o módulo Departamentos no menu lateral.' },
+  { module: 'module_departamentos', action: 'interact', code: MODULE_PERMISSION_CODES.DEPARTAMENTOS_INTERACT, description: 'Acessar e interagir com o módulo Departamentos.' },
+  { module: 'module_notificacoes', action: 'view', code: MODULE_PERMISSION_CODES.NOTIFICACOES_VIEW, description: 'Visualizar o módulo Notificações no menu lateral.' },
+  { module: 'module_notificacoes', action: 'interact', code: MODULE_PERMISSION_CODES.NOTIFICACOES_INTERACT, description: 'Acessar e interagir com o módulo Notificações.' },
+  { module: 'module_dev', action: 'view', code: MODULE_PERMISSION_CODES.DEV_VIEW, description: 'Visualizar o módulo Desenvolvimento no menu lateral.' },
+  { module: 'module_dev', action: 'interact', code: MODULE_PERMISSION_CODES.DEV_INTERACT, description: 'Acessar e interagir com o módulo Desenvolvimento.' },
 ] as const
 
 const ALL_MODULE_CODES = Object.values(MODULE_PERMISSION_CODES) as string[]
@@ -286,6 +319,13 @@ const MODULE_KEY_TO_PERMISSION: Record<string, { view: string; interact: string 
   comunicacao: { view: MODULE_PERMISSION_CODES.COMUNICACAO_VIEW, interact: MODULE_PERMISSION_CODES.COMUNICACAO_INTERACT },
   configuracoes: { view: MODULE_PERMISSION_CODES.CONFIGURACOES_VIEW, interact: MODULE_PERMISSION_CODES.CONFIGURACOES_INTERACT },
   integracoes: { view: MODULE_PERMISSION_CODES.INTEGRACOES_VIEW, interact: MODULE_PERMISSION_CODES.INTEGRACOES_INTERACT },
+  previsao: { view: MODULE_PERMISSION_CODES.PREVISAO_VIEW, interact: MODULE_PERMISSION_CODES.PREVISAO_INTERACT },
+  usuarios: { view: MODULE_PERMISSION_CODES.USUARIOS_VIEW, interact: MODULE_PERMISSION_CODES.USUARIOS_INTERACT },
+  analytics: { view: MODULE_PERMISSION_CODES.ANALYTICS_VIEW, interact: MODULE_PERMISSION_CODES.ANALYTICS_INTERACT },
+  auditoria: { view: MODULE_PERMISSION_CODES.AUDITORIA_VIEW, interact: MODULE_PERMISSION_CODES.AUDITORIA_INTERACT },
+  departamentos: { view: MODULE_PERMISSION_CODES.DEPARTAMENTOS_VIEW, interact: MODULE_PERMISSION_CODES.DEPARTAMENTOS_INTERACT },
+  notificacoes: { view: MODULE_PERMISSION_CODES.NOTIFICACOES_VIEW, interact: MODULE_PERMISSION_CODES.NOTIFICACOES_INTERACT },
+  dev: { view: MODULE_PERMISSION_CODES.DEV_VIEW, interact: MODULE_PERMISSION_CODES.DEV_INTERACT },
 }
 
 export interface ModuleAccessLevel {
@@ -307,7 +347,10 @@ async function bootstrapModulePermissionCatalog() {
     })
   }
 
-  const [roles, permissions] = await Promise.all([
+  const [roles, permissions]: [
+    Array<{ id: string; code: string }>,
+    Array<{ id: string; code: string }>,
+  ] = await Promise.all([
     prisma.role.findMany({
       where: { code: { in: ROLE_CATALOG_CODES } },
       select: { id: true, code: true },
@@ -323,10 +366,20 @@ async function bootstrapModulePermissionCatalog() {
     .map((code) => permissionIdByCode.get(code))
     .filter((id): id is string => Boolean(id))
 
-  // Grant all module access to every role except COMMERCIAL_SUPERVISOR (admin-controlled)
+  // Seed RolePermission ONLY for roles that have zero permissions.
+  // Once a role has any permission, bootstrap must never touch it again.
+  const roleIds = roles.map((r) => r.id)
+  const existingRolePermissions = await prisma.rolePermission.groupBy({
+    by: ['roleId'],
+    where: { roleId: { in: roleIds } },
+  })
+  const rolesWithPermissions = new Set<string>(existingRolePermissions.map((rp: { roleId: string }) => rp.roleId))
+
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const role of roles) {
       if (role.code === 'COMMERCIAL_SUPERVISOR') continue
+      // Skip if this role already has any permission — admin owns it from now on.
+      if (rolesWithPermissions.has(role.id)) continue
       if (allPermissionIds.length > 0) {
         await tx.rolePermission.createMany({
           data: allPermissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
@@ -375,6 +428,16 @@ export async function getModulePermissions(user: AuthzUserLike | null | undefine
       { view: codes.has(perms.view), interact: codes.has(perms.interact) },
     ])
   )
+}
+
+/** Server-side helper: checks module interact permission and returns null if allowed, or redirects to /acesso-negado. */
+export async function requireModuleAccess(
+  user: AuthzUserLike | null | undefined,
+  moduleKey: string
+): Promise<null> {
+  const perms = await getModulePermissions(user)
+  if (perms[moduleKey]?.interact) return null
+  redirect('/acesso-negado')
 }
 
 export interface AuthzUserLike {
