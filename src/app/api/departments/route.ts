@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, isUserManager } from '@/lib/auth/permissions'
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+  if (!user) return NextResponse.json({ message: 'NÃ£o autenticado' }, { status: 401 })
 
   await prisma.department.upsert({
     where: { code: 'DESENV' },
@@ -33,24 +33,24 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+  if (!user) return NextResponse.json({ message: 'NÃ£o autenticado' }, { status: 401 })
 
   if (!isUserManager(user.role?.code)) {
-    return NextResponse.json({ message: 'Área restrita a administradores.' }, { status: 403 })
+    return NextResponse.json({ message: 'Ãrea restrita a administradores.' }, { status: 403 })
   }
 
   const body = await req.json()
   const { name, code, description, managerUserId } = body
 
   if (!name?.trim() || !code?.trim()) {
-    return NextResponse.json({ error: 'Nome e código são obrigatórios' }, { status: 400 })
+    return NextResponse.json({ error: 'Nome e cÃ³digo sÃ£o obrigatÃ³rios' }, { status: 400 })
   }
 
   const existing = await prisma.department.findFirst({
     where: { OR: [{ name: name.trim() }, { code: code.trim().toUpperCase() }] },
   })
   if (existing) {
-    return NextResponse.json({ error: 'Nome ou código já existem' }, { status: 409 })
+    return NextResponse.json({ error: 'Nome ou cÃ³digo jÃ¡ existem' }, { status: 409 })
   }
 
   const department = await prisma.department.create({
@@ -72,3 +72,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ department }, { status: 201 })
 }
+
+

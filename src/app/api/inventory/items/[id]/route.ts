@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { getItemById, updateItem, toggleItemActive } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
 
@@ -20,6 +20,8 @@ export async function GET(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
 
   const { id } = await params
   const item = await getItemById(id)
@@ -34,6 +36,8 @@ export async function PUT(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
 
   const { id } = await params
   const body = await req.json().catch(() => null)

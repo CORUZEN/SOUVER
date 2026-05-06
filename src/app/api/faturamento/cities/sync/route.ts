@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { writeCityList } from '@/lib/faturamento/city-store'
@@ -7,9 +7,9 @@ import type { City } from '@/lib/faturamento/city-types'
 
 type RawRecord = Record<string, unknown>
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Auth helpers (same pattern as all other routes)
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function getSankhyaAuthOrigins(baseUrl: string) {
   const url = new URL(baseUrl)
@@ -134,7 +134,7 @@ function extractServiceError(data: unknown): string | null {
   const status = String(obj.status ?? obj.statusMessage ?? '').toLowerCase()
   if (status.includes('error') || status.includes('erro') || status === '1') {
     const msg = obj.statusMessage ?? obj.message ?? obj.error
-    return typeof msg === 'string' ? msg : 'Erro de serviço Sankhya'
+    return typeof msg === 'string' ? msg : 'Erro de serviÃ§o Sankhya'
   }
   return null
 }
@@ -238,12 +238,12 @@ async function queryRows(
   throw new Error(`Sankhya cities query falhou (${failures.join(' | ') || 'sem detalhes'})`)
 }
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    SQL: TSICUS split into two batches (Oracle 5000 row limit)
    Batch A: cities starting A-M (roughly half)
    Batch B: cities starting N-Z
    Both use ROWNUM guard as safety net.
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function buildCitiesSql(letterFrom: string, letterTo: string): string {
   return `
@@ -279,7 +279,7 @@ ORDER BY UPPER(TRIM(C.NOMECID))
 `.trim()
 }
 
-// Last resort: TGFPAR (get distinct cities from orders — always available)
+// Last resort: TGFPAR (get distinct cities from orders â€” always available)
 function buildCitiesFromParSql(): string {
   return `
 SELECT DISTINCT
@@ -309,14 +309,17 @@ function parseCityRecords(records: RawRecord[]): City[] {
   return [...dedup.values()]
 }
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    POST handler
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 export async function POST(request: NextRequest) {
   try {
     const authUser = await getAuthUser(request)
     if (!authUser) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(request, 'previsao')
+  if (denied) return denied
 
     const integration = await prisma.integration.findFirst({
       where: { provider: 'sankhya', status: 'ACTIVE' },
@@ -325,14 +328,14 @@ export async function POST(request: NextRequest) {
     })
 
     if (!integration?.configEncrypted) {
-      return NextResponse.json({ error: 'Integração Sankhya não configurada' }, { status: 503 })
+      return NextResponse.json({ error: 'IntegraÃ§Ã£o Sankhya nÃ£o configurada' }, { status: 503 })
     }
 
     const config = parseStoredConfig(integration.configEncrypted)
-    if (!config) return NextResponse.json({ error: 'Configuração Sankhya inválida' }, { status: 503 })
+    if (!config) return NextResponse.json({ error: 'ConfiguraÃ§Ã£o Sankhya invÃ¡lida' }, { status: 503 })
 
     const baseUrl = normalizeBaseUrl(integration.baseUrl ?? '')
-    if (!baseUrl) return NextResponse.json({ error: 'URL base do Sankhya não configurada' }, { status: 503 })
+    if (!baseUrl) return NextResponse.json({ error: 'URL base do Sankhya nÃ£o configurada' }, { status: 503 })
 
     let bearerToken = await authenticateOAuth(config, baseUrl)
     if (!bearerToken) bearerToken = await authenticateSession(config, baseUrl)
@@ -340,7 +343,7 @@ export async function POST(request: NextRequest) {
     const headers = buildHeaders(config, bearerToken)
     const appKey = config.appKey || config.token || null
 
-    // Fetch cities in two batches (A–M and N–[beyond Z]) to stay under 5000-row limit
+    // Fetch cities in two batches (Aâ€“M and Nâ€“[beyond Z]) to stay under 5000-row limit
     const allCities: City[] = []
     const batches: Array<[string, string]> = [['A', 'N'], ['N', 'ZZZZZZ']]
 
@@ -355,7 +358,7 @@ export async function POST(request: NextRequest) {
           records = await queryRows(baseUrl, headers, buildCitiesSqlNoJoin(from, to), appKey, { allowEmpty: true })
           usedFallback = true
         } catch {
-          // batch failed — continue
+          // batch failed â€” continue
         }
       }
       allCities.push(...parseCityRecords(records))
@@ -368,7 +371,7 @@ export async function POST(request: NextRequest) {
         allCities.push(...parseCityRecords(records))
         usedFallback = true
       } catch {
-        return NextResponse.json({ error: 'Não foi possível obter cidades do Sankhya. Verifique a conexão.' }, { status: 502 })
+        return NextResponse.json({ error: 'NÃ£o foi possÃ­vel obter cidades do Sankhya. Verifique a conexÃ£o.' }, { status: 502 })
       }
     }
 
@@ -386,3 +389,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+

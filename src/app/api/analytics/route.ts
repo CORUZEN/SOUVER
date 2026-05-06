@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
@@ -10,16 +10,19 @@ type UserSummary = {
 }
 
 /**
- * GET /api/analytics — Analytics avançado por módulo e usuário
+ * GET /api/analytics â€” Analytics avanÃ§ado por mÃ³dulo e usuÃ¡rio
  *
  * Query params:
  *   ?period=7|30|90 (dias, default 30)
- *   ?userId=xxx (filtrar por usuário)
+ *   ?userId=xxx (filtrar por usuÃ¡rio)
  */
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'analytics')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const period = Math.min(Number(searchParams.get('period') ?? 30), 365)
@@ -28,7 +31,7 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000)
   const userFilter = filterUserId ? { userId: filterUserId } : {}
 
-  // ── Ações por módulo ────────────────────────────────────────
+  // â”€â”€ AÃ§Ãµes por mÃ³dulo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const actionsByModule = await prisma.auditLog.groupBy({
     by: ['module'],
     where: { createdAt: { gte: since }, ...userFilter },
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
     orderBy: { _count: { id: 'desc' } },
   })
 
-  // ── Ações por tipo de ação ──────────────────────────────────
+  // â”€â”€ AÃ§Ãµes por tipo de aÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const actionsByType = await prisma.auditLog.groupBy({
     by: ['action'],
     where: { createdAt: { gte: since }, ...userFilter },
@@ -45,7 +48,7 @@ export async function GET(req: NextRequest) {
     take: 15,
   })
 
-  // ── Top 10 usuários mais ativos ─────────────────────────────
+  // â”€â”€ Top 10 usuÃ¡rios mais ativos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const topUsers = await prisma.auditLog.groupBy({
     by: ['userId'],
     where: { createdAt: { gte: since }, userId: { not: null } },
@@ -72,7 +75,7 @@ export async function GET(req: NextRequest) {
     actions: u._count.id,
   }))
 
-  // ── Atividade por dia (timeline) ────────────────────────────
+  // â”€â”€ Atividade por dia (timeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userClause = filterUserId
     ? Prisma.sql`AND "user_id" = ${filterUserId}`
     : Prisma.empty
@@ -86,21 +89,21 @@ export async function GET(req: NextRequest) {
     ORDER BY day ASC
   `.catch(() => [])
 
-  // ── Produção: lotes por status (período) ────────────────────
+  // â”€â”€ ProduÃ§Ã£o: lotes por status (perÃ­odo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const batchesByStatus = await prisma.productionBatch.groupBy({
     by: ['status'],
     where: { createdAt: { gte: since } },
     _count: { id: true },
   })
 
-  // ── Qualidade: NCs por severidade (período) ─────────────────
+  // â”€â”€ Qualidade: NCs por severidade (perÃ­odo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ncBySeverity = await prisma.nonConformance.groupBy({
     by: ['severity'],
     where: { createdAt: { gte: since } },
     _count: { id: true },
   })
 
-  // ── Logística: movimentações por tipo (período) ─────────────
+  // â”€â”€ LogÃ­stica: movimentaÃ§Ãµes por tipo (perÃ­odo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const movementsByType = await prisma.inventoryMovement.groupBy({
     by: ['type'],
     where: { createdAt: { gte: since } },
@@ -131,3 +134,4 @@ export async function GET(req: NextRequest) {
     { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } }
   )
 }
+

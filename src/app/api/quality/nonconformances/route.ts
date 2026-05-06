@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { listNonConformances, createNC, NCStatusValue, NCSeverityValue } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
@@ -10,8 +10,8 @@ import {
 } from '@/domains/notifications/notifications.service'
 
 const createSchema = z.object({
-  title:           z.string().min(1, 'Título obrigatório'),
-  description:     z.string().min(1, 'Descrição obrigatória'),
+  title:           z.string().min(1, 'TÃ­tulo obrigatÃ³rio'),
+  description:     z.string().min(1, 'DescriÃ§Ã£o obrigatÃ³ria'),
   severity:        z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   batchId:         z.string().optional(),
   departmentId:    z.string().optional(),
@@ -22,6 +22,9 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const result = await listNonConformances({
@@ -44,12 +47,15 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
+
   const body = await req.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+  if (!body) return NextResponse.json({ error: 'Corpo invÃ¡lido' }, { status: 400 })
 
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 422 })
+    return NextResponse.json({ error: 'Dados invÃ¡lidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const nc = await createNC({ ...parsed.data, openedById: user.id })
@@ -67,31 +73,32 @@ export async function POST(req: NextRequest) {
     ipAddress:   req.headers.get('x-forwarded-for') ?? undefined,
   })
 
-  // ── Automação: alertas por severidade ─────────────────────────
+  // â”€â”€ AutomaÃ§Ã£o: alertas por severidade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (parsed.data.severity === 'CRITICAL' || parsed.data.severity === 'HIGH') {
     const type    = parsed.data.severity === 'CRITICAL' ? NOTIFICATION_TYPES.NC_CRITICAL : NOTIFICATION_TYPES.NC_OPENED
-    const sevLabel = parsed.data.severity === 'CRITICAL' ? '🔴 CRÍTICA' : '🟠 ALTA'
+    const sevLabel = parsed.data.severity === 'CRITICAL' ? 'ðŸ”´ CRÃTICA' : 'ðŸŸ  ALTA'
 
     createNotificationsForRole('QUALITY', {
       type,
       title:   `NC ${sevLabel} aberta: ${nc.title}`,
-      message: `Uma não conformidade de severidade ${parsed.data.severity} foi registrada por ${user.fullName ?? user.id}. Requer atenção.`,
+      message: `Uma nÃ£o conformidade de severidade ${parsed.data.severity} foi registrada por ${user.fullName ?? user.id}. Requer atenÃ§Ã£o.`,
       module:  'quality',
       link:    '/qualidade',
     }).catch(() => null)
 
-    // NCs CRÍTICAS também alertam ADMIN
+    // NCs CRÃTICAS tambÃ©m alertam ADMIN
     if (parsed.data.severity === 'CRITICAL') {
       createNotificationsForRole('ADMIN', {
         type,
-        title:   `NC CRÍTICA aberta: ${nc.title}`,
-        message: `Uma não conformidade crítica foi registrada no módulo de Qualidade por ${user.fullName ?? user.id}. Verifique imediatamente.`,
+        title:   `NC CRÃTICA aberta: ${nc.title}`,
+        message: `Uma nÃ£o conformidade crÃ­tica foi registrada no mÃ³dulo de Qualidade por ${user.fullName ?? user.id}. Verifique imediatamente.`,
         module:  'quality',
         link:    '/qualidade',
       }).catch(() => null)
     }
   }
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return NextResponse.json(nc, { status: 201 })
 }
+

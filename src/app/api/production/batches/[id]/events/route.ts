@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { listBatchEvents, createEvent } from '@/domains/production/production.service'
 import { auditLog } from '@/domains/audit/audit.service'
 
@@ -18,6 +18,8 @@ export async function GET(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
 
   const { id } = await params
   const events = await listBatchEvents(id)
@@ -30,6 +32,8 @@ export async function POST(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
 
   const { id } = await params
   const body = await req.json().catch(() => null)

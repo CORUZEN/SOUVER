@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, isUserManager } from '@/lib/auth/permissions'
 import { auditLog } from '@/domains/audit/audit.service'
 
 interface Params { params: Promise<{ id: string }> }
@@ -8,6 +8,9 @@ interface Params { params: Promise<{ id: string }> }
 export async function GET(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+  if (!isUserManager(user.role?.code)) {
+    return NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 })
+  }
 
   const { id } = await params
 
@@ -31,6 +34,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+  if (!isUserManager(user.role?.code)) {
+    return NextResponse.json({ message: 'Área restrita a administradores de usuários.' }, { status: 403 })
+  }
   if (!['DEVELOPER', 'ADMIN'].includes(user.role?.code ?? '')) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }

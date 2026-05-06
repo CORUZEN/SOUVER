@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import {
   listMessages,
   sendMessage,
@@ -15,6 +15,8 @@ interface Params {
 export async function GET(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'comunicacao')
+  if (denied) return denied
 
   const { id } = await params
   const { searchParams } = req.nextUrl
@@ -35,6 +37,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'comunicacao')
+  if (denied) return denied
 
   const { id } = await params
   const conv = await getConversationById(id)
@@ -61,6 +65,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'comunicacao')
+  if (denied) return denied
 
   const { id } = await params
   await markConversationRead(id, user.id)

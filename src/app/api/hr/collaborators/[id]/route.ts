@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { getCollaboratorById } from '@/domains/hr/hr.service'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'rh')
+  if (denied) return denied
 
   const { id } = await params
   const collaborator = await getCollaboratorById(id)

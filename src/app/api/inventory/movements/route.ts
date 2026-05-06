@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { listMovements, registerMovement, MovementTypeValue } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
@@ -11,7 +11,7 @@ import {
 } from '@/domains/notifications/notifications.service'
 
 const createSchema = z.object({
-  itemId: z.string().min(1, 'Item é obrigatório'),
+  itemId: z.string().min(1, 'Item Ã© obrigatÃ³rio'),
   type: z.enum(['ENTRY', 'EXIT', 'TRANSFER', 'ADJUSTMENT', 'RETURN', 'WASTE']),
   quantity: z.number().positive('Quantidade deve ser positiva'),
   reason: z.string().optional(),
@@ -24,6 +24,9 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const result = await listMovements({
@@ -46,12 +49,15 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
+
   const body = await req.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+  if (!body) return NextResponse.json({ error: 'Corpo invÃ¡lido' }, { status: 400 })
 
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 422 })
+    return NextResponse.json({ error: 'Dados invÃ¡lidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const movement = await registerMovement({
@@ -75,11 +81,11 @@ export async function POST(req: NextRequest) {
     entityId: movement.id,
     action: 'CREATE',
     newData: { itemId: parsed.data.itemId, type: parsed.data.type, quantity: parsed.data.quantity },
-    description: `Movimentação ${parsed.data.type}: ${movement.item.name} (${parsed.data.quantity} ${movement.item.unit})`,
+    description: `MovimentaÃ§Ã£o ${parsed.data.type}: ${movement.item.name} (${parsed.data.quantity} ${movement.item.unit})`,
     ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
-  // ── Automação: alerta de estoque mínimo ───────────────────────
+  // â”€â”€ AutomaÃ§Ã£o: alerta de estoque mÃ­nimo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (['EXIT', 'WASTE', 'TRANSFER'].includes(parsed.data.type)) {
     const item = await prisma.inventoryItem.findUnique({
       where:  { id: parsed.data.itemId },
@@ -88,14 +94,15 @@ export async function POST(req: NextRequest) {
     if (item?.minQty && item.currentQty.lte(item.minQty)) {
       createNotificationsForRole('LOGISTICS', {
         type:    NOTIFICATION_TYPES.LOW_STOCK,
-        title:   `Estoque mínimo atingido: ${item.name}`,
-        message: `O item ${item.sku} — ${item.name} está com ${item.currentQty} ${item.unit} (mínimo: ${item.minQty} ${item.unit}). Reposição necessária.`,
+        title:   `Estoque mÃ­nimo atingido: ${item.name}`,
+        message: `O item ${item.sku} â€” ${item.name} estÃ¡ com ${item.currentQty} ${item.unit} (mÃ­nimo: ${item.minQty} ${item.unit}). ReposiÃ§Ã£o necessÃ¡ria.`,
         module:  'inventory',
         link:    '/logistica',
       }).catch(() => null)
     }
   }
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return NextResponse.json(movement, { status: 201 })
 }
+

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import {
   getBatchById,
   updateBatch,
@@ -31,6 +31,8 @@ export async function GET(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
 
   const { id } = await params
   const batch = await getBatchById(id)
@@ -45,6 +47,8 @@ export async function PUT(
 ) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
 
   const { id } = await params
   const body = await req.json().catch(() => null)

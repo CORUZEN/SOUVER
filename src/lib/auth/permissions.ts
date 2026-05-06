@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
 import type { Prisma } from '@prisma/client'
 import { ROLE_CATALOG_CODES } from '@/lib/role-catalog'
@@ -527,6 +527,24 @@ const USER_MANAGER_ROLE_CODES = new Set(['DEVELOPER', 'IT_ANALYST'])
 export function isUserManager(roleCode: string | null | undefined): boolean {
   if (!roleCode) return false
   return USER_MANAGER_ROLE_CODES.has(roleCode.toUpperCase())
+}
+
+/** Verifica se o usuário autenticado no request tem permissão de interação com um módulo.
+ *  Retorna null se autorizado, ou uma NextResponse 403 se negado.
+ */
+export async function requireModuleInteract(
+  req: NextRequest,
+  moduleKey: string
+): Promise<null | Response> {
+  const user = await getAuthUser(req)
+  if (!user) {
+    return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
+  }
+  const perms = await getModulePermissions(user)
+  if (!perms[moduleKey]?.interact) {
+    return NextResponse.json({ message: 'Sem permissão para acessar este recurso.' }, { status: 403 })
+  }
+  return null
 }
 
 /** Regra central para acesso ao painel de integrações. */

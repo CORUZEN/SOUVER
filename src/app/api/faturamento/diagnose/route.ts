@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
@@ -129,7 +129,7 @@ function extractServiceError(data: unknown): string | null {
   const status = String(obj.status ?? obj.statusMessage ?? '').toLowerCase()
   if (status.includes('error') || status.includes('erro') || status === '1') {
     const msg = obj.statusMessage ?? obj.message ?? obj.error
-    return typeof msg === 'string' ? msg : 'Erro de serviço Sankhya'
+    return typeof msg === 'string' ? msg : 'Erro de serviÃ§o Sankhya'
   }
   return null
 }
@@ -241,8 +241,10 @@ export async function GET(request: NextRequest) {
   try {
     const authUser = await getAuthUser(request)
     if (!authUser) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+      return NextResponse.json({ error: 'NÃ£o autorizado' }, { status: 401 })
     }
+  const denied = await requireModuleInteract(request, 'previsao')
+  if (denied) return denied
 
     const searchParams = request.nextUrl.searchParams
     const sellersParam = searchParams.get('sellers') ?? ''
@@ -257,17 +259,17 @@ export async function GET(request: NextRequest) {
     })
 
     if (!integration?.configEncrypted) {
-      return NextResponse.json({ error: 'Integração Sankhya não configurada' }, { status: 503 })
+      return NextResponse.json({ error: 'IntegraÃ§Ã£o Sankhya nÃ£o configurada' }, { status: 503 })
     }
 
     const config = parseStoredConfig(integration.configEncrypted)
     if (!config) {
-      return NextResponse.json({ error: 'Configuração Sankhya inválida' }, { status: 503 })
+      return NextResponse.json({ error: 'ConfiguraÃ§Ã£o Sankhya invÃ¡lida' }, { status: 503 })
     }
 
     const baseUrl = normalizeBaseUrl(integration.baseUrl ?? '')
     if (!baseUrl) {
-      return NextResponse.json({ error: 'URL base do Sankhya não configurada' }, { status: 503 })
+      return NextResponse.json({ error: 'URL base do Sankhya nÃ£o configurada' }, { status: 503 })
     }
 
     const bearerToken = await authenticateSankhyaCached(config, baseUrl, integration.id)
@@ -308,7 +310,7 @@ ORDER BY CAB.CODVEND
       results.metasMirrorQueryError = err instanceof Error ? err.message : 'erro'
     }
 
-    // Test 1: TGFCAB only — count ALL orders (no date filter)
+    // Test 1: TGFCAB only â€” count ALL orders (no date filter)
     try {
       const rows = await queryRows(baseUrl, headers, `
         SELECT COUNT(1) AS TOTAL FROM TGFCAB WHERE ROWNUM <= 1
@@ -400,7 +402,7 @@ ORDER BY CAB.CODVEND
       results.allSellersSampleError = err instanceof Error ? err.message : 'erro'
     }
 
-    // Test 8: Full JOIN query (what faturamento uses) — corrected
+    // Test 8: Full JOIN query (what faturamento uses) â€” corrected
     try {
       const today = new Date().toISOString().slice(0, 10)
       const rows = await queryRows(baseUrl, headers, `
@@ -450,3 +452,4 @@ ORDER BY VEN.APELIDO, CID.NOMECID, CAB.NUNOTA, I.CODPROD
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+

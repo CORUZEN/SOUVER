@@ -1,24 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/dashboard/trend
  *
- * Retorna dados de tendência dos últimos N dias para o dashboard.
+ * Retorna dados de tendÃªncia dos Ãºltimos N dias para o dashboard.
  * Resposta: { days: [{ date, batches, movements, ncs }] }
  *
  * Query params:
- *   days  number  — quantos dias atrás (padrão: 7, máx: 30)
+ *   days  number  â€” quantos dias atrÃ¡s (padrÃ£o: 7, mÃ¡x: 30)
  */
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'painel-executivo')
+  if (denied) return denied
+
   const days = Math.min(30, Math.max(2, Number(req.nextUrl.searchParams.get('days') ?? 7)))
   const now  = new Date()
 
-  // Gera array de datas dos últimos N dias (hoje incluído)
+  // Gera array de datas dos Ãºltimos N dias (hoje incluÃ­do)
   const dates: Date[] = []
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(now)
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const since = dates[0]
 
-  // Agregação direta no banco via GROUP BY (evita transferir milhares de linhas)
+  // AgregaÃ§Ã£o direta no banco via GROUP BY (evita transferir milhares de linhas)
   type DayCount = { day: Date; count: bigint }
 
   const [batchRows, movementRows, ncRows] = await Promise.all([
@@ -76,3 +79,4 @@ export async function GET(req: NextRequest) {
     },
   )
 }
+

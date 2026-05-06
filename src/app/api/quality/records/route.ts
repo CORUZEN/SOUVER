@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import {
   listQualityRecords,
   createQualityRecord,
@@ -11,7 +11,7 @@ import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
   batchId:        z.string().optional(),
-  inspectionType: z.string().min(1, 'Tipo de inspeção obrigatório'),
+  inspectionType: z.string().min(1, 'Tipo de inspeÃ§Ã£o obrigatÃ³rio'),
   result:         z.enum(['PENDING', 'APPROVED', 'CONDITIONAL', 'REJECTED']),
   notes:          z.string().optional(),
   inspectedAt:    z.string().optional(),
@@ -20,6 +20,9 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const result = await listQualityRecords({
@@ -39,12 +42,15 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
+
   const body = await req.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+  if (!body) return NextResponse.json({ error: 'Corpo invÃ¡lido' }, { status: 400 })
 
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 422 })
+    return NextResponse.json({ error: 'Dados invÃ¡lidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const record = await createQualityRecord({ ...parsed.data, inspectedById: user.id })
@@ -58,9 +64,10 @@ export async function POST(req: NextRequest) {
     entityId:    record.id,
     action:      'CREATE',
     newData:     record,
-    description: `Inspeção registrada: ${record.inspectionType} — ${record.result}`,
+    description: `InspeÃ§Ã£o registrada: ${record.inspectionType} â€” ${record.result}`,
     ipAddress:   req.headers.get('x-forwarded-for') ?? undefined,
   })
 
   return NextResponse.json(record, { status: 201 })
 }
+

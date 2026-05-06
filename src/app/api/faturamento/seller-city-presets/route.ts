@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 
-/* ── GET: listar presets ── */
+/* â”€â”€ GET: listar presets â”€â”€ */
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    return NextResponse.json({ error: 'NÃ£o autenticado' }, { status: 401 })
   }
 
   const { searchParams } = new URL(req.url)
@@ -24,11 +24,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/* ── POST: criar ou substituir presets de um vendedor ── */
+/* â”€â”€ POST: criar ou substituir presets de um vendedor â”€â”€ */
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    return NextResponse.json({ error: 'NÃ£o autenticado' }, { status: 401 })
   }
 
   try {
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!body.sellerName || !Array.isArray(body.cityKeys)) {
-      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
+      return NextResponse.json({ error: 'Dados invÃ¡lidos' }, { status: 400 })
     }
 
     await prisma.$transaction(async (tx: typeof prisma) => {
@@ -70,11 +70,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/* ── DELETE: remover presets de um vendedor ── */
+/* â”€â”€ DELETE: remover presets de um vendedor â”€â”€ */
 export async function DELETE(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    return NextResponse.json({ error: 'NÃ£o autenticado' }, { status: 401 })
   }
 
   try {
@@ -82,7 +82,7 @@ export async function DELETE(req: NextRequest) {
     const sellerName = searchParams.get('sellerName')
 
     if (!sellerName) {
-      return NextResponse.json({ error: 'sellerName obrigatório' }, { status: 400 })
+      return NextResponse.json({ error: 'sellerName obrigatÃ³rio' }, { status: 400 })
     }
 
     await prisma.sellerCityFilterPreset.deleteMany({
@@ -95,3 +95,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+

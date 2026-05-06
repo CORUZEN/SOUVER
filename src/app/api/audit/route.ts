@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, hasPermission } from '@/lib/auth/permissions'
 
 export async function GET(req: NextRequest) {
   const currentUser = await getAuthUser(req)
-  if (!currentUser) return NextResponse.json({ message: 'Não autenticado' }, { status: 401 })
+  if (!currentUser) return NextResponse.json({ message: 'NÃ£o autenticado' }, { status: 401 })
 
   const canRead = await hasPermission(currentUser.roleId, 'audit:read')
-  if (!canRead) return NextResponse.json({ message: 'Sem permissão para acessar auditoria' }, { status: 403 })
+  if (!canRead) return NextResponse.json({ message: 'Sem permissÃ£o para acessar auditoria' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const search  = searchParams.get('search') ?? ''
@@ -16,10 +16,10 @@ export async function GET(req: NextRequest) {
   const userId  = searchParams.get('userId') || undefined
   const page    = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const limit   = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50')))
-  // Cursor-based pagination (alternativa — mais eficiente em tabelas grandes)
+  // Cursor-based pagination (alternativa â€” mais eficiente em tabelas grandes)
   const cursor  = searchParams.get('cursor') || undefined
 
-  // Filtro de período
+  // Filtro de perÃ­odo
   const period = searchParams.get('period') ?? '7d'
   let since: Date | undefined
   const now = new Date()
@@ -48,11 +48,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (cursor) {
-    // ── Modo cursor-based (mais eficiente para tabelas grandes) ────────────
+    // â”€â”€ Modo cursor-based (mais eficiente para tabelas grandes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const logs = await prisma.auditLog.findMany({
       where,
       cursor:  { id: cursor },
-      skip:    1,           // pula o próprio cursor
+      skip:    1,           // pula o prÃ³prio cursor
       take:    limit,
       select: {
         id: true, module: true, action: true, description: true,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // ── Modo offset-based (compatibilidade com UI existente) ─────────────────
+  // â”€â”€ Modo offset-based (compatibilidade com UI existente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [logs, total] = await Promise.all([
     prisma.auditLog.findMany({
       where,
@@ -91,3 +91,4 @@ export async function GET(req: NextRequest) {
     { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=30' } },
   )
 }
+

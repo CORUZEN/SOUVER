@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { listItems, createItem } from '@/domains/inventory/inventory.service'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
-  sku: z.string().min(1, 'SKU é obrigatório'),
-  name: z.string().min(1, 'Nome é obrigatório'),
+  sku: z.string().min(1, 'SKU Ã© obrigatÃ³rio'),
+  name: z.string().min(1, 'Nome Ã© obrigatÃ³rio'),
   description: z.string().optional(),
   category: z.string().optional(),
   unit: z.string().optional(),
@@ -19,6 +19,9 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const result = await listItems({
@@ -43,12 +46,15 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'logistica')
+  if (denied) return denied
+
   const body = await req.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+  if (!body) return NextResponse.json({ error: 'Corpo invÃ¡lido' }, { status: 400 })
 
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 422 })
+    return NextResponse.json({ error: 'Dados invÃ¡lidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const item = await createItem({ ...parsed.data, createdByUserId: user.id })
@@ -62,9 +68,10 @@ export async function POST(req: NextRequest) {
     entityId: item.id,
     action: 'CREATE',
     newData: { sku: item.sku, name: item.name },
-    description: `Item criado: ${item.sku} — ${item.name}`,
+    description: `Item criado: ${item.sku} â€” ${item.name}`,
     ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
   return NextResponse.json(item, { status: 201 })
 }
+

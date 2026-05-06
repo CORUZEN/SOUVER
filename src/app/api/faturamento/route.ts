@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { normalizeBaseUrl, parseStoredConfig, type SankhyaConfig } from '@/lib/integrations/config'
 import { authenticateSankhyaCached } from '@/lib/integrations/sankhya-auth'
@@ -503,6 +503,8 @@ export async function GET(request: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
+    const denied = await requireModuleInteract(request, 'previsao')
+    if (denied) return denied
 
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date') ?? new Date().toISOString().slice(0, 10)

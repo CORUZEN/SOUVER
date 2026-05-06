@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { listBatches, createBatch, ProductionShiftValue } from '@/domains/production/production.service'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
 
 const createSchema = z.object({
-  batchCode: z.string().min(1, 'Código do lote é obrigatório'),
-  productName: z.string().min(1, 'Nome do produto é obrigatório'),
+  batchCode: z.string().min(1, 'CÃ³digo do lote Ã© obrigatÃ³rio'),
+  productName: z.string().min(1, 'Nome do produto Ã© obrigatÃ³rio'),
   productType: z.string().optional(),
   productionLine: z.string().optional(),
   shift: z.enum(['MORNING', 'AFTERNOON', 'NIGHT']),
@@ -20,6 +20,9 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const result = await listBatches({
@@ -40,12 +43,15 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  const denied = await requireModuleInteract(req, 'producao')
+  if (denied) return denied
+
   const body = await req.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+  if (!body) return NextResponse.json({ error: 'Corpo invÃ¡lido' }, { status: 400 })
 
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 422 })
+    return NextResponse.json({ error: 'Dados invÃ¡lidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const batch = await createBatch({ ...parsed.data, createdByUserId: user.id })
@@ -59,9 +65,10 @@ export async function POST(req: NextRequest) {
     entityId: batch.id,
     action: 'CREATE',
     newData: { batchCode: batch.batchCode, productName: batch.productName },
-    description: `Lote criado: ${batch.batchCode} — ${batch.productName}`,
+    description: `Lote criado: ${batch.batchCode} â€” ${batch.productName}`,
     ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
   })
 
   return NextResponse.json(batch, { status: 201 })
 }
+

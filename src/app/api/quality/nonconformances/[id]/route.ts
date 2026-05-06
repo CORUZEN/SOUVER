@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAuthUser } from '@/lib/auth/permissions'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { getNCById, updateNC, changeNCStatus, NCStatusValue } from '@/domains/quality/quality.service'
 import { auditLog } from '@/domains/audit/audit.service'
 import { emitDomainEvent } from '@/lib/events'
@@ -20,6 +20,8 @@ const statusSchema = z.object({
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
 
   const { id } = await params
   const nc = await getNCById(id)
@@ -31,6 +33,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const denied = await requireModuleInteract(req, 'qualidade')
+  if (denied) return denied
 
   const { id } = await params
   const existing = await getNCById(id)

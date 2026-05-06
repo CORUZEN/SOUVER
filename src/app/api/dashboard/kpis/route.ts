@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth/permissions'
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser, requireModuleInteract } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { getProductionKPIs, KpiDateRange } from '@/domains/production/production.service'
 import { getInventoryKPIs } from '@/domains/inventory/inventory.service'
@@ -8,7 +8,7 @@ import { getHRKPIs } from '@/domains/hr/hr.service'
 
 type DashboardModule = 'production' | 'inventory' | 'quality' | 'hr'
 
-// ─── Cache em memória com TTL ────────────────────────────────────
+// â”€â”€â”€ Cache em memÃ³ria com TTL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface CacheEntry<T> { data: T; expiresAt: number }
 const kpiCache = new Map<string, CacheEntry<unknown>>()
 
@@ -33,7 +33,7 @@ function cacheTTL(period: string): number {
   return 120_000                          // 2min
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildDateRange(period: string): KpiDateRange | undefined {
   const now = new Date()
@@ -109,6 +109,9 @@ async function cachedModuleData(moduleName: DashboardModule, dateRange: KpiDateR
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+  const denied = await requireModuleInteract(req, 'painel-executivo')
+  if (denied) return denied
 
   const period = req.nextUrl.searchParams.get('period') ?? 'all'
   const moduleParam = req.nextUrl.searchParams.get('module') as DashboardModule | null
@@ -214,3 +217,4 @@ export async function GET(req: NextRequest) {
     { headers: { 'Cache-Control': cacheHeader(period) } },
   )
 }
+
