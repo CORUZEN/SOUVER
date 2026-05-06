@@ -16,7 +16,7 @@ export type AuthUser = {
     developerName: string
   } | null
   canAccessIntegrations?: boolean
-  modulePermissions?: Record<string, boolean>
+  modulePermissions?: Record<string, { view: boolean; interact: boolean }>
   metasPermissions?: {
     config?: { view?: boolean; edit?: boolean; save?: boolean; remove?: boolean }
     sellers?: { view?: boolean; edit?: boolean; save?: boolean; remove?: boolean }

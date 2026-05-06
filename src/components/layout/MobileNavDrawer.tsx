@@ -94,7 +94,7 @@ export default function MobileNavDrawer({
 }: MobileNavDrawerProps) {
   const pathname = usePathname()
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
-  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean>>({})
+  const [modulePermissions, setModulePermissions] = useState<Record<string, { view: boolean; interact: boolean }>>({})
   const [modulePermissionsLoaded, setModulePermissionsLoaded] = useState(false)
 
   useEffect(() => {
@@ -177,7 +177,7 @@ export default function MobileNavDrawer({
                 const mk = key as ModuleKey
                 if (mk === 'integracoes' && !canAccessIntegrations) return false
                 if (!modulePermissionsLoaded) return false
-                if (modulePermissions[mk] === false) return false
+                if (!modulePermissions[mk]?.view) return false
                 return true
               })
               if (visibleItems.length === 0) return null

@@ -1,6 +1,9 @@
 ﻿import type { Metadata } from 'next'
 import { Clock3 } from 'lucide-react'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/auth/session'
+import { getModulePermissions } from '@/lib/auth/permissions'
 import { getModulePlan } from '@/lib/development-modules'
 
 export const metadata: Metadata = {
@@ -26,7 +29,15 @@ export default async function DevelopmentPage({ searchParams }: DevelopmentPageP
   const selectedModuleKey = resolveModuleKey(resolvedSearchParams)
 
   if (selectedModuleKey === 'metas') {
-    redirect('/metas')
+    const token = (await cookies()).get('souver_token')?.value
+    if (token) {
+      const user = await getCurrentUser(token)
+      if (user) {
+        const perms = await getModulePermissions(user)
+        if (perms.metas?.interact) redirect('/metas')
+      }
+    }
+    redirect('/acesso-negado')
   }
 
   const modulePlan = getModulePlan(selectedModuleKey)

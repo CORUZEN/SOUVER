@@ -223,50 +223,77 @@ const INTEGRATIONS_ALLOWED_ROLE_CODES = new Set(['DEVELOPER', 'IT_ANALYST'])
 // ── Module access permissions ───────────────────────────────────────────
 // Controls visibility and access to sidebar menu items per role.
 export const MODULE_PERMISSION_CODES = {
-  PAINEL_EXECUTIVO: 'module_painel-executivo:access',
-  METAS: 'module_metas:access',
-  PRODUCAO: 'module_producao:access',
-  LOGISTICA: 'module_logistica:access',
-  QUALIDADE: 'module_qualidade:access',
-  RH: 'module_rh:access',
-  RELATORIOS: 'module_relatorios:access',
-  CONTABILIDADE: 'module_contabilidade:access',
-  COMUNICACAO: 'module_comunicacao:access',
-  CONFIGURACOES: 'module_configuracoes:access',
-  INTEGRACOES: 'module_integracoes:access',
+  PAINEL_EXECUTIVO_VIEW: 'module_painel-executivo:view',
+  PAINEL_EXECUTIVO_INTERACT: 'module_painel-executivo:interact',
+  METAS_VIEW: 'module_metas:view',
+  METAS_INTERACT: 'module_metas:interact',
+  PRODUCAO_VIEW: 'module_producao:view',
+  PRODUCAO_INTERACT: 'module_producao:interact',
+  LOGISTICA_VIEW: 'module_logistica:view',
+  LOGISTICA_INTERACT: 'module_logistica:interact',
+  QUALIDADE_VIEW: 'module_qualidade:view',
+  QUALIDADE_INTERACT: 'module_qualidade:interact',
+  RH_VIEW: 'module_rh:view',
+  RH_INTERACT: 'module_rh:interact',
+  RELATORIOS_VIEW: 'module_relatorios:view',
+  RELATORIOS_INTERACT: 'module_relatorios:interact',
+  CONTABILIDADE_VIEW: 'module_contabilidade:view',
+  CONTABILIDADE_INTERACT: 'module_contabilidade:interact',
+  COMUNICACAO_VIEW: 'module_comunicacao:view',
+  COMUNICACAO_INTERACT: 'module_comunicacao:interact',
+  CONFIGURACOES_VIEW: 'module_configuracoes:view',
+  CONFIGURACOES_INTERACT: 'module_configuracoes:interact',
+  INTEGRACOES_VIEW: 'module_integracoes:view',
+  INTEGRACOES_INTERACT: 'module_integracoes:interact',
 } as const
 
 const MODULE_PERMISSION_DEFINITIONS = [
-  { module: 'module_painel-executivo', action: 'access', code: MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO, description: 'Acesso ao módulo Painel Executivo no menu lateral.' },
-  { module: 'module_metas', action: 'access', code: MODULE_PERMISSION_CODES.METAS, description: 'Acesso ao módulo Metas no menu lateral.' },
-  { module: 'module_producao', action: 'access', code: MODULE_PERMISSION_CODES.PRODUCAO, description: 'Acesso ao módulo Produção no menu lateral.' },
-  { module: 'module_logistica', action: 'access', code: MODULE_PERMISSION_CODES.LOGISTICA, description: 'Acesso ao módulo Logística no menu lateral.' },
-  { module: 'module_qualidade', action: 'access', code: MODULE_PERMISSION_CODES.QUALIDADE, description: 'Acesso ao módulo Qualidade no menu lateral.' },
-  { module: 'module_rh', action: 'access', code: MODULE_PERMISSION_CODES.RH, description: 'Acesso ao módulo RH no menu lateral.' },
-  { module: 'module_relatorios', action: 'access', code: MODULE_PERMISSION_CODES.RELATORIOS, description: 'Acesso ao módulo Relatórios no menu lateral.' },
-  { module: 'module_contabilidade', action: 'access', code: MODULE_PERMISSION_CODES.CONTABILIDADE, description: 'Acesso ao módulo Contabilidade no menu lateral.' },
-  { module: 'module_comunicacao', action: 'access', code: MODULE_PERMISSION_CODES.COMUNICACAO, description: 'Acesso ao módulo Comunicação no menu lateral.' },
-  { module: 'module_configuracoes', action: 'access', code: MODULE_PERMISSION_CODES.CONFIGURACOES, description: 'Acesso ao módulo Configurações no menu lateral.' },
-  { module: 'module_integracoes', action: 'access', code: MODULE_PERMISSION_CODES.INTEGRACOES, description: 'Acesso ao módulo Integrações no menu lateral.' },
+  { module: 'module_painel-executivo', action: 'view', code: MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO_VIEW, description: 'Visualizar o módulo Painel Executivo no menu lateral.' },
+  { module: 'module_painel-executivo', action: 'interact', code: MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO_INTERACT, description: 'Acessar e interagir com o módulo Painel Executivo.' },
+  { module: 'module_metas', action: 'view', code: MODULE_PERMISSION_CODES.METAS_VIEW, description: 'Visualizar o módulo Metas no menu lateral.' },
+  { module: 'module_metas', action: 'interact', code: MODULE_PERMISSION_CODES.METAS_INTERACT, description: 'Acessar e interagir com o módulo Metas.' },
+  { module: 'module_producao', action: 'view', code: MODULE_PERMISSION_CODES.PRODUCAO_VIEW, description: 'Visualizar o módulo Produção no menu lateral.' },
+  { module: 'module_producao', action: 'interact', code: MODULE_PERMISSION_CODES.PRODUCAO_INTERACT, description: 'Acessar e interagir com o módulo Produção.' },
+  { module: 'module_logistica', action: 'view', code: MODULE_PERMISSION_CODES.LOGISTICA_VIEW, description: 'Visualizar o módulo Logística no menu lateral.' },
+  { module: 'module_logistica', action: 'interact', code: MODULE_PERMISSION_CODES.LOGISTICA_INTERACT, description: 'Acessar e interagir com o módulo Logística.' },
+  { module: 'module_qualidade', action: 'view', code: MODULE_PERMISSION_CODES.QUALIDADE_VIEW, description: 'Visualizar o módulo Qualidade no menu lateral.' },
+  { module: 'module_qualidade', action: 'interact', code: MODULE_PERMISSION_CODES.QUALIDADE_INTERACT, description: 'Acessar e interagir com o módulo Qualidade.' },
+  { module: 'module_rh', action: 'view', code: MODULE_PERMISSION_CODES.RH_VIEW, description: 'Visualizar o módulo RH no menu lateral.' },
+  { module: 'module_rh', action: 'interact', code: MODULE_PERMISSION_CODES.RH_INTERACT, description: 'Acessar e interagir com o módulo RH.' },
+  { module: 'module_relatorios', action: 'view', code: MODULE_PERMISSION_CODES.RELATORIOS_VIEW, description: 'Visualizar o módulo Relatórios no menu lateral.' },
+  { module: 'module_relatorios', action: 'interact', code: MODULE_PERMISSION_CODES.RELATORIOS_INTERACT, description: 'Acessar e interagir com o módulo Relatórios.' },
+  { module: 'module_contabilidade', action: 'view', code: MODULE_PERMISSION_CODES.CONTABILIDADE_VIEW, description: 'Visualizar o módulo Contabilidade no menu lateral.' },
+  { module: 'module_contabilidade', action: 'interact', code: MODULE_PERMISSION_CODES.CONTABILIDADE_INTERACT, description: 'Acessar e interagir com o módulo Contabilidade.' },
+  { module: 'module_comunicacao', action: 'view', code: MODULE_PERMISSION_CODES.COMUNICACAO_VIEW, description: 'Visualizar o módulo Comunicação no menu lateral.' },
+  { module: 'module_comunicacao', action: 'interact', code: MODULE_PERMISSION_CODES.COMUNICACAO_INTERACT, description: 'Acessar e interagir com o módulo Comunicação.' },
+  { module: 'module_configuracoes', action: 'view', code: MODULE_PERMISSION_CODES.CONFIGURACOES_VIEW, description: 'Visualizar o módulo Configurações no menu lateral.' },
+  { module: 'module_configuracoes', action: 'interact', code: MODULE_PERMISSION_CODES.CONFIGURACOES_INTERACT, description: 'Acessar e interagir com o módulo Configurações.' },
+  { module: 'module_integracoes', action: 'view', code: MODULE_PERMISSION_CODES.INTEGRACOES_VIEW, description: 'Visualizar o módulo Integrações no menu lateral.' },
+  { module: 'module_integracoes', action: 'interact', code: MODULE_PERMISSION_CODES.INTEGRACOES_INTERACT, description: 'Acessar e interagir com o módulo Integrações.' },
 ] as const
 
 const ALL_MODULE_CODES = Object.values(MODULE_PERMISSION_CODES) as string[]
 
-const MODULE_KEY_TO_PERMISSION: Record<string, string> = {
-  'painel-executivo': MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO,
-  metas: MODULE_PERMISSION_CODES.METAS,
-  producao: MODULE_PERMISSION_CODES.PRODUCAO,
-  logistica: MODULE_PERMISSION_CODES.LOGISTICA,
-  qualidade: MODULE_PERMISSION_CODES.QUALIDADE,
-  rh: MODULE_PERMISSION_CODES.RH,
-  relatorios: MODULE_PERMISSION_CODES.RELATORIOS,
-  contabilidade: MODULE_PERMISSION_CODES.CONTABILIDADE,
-  comunicacao: MODULE_PERMISSION_CODES.COMUNICACAO,
-  configuracoes: MODULE_PERMISSION_CODES.CONFIGURACOES,
-  integracoes: MODULE_PERMISSION_CODES.INTEGRACOES,
+const MODULE_KEY_TO_PERMISSION: Record<string, { view: string; interact: string }> = {
+  'painel-executivo': { view: MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO_VIEW, interact: MODULE_PERMISSION_CODES.PAINEL_EXECUTIVO_INTERACT },
+  metas: { view: MODULE_PERMISSION_CODES.METAS_VIEW, interact: MODULE_PERMISSION_CODES.METAS_INTERACT },
+  producao: { view: MODULE_PERMISSION_CODES.PRODUCAO_VIEW, interact: MODULE_PERMISSION_CODES.PRODUCAO_INTERACT },
+  logistica: { view: MODULE_PERMISSION_CODES.LOGISTICA_VIEW, interact: MODULE_PERMISSION_CODES.LOGISTICA_INTERACT },
+  qualidade: { view: MODULE_PERMISSION_CODES.QUALIDADE_VIEW, interact: MODULE_PERMISSION_CODES.QUALIDADE_INTERACT },
+  rh: { view: MODULE_PERMISSION_CODES.RH_VIEW, interact: MODULE_PERMISSION_CODES.RH_INTERACT },
+  relatorios: { view: MODULE_PERMISSION_CODES.RELATORIOS_VIEW, interact: MODULE_PERMISSION_CODES.RELATORIOS_INTERACT },
+  contabilidade: { view: MODULE_PERMISSION_CODES.CONTABILIDADE_VIEW, interact: MODULE_PERMISSION_CODES.CONTABILIDADE_INTERACT },
+  comunicacao: { view: MODULE_PERMISSION_CODES.COMUNICACAO_VIEW, interact: MODULE_PERMISSION_CODES.COMUNICACAO_INTERACT },
+  configuracoes: { view: MODULE_PERMISSION_CODES.CONFIGURACOES_VIEW, interact: MODULE_PERMISSION_CODES.CONFIGURACOES_INTERACT },
+  integracoes: { view: MODULE_PERMISSION_CODES.INTEGRACOES_VIEW, interact: MODULE_PERMISSION_CODES.INTEGRACOES_INTERACT },
 }
 
-export type ModulePermissions = Record<string, boolean>
+export interface ModuleAccessLevel {
+  view: boolean
+  interact: boolean
+}
+
+export type ModulePermissions = Record<string, ModuleAccessLevel>
 
 let modulePermissionBootstrapDone = false
 let modulePermissionBootstrapPromise: Promise<void> | null = null
@@ -321,8 +348,9 @@ export async function ensureModulePermissionCatalog(): Promise<void> {
 }
 
 export async function getModulePermissions(user: AuthzUserLike | null | undefined): Promise<ModulePermissions> {
-  const allTrue: ModulePermissions = Object.fromEntries(Object.keys(MODULE_KEY_TO_PERMISSION).map((k) => [k, true]))
-  const allFalse: ModulePermissions = Object.fromEntries(Object.keys(MODULE_KEY_TO_PERMISSION).map((k) => [k, false]))
+  const moduleKeys = Object.keys(MODULE_KEY_TO_PERMISSION)
+  const allTrue: ModulePermissions = Object.fromEntries(moduleKeys.map((k) => [k, { view: true, interact: true }]))
+  const allFalse: ModulePermissions = Object.fromEntries(moduleKeys.map((k) => [k, { view: false, interact: false }]))
 
   if (!user?.roleId) return allFalse
   const roleCode = user.role?.code?.toUpperCase() ?? null
@@ -342,7 +370,10 @@ export async function getModulePermissions(user: AuthzUserLike | null | undefine
 
   const codes = new Set(role.rolePermissions.map((rp: { permission: { code: string } }) => rp.permission.code))
   return Object.fromEntries(
-    Object.entries(MODULE_KEY_TO_PERMISSION).map(([key, code]) => [key, codes.has(code)])
+    Object.entries(MODULE_KEY_TO_PERMISSION).map(([key, perms]) => [
+      key,
+      { view: codes.has(perms.view), interact: codes.has(perms.interact) },
+    ])
   )
 }
 

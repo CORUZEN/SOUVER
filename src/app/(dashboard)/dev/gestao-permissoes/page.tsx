@@ -119,18 +119,25 @@ const METAS_PERMISSION_SECTIONS: Array<{ key: string; title: string; items: Meta
   },
 ]
 
-const MODULE_PERMISSION_ITEMS: MetasPermissionItem[] = [
-  { code: 'module_painel-executivo:access', label: 'Painel Executivo', description: 'Visão executiva consolidada da operação.' },
-  { code: 'module_metas:access', label: 'Metas', description: 'Painel de metas e performance comercial.' },
-  { code: 'module_producao:access', label: 'Produção', description: 'Gestão de produção e lotes.' },
-  { code: 'module_logistica:access', label: 'Logística', description: 'Gestão de logística e faturamento.' },
-  { code: 'module_qualidade:access', label: 'Qualidade', description: 'Controle de qualidade e conformidade.' },
-  { code: 'module_rh:access', label: 'RH', description: 'Recursos humanos e gestão de pessoas.' },
-  { code: 'module_relatorios:access', label: 'Relatórios', description: 'Relatórios e auditoria.' },
-  { code: 'module_contabilidade:access', label: 'Contabilidade', description: 'Gestão contábil e fiscal.' },
-  { code: 'module_comunicacao:access', label: 'Comunicação', description: 'Comunicação interna.' },
-  { code: 'module_configuracoes:access', label: 'Configurações', description: 'Configurações do sistema.' },
-  { code: 'module_integracoes:access', label: 'Integrações', description: 'Painel de integrações com sistemas externos.' },
+interface ModulePermissionItem {
+  viewCode: string
+  interactCode: string
+  label: string
+  description: string
+}
+
+const MODULE_PERMISSION_ITEMS: ModulePermissionItem[] = [
+  { viewCode: 'module_painel-executivo:view', interactCode: 'module_painel-executivo:interact', label: 'Painel Executivo', description: 'Visão executiva consolidada da operação.' },
+  { viewCode: 'module_metas:view', interactCode: 'module_metas:interact', label: 'Metas', description: 'Painel de metas e performance comercial.' },
+  { viewCode: 'module_producao:view', interactCode: 'module_producao:interact', label: 'Produção', description: 'Gestão de produção e lotes.' },
+  { viewCode: 'module_logistica:view', interactCode: 'module_logistica:interact', label: 'Logística', description: 'Gestão de logística e faturamento.' },
+  { viewCode: 'module_qualidade:view', interactCode: 'module_qualidade:interact', label: 'Qualidade', description: 'Controle de qualidade e conformidade.' },
+  { viewCode: 'module_rh:view', interactCode: 'module_rh:interact', label: 'RH', description: 'Recursos humanos e gestão de pessoas.' },
+  { viewCode: 'module_relatorios:view', interactCode: 'module_relatorios:interact', label: 'Relatórios', description: 'Relatórios e auditoria.' },
+  { viewCode: 'module_contabilidade:view', interactCode: 'module_contabilidade:interact', label: 'Contabilidade', description: 'Gestão contábil e fiscal.' },
+  { viewCode: 'module_comunicacao:view', interactCode: 'module_comunicacao:interact', label: 'Comunicação', description: 'Comunicação interna.' },
+  { viewCode: 'module_configuracoes:view', interactCode: 'module_configuracoes:interact', label: 'Configurações', description: 'Configurações do sistema.' },
+  { viewCode: 'module_integracoes:view', interactCode: 'module_integracoes:interact', label: 'Integrações', description: 'Painel de integrações com sistemas externos.' },
 ]
 
 export default function GestaoPermissoesPage() {
@@ -327,23 +334,43 @@ export default function GestaoPermissoesPage() {
                 <p className="text-[11px] text-surface-500">Controle quais módulos aparecem no menu lateral para este cargo.</p>
                 <div className="grid gap-2">
                   {MODULE_PERMISSION_ITEMS.map((item) => {
-                    const permissionExists = permissionCodeSet.has(item.code)
-                    const disabled = selectedRoleData?.code === 'DEVELOPER' || !permissionExists
+                    const viewExists = permissionCodeSet.has(item.viewCode)
+                    const interactExists = permissionCodeSet.has(item.interactCode)
+                    const disabled = selectedRoleData?.code === 'DEVELOPER'
                     return (
-                      <label key={item.code} className={`flex items-start gap-2 rounded border px-2 py-2 text-xs ${disabled ? 'border-surface-200 bg-surface-100 opacity-70' : 'border-surface-200 bg-white'}`}>
-                        <input
-                          type="checkbox"
-                          checked={selectedRolePermissionCodes.includes(item.code)}
-                          onChange={() => toggleRolePermission(item.code)}
-                          disabled={disabled}
-                          className="mt-0.5 h-4 w-4"
-                        />
-                        <span>
-                          <strong>{item.label}</strong>
-                          <span className="block text-surface-500">{item.description}</span>
-                          {!permissionExists ? <span className="block text-[11px] text-amber-700">Permissão ainda não cadastrada no banco.</span> : null}
-                        </span>
-                      </label>
+                      <div key={item.viewCode} className={`rounded border px-3 py-2.5 text-xs ${disabled ? 'border-surface-200 bg-surface-100 opacity-70' : 'border-surface-200 bg-white'}`}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div>
+                            <strong className="text-sm">{item.label}</strong>
+                            <span className="block text-surface-500 text-[11px] mt-0.5">{item.description}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2">
+                          <label className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-surface-50'} ${selectedRolePermissionCodes.includes(item.viewCode) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-surface-200 bg-white text-surface-600'}`}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRolePermissionCodes.includes(item.viewCode)}
+                              onChange={() => toggleRolePermission(item.viewCode)}
+                              disabled={disabled || !viewExists}
+                              className="h-3.5 w-3.5 accent-emerald-600"
+                            />
+                            <span className="font-semibold text-[11px]">Ver</span>
+                          </label>
+                          <label className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-surface-50'} ${selectedRolePermissionCodes.includes(item.interactCode) ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-surface-200 bg-white text-surface-600'}`}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRolePermissionCodes.includes(item.interactCode)}
+                              onChange={() => toggleRolePermission(item.interactCode)}
+                              disabled={disabled || !interactExists}
+                              className="h-3.5 w-3.5 accent-blue-600"
+                            />
+                            <span className="font-semibold text-[11px]">Interagir</span>
+                          </label>
+                        </div>
+                        {(!viewExists || !interactExists) && (
+                          <span className="block text-[11px] text-amber-700 mt-1.5">Permissão ainda não cadastrada no banco.</span>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

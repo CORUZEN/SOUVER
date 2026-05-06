@@ -79,7 +79,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
   const [modulePermissionsLoaded, setModulePermissionsLoaded] = useState(false)
-  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean>>({})
+  const [modulePermissions, setModulePermissions] = useState<Record<string, { view: boolean; interact: boolean }>>({})
 
   const selectedModuloParam = searchParams.get('modulo')
   const activeAccessibleModule: ModuleKey | null =
@@ -367,7 +367,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
               const hasVisibleItem = modulePermissionsLoaded && itemKeys.some((key) => {
                 const mk = key as ModuleKey
                 if (mk === 'integracoes' && !canAccessIntegrations) return false
-                return modulePermissions[mk] !== false
+                return modulePermissions[mk]?.view === true
               })
               if (!hasVisibleItem) return null
 
@@ -386,7 +386,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
 
                     // Hide modules until permissions are loaded, then hide disabled ones
                     if (!modulePermissionsLoaded) return null
-                    if (modulePermissions[moduleKey] === false) return null
+                    if (!modulePermissions[moduleKey]?.view) return null
 
                     if (moduleKey === 'rh') {
                       return (
