@@ -39,6 +39,7 @@ import Modal from '@/components/ui/Modal'
 import { useAuth } from '@/lib/client/hooks/use-auth'
 import { generateMetasReport, downloadBuffer } from '@/lib/metas/excel-report'
 import { generateSellerPdfReport, downloadPdf } from '@/lib/metas/pdf-report'
+import { getStageTargetMultiplier } from '@/lib/metas/stage-target'
 
 type StageKey = 'W1' | 'W2' | 'W3' | 'CLOSING' | 'FULL'
 type OperationalStageKey = Exclude<StageKey, 'FULL'>
@@ -811,13 +812,14 @@ function getSellerWeightTargetRatios(
     if (stage === 'CLOSING') return Number(row.totalKgClosing ?? row.totalKg ?? 0)
     return Number(row.totalKg ?? 0)
   }
+  const targetMultiplier = getStageTargetMultiplier(stage, cycleWeeks)
   return weightTargets
     .filter((target) => target.brand && target.targetKg > 0)
     .map((target) => {
       const soldKg = brandWeightRows
         .filter((row) => row.sellerCode === sellerCode && row.brand === target.brand.toUpperCase())
         .reduce((sum, row) => sum + resolveStageKg(row), 0)
-      return target.targetKg > 0 ? soldKg / target.targetKg : 0
+      return target.targetKg * targetMultiplier > 0 ? soldKg / (target.targetKg * targetMultiplier) : 0
     })
 }
 

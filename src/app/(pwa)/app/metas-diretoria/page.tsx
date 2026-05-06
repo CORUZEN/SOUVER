@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { clearPwaClientState } from '@/lib/pwa/clear-client-state'
 import { useAuth } from '@/lib/client/hooks/use-auth'
+import { getStageTargetMultiplier } from '@/lib/metas/stage-target'
 import PwaFooter from '@/components/pwa/PwaFooter'
 import PwaLoadingScreen from '@/components/pwa/PwaLoadingScreen'
 import { PwaLogoutConfirmDialog, PwaSigningOutOverlay } from '@/components/pwa/PwaLogoutExperience'
@@ -319,9 +320,11 @@ function computeEarnedReward(
         const key = row.brand.toUpperCase()
         stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
       }
+      const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return wt.targetKg > 0 ? sold / wt.targetKg : 0
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        return stageTargetKg > 0 ? sold / stageTargetKg : 0
       })
       if (requiredGroups > 0 && stageWeightTargetRatios.length > 0) {
         const topRatios = [...stageWeightTargetRatios].sort((a, b) => b - a).slice(0, requiredGroups)
@@ -637,16 +640,19 @@ function computeAllKpiProgress(
         const key = row.brand.toUpperCase()
         stageWeightByBrand.set(key, (stageWeightByBrand.get(key) ?? 0) + getBrandWeightByStage(row, rule.stage))
       }
+      const targetMultiplier = getStageTargetMultiplier(rule.stage, cycleWeeks)
       const stageWeightTargetRatios = weightTargets.map((wt) => {
         const sold = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        return wt.targetKg > 0 ? sold / wt.targetKg : 0
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        return stageTargetKg > 0 ? sold / stageTargetKg : 0
       })
       const volumeGroups = weightTargets.map((wt) => {
         const soldKg = stageWeightByBrand.get(wt.brand.toUpperCase()) ?? 0
-        const progressPct = wt.targetKg > 0 ? (soldKg / wt.targetKg) * 100 : 0
+        const stageTargetKg = wt.targetKg * targetMultiplier
+        const progressPct = stageTargetKg > 0 ? (soldKg / stageTargetKg) * 100 : 0
         return {
           brand: wt.brand,
-          targetKg: wt.targetKg,
+          targetKg: stageTargetKg,
           soldKg,
           progressPct,
         }
