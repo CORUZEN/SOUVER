@@ -112,7 +112,13 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
   3. Legacy `targetKg` do bloco local.
 - Isso elimina divergências permanentes entre PWA e Dashboard para qualquer vendedor cujos targets locais tenham sido alterados/zerados.
 
-### 14) Bump de versão do PWA para invalidação de cache
+### 14) Filtro de base de clientes por data de cadastro (DTCAD)
+- **Problema**: o card "Clientes únicos atendidos" mostrava o total atual de clientes (2.777) como denominador, mesmo quando o usuário selecionava meses anteriores (ex: abril).
+- **Causa**: a query SQL em `buildSellerBaseSqlCandidates` (API `sellers-performance`) não recebia o período e retornava sempre o total atual de clientes ativos no Sankhya.
+- **Correção**: `src/app/api/metas/sellers-performance/route.ts` agora recebe `endDateExclusive` e filtra `TGFPAR.DTCAD < TO_DATE(...)` nas 4 variantes de query. Isso garante que o denominador reflita apenas clientes cadastrados até o final do período selecionado.
+- Afeta tanto o **Dashboard Web** quanto o **PWA**, pois ambos consomem a mesma API.
+
+### 15) Bump de versão do PWA para invalidação de cache
 - Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
 - Isso força o service worker a reinstalar e limpar caches antigos nos dispositivos dos usuários no próximo acesso.
 

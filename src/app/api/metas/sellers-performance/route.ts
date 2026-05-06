@@ -601,7 +601,7 @@ ${buildBaseFilters(pendingCond, withReceitasReal)}
   return candidates
 }
 
-function buildSellerBaseSqlCandidates(sellerCodes: string[]) {
+function buildSellerBaseSqlCandidates(sellerCodes: string[], endDateExclusive: string) {
   const safeSellerCodes = sanitizeSellerCodes(sellerCodes)
   const sellerFilter = buildSafeSellerInClause(safeSellerCodes, 'NVL(PAR.CODVEND, 0)')
   const sellerPrefFilter = buildSafeSellerInClause(safeSellerCodes, 'NVL(PAR.CODVENDPREF, 0)')
@@ -609,6 +609,8 @@ function buildSellerBaseSqlCandidates(sellerCodes: string[]) {
   const clienteCond = "UPPER(TO_CHAR(NVL(PAR.CLIENTE, 'N'))) IN ('S', '1', 'SIM')"
   const ativoCond = "UPPER(TO_CHAR(NVL(PAR.ATIVO, 'S'))) IN ('S', '1', 'SIM')"
   const notInactiveCond = "UPPER(TO_CHAR(NVL(PAR.INATIVO, 'N'))) IN ('N', '0', 'NAO', 'NÃƒO')"
+  // Consider only clients registered before the end of the selected period (DTCAD < first day of next month)
+  const dtCadFilter = `AND PAR.DTCAD < TO_DATE('${endDateExclusive}', 'YYYY-MM-DD')`
 
   const q1 = `
 SELECT
@@ -618,6 +620,7 @@ FROM TGFPAR PAR
 WHERE NVL(PAR.CODVEND, 0) > 0
   AND ${clienteCond}
   AND ${ativoCond}
+  ${dtCadFilter}
   ${sellerFilter}GROUP BY PAR.CODVEND
 ORDER BY PAR.CODVEND`.trim()
 
@@ -629,6 +632,7 @@ FROM TGFPAR PAR
 WHERE NVL(PAR.CODVEND, 0) > 0
   AND ${clienteCond}
   AND ${notInactiveCond}
+  ${dtCadFilter}
   ${sellerFilter}GROUP BY PAR.CODVEND
 ORDER BY PAR.CODVEND`.trim()
 
@@ -640,6 +644,7 @@ FROM TGFPAR PAR
 WHERE NVL(PAR.CODVENDPREF, 0) > 0
   AND ${clienteCond}
   AND ${ativoCond}
+  ${dtCadFilter}
   ${sellerPrefFilter}GROUP BY PAR.CODVENDPREF
 ORDER BY PAR.CODVENDPREF`.trim()
 
@@ -651,6 +656,7 @@ FROM TGFPAR PAR
 WHERE NVL(PAR.CODVENDPREF, 0) > 0
   AND ${clienteCond}
   AND ${notInactiveCond}
+  ${dtCadFilter}
   ${sellerPrefFilter}GROUP BY PAR.CODVENDPREF
 ORDER BY PAR.CODVENDPREF`.trim()
 
@@ -854,7 +860,7 @@ export async function GET(req: NextRequest) {
     const sellerCodesForBase = sellerCodes.length > 0
       ? sellerCodes
       : [...new Set(orders.map((o) => String(o.sellerCode ?? '').trim()).filter((c) => c.length > 0))]
-    const sellerBaseSqlCandidates = buildSellerBaseSqlCandidates(sellerCodesForBase)
+    const sellerBaseSqlCandidates = buildSellerBaseSqlCandidates(sellerCodesForBase, endDateExclusive)
     for (let i = 0; i < sellerBaseSqlCandidates.length; i += 1) {
       const sqlBase = sellerBaseSqlCandidates[i]
       try {
