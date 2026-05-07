@@ -31,6 +31,7 @@ interface DevUserData {
 interface CurrentUser {
   id: string
   roleCode?: string | null
+  isSystemOwner?: boolean
 }
 
 interface MetasPermissionItem {
@@ -146,6 +147,7 @@ const MODULE_PERMISSION_ITEMS: ModulePermissionItem[] = [
   { viewCode: 'module_departamentos:view', interactCode: 'module_departamentos:interact', label: 'Departamentos', description: 'Hierarquia e gestão organizacional.' },
   { viewCode: 'module_notificacoes:view', interactCode: 'module_notificacoes:interact', label: 'Notificações', description: 'Central de notificações do sistema.' },
   { viewCode: 'module_dev:view', interactCode: 'module_dev:interact', label: 'Desenvolvimento', description: 'Painel Dev, diagnóstico e gestão de permissões.' },
+  { viewCode: 'module_painel-controle:view', interactCode: 'module_painel-controle:interact', label: 'Painel de Controle', description: 'Ferramentas de governança e administração do sistema.' },
 ]
 
 export default function GestaoPermissoesPage() {
@@ -198,7 +200,7 @@ export default function GestaoPermissoesPage() {
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
+        if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null, isSystemOwner: d.user.isSystemOwner ?? false })
       })
       .finally(() => setAuthLoaded(true))
   }, [])
@@ -301,7 +303,7 @@ export default function GestaoPermissoesPage() {
     )
   }
 
-  const groupedRoleOptions = [{ value: '', label: 'Sem cargo' }, ...devRoles.map((r) => ({ value: r.id, label: r.name }))]
+  const groupedRoleOptions = [{ value: '', label: 'Sem cargo' }, ...devRoles.filter((r) => currentUser?.isSystemOwner || r.code !== 'DEVELOPER').map((r) => ({ value: r.id, label: r.name }))]
 
   return (
     <div className="space-y-6">

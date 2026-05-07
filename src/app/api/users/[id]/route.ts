@@ -98,10 +98,11 @@ export async function PUT(
 
   const { password, ...rest } = parsed.data
 
-  if (rest.roleId && currentUser?.role?.code !== 'DEVELOPER') {
+  const SYSTEM_OWNER_LOGIN = process.env.SYSTEM_OWNER_LOGIN || 'admin'
+  if (rest.roleId && currentUser?.login !== SYSTEM_OWNER_LOGIN) {
     const newRole = await prisma.role.findUnique({ where: { id: rest.roleId }, select: { code: true } })
     if (newRole?.code === 'DEVELOPER') {
-      return NextResponse.json({ message: 'Você não tem permissão para atribuir o cargo Desenvolvedor.' }, { status: 403 })
+      return NextResponse.json({ message: 'Apenas o administrador principal do sistema pode atribuir o cargo Desenvolvedor.' }, { status: 403 })
     }
   }
 

@@ -29,6 +29,11 @@ interface CurrentUser {
   roleCode?: string | null
 }
 
+interface ModuleAccess {
+  view: boolean
+  interact: boolean
+}
+
 /* ─── Liquid Glass Stat Pill (para os 4 cards da hero) ──────────────── */
 function LiquidGlassStat({
   icon,
@@ -71,25 +76,33 @@ interface DevToolCardProps {
   cta: string
   variant?: 'default' | 'accent' | 'dark'
   badge?: string
+  disabled?: boolean
 }
 
-function DevToolCard({ href, icon, title, description, cta, variant = 'default', badge }: DevToolCardProps) {
+function DevToolCard({ href, icon, title, description, cta, variant = 'default', badge, disabled }: DevToolCardProps) {
   const isDark = variant === 'dark'
   const isAccent = variant === 'accent'
 
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300',
-        'hover:-translate-y-0.5 hover:shadow-xl',
-        isDark
-          ? 'border-[#3f6d57]/45 bg-linear-to-br from-[#07160f] via-[#0f2a1d] to-[#173c2c] text-white hover:border-[#5a8f75]/55'
-          : isAccent
-            ? 'border-emerald-300/55 bg-linear-to-br from-[#f2fbf7] via-[#ecf8f2] to-[#e4f4eb] hover:border-emerald-400/60'
-            : 'border-slate-200/90 bg-linear-to-br from-white via-[#fbfdfc] to-[#f2f8f5] hover:border-emerald-300/55'
-      )}
-    >
+  const cardClasses = cn(
+    'group relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300',
+    disabled
+      ? 'cursor-not-allowed opacity-60'
+      : 'hover:-translate-y-0.5 hover:shadow-xl',
+    isDark
+      ? disabled
+        ? 'border-[#3f6d57]/25 bg-linear-to-br from-[#07160f]/80 via-[#0f2a1d]/80 to-[#173c2c]/80 text-white/70'
+        : 'border-[#3f6d57]/45 bg-linear-to-br from-[#07160f] via-[#0f2a1d] to-[#173c2c] text-white hover:border-[#5a8f75]/55'
+      : isAccent
+        ? disabled
+          ? 'border-emerald-300/30 bg-linear-to-br from-[#f2fbf7]/70 via-[#ecf8f2]/70 to-[#e4f4eb]/70'
+          : 'border-emerald-300/55 bg-linear-to-br from-[#f2fbf7] via-[#ecf8f2] to-[#e4f4eb] hover:border-emerald-400/60'
+        : disabled
+          ? 'border-slate-200/60 bg-linear-to-br from-white/70 via-[#fbfdfc]/70 to-[#f2f8f5]/70'
+          : 'border-slate-200/90 bg-linear-to-br from-white via-[#fbfdfc] to-[#f2f8f5] hover:border-emerald-300/55'
+  )
+
+  const content = (
+    <>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/70 to-transparent" />
         <div
@@ -154,6 +167,16 @@ function DevToolCard({ href, icon, title, description, cta, variant = 'default',
           )}
         />
       </div>
+    </>
+  )
+
+  if (disabled) {
+    return <div className={cardClasses}>{content}</div>
+  }
+
+  return (
+    <Link href={href} className={cardClasses}>
+      {content}
     </Link>
   )
 }
@@ -227,12 +250,16 @@ export default function DevPage() {
     modules: '3',
     extensions: '1',
   })
+  const [modulePermissions, setModulePermissions] = useState<Record<string, ModuleAccess>>({})
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
+        if (d?.user) {
+          setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
+          setModulePermissions(d.user.modulePermissions ?? {})
+        }
       })
       .finally(() => setAuthLoaded(true))
   }, [])
@@ -341,70 +368,85 @@ export default function DevPage() {
       </section>
 
       {/* Tools Grid — 5 cards + Side Panel ao lado da Auditoria */}
-      <section>
-        <div className="mb-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-surface-200" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">
-            Ferramentas de Governança
-          </span>
-          <div className="h-px flex-1 bg-surface-200" />
-        </div>
+      {modulePermissions['painel-controle']?.view && (
+        <section>
+          <div className="mb-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-surface-200" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-surface-400">
+              Ferramentas de Governança
+            </span>
+            <div className="h-px flex-1 bg-surface-200" />
+          </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {/* Row 1 */}
-          <DevToolCard
-            href={`${basePath}/gestao-usuarios`}
-            icon={<Users className="h-5 w-5" />}
-            title="Gestão de Usuários"
-            description="Cadastro, edição, status, vínculos com vendedores/supervisores e ciclo de vida completo das contas corporativas."
-            cta="Acessar seção"
-            variant="default"
-          />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {/* Row 1 */}
+            {modulePermissions['usuarios']?.view && (
+              <DevToolCard
+                href={`${basePath}/gestao-usuarios`}
+                icon={<Users className="h-5 w-5" />}
+                title="Gestão de Usuários"
+                description="Cadastro, edição, status, vínculos com vendedores/supervisores e ciclo de vida completo das contas corporativas."
+                cta="Acessar seção"
+                variant="default"
+                disabled={!modulePermissions['usuarios']?.interact}
+              />
+            )}
 
-          <DevToolCard
-            href={`${basePath}/gestao-permissoes`}
-            icon={<KeyRound className="h-5 w-5" />}
-            title="Gestão de Permissões"
-            description="Controle granular de grupos, privilégios por módulo e atribuição dinâmica de acessos por usuário."
-            cta="Acessar seção"
-            variant="accent"
-          />
+            {modulePermissions['dev']?.view && (
+              <DevToolCard
+                href={`${basePath}/gestao-permissoes`}
+                icon={<KeyRound className="h-5 w-5" />}
+                title="Gestão de Permissões"
+                description="Controle granular de grupos, privilégios por módulo e atribuição dinâmica de acessos por usuário."
+                cta="Acessar seção"
+                variant="accent"
+                disabled={!modulePermissions['dev']?.interact}
+              />
+            )}
 
-          {isDeveloper && (
-            <DevToolCard
-              href={`${basePath}/diagnostico`}
-              icon={<Activity className="h-5 w-5" />}
-              title="Central de Diagnóstico"
-              description="Testes de conectividade, autenticação Sankhya, inspeção de campos e execução de SQL livre."
-              cta="Abrir diagnóstico"
-              variant="dark"
-              badge="Dev Only"
-            />
-          )}
+            {isDeveloper && modulePermissions['dev']?.view && (
+              <DevToolCard
+                href={`${basePath}/diagnostico`}
+                icon={<Activity className="h-5 w-5" />}
+                title="Central de Diagnóstico"
+                description="Testes de conectividade, autenticação Sankhya, inspeção de campos e execução de SQL livre."
+                cta="Abrir diagnóstico"
+                variant="dark"
+                badge="Dev Only"
+                disabled={!modulePermissions['dev']?.interact}
+              />
+            )}
 
-          {/* Row 2 */}
-          <DevToolCard
-            href="/metas/telemetria"
-            icon={<BarChart3 className="h-5 w-5" />}
-            title="Telemetria do Sistema"
-            description="Monitoramento em tempo real de requisições, latência, cache hit rate e métricas de concorrência."
-            cta="Visualizar métricas"
-            variant="default"
-          />
+            {/* Row 2 */}
+            {modulePermissions['analytics']?.view && (
+              <DevToolCard
+                href="/metas/telemetria"
+                icon={<BarChart3 className="h-5 w-5" />}
+                title="Telemetria do Sistema"
+                description="Monitoramento em tempo real de requisições, latência, cache hit rate e métricas de concorrência."
+                cta="Visualizar métricas"
+                variant="default"
+                disabled={!modulePermissions['analytics']?.interact}
+              />
+            )}
 
-          <DevToolCard
-            href="/auditoria"
-            icon={<ClipboardList className="h-5 w-5" />}
-            title="Auditoria Corporativa"
-            description="Rastreamento de ações críticas, exportação de logs e análise de comportamento do sistema."
-            cta="Consultar logs"
-            variant="accent"
-          />
+            {modulePermissions['auditoria']?.view && (
+              <DevToolCard
+                href="/auditoria"
+                icon={<ClipboardList className="h-5 w-5" />}
+                title="Auditoria Corporativa"
+                description="Rastreamento de ações críticas, exportação de logs e análise de comportamento do sistema."
+                cta="Consultar logs"
+                variant="accent"
+                disabled={!modulePermissions['auditoria']?.interact}
+              />
+            )}
 
-          {/* Side Panel — Atalhos + Ambiente */}
-          <SidePanelCard />
-        </div>
-      </section>
+            {/* Side Panel — Atalhos + Ambiente */}
+            <SidePanelCard />
+          </div>
+        </section>
+      )}
 
       {/* Footer note */}
       <section className="flex items-center justify-center rounded-xl border border-surface-200 bg-surface-50 p-4 text-sm text-surface-600">

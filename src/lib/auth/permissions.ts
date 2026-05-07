@@ -166,29 +166,10 @@ async function bootstrapMetasPermissionCatalog() {
   })
   const rolesWithPermissions = new Set<string>(existingRolePermissions.map((rp: { roleId: string }) => rp.roleId))
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    for (const role of roles) {
-      // COMMERCIAL_SUPERVISOR permissions are fully admin-controlled via gestao-permissoes.
-      if (role.code === 'COMMERCIAL_SUPERVISOR') continue
-      // Skip if this role already has any permission — admin owns it from now on.
-      if (rolesWithPermissions.has(role.id)) continue
-
-      const permissionIds =
-        role.code === 'DIRECTORATE'
-          ? readPermissionIds
-          : [...readPermissionIds, ...mutatePermissionIds]
-
-      if (permissionIds.length > 0) {
-        await tx.rolePermission.createMany({
-          data: permissionIds.map((permissionId) => ({
-            roleId: role.id,
-            permissionId,
-          })),
-          skipDuplicates: true,
-        })
-      }
-    }
-  })
+  // NOTE: We no longer auto-assign metas permissions to roles.
+  // All roles (except DEVELOPER who has a hardcoded bypass) start with zero
+  // metas permissions. Admins must explicitly grant access via gestao-permissoes.
+  // This guarantees that any newly-added permission is opt-in (unchecked by default).
 }
 
 export async function ensureMetasPermissionCatalog(): Promise<void> {
@@ -264,6 +245,8 @@ export const MODULE_PERMISSION_CODES = {
   NOTIFICACOES_INTERACT: 'module_notificacoes:interact',
   DEV_VIEW: 'module_dev:view',
   DEV_INTERACT: 'module_dev:interact',
+  PAINEL_CONTROLE_VIEW: 'module_painel-controle:view',
+  PAINEL_CONTROLE_INTERACT: 'module_painel-controle:interact',
 } as const
 
 const MODULE_PERMISSION_DEFINITIONS = [
@@ -303,6 +286,8 @@ const MODULE_PERMISSION_DEFINITIONS = [
   { module: 'module_notificacoes', action: 'interact', code: MODULE_PERMISSION_CODES.NOTIFICACOES_INTERACT, description: 'Acessar e interagir com o módulo Notificações.' },
   { module: 'module_dev', action: 'view', code: MODULE_PERMISSION_CODES.DEV_VIEW, description: 'Visualizar o módulo Desenvolvimento no menu lateral.' },
   { module: 'module_dev', action: 'interact', code: MODULE_PERMISSION_CODES.DEV_INTERACT, description: 'Acessar e interagir com o módulo Desenvolvimento.' },
+  { module: 'module_painel-controle', action: 'view', code: MODULE_PERMISSION_CODES.PAINEL_CONTROLE_VIEW, description: 'Visualizar as ferramentas de governança no painel de controle.' },
+  { module: 'module_painel-controle', action: 'interact', code: MODULE_PERMISSION_CODES.PAINEL_CONTROLE_INTERACT, description: 'Acessar e interagir com as ferramentas de governança.' },
 ] as const
 
 const ALL_MODULE_CODES = Object.values(MODULE_PERMISSION_CODES) as string[]
@@ -326,6 +311,7 @@ const MODULE_KEY_TO_PERMISSION: Record<string, { view: string; interact: string 
   departamentos: { view: MODULE_PERMISSION_CODES.DEPARTAMENTOS_VIEW, interact: MODULE_PERMISSION_CODES.DEPARTAMENTOS_INTERACT },
   notificacoes: { view: MODULE_PERMISSION_CODES.NOTIFICACOES_VIEW, interact: MODULE_PERMISSION_CODES.NOTIFICACOES_INTERACT },
   dev: { view: MODULE_PERMISSION_CODES.DEV_VIEW, interact: MODULE_PERMISSION_CODES.DEV_INTERACT },
+  'painel-controle': { view: MODULE_PERMISSION_CODES.PAINEL_CONTROLE_VIEW, interact: MODULE_PERMISSION_CODES.PAINEL_CONTROLE_INTERACT },
 }
 
 export interface ModuleAccessLevel {
@@ -375,19 +361,10 @@ async function bootstrapModulePermissionCatalog() {
   })
   const rolesWithPermissions = new Set<string>(existingRolePermissions.map((rp: { roleId: string }) => rp.roleId))
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    for (const role of roles) {
-      if (role.code === 'COMMERCIAL_SUPERVISOR') continue
-      // Skip if this role already has any permission — admin owns it from now on.
-      if (rolesWithPermissions.has(role.id)) continue
-      if (allPermissionIds.length > 0) {
-        await tx.rolePermission.createMany({
-          data: allPermissionIds.map((permissionId) => ({ roleId: role.id, permissionId })),
-          skipDuplicates: true,
-        })
-      }
-    }
-  })
+  // NOTE: We no longer auto-assign module permissions to roles.
+  // All roles (except DEVELOPER who has a hardcoded bypass) start with zero
+  // module permissions. Admins must explicitly grant access via gestao-permissoes.
+  // This guarantees that any newly-added module is opt-in (unchecked by default).
 }
 
 export async function ensureModulePermissionCatalog(): Promise<void> {

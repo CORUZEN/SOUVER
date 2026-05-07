@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
         avatarUrl: user.avatarUrl,
         role: user.role?.name ?? user.role?.code ?? 'Usuário',
         roleCode: user.role?.code,
+        isSystemOwner: user.login === (process.env.SYSTEM_OWNER_LOGIN || 'admin'),
         canAccessIntegrations: integrationsAccess,
         metasPermissions,
         modulePermissions,

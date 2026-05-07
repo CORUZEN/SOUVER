@@ -27,7 +27,7 @@ interface UserRow {
 }
 interface RoleOption { id: string; name: string; code: string }
 interface DeptOption { id: string; name: string; code: string }
-interface CurrentUser { id: string; roleCode?: string | null }
+interface CurrentUser { id: string; roleCode?: string | null; isSystemOwner?: boolean }
 interface UserFormData {
   fullName: string
   login: string
@@ -116,7 +116,7 @@ export default function GestaoUsuariosPage() {
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null })
+        if (d?.user) setCurrentUser({ id: d.user.id, roleCode: d.user.roleCode ?? null, isSystemOwner: d.user.isSystemOwner ?? false })
       })
       .finally(() => setAuthLoaded(true))
   }, [])
@@ -329,7 +329,7 @@ export default function GestaoUsuariosPage() {
 
   const roleSelectOptions = [{ value: '', label: 'Todos os cargos' }, ...roles.map((r) => ({ value: r.id, label: r.name }))]
   const deptSelectOptions = [{ value: '', label: 'Todos os departamentos' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]
-  const roleFormOptions = [{ value: '', label: 'Sem cargo' }, ...roles.map((r) => ({ value: r.id, label: r.name }))]
+  const roleFormOptions = [{ value: '', label: 'Sem cargo' }, ...roles.filter((r) => currentUser?.isSystemOwner || r.code !== 'DEVELOPER').map((r) => ({ value: r.id, label: r.name }))]
 
   return (
     <div className="space-y-6">

@@ -120,8 +120,9 @@ export async function POST(req: NextRequest) {
       select: { code: true },
     })
     const roleCode = String(role?.code ?? '').toUpperCase()
-    if (roleCode === 'DEVELOPER' && currentUser?.role?.code !== 'DEVELOPER') {
-      return NextResponse.json({ message: 'Você não tem permissão para atribuir o cargo Desenvolvedor.' }, { status: 403 })
+    const SYSTEM_OWNER_LOGIN = process.env.SYSTEM_OWNER_LOGIN || 'admin'
+    if (roleCode === 'DEVELOPER' && currentUser?.login !== SYSTEM_OWNER_LOGIN) {
+      return NextResponse.json({ message: 'Apenas o administrador principal do sistema pode atribuir o cargo Desenvolvedor.' }, { status: 403 })
     }
     if (roleCode === 'SALES_SUPERVISOR' || roleCode === 'SELLER') {
       if (!normalizedSellerCode) {
