@@ -1881,37 +1881,37 @@ export default function PrevisaoDeEstoque() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-sm">
-              <thead className="bg-slate-100/80">
+            <table className="w-full min-w-[960px]">
+              <thead className="bg-linear-to-r from-[#07160f] via-[#0f2a1d] to-[#173c2c]">
                 <tr className="[&_th]:whitespace-nowrap">
-                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-20">
-                    <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-3 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-20 first:rounded-tl-xl">
+                    <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-white transition-colors">
                       SKU <SortIcon column="productCode" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">
-                    <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-3 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90">
+                    <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-white transition-colors">
                       DESCRIÇÃO <SortIcon column="productName" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-14">UN</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
-                    <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-3 py-3.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-14">UN</th>
+                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-24">
+                    <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
                       QTD <SortIcon column="quantity" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
-                    <button type="button" onClick={() => handleSort('weightKg')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-36">
+                    <button type="button" onClick={() => handleSort('weightKg')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
                       PESO TOTAL <SortIcon column="weightKg" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
-                    <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-24">
+                    <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
                       ESTOQUE <SortIcon column="stock" />
                     </button>
                   </th>
-                  <th className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
-                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-emerald-700 transition-colors">
+                  <th className="px-1 py-3.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-100/90 w-36 last:rounded-tr-xl">
+                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-white transition-colors">
                       COBERTURA <SortIcon column="status" />
                     </button>
                   </th>
@@ -1927,12 +1927,12 @@ export default function PrevisaoDeEstoque() {
 
                   return (
                     <tr key={p.productCode} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} transition-colors hover:bg-emerald-50/40`}>
-                      <td className={cn('px-3 py-3.5 text-sm font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.productCode}</td>
-                      <td className={cn('px-3 py-3.5 font-semibold', hasStock ? 'text-slate-800' : 'text-rose-700')}>{p.productName}</td>
-                      <td className={cn('px-3 py-3.5 text-center font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.unit}</td>
-                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(p.quantity)}</td>
-                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtKg(p.weightKg)} <span className="text-xs font-medium text-slate-400">kg</span></td>
-                      <td className={cn('px-3 py-3.5 text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.productCode}</td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] font-semibold', hasStock ? 'text-slate-800' : 'text-rose-700')}>{p.productName}</td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] text-center font-medium whitespace-nowrap', hasStock ? 'text-slate-600' : 'text-rose-600')}>{p.unit}</td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(p.quantity)}</td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtKg(p.weightKg)} <span className="text-[0.7rem] font-medium text-slate-400">kg</span></td>
+                      <td className={cn('px-3 py-3.5 text-[0.775rem] text-right font-semibold tabular-nums whitespace-nowrap', hasStock ? 'text-slate-800' : 'text-rose-600')}>{fmtQty(stock)}</td>
                       <td className="px-0 py-3.5 text-center whitespace-nowrap">
                         <span
                           className={cn(
