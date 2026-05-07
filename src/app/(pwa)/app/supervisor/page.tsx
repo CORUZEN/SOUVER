@@ -895,6 +895,7 @@ export default function SupervisorPwaDashboard() {
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [error, setError] = useState('')
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
+  const [expandedVolumeCard, setExpandedVolumeCard] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [brandWeightRows, setBrandWeightRows] = useState<BrandWeightRow[]>([])
@@ -1365,6 +1366,100 @@ export default function SupervisorPwaDashboard() {
 
   const todayIso = new Date().toISOString().slice(0, 10)
 
+  // ── Aggregated Focus (all sellers) ─────────────────────────────────────────
+  const aggregatedFocus = useMemo(() => {
+    // Find the first valid focus config across all sellers (they all share the same product)
+    let productCode = ''
+    let focusTargetMode: FocusTargetMode = 'KG'
+    let focusTargetBasePct = 0
+    let focusTargetKg = 0
+    for (const seller of sellers) {
+      const code = seller.id.replace(/^sankhya-/, '')
+      const normalizedCode = normalizeCode(code)
+      const cfg = focusConfigBySeller[code] ?? focusConfigBySeller[normalizedCode] ?? null
+      if (cfg?.focusProductCode) {
+        productCode = cfg.focusProductCode
+        focusTargetMode = cfg.focusTargetMode
+        focusTargetBasePct = cfg.focusTargetBasePct
+        focusTargetKg = cfg.focusTargetKg
+        break
+      }
+    }
+    if (!productCode) return null
+
+    const focusRows = focusRowsByProduct[productCode] ?? []
+    const soldClients = focusRows.reduce((sum, row) => sum + (row.soldClients ?? 0), 0)
+    const soldKg = focusRows.reduce((sum, row) => sum + (row.soldKg ?? 0), 0)
+
+    if (focusTargetMode === 'BASE_CLIENTS') {
+      const totalBase = sellers.reduce((sum, s) => sum + s.baseClientCount, 0)
+      const targetClients = focusTargetBasePct > 0 && totalBase > 0
+        ? Math.ceil(totalBase * (focusTargetBasePct / 100))
+        : 0
+      return {
+        mode: 'BASE_CLIENTS' as const,
+        target: targetClients,
+        achieved: soldClients,
+        pct: targetClients > 0 ? (soldClients / targetClients) * 100 : 0,
+        label: `${focusTargetBasePct}% da base`,
+      }
+    }
+
+    return {
+      mode: 'KG' as const,
+      target: focusTargetKg,
+      achieved: soldKg,
+      pct: focusTargetKg > 0 ? (soldKg / focusTargetKg) * 100 : 0,
+      label: `${fmt(focusTargetKg, 2)} kg`,
+    }
+  }, [sellers, focusConfigBySeller, focusRowsByProduct])
+
+  // ── Aggregated Volume (all sellers, full month) ────────────────────────────
+  const aggregatedVolume = useMemo(() => {
+    const groupMap = new Map<string, { targetKg: number; soldKg: number }>()
+    let totalTarget = 0
+    let totalSold = 0
+
+    for (const seller of sellers) {
+      const code = seller.id.replace(/^sankhya-/, '')
+      const normalizedCode = normalizeCode(code)
+      const wTargets = weightTargetsBySeller[code] ?? weightTargetsBySeller[normalizedCode] ?? []
+
+      for (const wt of wTargets) {
+        const brand = wt.brand.toUpperCase()
+        const existing = groupMap.get(brand) ?? { targetKg: 0, soldKg: 0 }
+        existing.targetKg += Math.max(wt.targetKg ?? 0, 0)
+        groupMap.set(brand, existing)
+        totalTarget += Math.max(wt.targetKg ?? 0, 0)
+      }
+
+      for (const row of brandWeightRows) {
+        if (normalizeCode(row.sellerCode) !== normalizedCode) continue
+        const brand = row.brand.toUpperCase()
+        const existing = groupMap.get(brand) ?? { targetKg: 0, soldKg: 0 }
+        existing.soldKg += Math.max(row.totalKg ?? 0, 0)
+        groupMap.set(brand, existing)
+        totalSold += Math.max(row.totalKg ?? 0, 0)
+      }
+    }
+
+    const groups = Array.from(groupMap.entries())
+      .map(([brand, data]) => ({
+        brand,
+        targetKg: data.targetKg,
+        soldKg: data.soldKg,
+        pct: data.targetKg > 0 ? (data.soldKg / data.targetKg) * 100 : 0,
+      }))
+      .sort((a, b) => b.pct - a.pct)
+
+    return {
+      totalTarget,
+      totalSold,
+      pct: totalTarget > 0 ? (totalSold / totalTarget) * 100 : 0,
+      groups,
+    }
+  }, [sellers, weightTargetsBySeller, brandWeightRows])
+
   const sellerCards = useMemo(() => {
     return sellers.map((seller) => {
       const code = seller.id.replace(/^sankhya-/, '')
@@ -1645,37 +1740,94 @@ export default function SupervisorPwaDashboard() {
                 </p>
               </div>
 
-              {/* Peso */}
+              {/* Item Foco */}
               <div className="pwa-card rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                  <Weight className="h-3 w-3" />
-                  Peso total bruto
-                </div>
-                <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
-                  {fmt(totalWeight, 2)}
-                  <span className="ml-1 text-xs font-semibold text-surface-400">kg</span>
-                </p>
-              </div>
-
-              {/* Valor */}
-              <div className="pwa-card col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
-                    <DollarSign className="h-3 w-3" />
-                    Valor Total dos Pedidos
+                    <Star className="h-3 w-3" />
+                    Item Foco
                   </div>
-                  <span className={`max-w-45 text-right text-[11px] font-semibold leading-tight tabular-nums ${
-                    totalTarget <= 0
-                      ? 'text-surface-300'
-                      : targetGapValue >= 0
-                        ? 'text-emerald-300'
-                        : 'text-amber-300'
+                  {aggregatedFocus && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${
+                      aggregatedFocus.pct >= 100 ? 'text-emerald-300' : aggregatedFocus.pct >= 50 ? 'text-amber-300' : 'text-rose-300'
+                    }`}>
+                      {fmt(aggregatedFocus.pct, 1)}%
+                    </span>
+                  )}
+                </div>
+                {aggregatedFocus ? (
+                  <p className="mt-1 text-base font-bold text-white whitespace-nowrap">
+                    {aggregatedFocus.mode === 'BASE_CLIENTS'
+                      ? `${fmt(aggregatedFocus.achieved)} / ${fmt(aggregatedFocus.target)}`
+                      : `${fmtKg(aggregatedFocus.achieved)} / ${fmtKg(aggregatedFocus.target)}`}
+                    <span className="ml-1 text-xs font-semibold text-surface-400">
+                      {aggregatedFocus.mode === 'BASE_CLIENTS' ? 'clientes' : ''}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-base font-bold text-surface-400">Não configurado</p>
+                )}
+              </div>
+
+              {/* Volume Geral */}
+              <button
+                type="button"
+                className="pwa-card col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3 text-left active:opacity-80"
+                onClick={() => setExpandedVolumeCard((v) => !v)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
+                    <BarChart2 className="h-3 w-3" />
+                    Meta de Volume Total
+                  </div>
+                  <span className={`text-[11px] font-semibold tabular-nums ${
+                    aggregatedVolume.pct >= 100 ? 'text-emerald-300' : aggregatedVolume.pct >= 50 ? 'text-amber-300' : 'text-rose-300'
                   }`}>
-                    {valueGapLabel}
+                    {fmt(aggregatedVolume.pct, 1)}%
                   </span>
                 </div>
-                <p className="mt-1 text-xl font-bold text-white">{fmtBrl(totalRevenue)}</p>
-              </div>
+                <p className="mt-1 text-xl font-bold text-white whitespace-nowrap">
+                  {fmtKg(aggregatedVolume.totalSold)} <span className="text-surface-400">/ {fmtKg(aggregatedVolume.totalTarget)}</span>
+                </p>
+
+                {expandedVolumeCard && (
+                  <div className="mt-3 space-y-2 border-t border-surface-700/50 pt-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Progresso por grupo</p>
+                    {aggregatedVolume.groups.length === 0 ? (
+                      <p className="text-xs text-surface-400">Nenhum grupo configurado</p>
+                    ) : (
+                      aggregatedVolume.groups.map((g) => (
+                        <div key={g.brand} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium text-surface-300">{g.brand}</span>
+                            <span className={`font-semibold tabular-nums ${
+                              g.pct >= 100 ? 'text-emerald-300' : g.pct >= 50 ? 'text-amber-300' : 'text-rose-300'
+                            }`}>
+                              {fmt(g.pct, 1)}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-surface-800">
+                            <div
+                              className={`h-full rounded-full ${
+                                g.pct >= 100
+                                  ? 'bg-emerald-400'
+                                  : g.pct >= 50
+                                    ? 'bg-amber-400'
+                                    : 'bg-rose-400'
+                              }`}
+                              style={{ width: `${Math.min(g.pct, 100)}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-surface-500">
+                            <span>Meta: {fmtKg(g.targetKg)}</span>
+                            <span>Vendido: {fmtKg(g.soldKg)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </button>
             </div>
 
             {/* ── Seller cards ───────────────────────────────────────────── */}
