@@ -2,6 +2,7 @@
 import { Inter } from 'next/font/google'
 import { APP_VERSION } from '@/generated/app-version'
 import { QueryProvider } from '@/components/providers/QueryProvider'
+import ServiceWorkerManager from '@/components/ServiceWorkerManager'
 import './globals.css'
 
 const inter = Inter({
@@ -49,41 +50,7 @@ export default function RootLayout({
         <QueryProvider>
           {children}
         </QueryProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function () {
-                if (!('serviceWorker' in navigator)) return;
-                var isLocalhost =
-                  location.hostname === 'localhost' ||
-                  location.hostname === '127.0.0.1' ||
-                  location.hostname === '::1';
-                var isProd = ${JSON.stringify(process.env.NODE_ENV === 'production')};
-
-                window.addEventListener('load', function () {
-                  if (!isProd || isLocalhost) {
-                    navigator.serviceWorker.getRegistrations()
-                      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
-                      .catch(function () {});
-                    if ('caches' in window) {
-                      caches.keys()
-                        .then(function (keys) {
-                          return Promise.all(
-                            keys
-                              .filter(function (k) { return k.indexOf('ov-pwa-') === 0; })
-                              .map(function (k) { return caches.delete(k); })
-                          );
-                        })
-                        .catch(function () {});
-                    }
-                    return;
-                  }
-                  navigator.serviceWorker.register('/sw.js?v=${APP_VERSION}').catch(function () {});
-                });
-              })();
-            `,
-          }}
-        />
+        <ServiceWorkerManager />
       </body>
     </html>
   )
