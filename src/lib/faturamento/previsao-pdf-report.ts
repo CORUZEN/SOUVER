@@ -43,6 +43,7 @@ export interface PrevisaoPdfData {
   metrics: PrevisaoPdfMetrics
   products: PrevisaoPdfProduct[]
   cities: PrevisaoPdfCity[]
+  showInCarga?: boolean
 }
 
 function fmtNumber(value: number, decimals = 0): string {
@@ -127,7 +128,9 @@ export function generatePrevisaoPdfReport(options: {
     ['Total de Pedidos', String(reportData.totals.orders), 'Clientes Únicos', String(reportData.totals.clients)],
     ['Vendas', `${reportData.metrics.vendas.count} · ${fmtKg(reportData.metrics.vendas.weightKg)} kg`, 'Bonificações', `${reportData.metrics.bonificacoes.count} · ${fmtKg(reportData.metrics.bonificacoes.weightKg)} kg`],
     ['Trocas', `${reportData.metrics.trocas.count} · ${fmtKg(reportData.metrics.trocas.weightKg)} kg`, 'Não Confirmados', `${reportData.metrics.naoConfirmados.count} · ${fmtKg(reportData.metrics.naoConfirmados.weightKg)} kg`],
-    ['Em Carga', `${reportData.metrics.emCarga.count} · ${fmtKg(reportData.metrics.emCarga.weightKg)} kg`, 'Peso Total', `${fmtKg(reportData.totals.weight)} kg`],
+    ...(reportData.showInCarga
+      ? [['Em Carga', `${reportData.metrics.emCarga.count} · ${fmtKg(reportData.metrics.emCarga.weightKg)} kg`, 'Peso Total', `${fmtKg(reportData.totals.weight)} kg`]]
+      : [['Peso Total', `${fmtKg(reportData.totals.weight)} kg`, '', '']]),
     ['Cidades Atendidas', `${reportData.cities.length}`, '', ''],
   ]
 
