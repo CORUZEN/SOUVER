@@ -1871,7 +1871,7 @@ export default function PrevisaoDeEstoque() {
       {/* -- Produtos (bloco único, largura total) -- */}
       {data && filteredOrders.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col">
-          <div className="relative overflow-hidden border-b border-emerald-800/30 bg-linear-to-r from-[#0f2e1f] via-[#164230] to-[#0f2e1f] px-6 py-4">
+          <div className="relative overflow-hidden border-b border-emerald-800/30 bg-linear-to-r from-[#07160f] via-[#0f2a1d] to-[#14966f] px-6 py-4">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-emerald-400/20 to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-linear-to-b from-white/[0.04] to-transparent" />
             <div className="relative flex items-center justify-between gap-3">
@@ -1888,7 +1888,7 @@ export default function PrevisaoDeEstoque() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px]">
-              <thead className="bg-[#14966f]">
+              <thead className="bg-linear-to-r from-[#0f5e42] via-[#14966f] to-[#0d8f6a]">
                 <tr className="[&_th]:whitespace-nowrap">
                   <th className="px-3 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-20">
                     <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-white transition-colors">
