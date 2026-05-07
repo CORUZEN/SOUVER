@@ -220,7 +220,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
         <div
           key={moduleKey}
           className={cn(baseClass, 'cursor-not-allowed opacity-50')}
-          title={`${modulePlan.label} — Sem permissão para interagir`}
+          title={`${modulePlan.label} — Sem permissão`}
         >
           <Icon className={iconClass} />
           {!isCollapsed && (
@@ -474,7 +474,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
                                   'group w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg ring-1 ring-transparent transition-all duration-300 cursor-not-allowed text-left opacity-50',
                                   'text-[#bac8b0]'
                                 )}
-                                title="Previsão de Pedidos — Sem permissão para interagir"
+                                title="Previsão de Pedidos — Sem permissão"
                               >
                                 <ClipboardList className="w-4 h-4 shrink-0 text-[#aac0a2]" />
                                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-[#c6d3bb]">Previsão de Pedidos</span>

@@ -223,9 +223,9 @@ export default function DevPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [stats, setStats] = useState({
     users: '—',
-    groups: '—',
-    roles: '12',
+    roles: '14',
     modules: '3',
+    extensions: '1',
   })
 
   useEffect(() => {
@@ -241,14 +241,16 @@ export default function DevPage() {
     if (!currentUser) return
     Promise.allSettled([
       fetch('/api/users?limit=1', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/permissions/groups?limit=1', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
-    ]).then(([usersRes, groupsRes]) => {
-      const usersTotal = usersRes.status === 'fulfilled' && usersRes.value?.pagination?.total
-      const groupsTotal = groupsRes.status === 'fulfilled' && groupsRes.value?.pagination?.total
+      fetch('/api/roles', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+    ]).then(([usersRes, rolesRes]) => {
+      const usersTotal = usersRes.status === 'fulfilled' && usersRes.value?.total
+      const rolesTotal = rolesRes.status === 'fulfilled' && Array.isArray(rolesRes.value?.roles)
+        ? rolesRes.value.roles.length
+        : null
       setStats((prev) => ({
         ...prev,
         users: usersTotal ? String(usersTotal) : '—',
-        groups: groupsTotal ? String(groupsTotal) : '—',
+        roles: rolesTotal ? String(rolesTotal) : prev.roles,
       }))
     })
   }, [currentUser])
@@ -331,9 +333,9 @@ export default function DevPage() {
           {/* Quick stats — Liquid Glass */}
           <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <LiquidGlassStat icon={<Users className="h-4 w-4" />} label="Usuários" value={stats.users} />
-            <LiquidGlassStat icon={<KeyRound className="h-4 w-4" />} label="Grupos" value={stats.groups} />
             <LiquidGlassStat icon={<Layers className="h-4 w-4" />} label="Cargos" value={stats.roles} />
             <LiquidGlassStat icon={<Globe className="h-4 w-4" />} label="Módulos" value={stats.modules} />
+            <LiquidGlassStat icon={<ArrowUpRight className="h-4 w-4" />} label="Extensões" value={stats.extensions} />
           </div>
         </div>
       </section>

@@ -203,7 +203,7 @@ export default function MobileNavDrawer({
                               'group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all cursor-not-allowed opacity-50',
                               'text-[#bac8b0]'
                             )}
-                            title={`${plan.label} — Sem permissão para interagir`}
+                            title={`${plan.label} — Sem permissão`}
                           >
                             <Icon className="h-4 w-4 shrink-0 text-[#aac0a2]" />
                             <span className="flex-1 text-sm font-medium text-[#c6d3bb]">{plan.label}</span>

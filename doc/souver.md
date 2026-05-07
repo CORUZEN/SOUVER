@@ -61,6 +61,80 @@ Rotas e áreas críticas:
 
 ---
 
+## 3.1) Módulo Logística — Previsão de Pedidos (`/previsao`)
+
+Objetivo da tela:
+- Entregar visão operacional consolidada de pedidos em aberto, estoque e cidades atendidas para expedição/logística.
+- Apoiar decisão diária de separação, cobertura de estoque e priorização de carga.
+
+Arquivos núcleo:
+- `src/app/(dashboard)/previsao/page.tsx` (gate de acesso)
+- `src/components/faturamento/PlanejamentoDiario.tsx` (UI principal)
+- `src/app/api/faturamento/route.ts` (dados de pedidos/itens/estoque)
+- `src/app/api/faturamento/cities/route.ts` (lista persistida de cidades)
+- `src/app/api/faturamento/cities/sync/route.ts` (sincronização de cidades via Sankhya)
+- `src/app/api/faturamento/diagnose/route.ts` (diagnóstico técnico)
+
+Permissão e segurança:
+- Acesso exige autenticação e permissão `previsao:interact` (`requireModuleInteract(request, 'previsao')`).
+- Nunca remover gate de permissão dessa área.
+- Mesmo padrão de integração Sankhya: bearer no `token`, `X-Token`, `appkey` com fallback.
+
+Fluxo técnico resumido:
+1. Usuário abre `/previsao` e passa no gate de permissão.
+2. Front consulta `/api/faturamento` com filtros (data/período, vendedores).
+3. API busca pedidos em aberto no Sankhya (TGFCAB + TGFITE + TGFPRO + TGFVEN + TGFPAR + cidade/UF), agrega por pedido e itens.
+4. API consulta estoque em `TGFEST` por produtos retornados.
+5. Front consolida KPIs, tabela de produtos, cobertura de estoque e cards/modais por status.
+
+KPIs principais da tela:
+- Total de pedidos
+- Vendas
+- Bonificações
+- Trocas
+- Não Confirmados
+- Em Carga (quando habilitado)
+- Peso agregado (kg) por agrupamento
+
+Regras funcionais críticas:
+- Classificação base por `CODTIPOPER`:
+- `1001` = Venda
+- `1051` = Bonificação
+- `1053` = Troca
+- “Não Confirmados” e “Em Carga” são visões operacionais da UI, baseadas em campos de status/liberação/carga.
+- Cobertura de estoque por item:
+- `SUFICIENTE` quando `estoque >= quantidade`
+- `FALTA` quando `estoque < quantidade`, com cálculo de falta em unidade e kg.
+- Conversão FD→UN em trocas (`1053`) tem regra específica no front (fator por `CONVERVOL`/`FATTOTAL`/`MEDAUX` ou parsing da descrição, ex.: `20X500G`).
+
+Filtros e operação:
+- Filtros por vendedores e cidades.
+- Modal detalhado por tipo de pedido com busca e filtros avançados.
+- Presets de cidades por vendedor para operação recorrente.
+- Exportação de relatório PDF pela própria tela.
+
+Cidades (fonte e fallback):
+- Sincronização principal via `TSICUS` em dois blocos (`A-M` e `N-ZZZZZZ`) para reduzir risco com limite de 5000 linhas.
+- Fallback sem join de UF quando necessário.
+- Último fallback via cidades distintas de `TGFPAR`.
+
+Riscos e cuidados para evitar regressão:
+- Não quebrar filtros SQL para trazer universo de pedidos e filtrar no client.
+- Não remover validação de datas (`YYYY-MM-DD`) e de vendedores numéricos.
+- Não alterar classificação de tipo de pedido sem alinhamento de negócio.
+- Não mudar regra de conversão de troca sem validar impacto operacional com logística.
+- Manter mensagens claras de erro de conectividade (não mascarar falha como ausência de pedidos).
+
+Checklist de validação da Previsão (obrigatório):
+- Acesso bloqueado para usuário sem `previsao:interact`.
+- Consulta com vendedor+cidade retornando totais coerentes.
+- Consistência entre cards e modal detalhado.
+- Cobertura (`SUFICIENTE`/`FALTA`) coerente com estoque retornado.
+- Sincronização de cidades funcionando com fallback.
+- Exportação PDF operacional.
+
+---
+
 ## 4) Regras de acesso e escopo (obrigatórias)
 
 Perfis relevantes:

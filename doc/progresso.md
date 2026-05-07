@@ -140,7 +140,12 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 - **Logística auto-expandida**: ao acessar a página "Previsão de Pedidos" (`/previsao`), o menu "Logística" expande automaticamente, mostrando a origem da página.
 - **Badge "Novo!" em Logística**: indicador elegante e profissional ao lado do item "Logística", com cor âmbar/dourada e leve glow, destacando que há novidade disponível.
 
-### 18) Bump de versão do PWA para invalidação de cache
+### 18) Redesign dos stats da Área Dev
+- **Card "Extensões"** substituiu "Grupos" na Central do Desenvolvedor.
+- Ordem dos cards ajustada: **Usuários → Cargos → Módulos → Extensões** (Extensões como último).
+- Valores atualizados para refletir a realidade atual do sistema.
+
+### 19) Bump de versão do PWA para invalidação de cache
 - Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
 - Isso força o service worker a reinstalar e limpar caches antigos nos dispositivos dos usuários no próximo acesso.
 
