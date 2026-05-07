@@ -136,7 +136,11 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
   - Dados agregados do escopo atual, mês completo (não por semana).
   - Ícone `BarChart2`, transição suave, design consistente.
 
-### 17) Bump de versão do PWA para invalidação de cache
+### 17) Melhorias no menu lateral (Sidebar)
+- **Logística auto-expandida**: ao acessar a página "Previsão de Pedidos" (`/previsao`), o menu "Logística" expande automaticamente, mostrando a origem da página.
+- **Badge "Novo!" em Logística**: indicador elegante e profissional ao lado do item "Logística", com cor âmbar/dourada e leve glow, destacando que há novidade disponível.
+
+### 18) Bump de versão do PWA para invalidação de cache
 - Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
 - Isso força o service worker a reinstalar e limpar caches antigos nos dispositivos dos usuários no próximo acesso.
 

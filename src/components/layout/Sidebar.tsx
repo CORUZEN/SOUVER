@@ -77,6 +77,14 @@ export default function Sidebar({ appVersion }: SidebarProps) {
   const [devTargetLabel, setDevTargetLabel] = useState('')
   const [isRhExpanded, setIsRhExpanded] = useState(false)
   const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false)
+
+  // Auto-expand Logística when on Previsão de Pedidos
+  useEffect(() => {
+    if (pathname === '/previsao') {
+      setIsLogisticaExpanded(true)
+    }
+  }, [pathname])
+
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [canAccessIntegrations, setCanAccessIntegrations] = useState(false)
   const [modulePermissionsLoaded, setModulePermissionsLoaded] = useState(false)
@@ -174,7 +182,7 @@ export default function Sidebar({ appVersion }: SidebarProps) {
     const isActive = moduleKey === 'integracoes'
       ? pathname.startsWith('/integracoes')
       : ACCESSIBLE_MODULES.includes(moduleKey) && activeAccessibleModule === moduleKey
-    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' || moduleKey === 'logistica' ? null : '(Em breve)'
+    const badgeLabel = moduleKey === 'metas' || moduleKey === 'integracoes' ? null : moduleKey === 'logistica' ? 'Novo!' : '(Em breve)'
     const iconClass = cn(
       'w-4 h-4 shrink-0 transition-all duration-300',
       isActive
@@ -185,11 +193,14 @@ export default function Sidebar({ appVersion }: SidebarProps) {
       'flex-1 min-w-0 truncate text-sm font-medium transition-colors',
       isActive ? 'text-[#edf0e2]' : 'text-[#c6d3bb] group-hover:text-[#edf0e2]'
     )
+    const isNovoBadge = badgeLabel === 'Novo!'
     const badgeClass = cn(
-      'shrink-0 text-[11px] font-medium transition-colors',
-      isActive
-        ? 'text-[#e9efe0]/85'
-        : 'text-[#7ea07d] group-hover:text-[#9db49a]'
+      'shrink-0 text-[11px] font-semibold transition-colors',
+      isNovoBadge
+        ? 'text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]'
+        : isActive
+          ? 'text-[#e9efe0]/85'
+          : 'text-[#7ea07d] group-hover:text-[#9db49a]'
     )
 
     const baseClass = cn(
