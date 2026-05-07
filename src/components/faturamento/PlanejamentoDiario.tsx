@@ -1871,53 +1871,51 @@ export default function PrevisaoDeEstoque() {
       {/* -- Produtos (bloco único, largura total) -- */}
       {data && filteredOrders.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col">
-          <div className="relative overflow-hidden border-b border-emerald-800/30 bg-linear-to-r from-[#07160f] via-[#0f2a1d] to-[#14966f] px-6 py-4">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-emerald-400/20 to-transparent" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-linear-to-b from-white/[0.04] to-transparent" />
-            <div className="relative flex items-center justify-between gap-3">
-              <h3 className="flex items-center gap-2.5 text-base font-semibold text-white tracking-tight">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.08] text-emerald-200 shadow-sm">
-                  <Package className="h-4 w-4" />
+          <div className="border-b border-slate-200 bg-linear-to-r from-slate-50 to-white px-6 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50">
+                  <Package className="h-4 w-4 text-emerald-700" />
                 </span>
                 Produtos
               </h3>
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-xs font-semibold text-emerald-100 shadow-sm">
+              <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
                 {productAggregates.length} item{productAggregates.length !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px]">
-              <thead className="bg-linear-to-r from-[#0f5e42] via-[#14966f] to-[#0d8f6a]">
+              <thead className="bg-slate-100/80">
                 <tr className="[&_th]:whitespace-nowrap">
-                  <th className="px-3 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-20">
-                    <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-white transition-colors">
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-20">
+                    <button type="button" onClick={() => handleSort('productCode')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
                       SKU <SortIcon column="productCode" />
                     </button>
                   </th>
-                  <th className="px-3 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-white/90">
-                    <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-white transition-colors">
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                    <button type="button" onClick={() => handleSort('productName')} className="inline-flex items-center cursor-pointer hover:text-emerald-700 transition-colors">
                       DESCRIÇÃO <SortIcon column="productName" />
                     </button>
                   </th>
-                  <th className="px-3 py-3.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-14">UN</th>
-                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-24">
-                    <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
+                  <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-14">UN</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
+                    <button type="button" onClick={() => handleSort('quantity')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
                       QTD <SortIcon column="quantity" />
                     </button>
                   </th>
-                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-36">
-                    <button type="button" onClick={() => handleSort('weightKg')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
+                    <button type="button" onClick={() => handleSort('weightKg')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
                       PESO TOTAL <SortIcon column="weightKg" />
                     </button>
                   </th>
-                  <th className="px-3 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-24">
-                    <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-white transition-colors">
+                  <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-24">
+                    <button type="button" onClick={() => handleSort('stock')} className="inline-flex items-center justify-end w-full cursor-pointer hover:text-emerald-700 transition-colors">
                       ESTOQUE <SortIcon column="stock" />
                     </button>
                   </th>
-                  <th className="px-1 py-3.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 w-36">
-                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-white transition-colors">
+                  <th className="px-1 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600 w-36">
+                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center justify-center w-full cursor-pointer hover:text-emerald-700 transition-colors">
                       COBERTURA <SortIcon column="status" />
                     </button>
                   </th>
