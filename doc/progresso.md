@@ -130,6 +130,7 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
   - Ícone `Star`, layout compacto e profissional.
 - **Card Volume Geral** (substitui "Valor Total dos Pedidos"):
   - Mostra meta total de peso (kg) vs vendido no mês, com percentual.
+  - **Layout profissional**: percentual em destaque no topo, vendido em `text-2xl` como número principal, barra de progresso colorida, e meta posicionada em fonte discreta no rodapé do card.
   - **Clique para expandir** e revelar progresso detalhado por grupo de produto (CAFÉS, GRÃOS, etc.), com barras de progresso coloridas, metas e vendidos em kg.
   - Dados agregados de todos os vendedores, mês completo (não por semana).
   - Ícone `BarChart2`, transição suave, design consistente com o restante do PWA.

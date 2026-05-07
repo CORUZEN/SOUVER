@@ -1450,6 +1450,7 @@ export default function SupervisorPwaDashboard() {
         soldKg: data.soldKg,
         pct: data.targetKg > 0 ? (data.soldKg / data.targetKg) * 100 : 0,
       }))
+      .filter((g) => g.targetKg > 0)
       .sort((a, b) => b.pct - a.pct)
 
     return {
@@ -1775,10 +1776,11 @@ export default function SupervisorPwaDashboard() {
                 className="pwa-card col-span-2 rounded-2xl border border-surface-700/50 bg-surface-900 px-3 py-3 text-left active:opacity-80"
                 onClick={() => setExpandedVolumeCard((v) => !v)}
               >
+                {/* Header: label + percentual */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">
                     <BarChart2 className="h-3 w-3" />
-                    Meta de Volume Total
+                    Meta de Volume Dos Grupos
                   </div>
                   <span className={`text-[11px] font-semibold tabular-nums ${
                     aggregatedVolume.pct >= 100 ? 'text-emerald-300' : aggregatedVolume.pct >= 50 ? 'text-amber-300' : 'text-rose-300'
@@ -1786,9 +1788,32 @@ export default function SupervisorPwaDashboard() {
                     {fmt(aggregatedVolume.pct, 1)}%
                   </span>
                 </div>
-                <p className="mt-1 text-xl font-bold text-white whitespace-nowrap">
-                  {fmtKg(aggregatedVolume.totalSold)} <span className="text-surface-400">/ {fmtKg(aggregatedVolume.totalTarget)}</span>
-                </p>
+
+                {/* Barra de progresso */}
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      aggregatedVolume.pct >= 100
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.35)]'
+                        : aggregatedVolume.pct >= 50
+                          ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.30)]'
+                          : 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.30)]'
+                    }`}
+                    style={{ width: `${Math.min(aggregatedVolume.pct, 100)}%` }}
+                  />
+                </div>
+
+                {/* Vendido vs Meta — destaque principal */}
+                <div className="mt-2 flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500">Vendido</p>
+                    <p className="text-lg font-bold tabular-nums text-white">{fmtKg(aggregatedVolume.totalSold)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500">Meta</p>
+                    <p className="text-sm font-semibold tabular-nums text-surface-400">{fmtKg(aggregatedVolume.totalTarget)}</p>
+                  </div>
+                </div>
 
                 {expandedVolumeCard && (
                   <div className="mt-3 space-y-2 border-t border-surface-700/50 pt-3">
