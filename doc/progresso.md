@@ -123,17 +123,18 @@ Fase atual focada em quatro pilares: clareza de indicadores, estabilidade em pro
 - **Cálculo**: simples subtração entre `totalBaseClients` do período atual e do período anterior (`previousPeriodScopedTotals`), usando dados que o Dashboard Web já carrega.
 - Quando não há período anterior ou não há novos clientes, mantém a descrição padrão de cobertura.
 
-### 16) Redesign dos cards executivos do PWA
-- **Card Item Foco** (substitui "Peso Total Bruto"):
-  - Mostra a meta do item foco agregada de todos os vendedores (clientes ou kg, conforme configuração do bloco).
+### 16) Redesign dos cards executivos do PWA (Supervisor, Vendedor, Diretoria)
+- **Card Item Foco** (substitui "Peso Total Bruto") em todas as interfaces PWA:
+  - Mostra a meta do item foco agregada do escopo atual (clientes ou kg, conforme configuração do bloco).
   - Exibe realizado / meta com percentual de atingimento.
   - Ícone `Star`, layout compacto e profissional.
-- **Card Volume Geral** (substitui "Valor Total dos Pedidos"):
-  - Mostra meta total de peso (kg) vs vendido no mês, com percentual.
-  - **Layout profissional**: percentual em destaque no topo, vendido em `text-2xl` como número principal, barra de progresso colorida, e meta posicionada em fonte discreta no rodapé do card.
+  - No app da **Diretoria**, respeita os filtros de supervisor/vendedor selecionados.
+- **Card Volume Geral** (substitui "Valor Total dos Pedidos") em todas as interfaces PWA:
+  - Label centralizado "Meta de Volume dos Grupos" com seta discreta indicando expansão.
   - **Clique para expandir** e revelar progresso detalhado por grupo de produto (CAFÉS, GRÃOS, etc.), com barras de progresso coloridas, metas e vendidos em kg.
-  - Dados agregados de todos os vendedores, mês completo (não por semana).
-  - Ícone `BarChart2`, transição suave, design consistente com o restante do PWA.
+  - Filtra apenas grupos com meta configurada (`targetKg > 0`), eliminando grupos indesejados.
+  - Dados agregados do escopo atual, mês completo (não por semana).
+  - Ícone `BarChart2`, transição suave, design consistente.
 
 ### 17) Bump de versão do PWA para invalidação de cache
 - Versão atualizada de `v1.01.632` → `v1.01.633` em `src/generated/app-version.ts` e `public/sw.js`.
